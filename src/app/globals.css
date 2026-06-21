@@ -3,25 +3,75 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #050508;
+  --foreground: #f0f0f0;
+  
+  --void-black: #050508;
+  --electric-blue: #00d4ff;
+  --deep-violet: #8b5cf6;
+  --hot-pink: #ff2d78;
+  --terminal-green: #00ff88;
+  --pure-white: #f0f0f0;
+  --deep-navy: #1a1a6e;
+  --node-green: #68a063;
+  --nebula-purple: #2d1b69;
+  --glass-dark: rgba(10, 10, 30, 0.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+/* Hide default cursor on mouse-enabled devices */
+@media (pointer: fine) {
+  html, body, a, button, select, input, textarea, [role="button"] {
+    cursor: none !important;
   }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--void-black);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--deep-navy);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--electric-blue);
+}
+
+/* Custom Cyberpunk Utilities */
+@layer utilities {
+  .text-glow-blue {
+    text-shadow: 0 0 5px var(--electric-blue), 0 0 10px rgba(0, 212, 255, 0.5);
+  }
+  .text-glow-pink {
+    text-shadow: 0 0 5px var(--hot-pink), 0 0 10px rgba(255, 45, 120, 0.5);
+  }
+  .text-glow-green {
+    text-shadow: 0 0 5px var(--terminal-green), 0 0 10px rgba(0, 255, 136, 0.5);
+  }
+  .border-glow-blue {
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3), inset 0 0 5px rgba(0, 212, 255, 0.1);
+  }
+  .border-glow-pink {
+    box-shadow: 0 0 10px rgba(255, 45, 120, 0.3), inset 0 0 5px rgba(255, 45, 120, 0.1);
+  }
+  .border-glow-green {
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3), inset 0 0 5px rgba(0, 255, 136, 0.1);
+  }
+}
+
+/* Disable Theatre.js studio style overrides if we are in production */
+.theatre-studio-hider {
+  display: none !important;
 }
