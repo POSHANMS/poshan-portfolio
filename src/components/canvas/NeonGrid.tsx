@@ -15,11 +15,11 @@ export default function NeonGrid() {
           resolution={512} // 512 for optimization (good compromise of speed and look)
           mixBlur={1.0}
           mixStrength={0.8}
-          roughness={1.0}
+          roughness={0.30}
           depthScale={1.2}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.4}
-          color="#050508" // Base background color
+          color="#101025" // Base background color
           metalness={0.8}
           mirror={0.7}
         />
@@ -31,12 +31,12 @@ export default function NeonGrid() {
         args={[40, 40]}
         cellSize={0.5}
         cellThickness={0.5}
-        cellColor="#111133" // Subtle navy subdivisions
+        cellColor="#1a1a4c" // Subtle navy subdivisions
         sectionSize={2.0}
         sectionThickness={1.0}
         sectionColor="#00d4ff" // Glowing cyan section lines
-        fadeDistance={15}
-        fadeStrength={1.5}
+        fadeDistance={20}
+        fadeStrength={1.2}
         infiniteGrid
       />
 

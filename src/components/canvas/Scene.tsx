@@ -2,6 +2,7 @@
 
 import React, { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
+import * as THREE from "three";
 import NebulaBackground from "./NebulaBackground";
 import StarField from "./StarField";
 import HeroName3D from "./HeroName3D";
@@ -21,7 +22,9 @@ export default function Scene() {
           antialias: true, 
           alpha: false, 
           powerPreference: "high-performance",
-          logarithmicDepthBuffer: true // fixes depth fighting on reflective floor
+          logarithmicDepthBuffer: true, // fixes depth fighting on reflective floor
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 0.95
         }}
         camera={{
           position: [0, 0.8, 9.5],
