@@ -3,6 +3,7 @@
 import React, { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
+import { CinematicCamera } from "@/animations/scrollCamera";
 import NebulaBackground from "./NebulaBackground";
 import StarField from "./StarField";
 import HeroName3D from "./HeroName3D";
@@ -13,7 +14,11 @@ import FloorRings from "./FloorRings";
 import NeonGrid from "./NeonGrid";
 import PostProcessing from "./PostProcessing";
 
-export default function Scene() {
+interface SceneProps {
+  scrollProgress: number;
+}
+
+export default function Scene({ scrollProgress }: SceneProps) {
   return (
     <div className="fixed inset-0 w-full h-full z-0 select-none pointer-events-none bg-[#050508]">
       <Canvas
@@ -33,6 +38,7 @@ export default function Scene() {
           far: 50,
         }}
       >
+        <CinematicCamera scrollProgress={scrollProgress} />
         <color attach="background" args={["#050508"]} />
         <fog attach="fog" args={["#050508", 8, 20]} />
 

@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { initScrollCamera } from "@/animations/scrollCamera";
 
 // Dynamically import WebGL Scene to prevent SSR errors (Canvas relies on browser window APIs)
 const Scene = dynamic(() => import("@/components/canvas/Scene"), {
@@ -10,11 +11,25 @@ const Scene = dynamic(() => import("@/components/canvas/Scene"), {
 });
 
 export default function Home() {
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  useEffect(() => {
+    const scrollControl = initScrollCamera((progress) => {
+      setScrollProgress(progress);
+    });
+
+    return () => {
+      if (scrollControl) {
+        scrollControl.destroy();
+      }
+    };
+  }, []);
+
   return (
     <main className="relative min-h-[150vh] bg-[#050508] overflow-hidden select-none">
       
       {/* 3D WebGL Scene background (fixed underneath overlay UI) */}
-      <Scene />
+      <Scene scrollProgress={scrollProgress} />
 
       {/* HTML Overlay Section (Passes pointer events to the canvas behind) */}
       <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col items-center justify-center text-center pt-48 px-6 pointer-events-none">
