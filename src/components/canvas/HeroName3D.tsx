@@ -1,123 +1,118 @@
 "use client";
 
 import React, { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Text3D } from "@react-three/drei";
 import * as THREE from "three";
 
 export default function HeroName3D() {
   const groupRef = useRef<THREE.Group>(null);
-  
-  // Material refs for animating the breathing glow
-  const matFrontRef = useRef<THREE.MeshStandardMaterial>(null);
-  const matSidePoshanRef = useRef<THREE.MeshStandardMaterial>(null);
-  const matSideMsRef = useRef<THREE.MeshStandardMaterial>(null);
+  const { width, height } = useThree((state) => state.viewport);
+
+  // Position responsively: Align with "< Hello, I'm />" X-position and grid Y-position
+  const posX = -width / 2 + 2.7;
+  const posY = height / 2 - 2.15;
 
   useFrame((state) => {
-    const time = state.clock.getElapsedTime();
-    
-    // 1. Slow glow breath animation (sine wave oscillation)
-    const breath = Math.sin(time * 2.0) * 0.5 + 0.5; // Range: [0, 1]
-    
-    if (matFrontRef.current) {
-      matFrontRef.current.emissiveIntensity = 0.4 + breath * 0.4;
-    }
-    if (matSidePoshanRef.current) {
-      matSidePoshanRef.current.emissiveIntensity = 0.6 + breath * 0.6;
-    }
-    if (matSideMsRef.current) {
-      matSideMsRef.current.emissiveIntensity = 0.8 + breath * 0.6;
-    }
-
-    // 2. Mouse parallax interactive skew / rotation
+    const t = state.clock.getElapsedTime();
     if (groupRef.current) {
-      const targetRotationY = state.pointer.x * 0.12;
-      const targetRotationX = -state.pointer.y * 0.08;
-      
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotationY, 0.05);
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRotationX, 0.05);
+      // Gentle floating and mouse rotation reaction
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, state.pointer.x * 0.08, 0.05);
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -state.pointer.y * 0.08, 0.05);
+      groupRef.current.position.y = posY + Math.sin(t * 1.2) * 0.03;
     }
   });
 
-  const textOptions = {
+  const textProps = {
     font: "/fonts/cyber.typeface.json",
-    height: 0.35,
     curveSegments: 16,
     bevelEnabled: true,
-    bevelThickness: 0.04,
+    bevelThickness: 0.08,
     bevelSize: 0.02,
     bevelOffset: 0,
-    bevelSegments: 5,
+    bevelSegments: 8,
   };
 
   return (
-    <group ref={groupRef} position={[-2.3, 0.8, 1.2]} scale={0.8}>
-      
-      {/* 3D text shadow plane or glowing background light */}
-      <pointLight
-        position={[0, 0, 1.5]}
-        intensity={1.2}
-        distance={6}
-        color="#00d4ff"
-      />
-
-      {/* POSHAN - Top Line */}
-      <Text3D
-        {...textOptions}
-        size={0.9}
-        position={[-1.8, 0.6, 0]}
-        castShadow
-        receiveShadow
-      >
+    <group ref={groupRef} position={[posX, posY, 0]} scale={[0.76, 0.76, 0.76]}>
+      {/* ================= POSHAN (Blue/Cyan) ================= */}
+      {/* Main Front Neon Mesh */}
+      <Text3D {...textProps} size={0.88} height={0.2} position={[0, 0, 0]}>
         POSHAN
-        {/* Index 0: Front face material */}
-        <meshStandardMaterial
-          ref={matFrontRef}
-          color="#00d4ff"
-          emissive="#00d4ff"
-          emissiveIntensity={0.6}
-          roughness={0.15}
+        <meshPhysicalMaterial
+          color="#00eeff"
+          emissive="#00b4ff"
+          emissiveIntensity={2.5}
           metalness={0.9}
-        />
-        {/* Index 1: Side / Bevel face material */}
-        <meshStandardMaterial
-          ref={matSidePoshanRef}
-          color="#1a1a6e"
-          emissive="#8b5cf6"
-          emissiveIntensity={0.8}
-          roughness={0.3}
-          metalness={0.8}
+          roughness={0.05}
+          clearcoat={1}
+          clearcoatRoughness={0.05}
         />
       </Text3D>
 
-      {/* MS - Bottom Line (Sized larger, slightly pushed forward for perspective wrap) */}
-      <Text3D
-        {...textOptions}
-        size={1.1}
-        position={[-0.6, -0.6, 0.2]}
-        castShadow
-        receiveShadow
-      >
-        MS
-        {/* Index 0: Front face material (Shares the same glowing cyan look) */}
-        <meshStandardMaterial
-          color="#00d4ff"
-          emissive="#00d4ff"
-          emissiveIntensity={0.6}
-          roughness={0.15}
+      {/* Inner Deep Glow Core */}
+      <Text3D {...textProps} size={0.88} height={0.22} position={[0, 0, -0.02]}>
+        POSHAN
+        <meshPhysicalMaterial
+          color="#ff2d78"
+          emissive="#ff2d78"
+          emissiveIntensity={1.8}
+          roughness={0.1}
           metalness={0.9}
         />
-        {/* Index 1: Side / Bevel face material (Hot Pink bleed for MS) */}
-        <meshStandardMaterial
-          ref={matSideMsRef}
-          color="#1a1a6e"
-          emissive="#ff2d78"
-          emissiveIntensity={1.0}
-          roughness={0.25}
-          metalness={0.85}
+      </Text3D>
+
+      {/* Ambient Halo Behind */}
+      <Text3D {...textProps} size={0.88} height={0.25} position={[0.02, -0.02, -0.06]}>
+        POSHAN
+        <meshBasicMaterial
+          color="#00d4ff"
+          transparent
+          opacity={0.4}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </Text3D>
-      
+
+      {/* ================= MS (Pink/Magenta) ================= */}
+      {/* Main Front Neon Mesh */}
+      <Text3D {...textProps} size={1.12} height={0.2} position={[0, -1.02, 0]}>
+        MS
+        <meshPhysicalMaterial
+          color="#ff2d78"
+          emissive="#ff0088"
+          emissiveIntensity={2.8}
+          metalness={0.9}
+          roughness={0.05}
+          clearcoat={1}
+          clearcoatRoughness={0.05}
+        />
+      </Text3D>
+
+      {/* Inner Deep Glow Core */}
+      <Text3D {...textProps} size={1.12} height={0.22} position={[0, -1.02, -0.02]}>
+        MS
+        <meshPhysicalMaterial
+          color="#00d4ff"
+          emissive="#00d4ff"
+          emissiveIntensity={1.8}
+          roughness={0.1}
+          metalness={0.9}
+        />
+      </Text3D>
+
+      {/* Ambient Halo Behind */}
+      <Text3D {...textProps} size={1.12} height={0.25} position={[-0.02, -1.04, -0.06]}>
+        MS
+        <meshBasicMaterial
+          color="#ff2d78"
+          transparent
+          opacity={0.4}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </Text3D>
     </group>
   );
 }
+

@@ -1,37 +1,43 @@
 "use client";
 
-import React from "react";
-import { EffectComposer, Bloom, DepthOfField, ChromaticAberration, Vignette } from "@react-three/postprocessing";
+import { useEffect, useMemo } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import * as THREE from "three";
 
 export default function PostProcessing() {
-  return (
-    <EffectComposer multisampling={0}>
-      <Bloom
-        intensity={0.8}
-        luminanceThreshold={0.9}
-        luminanceSmoothing={0.02}
-        mipmapBlur={true}
-      />
+  const { gl, scene, camera, size } = useThree();
 
-      <ChromaticAberration
-        offset={new THREE.Vector2(0.0012, 0.0012)}
-        radialModulation={false}
-        modulationOffset={0.0}
-      />
+  const composer = useMemo(() => {
+    const instance = new EffectComposer(gl);
+    const renderPass = new RenderPass(scene, camera);
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(size.width, size.height),
+      0.42,
+      0.4,
+      0.78
+    );
+    const outputPass = new OutputPass();
 
-      <DepthOfField
-        focusDistance={0.012}
-        focalLength={0.18}
-        bokehScale={3.0}
-        height={480}
-      />
+    instance.addPass(renderPass);
+    instance.addPass(bloomPass);
+    instance.addPass(outputPass);
 
-      <Vignette
-        offset={0.1}
-        darkness={0.55}
-        eskil={false}
-      />
-    </EffectComposer>
-  );
+    return instance;
+  }, [gl, scene, camera, size.width, size.height]);
+
+  useEffect(() => {
+    composer.setSize(size.width, size.height);
+    composer.renderToScreen = true;
+    return () => composer.dispose();
+  }, [composer, size.width, size.height]);
+
+  useFrame((_, delta) => {
+    composer.render(delta);
+  }, 1);
+
+  return null;
 }

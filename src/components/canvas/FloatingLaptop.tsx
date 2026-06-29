@@ -1,127 +1,95 @@
 "use client";
 
-import React, { useRef, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
+import React, { useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 
 export default function FloatingLaptop() {
-  // Load the laptop GLTF model
   const { scene } = useGLTF("/models/laptop.glb");
-  
-  // Load the generated VS Code screen texture
-  const screenTexture = useTexture("/textures/laptop-screen.png");
+  const screenTexture = useTexture("/textures/laptop-screen.svg");
   screenTexture.colorSpace = THREE.SRGBColorSpace;
-  // Next.js/Three textures are flipped by default relative to GLTF standard
-  screenTexture.flipY = false;
+  screenTexture.flipY = true;
 
   const groupRef = useRef<THREE.Group>(null);
-  const laptopRef = useRef<THREE.Group>(null);
+  const bobRef = useRef<THREE.Group>(null);
 
-  // Traverse the GLTF scene once to apply custom materials and textures
   useMemo(() => {
-    scene.traverse((child) => {
-      const node = child as THREE.Mesh;
-      if (node.isMesh) {
-        node.castShadow = true;
-        node.receiveShadow = true;
-
-        const matName = node.material ? (node.material as THREE.Material).name.toLowerCase() : "";
-        const nodeName = node.name.toLowerCase();
-
-        // Check if this mesh represents the screen display
-        if (
-          nodeName.includes("screen") || 
-          nodeName.includes("display") || 
-          nodeName.includes("monitor") ||
-          matName.includes("screen") ||
-          matName.includes("display")
-        ) {
-          // Replace with glowing screen texture
-          node.material = new THREE.MeshBasicMaterial({
-            map: screenTexture,
-            toneMapped: false,
-          });
-        } else {
-          // Recolor chassis to dark metallic body
-          node.material = new THREE.MeshStandardMaterial({
-            color: new THREE.Color("#070710"),
-            metalness: 0.95,
-            roughness: 0.15,
-            envMapIntensity: 1.5,
-          });
-        }
-      }
+    const darkBody = new THREE.MeshStandardMaterial({
+      color: "#07070f",
+      metalness: 0.92,
+      roughness: 0.14,
+      emissive: "#02020a",
+      emissiveIntensity: 0.08,
     });
+    const screenMat = new THREE.MeshBasicMaterial({
+      map: screenTexture,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+    });
+
+    scene.updateMatrixWorld(true);
+    const screenCandidates: Array<{ mesh: THREE.Mesh; score: number }> = [];
+
+    scene.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      const bounds = new THREE.Box3().setFromObject(mesh);
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      bounds.getSize(size);
+      bounds.getCenter(center);
+
+      const flatness = size.z / Math.max(size.x, size.y, 0.0001);
+      const score = size.x * size.y * 1.4 - size.z * 8 + center.y * 2.5 - flatness * 12;
+
+      if (center.y > 0.15 && size.x > 0.2 && size.y > 0.12) {
+        screenCandidates.push({ mesh, score });
+      }
+
+      mesh.material = darkBody;
+    });
+
+    const screenMesh = screenCandidates.sort((a, b) => b.score - a.score)[0]?.mesh;
+    if (screenMesh) {
+      screenMesh.material = screenMat;
+      screenMesh.renderOrder = 3;
+    }
   }, [scene, screenTexture]);
 
-  // Animate floating bob and mouse-reactive tilt
   useFrame((state) => {
-    const time = state.clock.getElapsedTime();
-    
-    // 1. Bobbing animation (Sine wave)
-    if (laptopRef.current) {
-      laptopRef.current.position.y = Math.sin(time * 1.2) * 0.12;
+    const t = state.clock.getElapsedTime();
+
+    if (bobRef.current) {
+      bobRef.current.position.y = Math.sin(t * 0.85) * 0.15;
     }
 
-    // 2. Mouse interactive tilt rotation
     if (groupRef.current) {
-      const targetRotY = -0.5 + state.pointer.x * 0.18; // base -30deg + mouse delta
-      const targetRotX = 0.18 - state.pointer.y * 0.12;  // base 10deg + mouse delta
-      
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotY, 0.05);
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRotX, 0.05);
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, -Math.PI / 2 - 0.24 + state.pointer.x * 0.08, 0.045);
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0.02 - state.pointer.y * 0.055, 0.045);
     }
   });
 
+  const { width } = useThree((state) => state.viewport);
+  const laptopX = Math.max(1.0, width * 0.22);
+
   return (
-    <group ref={groupRef} position={[0.7, 0.0, -0.8]} rotation={[0.18, -0.5, 0]}>
-      
-      {/* Floating Laptop Mesh */}
-      <group ref={laptopRef}>
-        <primitive object={scene} scale={1.2} />
+    <group ref={groupRef} position={[laptopX, -0.2, -0.75]} rotation={[0.02, -Math.PI / 2 - 0.24, -0.04]}>
+      <group ref={bobRef}>
+        <primitive object={scene} scale={1.22} />
 
-        {/* Electric Blue neon screen halo rim light */}
-        <pointLight
-          position={[0, 0.8, -0.6]}
-          intensity={2.8}
-          distance={5}
-          color="#00d4ff"
-          castShadow
-        />
-
-        {/* Hot Pink bottom edge accent bleed */}
-        <pointLight
-          position={[0, -0.4, 0.3]}
-          intensity={1.0}
-          distance={3}
-          color="#ff2d78"
-        />
+        <pointLight position={[0, 1.8, -1.2]} intensity={4.2} distance={9} color="#00d4ff" decay={2} />
+        <pointLight position={[-1.8, 0.5, 0.3]} intensity={2.0} distance={7} color="#00d4ff" decay={2} />
+        <pointLight position={[0, -1.0, 0.8]} intensity={1.45} distance={5} color="#ff2d78" decay={2} />
+        <pointLight position={[0, 0.5, 1.5]} intensity={1.55} distance={6} color="#4488ff" decay={2} />
       </group>
-
-      {/* Glowing platform pedestal sitting directly under the laptop */}
-      <mesh position={[0, -1.3, 0]} rotation={[0, 0, 0]}>
-        <cylinderGeometry args={[1.7, 1.8, 0.06, 32]} />
-        <meshPhysicalMaterial
-          color="#121226"
-          emissive="#00d4ff"
-          emissiveIntensity={0.3}
-          roughness={0.2}
-          metalness={0.8}
-          transmission={0.6}
-          thickness={0.5}
-        />
-      </mesh>
-      
-      {/* Glowing base rim edge */}
-      <mesh position={[0, -1.26, 0]}>
-        <torusGeometry args={[1.75, 0.015, 8, 48]} />
-        <meshBasicMaterial color="#ff2d78" toneMapped={false} />
-      </mesh>
 
     </group>
   );
 }
 
-// Pre-load the asset to prevent pop-in
 useGLTF.preload("/models/laptop.glb");

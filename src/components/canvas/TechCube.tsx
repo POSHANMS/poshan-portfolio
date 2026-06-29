@@ -1,124 +1,103 @@
 "use client";
 
-import React, { useRef, useState } from "react";
-import { useFrame, ThreeEvent } from "@react-three/fiber";
+import React, { useMemo, useRef, useState } from "react";
 import { RoundedBox, MeshTransmissionMaterial, useTexture } from "@react-three/drei";
-import { RigidBody, RapierRigidBody } from "@react-three/rapier";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 interface TechCubeProps {
+  position: [number, number, number];
+  scale?: number;
   color: string;
   glowColor: string;
   logoPath: string;
-  scale: number;
-  position: [number, number, number];
 }
 
-export default function TechCube({ color, glowColor, logoPath, scale, position }: TechCubeProps) {
-  const rbRef = useRef<RapierRigidBody>(null);
-  const meshRef = useRef<THREE.Mesh>(null);
+export default function TechCube({ position, scale = 1, color, glowColor, logoPath }: TechCubeProps) {
+  const groupRef = useRef<THREE.Group>(null);
   const lightRef = useRef<THREE.PointLight>(null);
-  
-  const [isHovered, setIsHovered] = useState(false);
-  const logoTexture = useTexture(logoPath);
+  const [hovered, setHovered] = useState(false);
+  const logoTex = useTexture(logoPath);
+  logoTex.colorSpace = THREE.SRGBColorSpace;
 
-  // Slow idle rotation + hover spin animation
-  useFrame((state, delta) => {
-    if (meshRef.current) {
-      const spinSpeed = isHovered ? 4.5 : 0.4;
-      meshRef.current.rotation.x += spinSpeed * delta;
-      meshRef.current.rotation.y += (spinSpeed * 1.5) * delta;
-    }
+  const glow = new THREE.Color(glowColor);
+  const edgeGeometry = useMemo(() => new THREE.BoxGeometry(1.08, 1.08, 1.08), []);
 
-    // Animate point light intensity breathing on hover
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    const t = state.clock.getElapsedTime();
+
+    groupRef.current.position.y = position[1] + Math.sin(t * 0.72 + position[0] * 0.5) * 0.16;
+    groupRef.current.rotation.y += hovered ? 0.06 : 0.008;
+    groupRef.current.rotation.x += hovered ? 0.03 : 0.004;
+    groupRef.current.rotation.z += hovered ? 0.018 : 0.002;
+
     if (lightRef.current) {
-      const time = state.clock.getElapsedTime();
-      const baseIntensity = isHovered ? 4.0 : 1.5;
-      const pulse = Math.sin(time * 6.0) * (isHovered ? 0.8 : 0.2);
-      lightRef.current.intensity = baseIntensity + pulse;
+      const pulse = Math.sin(t * 2.2 + position[0]) * 0.5 + 0.5;
+      lightRef.current.intensity = hovered ? 7 + pulse * 2.5 : 3.8 + pulse * 1.3;
     }
   });
 
-  const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    setIsHovered(true);
-    
-    // Morph cursor
-    document.body.style.cursor = "none";
-    
-    // Apply Rapier physics impulse to bounce the cube upward
-    if (rbRef.current) {
-      rbRef.current.applyImpulse({ x: 0, y: 1.5 * scale, z: 0 }, true);
-      // Give it a random spin kick
-      rbRef.current.applyTorqueImpulse({
-        x: (Math.random() - 0.5) * 0.25 * scale,
-        y: (Math.random() - 0.5) * 0.25 * scale,
-        z: (Math.random() - 0.5) * 0.25 * scale
-      }, true);
-    }
-  };
-
-  const handlePointerOut = () => {
-    setIsHovered(false);
-  };
-
   return (
-    <RigidBody
-      ref={rbRef}
+    <group
+      ref={groupRef}
       position={position}
-      colliders="cuboid"
-      // Prevent gravity from pulling the cubes down, keeping them floating in space
-      gravityScale={0}
-      linearDamping={1.5}
-      angularDamping={1.5}
+      scale={scale}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
     >
-      <group
-        onPointerOver={handlePointerOver}
-        onPointerOut={handlePointerOut}
-        scale={scale}
-      >
-        
-        {/* Core Glass Cube */}
-        <mesh ref={meshRef}>
-          <RoundedBox args={[1, 1, 1]} radius={0.12} smoothness={4}>
-            {/* Real glass refraction material */}
-            <MeshTransmissionMaterial
-              transmission={1.0}
-              thickness={0.4}
-              roughness={0.05}
-              chromaticAberration={0.06}
-              anisotropy={0.2}
-              distortion={0.25}
-              distortionScale={0.4}
-              temporalDistortion={0.1}
-              color={isHovered ? glowColor : "#ffffff"}
-            />
-          </RoundedBox>
+      <pointLight ref={lightRef} color={glowColor} intensity={3.8} distance={5} decay={2} />
 
-          {/* Emissive Decal Plane inside the glass cube */}
-          <mesh position={[0, 0, 0]} rotation={[0, 0, 0]}>
-            <planeGeometry args={[0.55, 0.55]} />
-            <meshBasicMaterial
-              map={logoTexture}
-              transparent={true}
-              opacity={isHovered ? 0.95 : 0.65}
-              color={new THREE.Color(color)}
-              side={THREE.DoubleSide}
-              toneMapped={false}
-            />
-          </mesh>
+      <RoundedBox args={[1, 1, 1]} radius={0.075} smoothness={6} castShadow>
+        <mesh>
+          <boxGeometry args={[0.94, 0.94, 0.94]} />
+          <meshBasicMaterial color={color} transparent opacity={0.07} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
-
-        {/* Emissive neon pointlight inside the cube */}
-        <pointLight
-          ref={lightRef}
-          color={glowColor}
-          intensity={1.5}
-          distance={4}
-          decay={1.8}
+        <MeshTransmissionMaterial
+          color={new THREE.Color(color).lerp(new THREE.Color("#f7fbff"), 0.72)}
+          transmission={1}
+          thickness={0.028}
+          roughness={0.008}
+          metalness={0}
+          ior={1.16}
+          chromaticAberration={0.005}
+          anisotropicBlur={0}
+          distortion={0}
+          distortionScale={0}
+          temporalDistortion={0}
+          attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#f0fbff"), 0.35)}
+          attenuationDistance={0.95}
+          emissive={glow}
+          emissiveIntensity={hovered ? 0.16 : 0.05}
+          envMapIntensity={1.35}
+          side={THREE.FrontSide}
         />
-        
-      </group>
-    </RigidBody>
+      </RoundedBox>
+
+      <lineSegments>
+        <edgesGeometry args={[edgeGeometry]} />
+        <lineBasicMaterial color="#f0fbff" transparent opacity={hovered ? 0.2 : 0.1} />
+      </lineSegments>
+
+      <mesh position={[0, 0, 0.535]}>
+        <planeGeometry args={[0.68, 0.68]} />
+        <meshBasicMaterial map={logoTex} transparent opacity={0.2} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+
+      <mesh position={[0, 0, -0.535]} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[0.68, 0.68]} />
+        <meshBasicMaterial map={logoTex} transparent opacity={0.12} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+
+      <mesh position={[0, 0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.48, 0.515, 4]} />
+        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.16 : 0.08} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+
+      <mesh position={[0, -0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.48, 0.515, 4]} />
+        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.1 : 0.05} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+    </group>
   );
 }

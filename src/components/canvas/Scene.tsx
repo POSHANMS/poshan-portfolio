@@ -2,16 +2,18 @@
 
 import React, { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
+import { Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
+import { useDeviceSize } from "@/hooks/useDeviceSize";
 import NebulaBackground from "./NebulaBackground";
+import ImageBackground from "./ImageBackground";
 import StarField from "./StarField";
-import HeroName3D from "./HeroName3D";
+import ParticleNetwork from "./ParticleNetwork";
+import NeonGrid from "./NeonGrid";
 import FloatingLaptop from "./FloatingLaptop";
 import TechCubes from "./TechCubes";
-import ParticleNetwork from "./ParticleNetwork";
 import FloorRings from "./FloorRings";
-import NeonGrid from "./NeonGrid";
 import PostProcessing from "./PostProcessing";
 
 interface SceneProps {
@@ -19,72 +21,47 @@ interface SceneProps {
 }
 
 export default function Scene({ scrollProgress }: SceneProps) {
+  const { deviceTier, reducedMotion } = useDeviceSize();
+  const isMobile = deviceTier === "mobile";
+
   return (
-    <div className="fixed inset-0 w-full h-full z-0 select-none pointer-events-none bg-[#050508]">
+    <div className="hero-mobile-soften fixed inset-0 z-0 h-full w-full bg-[#050508]">
       <Canvas
-        shadows
-        gl={{ 
-          antialias: true, 
-          alpha: false, 
-          powerPreference: "high-performance",
-          logarithmicDepthBuffer: true, // fixes depth fighting on reflective floor
+        shadows={false}
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: isMobile ? "default" : "high-performance",
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.95
+          toneMappingExposure: 0.9,
         }}
         camera={{
-          position: [0, 0.8, 9.5],
-          fov: 50,
+          position: [0.15, 2.2, 9.2],
+          fov: 45,
           near: 0.1,
-          far: 50,
+          far: 100,
         }}
       >
         <CinematicCamera scrollProgress={scrollProgress} />
-        <color attach="background" args={["#050508"]} />
-        <fog attach="fog" args={["#050508", 8, 20]} />
+        <color attach="background" args={["#000000"]} />
+        <fog attach="fog" args={["#010106", 26, 68]} />
+        <Environment preset="city" background={false} blur={0.8} />
 
-        {/* Ambient base lighting */}
-        <ambientLight intensity={0.4} />
-        
-        {/* Soft fill directional light */}
-        <directionalLight
-          position={[5, 10, 5]}
-          intensity={0.6}
-          castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
-          shadow-bias={-0.0001}
-        />
+        <ambientLight intensity={0.14} color="#030612" />
+        <pointLight position={[5.5, -1.5, 4.5]} intensity={1.75} color="#00d4ff" distance={30} decay={2} />
+        <pointLight position={[-5.8, 5.2, 2.6]} intensity={1.12} color="#ff2d78" distance={28} decay={2} />
+        <pointLight position={[0.2, 4.2, -8]} intensity={1.05} color="#8b5cf6" distance={34} decay={2} />
 
-        {/* R3F elements wrap */}
         <Suspense fallback={null}>
-          {/* Layer 1: Nebula background plane running GLSL shader */}
+          <ImageBackground />
           <NebulaBackground />
-
-          {/* Layer 2: Starfield particle network */}
           <StarField />
+          {!isMobile && !reducedMotion && <ParticleNetwork />}
 
-          {/* Layer 3: Main interactive elements */}
-          <group position={[0, 0, 0]}>
-            {/* Holographic 3D extruded title */}
-            <HeroName3D />
-
-            {/* floating metallic laptop */}
-            <FloatingLaptop />
-
-            {/* Rounded glass tech cubes connected with glow lines */}
-            <TechCubes />
-
-            {/* Interactive mouse particle network */}
-            <ParticleNetwork />
-
-            {/* Pulsing base ring underneath laptop */}
-            <FloorRings />
-          </group>
-
-          {/* Reflective cyber grid floor */}
+          <FloatingLaptop />
+          {!reducedMotion && <TechCubes />}
           <NeonGrid />
-
-          {/* Render effects: Bloom, DOF, Chromatic Aberration */}
+          {!reducedMotion && <FloorRings />}
           <PostProcessing />
         </Suspense>
       </Canvas>

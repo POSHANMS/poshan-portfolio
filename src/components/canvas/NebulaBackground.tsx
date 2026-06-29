@@ -19,39 +19,35 @@ export default function NebulaBackground() {
     [size]
   );
 
-  // Update uniforms per-frame
   useFrame((state) => {
-    if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
-      
-      // Lerp mouse coordinates into uMouse uniform for subtle interactivity
-      const targetMouseX = state.pointer.x;
-      const targetMouseY = state.pointer.y;
-      
-      materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(
-        materialRef.current.uniforms.uMouse.value.x,
-        targetMouseX,
-        0.05
-      );
-      materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(
-        materialRef.current.uniforms.uMouse.value.y,
-        targetMouseY,
-        0.05
-      );
-    }
+    if (!materialRef.current) return;
+    materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
+
+    materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(
+      materialRef.current.uniforms.uMouse.value.x,
+      state.pointer.x,
+      0.04
+    );
+    materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(
+      materialRef.current.uniforms.uMouse.value.y,
+      state.pointer.y,
+      0.04
+    );
   });
 
   return (
-    <mesh position={[0, 0, -12]}>
-      {/* Large plane to cover the camera's full frustum at this depth */}
-      <planeGeometry args={[35, 20]} />
+    <mesh position={[0, 0, -20]} renderOrder={-10}>
+      <planeGeometry args={[300, 150]} />
       <shaderMaterial
         ref={materialRef}
         vertexShader={nebulaVertex}
         fragmentShader={nebulaFragment}
         uniforms={uniforms}
+        transparent
         depthWrite={false}
-        depthTest={true}
+        depthTest={false}
+        blending={THREE.NormalBlending}
+        opacity={0.38}
       />
     </mesh>
   );

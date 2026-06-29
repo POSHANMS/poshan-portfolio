@@ -28,14 +28,14 @@ void main() {
   vec2 center = uv - vec2(0.5, 0.5);
   float r = length(center);
   
-  // Spatial wave density (40.0) and expansion speed (3.0)
-  float wave = sin(r * 45.0 - uTime * 4.0);
+  // Spatial wave density and expansion speed create many tight neon rings.
+  float wave = sin(r * 70.0 - uTime * 5.0);
   
   // Create thin, sharp rings instead of broad sine waves
-  float ringMask = smoothstep(0.85, 0.98, wave);
+  float ringMask = smoothstep(0.9, 0.995, wave);
   
   // Fades out rings as they expand outward
-  float fade = max(0.0, 1.0 - (r * 2.2));
+  float fade = max(0.0, 1.0 - (r * 1.55));
   
   // Cyberpunk colors: Electric blue at the center, shifting to violet/pink on edges
   vec3 innerColor = vec3(0.0, 0.83, 1.0); // Cyan/Electric Blue
@@ -43,7 +43,8 @@ void main() {
   vec3 ringColor = mix(innerColor, outerColor, r * 2.0);
   
   // Apply mask, fade, and increase brightness for bloom
-  vec4 finalColor = vec4(ringColor, ringMask * fade * 0.7);
+  float coreGlow = exp(-r * 4.5) * 0.18;
+  vec4 finalColor = vec4(ringColor, ringMask * fade * 0.42 + coreGlow * 0.62);
   
   // Discard completely transparent pixels to save fillrate
   if (finalColor.a < 0.01) {
