@@ -77,12 +77,12 @@ export default function FloatingLaptop() {
   });
 
   const { width } = useThree((state) => state.viewport);
-  const laptopX = Math.max(2.2, width * 0.2);
+  const laptopX = Math.max(2.1, width * 0.17);
 
   return (
-    <group ref={groupRef} position={[laptopX, -0.45, -1.08]} rotation={[0.105, -Math.PI / 2 - 0.31, -0.035]}>
+    <group ref={groupRef} position={[laptopX, -0.18, -1.24]} rotation={[0.105, -Math.PI / 2 - 0.31, -0.035]}>
       <group ref={bobRef}>
-        <primitive object={scene} scale={1.76} />
+        <primitive object={scene} scale={1.46} />
 
         <mesh position={[0.2, 0.78, -0.72]} rotation={[0.05, 0, 0]}>
           <planeGeometry args={[2.2, 1.35]} />

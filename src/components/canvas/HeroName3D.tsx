@@ -90,8 +90,8 @@ export default function HeroName3D() {
   const groupRef = useRef<THREE.Group>(null);
   const { width, height } = useThree((state) => state.viewport);
 
-  const posX = -width / 2 + 2.12;
-  const posY = height / 2 - 2.82;
+  const posX = -width / 2 + 2.55;
+  const posY = height / 2 - 2.72;
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
@@ -104,7 +104,7 @@ export default function HeroName3D() {
   });
 
   return (
-    <group ref={groupRef} position={[posX, posY, 1.05]} rotation={[0.07, -0.14, -0.035]} scale={[0.68, 0.68, 0.68]}>
+    <group ref={groupRef} position={[posX, posY, 2.2]} rotation={[0.07, -0.14, -0.035]} scale={[0.82, 0.82, 0.82]}>
       <pointLight position={[-0.7, 1.0, 2.0]} intensity={7.2} distance={7.5} color="#00f5ff" decay={2} />
       <pointLight position={[3.5, -0.6, 1.4]} intensity={4.7} distance={7} color="#ff3ed1" decay={2} />
       <pointLight position={[1.7, -1.8, 1.8]} intensity={2.8} distance={6.5} color="#2bd9ff" decay={2} />

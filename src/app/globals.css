@@ -80,11 +80,11 @@ body {
 
 .dashboard-haze {
   background:
-    radial-gradient(circle at 72% 52%, rgba(0, 245, 255, 0.2), transparent 18rem),
+    radial-gradient(circle at 72% 52%, rgba(0, 245, 255, 0.16), transparent 18rem),
     radial-gradient(circle at 76% 58%, rgba(255, 62, 209, 0.24), transparent 19rem),
-    radial-gradient(circle at 28% 34%, rgba(43, 217, 255, 0.22), transparent 22rem),
+    radial-gradient(circle at 26% 38%, rgba(43, 217, 255, 0.1), transparent 20rem),
     radial-gradient(circle at 82% 18%, rgba(138, 46, 255, 0.24), transparent 22rem),
-    linear-gradient(180deg, rgba(2, 3, 13, 0.24), rgba(4, 4, 12, 0.04) 56%, rgba(4, 4, 12, 0.44));
+    linear-gradient(180deg, rgba(2, 3, 13, 0.16), rgba(4, 4, 12, 0.02) 56%, rgba(4, 4, 12, 0.34));
   mix-blend-mode: screen;
 }
 
@@ -122,14 +122,14 @@ body {
 }
 
 .dashboard-stage::before {
-  left: 24px;
-  top: 46px;
+  left: 120px;
+  top: 116px;
   width: 620px;
   height: 430px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(0, 245, 255, 0.3), rgba(43, 217, 255, 0.12) 38%, transparent 72%);
-  filter: blur(62px);
-  opacity: 0.72;
+  background: radial-gradient(circle, rgba(0, 245, 255, 0.12), rgba(43, 217, 255, 0.05) 38%, transparent 72%);
+  filter: blur(74px);
+  opacity: 0.38;
   mix-blend-mode: screen;
 }
 
@@ -148,8 +148,8 @@ body {
 }
 
 .dashboard-front-particles {
-  z-index: 18;
-  opacity: 0.58;
+  z-index: 4;
+  opacity: 0.46;
   background-image:
     radial-gradient(circle, rgba(0, 212, 255, 0.85) 0 1px, transparent 1.8px),
     radial-gradient(circle, rgba(255, 45, 120, 0.7) 0 1px, transparent 1.8px),
@@ -193,7 +193,7 @@ body {
   grid-column: 1 / span 4;
   grid-row: 1 / span 2;
   align-self: center;
-  transform: translate3d(80px, 70px, 80px);
+  transform: translate3d(120px, 96px, 80px);
 }
 
 .stage-center-cards {
@@ -201,7 +201,7 @@ body {
   z-index: 18;
   grid-column: 6 / span 2;
   grid-row: 1 / span 2;
-  transform: translate3d(8px, 10px, 42px);
+  transform: translate3d(26px, 8px, 42px);
 }
 
 .stage-code-card {
@@ -210,7 +210,7 @@ body {
   grid-column: 7 / span 4;
   grid-row: 2;
   align-self: start;
-  transform: translate3d(42px, 22px, 36px);
+  transform: translate3d(70px, 8px, 36px);
 }
 
 .stage-right-panels {
@@ -233,10 +233,10 @@ body {
 .stage-stats {
   position: relative;
   z-index: 22;
-  grid-column: 4 / span 6;
+  grid-column: 4 / span 5;
   grid-row: 3;
   min-height: 92px;
-  transform: translate3d(48px, 34px, 58px);
+  transform: translate3d(66px, 18px, 58px);
 }
 
 .stage-featured {
@@ -245,7 +245,7 @@ body {
   grid-column: 3 / span 4;
   grid-row: 4;
   min-height: 144px;
-  transform: translateZ(52px);
+  transform: translate3d(16px, 0, 52px);
 }
 
 .stage-skills {
@@ -254,7 +254,7 @@ body {
   grid-column: 7 / span 3;
   grid-row: 4;
   min-height: 144px;
-  transform: translateZ(52px);
+  transform: translate3d(28px, 0, 52px);
 }
 
 .stage-footer {
@@ -373,11 +373,116 @@ body {
   box-shadow: 0 0 22px rgba(255, 62, 209, 0.26), inset 0 0 14px rgba(255, 62, 209, 0.08);
 }
 
-.hero-title-reserve {
+.hero-title-stack {
   position: relative;
-  height: 300px;
-  width: 100%;
+  height: 268px;
+  width: 620px;
+  transform: perspective(1050px) rotateX(4deg) rotateY(-8deg) rotateZ(-2deg);
+  transform-origin: left center;
   pointer-events: none;
+  filter: drop-shadow(0 0 22px rgba(0, 245, 255, 0.56)) drop-shadow(0 0 64px rgba(138, 46, 255, 0.34));
+}
+
+.hero-title-stack::before,
+.hero-title-stack::after {
+  content: "";
+  position: absolute;
+  inset: -42px -82px -54px -46px;
+  border-radius: 44%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.hero-title-stack::before {
+  background:
+    radial-gradient(circle at 34% 38%, rgba(0, 245, 255, 0.38), transparent 54%),
+    radial-gradient(circle at 20% 72%, rgba(43, 217, 255, 0.2), transparent 48%);
+  filter: blur(42px);
+  opacity: 0.72;
+}
+
+.hero-title-stack::after {
+  background: radial-gradient(circle at 58% 70%, rgba(255, 62, 209, 0.22), transparent 55%);
+  filter: blur(46px);
+  opacity: 0.64;
+}
+
+.hero-title-layer,
+.hero-title-face {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  font-family: Impact, Haettenschweiler, "Arial Black", var(--font-inter);
+  font-weight: 900;
+  line-height: 0.78;
+  letter-spacing: -0.058em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hero-title-layer span,
+.hero-title-face span {
+  display: block;
+  font-size: 164px;
+}
+
+.hero-title-layer .hero-title-layer-ms,
+.hero-title-face .hero-title-layer-ms {
+  margin-top: -0.18em;
+  font-size: 198px;
+}
+
+.hero-title-layer {
+  transform: translate3d(calc(var(--layer) * 1.65px), calc(var(--layer) * 1.35px), calc(var(--layer) * -1px));
+  color: color-mix(in srgb, #090b18 calc(var(--layer) * 2.2%), #8a2eff);
+  -webkit-text-stroke: 1px rgba(0, 245, 255, 0.14);
+  text-shadow: 0 0 16px rgba(0, 245, 255, 0.12);
+  opacity: calc(0.94 - (var(--layer) * 0.018));
+}
+
+.hero-title-layer:nth-child(n + 12) {
+  color: #101052;
+  -webkit-text-stroke-color: rgba(255, 62, 209, 0.2);
+}
+
+.hero-title-face {
+  z-index: 40;
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(220, 253, 255, 0.96);
+  background:
+    radial-gradient(circle at 18% 9%, rgba(255, 255, 255, 0.9) 0 3%, transparent 18%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.62) 0 1px, rgba(0, 245, 255, 0.12) 1px 5px),
+    linear-gradient(180deg, #e9feff 0%, #00f5ff 16%, #2bd9ff 44%, #8a2eff 74%, #ff3ed1 100%);
+  background-blend-mode: screen, overlay, normal;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.hero-title-face::before,
+.hero-title-face::after {
+  content: "POSHAN\A MS";
+  white-space: pre;
+  position: absolute;
+  inset: 0;
+  font-size: 164px;
+  line-height: 0.78;
+  letter-spacing: -0.058em;
+  pointer-events: none;
+  color: transparent;
+}
+
+.hero-title-face::before {
+  -webkit-text-stroke: 2px rgba(0, 245, 255, 0.42);
+  transform: translate(-4px, -2px);
+  filter: blur(0.4px);
+}
+
+.hero-title-face::after {
+  -webkit-text-stroke: 2px rgba(255, 62, 209, 0.42);
+  transform: translate(5px, 2px);
+  filter: blur(0.5px);
 }
 
 .tech-badge {

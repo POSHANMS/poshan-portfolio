@@ -132,6 +132,25 @@ function GitHubMark() {
   );
 }
 
+function ExtrudedHeroTitle() {
+  const layers = Array.from({ length: 28 }, (_, index) => index);
+
+  return (
+    <div className="hero-title-stack" aria-hidden="true">
+      {layers.map((layer) => (
+        <div key={layer} className="hero-title-layer" style={{ ["--layer" as string]: layer }}>
+          <span>POSHAN</span>
+          <span className="hero-title-layer-ms">MS</span>
+        </div>
+      ))}
+      <div className="hero-title-face">
+        <span>POSHAN</span>
+        <span className="hero-title-layer-ms">MS</span>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardHero({ scrollProgress }: { scrollProgress: number }) {
   const hello = useTypewriter("< Hello, I'm />");
   const clock = useLiveClock();
@@ -167,7 +186,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
           </p>
 
           <h1 className="sr-only">Poshan MS</h1>
-          <div className="hero-title-reserve" aria-hidden="true" />
+          <ExtrudedHeroTitle />
 
           <p className="mt-4 font-mono text-xl font-bold uppercase tracking-[0.28em] text-[var(--electric-blue)] text-glow-blue">
             Full Stack Engineer <span className="animate-pulse">_</span>
