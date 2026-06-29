@@ -16,11 +16,11 @@ export default function FloatingLaptop() {
 
   useMemo(() => {
     const darkBody = new THREE.MeshStandardMaterial({
-      color: "#07070f",
+      color: "#09091a",
       metalness: 0.92,
-      roughness: 0.14,
-      emissive: "#02020a",
-      emissiveIntensity: 0.08,
+      roughness: 0.1,
+      emissive: "#06142f",
+      emissiveIntensity: 0.16,
     });
     const screenMat = new THREE.MeshBasicMaterial({
       map: screenTexture,
@@ -69,23 +69,23 @@ export default function FloatingLaptop() {
     }
 
     if (groupRef.current) {
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, -Math.PI / 2 - 0.24 + state.pointer.x * 0.08, 0.045);
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0.02 - state.pointer.y * 0.055, 0.045);
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, -Math.PI / 2 - 0.1 + state.pointer.x * 0.06, 0.045);
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0.08 - state.pointer.y * 0.045, 0.045);
     }
   });
 
   const { width } = useThree((state) => state.viewport);
-  const laptopX = Math.max(1.0, width * 0.22);
+  const laptopX = Math.max(1.35, width * 0.13);
 
   return (
-    <group ref={groupRef} position={[laptopX, -0.2, -0.75]} rotation={[0.02, -Math.PI / 2 - 0.24, -0.04]}>
+    <group ref={groupRef} position={[laptopX, 0.55, -1.1]} rotation={[0.08, -Math.PI / 2 - 0.1, -0.035]}>
       <group ref={bobRef}>
-        <primitive object={scene} scale={1.22} />
+        <primitive object={scene} scale={1.36} />
 
-        <pointLight position={[0, 1.8, -1.2]} intensity={4.2} distance={9} color="#00d4ff" decay={2} />
-        <pointLight position={[-1.8, 0.5, 0.3]} intensity={2.0} distance={7} color="#00d4ff" decay={2} />
-        <pointLight position={[0, -1.0, 0.8]} intensity={1.45} distance={5} color="#ff2d78" decay={2} />
-        <pointLight position={[0, 0.5, 1.5]} intensity={1.55} distance={6} color="#4488ff" decay={2} />
+        <pointLight position={[0, 1.8, -1.2]} intensity={5.6} distance={10} color="#00d4ff" decay={2} />
+        <pointLight position={[-2.1, 0.65, 0.45]} intensity={3.0} distance={8} color="#00d4ff" decay={2} />
+        <pointLight position={[0.8, -1.15, 0.95]} intensity={2.7} distance={7} color="#ff2d78" decay={2} />
+        <pointLight position={[0, 0.5, 1.5]} intensity={2.25} distance={7} color="#4488ff" decay={2} />
       </group>
 
     </group>

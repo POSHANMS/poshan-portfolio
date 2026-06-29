@@ -34,7 +34,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
 
     if (lightRef.current) {
       const pulse = Math.sin(t * 2.2 + position[0]) * 0.5 + 0.5;
-      lightRef.current.intensity = hovered ? 7 + pulse * 2.5 : 3.8 + pulse * 1.3;
+      lightRef.current.intensity = hovered ? 9 + pulse * 3 : 5.6 + pulse * 1.8;
     }
   });
 
@@ -46,12 +46,12 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
     >
-      <pointLight ref={lightRef} color={glowColor} intensity={3.8} distance={5} decay={2} />
+      <pointLight ref={lightRef} color={glowColor} intensity={5.6} distance={6.5} decay={2} />
 
       <RoundedBox args={[1, 1, 1]} radius={0.075} smoothness={6} castShadow>
         <mesh>
           <boxGeometry args={[0.94, 0.94, 0.94]} />
-          <meshBasicMaterial color={color} transparent opacity={0.07} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color={color} transparent opacity={0.13} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
         <MeshTransmissionMaterial
           color={new THREE.Color(color).lerp(new THREE.Color("#f7fbff"), 0.72)}
@@ -68,20 +68,20 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
           attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#f0fbff"), 0.35)}
           attenuationDistance={0.95}
           emissive={glow}
-          emissiveIntensity={hovered ? 0.16 : 0.05}
-          envMapIntensity={1.35}
+          emissiveIntensity={hovered ? 0.34 : 0.16}
+          envMapIntensity={1.85}
           side={THREE.FrontSide}
         />
       </RoundedBox>
 
       <lineSegments>
         <edgesGeometry args={[edgeGeometry]} />
-        <lineBasicMaterial color="#f0fbff" transparent opacity={hovered ? 0.2 : 0.1} />
+        <lineBasicMaterial color="#f0fbff" transparent opacity={hovered ? 0.42 : 0.24} />
       </lineSegments>
 
       <mesh position={[0, 0, 0.535]}>
         <planeGeometry args={[0.68, 0.68]} />
-        <meshBasicMaterial map={logoTex} transparent opacity={0.2} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial map={logoTex} transparent opacity={0.34} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, 0, -0.535]} rotation={[0, Math.PI, 0]}>
