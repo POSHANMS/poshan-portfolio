@@ -166,14 +166,8 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
             <span className="ml-1 inline-block h-6 w-[2px] translate-y-1 animate-pulse bg-[var(--electric-blue)]" />
           </p>
 
-          <div className="hero-title-wrap">
-            <h1 className="hero-title hero-title-poshan" data-text="POSHAN">
-              POSHAN
-            </h1>
-            <h2 className="hero-title hero-title-ms" data-text="MS">
-              MS
-            </h2>
-          </div>
+          <h1 className="sr-only">Poshan MS</h1>
+          <div className="hero-title-reserve" aria-hidden="true" />
 
           <p className="mt-4 font-mono text-xl font-bold uppercase tracking-[0.28em] text-[var(--electric-blue)] text-glow-blue">
             Full Stack Engineer <span className="animate-pulse">_</span>

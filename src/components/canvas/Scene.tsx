@@ -12,6 +12,7 @@ import StarField from "./StarField";
 import ParticleNetwork from "./ParticleNetwork";
 import NeonGrid from "./NeonGrid";
 import FloatingLaptop from "./FloatingLaptop";
+import HeroName3D from "./HeroName3D";
 import TechCubes from "./TechCubes";
 import FloorRings from "./FloorRings";
 import PostProcessing from "./PostProcessing";
@@ -27,7 +28,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
   return (
     <div className="hero-mobile-soften fixed inset-0 z-0 h-full w-full bg-[#050508]">
       <Canvas
-        shadows={false}
+        shadows
         gl={{
           antialias: true,
           alpha: false,
@@ -61,6 +62,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
           <StarField />
           {!isMobile && !reducedMotion && <ParticleNetwork />}
 
+          <HeroName3D />
           <FloatingLaptop />
           {!reducedMotion && <TechCubes />}
           <NeonGrid />
