@@ -100,7 +100,7 @@ function GlassPanel({
 }
 
 function MiniHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <p className={`font-mono text-[10px] uppercase tracking-[0.22em] text-cyan-200/65 ${className}`}>{children}</p>;
+  return <p className={`font-mono text-[10px] uppercase tracking-[0.22em] text-[#9df7ff]/68 ${className}`}>{children}</p>;
 }
 
 function SkillBar({ label, value }: { label: string; value: number }) {
@@ -151,6 +151,8 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
       <div className="dashboard-haze pointer-events-none absolute inset-0" />
       <div className="dashboard-scanlines pointer-events-none absolute inset-0" />
       <div className="dashboard-front-particles pointer-events-none absolute inset-0" />
+      <div className="dashboard-depth-lines pointer-events-none absolute inset-0" />
+      <div className="dashboard-floor-glow pointer-events-none absolute inset-x-0 bottom-0" />
 
       <div className="dashboard-stage" style={{ transform: `translate(-50%, -50%) scale(${stageScale})` }}>
         <motion.div
@@ -176,8 +178,8 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
           <p className="mt-4 font-mono text-xl font-bold uppercase tracking-[0.28em] text-[var(--electric-blue)] text-glow-blue">
             Full Stack Engineer <span className="animate-pulse">_</span>
           </p>
-          <p className="mt-3 max-w-[29rem] font-mono text-[15px] leading-7 text-white/84">
-            I build scalable <span className="text-white/45">.</span> performant <span className="text-white/45">.</span> beautiful digital experiences.
+          <p className="mt-3 max-w-[29rem] font-mono text-[15px] leading-7 text-[#d8faff]/78">
+            I build <span className="text-[#00f5ff]">scalable</span> <span className="text-white/35">·</span> <span className="text-[#ff3ed1]">performant</span> <span className="text-white/35">·</span> beautiful digital experiences.
           </p>
 
           <div className="pointer-events-auto mt-6 flex gap-5">
@@ -205,8 +207,8 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
           </div>
         </motion.div>
 
-        <div className="stage-center-cards flex flex-col gap-4">
-          <GlassPanel accent="pink" className="w-[14.5rem] p-5">
+        <div className="stage-center-cards flex flex-col gap-6">
+          <GlassPanel accent="pink" className="p-6">
             <MiniHeader>{"// Current Status"}</MiniHeader>
             <p className="mt-4 font-mono text-base leading-7 text-[var(--terminal-green)] text-glow-green">
               Available for
@@ -218,7 +220,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
             </button>
           </GlassPanel>
 
-          <GlassPanel accent="blue" className="w-[14.5rem] p-5">
+          <GlassPanel accent="blue" className="p-6">
             <MiniHeader>{"// Tech Stack"}</MiniHeader>
             <div className="mt-4 space-y-3">
               {techStack.map((tech, index) => (
@@ -248,8 +250,8 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
           </div>
         </div>
 
-        <div className="stage-right-panels flex flex-col gap-4">
-          <GlassPanel className="p-5" accent="blue">
+        <div className="stage-right-panels flex flex-col gap-6">
+          <GlassPanel className="p-6" accent="blue">
             <div className="flex items-center justify-between">
               <MiniHeader>{"// GitHub Activity"}</MiniHeader>
               <GitHubMark />
@@ -275,7 +277,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
             <p className="mt-4 font-mono text-[12px] text-white/76">1,247 Contributions this year</p>
           </GlassPanel>
 
-          <GlassPanel className="p-5" accent="violet">
+          <GlassPanel className="p-6" accent="violet">
             <MiniHeader className="text-yellow-200/80">{"// Achievements"}</MiniHeader>
             <div className="mt-5 space-y-4 font-mono text-[12px] text-white/76">
               <p className="flex items-center gap-4">
@@ -291,7 +293,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
             <div className="mt-5 flex items-center justify-center gap-4 font-mono text-[var(--electric-blue)]">← <span className="text-white/20">● ● ●</span> →</div>
           </GlassPanel>
 
-          <GlassPanel className="p-5" accent="blue">
+          <GlassPanel className="p-6" accent="blue">
             <MiniHeader>{"// Testimonial"}</MiniHeader>
             <p className="mt-4 font-mono text-[12px] leading-6 text-white/72">
               &quot;Poshan is an exceptional developer with a keen eye for detail and problem-solving skills that are truly next level.&quot;
@@ -300,7 +302,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
             <div className="mt-3 text-center text-[var(--deep-violet)]">● ● ●</div>
           </GlassPanel>
 
-          <GlassPanel className="p-5" accent="pink">
+          <GlassPanel className="p-6" accent="pink">
             <MiniHeader className="text-[var(--hot-pink)]">{"// Let's Build Together"}</MiniHeader>
             <p className="mt-4 font-mono text-[13px] leading-7 text-white/76">Have a project in mind? Let&apos;s create something amazing together!</p>
             <a href="mailto:siddeshwaraprasanna5@gmail.com" className="pointer-events-auto mt-5 inline-flex rounded border border-[var(--electric-blue)] px-6 py-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white transition hover:border-[var(--hot-pink)] hover:text-[var(--hot-pink)]">
@@ -309,7 +311,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
           </GlassPanel>
         </div>
 
-        <GlassPanel className="stage-music p-4" accent="blue">
+        <GlassPanel className="stage-music p-5" accent="blue">
           <MiniHeader>Currently Listening</MiniHeader>
           <div className="mt-3 flex items-start gap-4">
             <button
@@ -340,7 +342,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
           </div>
         </GlassPanel>
 
-        <GlassPanel className="stage-stats grid grid-cols-4 items-center p-4" accent="violet">
+        <GlassPanel className="stage-stats grid grid-cols-4 items-center p-5" accent="violet">
           {[
             ["2+", "Years Experience"],
             ["25+", "Projects Completed"],
@@ -359,7 +361,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
           ))}
         </GlassPanel>
 
-        <GlassPanel className="stage-featured p-4" accent="pink">
+        <GlassPanel className="stage-featured p-5" accent="pink">
           <MiniHeader>Featured Project</MiniHeader>
           <h3 className="mt-3 font-mono text-xl uppercase tracking-[0.16em] text-white">FindIt <span className="text-[var(--terminal-green)]">●</span></h3>
           <p className="mt-2 font-mono text-[12px] leading-5 text-white/62">Campus lost & found portal with real-time notifications, auth, image upload, and Dockerized backend.</p>
@@ -367,7 +369,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
           <a href="#projects" className="pointer-events-auto mt-3 inline-flex rounded border border-[var(--electric-blue)]/45 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--electric-blue)]">Live Preview →</a>
         </GlassPanel>
 
-        <GlassPanel className="stage-skills p-5" accent="blue">
+        <GlassPanel className="stage-skills p-6" accent="blue">
           <MiniHeader>{"// Skills Overview"}</MiniHeader>
           <div className="mt-4 space-y-3">
             <SkillBar label="Frontend Development" value={95} />

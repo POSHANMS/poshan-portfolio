@@ -47,10 +47,13 @@ export default function Scene({ scrollProgress }: SceneProps) {
         <fog attach="fog" args={["#010106", 26, 68]} />
         <Environment preset="city" background={false} blur={0.8} />
 
-        <ambientLight intensity={0.14} color="#030612" />
-        <pointLight position={[5.5, -1.5, 4.5]} intensity={1.75} color="#00d4ff" distance={30} decay={2} />
-        <pointLight position={[-5.8, 5.2, 2.6]} intensity={1.12} color="#ff2d78" distance={28} decay={2} />
-        <pointLight position={[0.2, 4.2, -8]} intensity={1.05} color="#8b5cf6" distance={34} decay={2} />
+        <ambientLight intensity={0.22} color="#06112a" />
+        <pointLight position={[4.8, 1.4, 4.8]} intensity={3.2} color="#00f5ff" distance={34} decay={2} />
+        <pointLight position={[3.6, -1.4, 3.2]} intensity={2.6} color="#ff3ed1" distance={30} decay={2} />
+        <pointLight position={[-4.8, 4.8, 2.6]} intensity={1.85} color="#8a2eff" distance={30} decay={2} />
+        <pointLight position={[0.2, 4.2, -8]} intensity={1.55} color="#2bd9ff" distance={38} decay={2} />
+        <spotLight position={[1.8, 5.8, 5]} angle={0.45} penumbra={0.8} intensity={2.2} color="#00f5ff" distance={34} />
+        <spotLight position={[5.6, 2.0, 2.4]} angle={0.5} penumbra={0.85} intensity={1.7} color="#ff3ed1" distance={28} />
 
         <Suspense fallback={null}>
           <ImageBackground />
