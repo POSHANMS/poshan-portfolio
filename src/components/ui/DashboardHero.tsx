@@ -228,7 +228,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
               <br />
               new projects
             </p>
-            <button className="pointer-events-auto mt-4 flex items-center gap-3 rounded border border-white/18 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.16em] text-white/74 transition hover:border-[var(--hot-pink)] hover:text-white">
+            <button suppressHydrationWarning className="pointer-events-auto mt-4 flex items-center gap-3 rounded border border-white/18 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.16em] text-white/74 transition hover:border-[var(--hot-pink)] hover:text-white">
               View Schedule <CalendarDays className="h-3.5 w-3.5 text-[var(--hot-pink)]" />
             </button>
           </GlassPanel>
@@ -330,6 +330,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
             <button
               type="button"
               onClick={toggleMusic}
+              suppressHydrationWarning
               className="music-art pointer-events-auto transition duration-300 hover:scale-[1.03] hover:shadow-[0_0_32px_rgba(0,212,255,0.32)]"
               aria-label={isMusicPlaying ? "Pause ambient music" : "Play ambient music"}
             >
@@ -344,6 +345,7 @@ export default function DashboardHero({ scrollProgress }: { scrollProgress: numb
                 <button
                   type="button"
                   onClick={toggleMusic}
+                  suppressHydrationWarning
                   className="pointer-events-auto text-[var(--electric-blue)] transition hover:text-[var(--hot-pink)]"
                   aria-label={isMusicPlaying ? "Pause ambient music" : "Play ambient music"}
                 >
