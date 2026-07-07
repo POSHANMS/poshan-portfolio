@@ -17,7 +17,7 @@ export default function StarField() {
   const constellationRef = useRef<THREE.LineSegments>(null);
 
   const [ambientPositions, ambientColors, ambientSizes] = useMemo(() => {
-    const count = 5200;
+    const count = 2000;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
@@ -45,7 +45,7 @@ export default function StarField() {
   }, []);
 
   const [galaxyPositions, galaxyColors] = useMemo(() => {
-    const count = 1450;
+    const count = 600;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const cyan = new THREE.Color("#00d4ff");
@@ -72,7 +72,7 @@ export default function StarField() {
 
   const [constellationGeometry, nodeGeometry] = useMemo(() => {
     const nodes: ConstellationNode[] = [];
-    const nodeCount = 310;
+    const nodeCount = 100;
     const colors = [
       new THREE.Color("#00d4ff"),
       new THREE.Color("#8b5cf6"),

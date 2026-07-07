@@ -16,8 +16,27 @@ const Scene = dynamic(() => import("@/components/canvas/Scene"), {
   loading: () => null,
 });
 
+function useStageScale() {
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const update = () => {
+      const widthScale = (window.innerWidth - 28) / 1760;
+      const heightScale = (window.innerHeight - 112) / 920;
+      setScale(Math.min(1, Math.max(0.58, Math.min(widthScale, heightScale))));
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  return scale;
+}
+
 export default function Home() {
   const [scrollProgress, setScrollProgress] = useState(0);
+  const stageScale = useStageScale();
 
   useEffect(() => {
     const scrollControl = initScrollCamera((progress) => {
@@ -32,7 +51,7 @@ export default function Home() {
     <main className="relative min-h-[500vh] bg-[#050508]">
       <Scene scrollProgress={scrollProgress} />
       <SocialSidebar />
-      <DashboardHero scrollProgress={scrollProgress} />
+      <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
       <div className="relative z-10 -mt-px bg-[linear-gradient(180deg,rgba(5,5,8,0.38)_0%,rgba(5,5,8,0.82)_18%,rgba(5,5,8,0.94)_100%)]">
         <About />
         <Skills />

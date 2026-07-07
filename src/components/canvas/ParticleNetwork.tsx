@@ -7,7 +7,7 @@ import * as THREE from "three";
 export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 4800;
+  const particleCount = 1800;
 
   const [positions, velocities, sizes] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
@@ -50,25 +50,39 @@ export default function ParticleNetwork() {
     materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.x, targetX, 0.09);
     materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.y, targetY, 0.09);
 
-    const mousePos = new THREE.Vector3(materialRef.current.uniforms.uMouse.value.x, materialRef.current.uniforms.uMouse.value.y, 0);
+    const mx = materialRef.current.uniforms.uMouse.value.x;
+    const my = materialRef.current.uniforms.uMouse.value.y;
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
+
       posArray[idx] += velocities[idx];
       posArray[idx + 1] += velocities[idx + 1];
       posArray[idx + 2] += velocities[idx + 2];
 
-      const p = new THREE.Vector3(posArray[idx], posArray[idx + 1], posArray[idx + 2]);
-      const distToMouse = p.distanceTo(mousePos);
+      const px = posArray[idx];
+      const py = posArray[idx + 1];
+      const pz = posArray[idx + 2];
 
-      if (distToMouse < 8.5) {
-        const dir = new THREE.Vector3().subVectors(mousePos, p).normalize();
-        const tangent = new THREE.Vector3(-dir.y, dir.x, 0);
+      const dx = mx - px;
+      const dy = my - py;
+      const dz = -pz;
+      const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (distToMouse < 8.5 && distToMouse > 0.001) {
+        const dirX = dx / distToMouse;
+        const dirY = dy / distToMouse;
+        const dirZ = dz / distToMouse;
+
+        const tangentX = -dirY;
+        const tangentY = dirX;
+
         const force = (8.5 - distToMouse) * 0.0042;
         const drift = (8.5 - distToMouse) * 0.0032;
-        posArray[idx] += dir.x * force + tangent.x * drift;
-        posArray[idx + 1] += dir.y * force + tangent.y * drift;
-        posArray[idx + 2] += dir.z * force;
+
+        posArray[idx] += dirX * force + tangentX * drift;
+        posArray[idx + 1] += dirY * force + tangentY * drift;
+        posArray[idx + 2] += dirZ * force;
       }
 
       if (Math.abs(posArray[idx]) > 15) posArray[idx] = -posArray[idx];
