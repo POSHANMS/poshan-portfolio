@@ -186,7 +186,7 @@ export default function DashboardHero({
 
           {/* 3D extruded CSS name */}
           <h1 className="sr-only">Poshan MS — Full Stack Engineer</h1>
-          <ExtrudedHeroTitle />
+          {/* <ExtrudedHeroTitle /> */}
 
           {/* Sub-title */}
           <p className="mt-3 font-mono text-lg font-bold uppercase tracking-[0.24em] text-[var(--electric-blue)] text-glow-blue">
@@ -229,7 +229,7 @@ export default function DashboardHero({
         </motion.div>
 
         {/* ═══════ CENTER-LEFT: Current Status + Tech Stack (cols 5-6, row 1) ═══════ */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.15 }}
@@ -259,10 +259,10 @@ export default function DashboardHero({
               ))}
             </div>
           </GlassPanel>
-        </motion.div>
+        </motion.div> */}
 
         {/* ═══════ CENTER: Welcome Code Card (cols 7-10, row 1) ═══════ */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.7, delay: 0.25 }}
@@ -287,16 +287,15 @@ export default function DashboardHero({
               Explore Projects →
             </a>
           </GlassPanel>
-        </motion.div>
+        </motion.div> */}
 
         {/* ═══════ RIGHT PANELS (cols 11-12, rows 1-3) ═══════ */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
           className="stage-right-panels"
         >
-          {/* GitHub Activity */}
           <GlassPanel className="p-5" accent="blue">
             <div className="flex items-center justify-between">
               <MiniHeader>{"// GitHub Activity"}</MiniHeader>
@@ -323,7 +322,6 @@ export default function DashboardHero({
             <p className="mt-3 font-mono text-[11px] text-white/72">1,247 Contributions this year</p>
           </GlassPanel>
 
-          {/* Achievements */}
           <GlassPanel className="p-5" accent="violet">
             <MiniHeader className="text-yellow-200/80">{"// Achievements"}</MiniHeader>
             <div className="mt-4 space-y-3 font-mono text-[12px] text-white/76">
@@ -339,7 +337,6 @@ export default function DashboardHero({
             </div>
           </GlassPanel>
 
-          {/* Testimonial */}
           <GlassPanel className="p-5" accent="blue">
             <MiniHeader>{"// Testimonial"}</MiniHeader>
             <p className="mt-3 font-mono text-[11px] leading-6 text-white/68">
@@ -348,7 +345,6 @@ export default function DashboardHero({
             <p className="mt-3 font-mono text-[10px] text-[var(--hot-pink)]">— Tech Project Collaborator</p>
           </GlassPanel>
 
-          {/* Let's Build Together */}
           <GlassPanel className="p-5" accent="pink">
             <MiniHeader className="text-[var(--hot-pink)]">{"// Let's Build Together"}</MiniHeader>
             <p className="mt-3 font-mono text-[12px] leading-6 text-white/72">
@@ -361,10 +357,10 @@ export default function DashboardHero({
               Get In Touch →
             </a>
           </GlassPanel>
-        </motion.div>
+        </motion.div> */}
 
         {/* ═══════ STATS BAR (cols 1-10, row 2) ═══════ */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.35 }}
@@ -387,10 +383,10 @@ export default function DashboardHero({
               </div>
             ))}
           </GlassPanel>
-        </motion.div>
+        </motion.div> */}
 
         {/* ═══════ MUSIC PLAYER (col 1-2, row 3) ═══════ */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
@@ -430,10 +426,10 @@ export default function DashboardHero({
               </div>
             </div>
           </GlassPanel>
-        </motion.div>
+        </motion.div> */}
 
         {/* ═══════ FEATURED PROJECT (cols 3-6, row 3) ═══════ */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.45 }}
@@ -456,10 +452,10 @@ export default function DashboardHero({
               Live Preview →
             </a>
           </GlassPanel>
-        </motion.div>
+        </motion.div> */}
 
         {/* ═══════ SKILLS OVERVIEW (cols 7-10, row 3) ═══════ */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
@@ -474,7 +470,7 @@ export default function DashboardHero({
               <SkillBar label="Problem Solving" value={95} />
             </div>
           </GlassPanel>
-        </motion.div>
+        </motion.div> */}
 
       </div>{/* end .dashboard-stage */}
     </section>
