@@ -17,7 +17,7 @@ export default function NeonGrid() {
     <group position={[0, -1.82, 0]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.12, 0]}>
         <planeGeometry args={[220, 220]} />
-        <meshStandardMaterial color="#020205" metalness={0.88} roughness={0.18} envMapIntensity={0.55} depthWrite={false} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.78} depthWrite={false} />
       </mesh>
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]}>
@@ -30,35 +30,36 @@ export default function NeonGrid() {
         <meshBasicMaterial color="#800010" transparent opacity={0.012} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
-      <Grid
-        args={[220, 220]}
-        position={[0, 0.012, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        cellSize={1.1}
-        cellThickness={0.035}
-        cellColor="#ff1744"
-        sectionSize={7}
-        sectionThickness={0.07}
-        sectionColor="#5a0010"
-        fadeDistance={58}
-        fadeStrength={2.2}
-        infiniteGrid
-      />
+      <group position={[0, 0.055, 0]}>
+        <Grid
+          args={[220, 220]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          cellSize={1.1}
+          cellThickness={0.05}
+          cellColor="#ff1744"
+          sectionSize={7}
+          sectionThickness={0.09}
+          sectionColor="#5a0010"
+          fadeDistance={46}
+          fadeStrength={1.65}
+          infiniteGrid
+        />
 
-      <Grid
-        args={[220, 220]}
-        position={[0, 0.016, 0]}
-        rotation={[-Math.PI / 2, 0.22, 0]}
-        cellSize={4.2}
-        cellThickness={0.026}
-        cellColor="#800010"
-        sectionSize={16}
-        sectionThickness={0.052}
-        sectionColor="#800010"
-        fadeDistance={48}
-        fadeStrength={2.4}
-        infiniteGrid
-      />
+        <Grid
+          args={[220, 220]}
+          position={[0, 0.004, 0]}
+          rotation={[-Math.PI / 2, 0.22, 0]}
+          cellSize={4.2}
+          cellThickness={0.038}
+          cellColor="#800010"
+          sectionSize={16}
+          sectionThickness={0.07}
+          sectionColor="#800010"
+          fadeDistance={42}
+          fadeStrength={1.8}
+          infiniteGrid
+        />
+      </group>
 
       {[2.15, 3.2, 4.75, 6.3].map((radius, index) => (
         <mesh key={radius} position={[2.45, 0.025 + index * 0.003, -0.55]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -88,13 +89,13 @@ export default function NeonGrid() {
         </mesh>
       ))}
 
-      <mesh position={[7.4, 0.035, -8]} rotation={[-Math.PI / 2, 0.1, -0.07]}>
+      <mesh position={[7.4, 0.08, -8]} rotation={[-Math.PI / 2, 0.1, -0.07]}>
         <planeGeometry args={[0.045, 34]} />
         <meshBasicMaterial color="#ff1744" transparent opacity={0.2} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
       {streaks.map(([x, z, width, height, opacity]) => (
-        <mesh key={`${x}-${z}`} position={[x, 0.08, z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh key={`${x}-${z}`} position={[x, 0.09, z]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[width, height]} />
           <meshBasicMaterial color="#ff1744" transparent opacity={opacity} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
