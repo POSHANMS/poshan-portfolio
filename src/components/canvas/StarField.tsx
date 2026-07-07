@@ -17,7 +17,7 @@ export default function StarField() {
   const constellationRef = useRef<THREE.LineSegments>(null);
 
   const [ambientPositions, ambientColors, ambientSizes] = useMemo(() => {
-    const count = 2000;
+    const count = 3200;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
