@@ -7,13 +7,12 @@ import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
 import { useDeviceSize } from "@/hooks/useDeviceSize";
 import NebulaBackground from "./NebulaBackground";
-import ImageBackground from "./ImageBackground";
 import StarField from "./StarField";
-import ParticleNetwork from "./ParticleNetwork";
 import NeonGrid from "./NeonGrid";
 import FloatingLaptop from "./FloatingLaptop";
 import TechCubes from "./TechCubes";
 import FloorRings from "./FloorRings";
+import DeepSpaceGlobe from "./DeepSpaceGlobe";
 import PostProcessing from "./PostProcessing";
 
 interface SceneProps {
@@ -56,10 +55,9 @@ export default function Scene({ scrollProgress }: SceneProps) {
         <spotLight position={[5.6, 2.0, 2.4]} angle={0.5} penumbra={0.85} intensity={1.2} color="#3a3a42" distance={28} />
 
         <Suspense fallback={null}>
-          <ImageBackground />
           <NebulaBackground />
           <StarField />
-          {!isMobile && !reducedMotion && <ParticleNetwork />}
+          {!isMobile && !reducedMotion && <DeepSpaceGlobe />}
 
           <FloatingLaptop />
           {!reducedMotion && <TechCubes />}
