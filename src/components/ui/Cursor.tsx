@@ -126,20 +126,20 @@ export default function Cursor() {
           width: 48px !important;
           height: 48px !important;
           border-color: var(--electric-blue) !important;
-          box-shadow: 0 0 15px var(--electric-blue), inset 0 0 10px rgba(0, 212, 255, 0.3) !important;
+          box-shadow: 0 0 15px var(--electric-blue), inset 0 0 10px rgba(255, 23, 68, 0.3) !important;
           margin-top: -12px;
           margin-left: -12px;
-          background-color: rgba(0, 212, 255, 0.05) !important;
+          background-color: rgba(255, 23, 68, 0.05) !important;
         }
         .dot-morph {
           transform: scale(0.5) !important;
           background-color: var(--hot-pink) !important;
-          shadow-[0_0_10px_#ff2d78] !important;
+          shadow-[0_0_10px_#cc1133] !important;
         }
         .cursor-click {
           transform: scale(0.7) !important;
           border-color: var(--hot-pink) !important;
-          background-color: rgba(255, 45, 120, 0.2) !important;
+          background-color: rgba(255, 23, 68, 0.2) !important;
         }
       `}</style>
     </>

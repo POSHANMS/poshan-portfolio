@@ -41,12 +41,12 @@ export default function HolographicTerminal({ scrollProgress = 0 }: { scrollProg
           <motion.span
             animate={{ opacity: [1, 0.25, 1] }}
             transition={{ duration: 1, repeat: Infinity }}
-            className="inline-block h-3 w-2 bg-emerald-300 shadow-[0_0_14px_rgba(0,255,136,0.75)]"
+            className="inline-block h-3 w-2 bg-red-500 shadow-[0_0_14px_rgba(255,23,68,0.75)]"
           />
         </div>
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-300/80 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-red-500/80 to-transparent" />
     </motion.div>
   );
 }

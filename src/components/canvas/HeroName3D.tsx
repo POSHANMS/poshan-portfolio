@@ -30,9 +30,9 @@ function TitleLine({
   y: number;
   isMagenta?: boolean;
 }) {
-  const faceColor = isMagenta ? "#ff2d78" : "#00d4ff";
-  const emissive  = isMagenta ? "#cc0060" : "#0090e0";
-  const shadowEm  = isMagenta ? "#3a0020" : "#000d30";
+  const faceColor = isMagenta ? "#cc1133" : "#ff1744";
+  const emissive  = isMagenta ? "#800010" : "#cc0018";
+  const shadowEm  = isMagenta ? "#280004" : "#200002";
 
   return (
     <group position={[0, y, 0]}>
@@ -101,13 +101,13 @@ export default function HeroName3D({ stageScale = 1 }: { stageScale?: number }) 
       scale={[s, s, s]}
     >
       {/* Key lights to illuminate the neon letters */}
-      <pointLight position={[-0.5, 1.2, 2.5]} intensity={2.8} distance={8} color="#00f5ff" decay={2} />
-      <pointLight position={[3.2, -0.8, 2.0]} intensity={1.8} distance={7} color="#ff3ed1" decay={2} />
+      <pointLight position={[-0.5, 1.2, 2.5]} intensity={2.8} distance={8} color="#ff1744" decay={2} />
+      <pointLight position={[3.2, -0.8, 2.0]} intensity={1.8} distance={7} color="#800010" decay={2} />
 
       {/* Floor glow blob */}
       <mesh position={[2.1, -1.55, -0.5]} rotation={[-Math.PI / 2, 0, 0]} scale={[4.4, 1.2, 1]}>
         <circleGeometry args={[1, 48]} />
-        <meshBasicMaterial color="#00f5ff" transparent opacity={0.09} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color="#ff1744" transparent opacity={0.06} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
       <TitleLine text="POSHAN" size={0.88} y={0} isMagenta={false} />

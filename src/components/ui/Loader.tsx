@@ -83,21 +83,21 @@ export default function Loader() {
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 6, ease: "linear" }}
-                className="absolute inset-0 border border-t-[var(--electric-blue)] border-r-[var(--hot-pink)] border-b-transparent border-l-transparent rounded-full shadow-[0_0_15px_rgba(0,212,255,0.4)]"
+                className="absolute inset-0 border border-t-[var(--electric-blue)] border-r-[var(--hot-pink)] border-b-transparent border-l-transparent rounded-full shadow-[0_0_15px_rgba(255,23,68,0.4)]"
               />
               
               {/* Secondary reverse rotating ring */}
               <motion.div
                 animate={{ rotate: -360 }}
                 transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-                className="absolute inset-2 border border-b-[var(--terminal-green)] border-l-[var(--deep-violet)] border-t-transparent border-r-transparent rounded-full opacity-60"
+                className="absolute inset-2 border border-b-[var(--deep-violet)] border-l-[var(--node-green)] border-t-transparent border-r-transparent rounded-full opacity-60"
               />
 
               {/* Stylized P Logo */}
               <motion.div 
                 animate={{ 
                   scale: [1, 1.05, 1],
-                  filter: ["drop-shadow(0 0 5px #00d4ff)", "drop-shadow(0 0 12px #ff2d78)", "drop-shadow(0 0 5px #00d4ff)"]
+                  filter: ["drop-shadow(0 0 5px #ff1744)", "drop-shadow(0 0 12px #800010)", "drop-shadow(0 0 5px #ff1744)"]
                 }}
                 transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
                 className="relative z-10 flex items-center justify-center"
@@ -112,21 +112,21 @@ export default function Loader() {
                 >
                   <path
                     d="M5 5H22C28.6274 5 34 10.3726 34 17C34 23.6274 28.6274 29 22 29H13V40"
-                    stroke="#00d4ff"
+                    stroke="#ff1744"
                     strokeWidth="8"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <path
                     d="M13 17H22C23.6569 17 25 15.6569 25 14C25 12.3431 23.6569 11 22 11H13V17Z"
-                    fill="#ff2d78"
+                    fill="#800010"
                   />
                 </svg>
               </motion.div>
             </div>
 
             {/* Terminal Feed Details */}
-            <div className="w-full bg-[rgba(10,10,30,0.6)] border border-[rgba(0,212,255,0.2)] p-4 rounded mb-6 text-[10px] text-[var(--terminal-green)] leading-5 h-36 overflow-hidden flex flex-col justify-end">
+            <div className="w-full bg-[rgba(5,5,8,0.92)] border border-[rgba(255,23,68,0.22)] p-4 rounded mb-6 text-[10px] text-[var(--terminal-green)] leading-5 h-36 overflow-hidden flex flex-col justify-end">
               <div className="space-y-1">
                 {bootLogs.map((log, index) => (
                   <motion.div
@@ -154,7 +154,7 @@ export default function Loader() {
               </span>
             </div>
 
-            <div className="w-full h-1.5 bg-[#121225] rounded-full overflow-hidden border border-white/5 relative">
+            <div className="w-full h-1.5 bg-[#0a0a0c] rounded-full overflow-hidden border border-white/5 relative">
               <motion.div
                 className="h-full bg-gradient-to-r from-[var(--electric-blue)] via-[var(--deep-violet)] to-[var(--hot-pink)] shadow-[0_0_10px_var(--electric-blue)]"
                 style={{ width: `${displayProgress}%` }}

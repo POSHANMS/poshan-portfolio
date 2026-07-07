@@ -32,7 +32,7 @@ export default function ParticleNetwork() {
     () => ({
       uTime: { value: 0 },
       uMouse: { value: new THREE.Vector2(0, 0) },
-      uColor: { value: new THREE.Color("#00d4ff") },
+      uColor: { value: new THREE.Color("#ff1744") },
     }),
     []
   );

@@ -27,10 +27,10 @@ export default function Navbar() {
       <nav className="fixed left-0 top-0 z-50 w-full border-b border-white/[0.04] bg-[#050508]/35 px-6 py-4 backdrop-blur-md md:px-12">
         <div className="mx-auto flex max-w-[96rem] items-center justify-between">
           <div className="flex select-none items-center space-x-3">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#00d4ff]/20 bg-[#00d4ff]/5 shadow-[0_0_18px_rgba(0,212,255,0.18)]">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff1744]/20 bg-[#ff1744]/5 shadow-[0_0_18px_rgba(255,23,68,0.18)]">
               <svg width="30" height="34" viewBox="0 0 40 45" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-[0_0_10px_var(--electric-blue)]">
-                <path d="M5 5H22C28.6274 5 34 10.3726 34 17C34 23.6274 28.6274 29 22 29H13V40" stroke="#00d4ff" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M13 17H22C23.6569 17 25 15.6569 25 14C25 12.3431 23.6569 11 22 11H13V17Z" fill="#ff2d78" />
+                <path d="M5 5H22C28.6274 5 34 10.3726 34 17C34 23.6274 28.6274 29 22 29H13V40" stroke="#ff1744" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M13 17H22C23.6569 17 25 15.6569 25 14C25 12.3431 23.6569 11 22 11H13V17Z" fill="#800010" />
               </svg>
             </div>
 
@@ -69,7 +69,7 @@ export default function Navbar() {
           <div className="hidden items-center space-x-4 md:flex">
             <a
               href="mailto:siddeshwaraprasanna5@gmail.com"
-              className="group flex items-center space-x-1.5 rounded-full border border-[var(--electric-blue)] bg-transparent px-5 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-white shadow-[0_0_16px_rgba(0,212,255,0.2)] transition-all duration-300 hover:border-[var(--hot-pink)] hover:bg-white/[0.02] hover:text-[var(--hot-pink)] hover:shadow-[0_0_18px_rgba(255,45,120,0.24)] md:text-xs"
+              className="group flex items-center space-x-1.5 rounded-full border border-[var(--electric-blue)] bg-transparent px-5 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-white shadow-[0_0_16px_rgba(255,23,68,0.2)] transition-all duration-300 hover:border-[var(--hot-pink)] hover:bg-white/[0.02] hover:text-[var(--hot-pink)] hover:shadow-[0_0_18px_rgba(204,17,51,0.24)] md:text-xs"
             >
               <span>LET&apos;S CONNECT</span>
               <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
@@ -79,7 +79,7 @@ export default function Navbar() {
               type="button"
               suppressHydrationWarning
               onClick={() => setIsOpen(!isOpen)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[var(--glass-dark)] text-white/80 transition-all duration-300 hover:border-[var(--electric-blue)] hover:text-[var(--electric-blue)] hover:shadow-[0_0_12px_rgba(0,212,255,0.24)]"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[var(--glass-dark)] text-white/80 transition-all duration-300 hover:border-[var(--electric-blue)] hover:text-[var(--electric-blue)] hover:shadow-[0_0_12px_rgba(255,23,68,0.24)]"
               aria-label="Open navigation menu"
             >
               <Menu className="h-4 w-4" />

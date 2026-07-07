@@ -92,7 +92,7 @@ function SkillBar({ label, value }: { label: string; value: number }) {
       </div>
       <div className="h-[3px] overflow-hidden rounded-full bg-white/10">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#00d4ff] to-[#8b5cf6]"
+          className="h-full rounded-full bg-gradient-to-r from-[#ff1744] to-[#800010]"
           style={{ width: `${value}%` }}
         />
       </div>
@@ -194,11 +194,11 @@ export default function DashboardHero({
           </p>
 
           {/* Tagline */}
-          <p className="mt-2 max-w-[28rem] font-mono text-[14px] leading-7 text-[#d8faff]/72">
+          <p className="mt-2 max-w-[28rem] font-mono text-[14px] leading-7 text-[#f5f0e8]/72">
             I build{" "}
-            <span className="font-semibold text-[#00f5ff]">scalable</span>{" "}
+            <span className="font-semibold text-[#ff1744]">scalable</span>{" "}
             <span className="text-white/30">·</span>{" "}
-            <span className="font-semibold text-[#ff3ed1]">performant</span>{" "}
+            <span className="font-semibold text-[#cc1133]">performant</span>{" "}
             <span className="text-white/30">·</span>{" "}
             beautiful digital experiences.
           </p>
@@ -216,7 +216,7 @@ export default function DashboardHero({
           {/* Status bar */}
           <div className="mt-5 flex flex-wrap items-center gap-4 font-mono text-[10px] uppercase tracking-[0.14em] text-white/55">
             <span className="flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-[#00ff88] shadow-[0_0_10px_rgba(0,255,136,0.8)]" />
+              <span className="h-2 w-2 animate-pulse rounded-full bg-[#ff1744] shadow-[0_0_10px_rgba(255,23,68,0.8)]" />
               Available for Collaboration
             </span>
             <span className="flex items-center gap-2">
@@ -309,12 +309,12 @@ export default function DashboardHero({
                   style={{
                     background:
                       cell % 7 === 0
-                        ? "rgba(0,255,136,0.95)"
+                        ? "rgba(255,23,68,0.95)"
                         : cell % 5 === 0
-                          ? "rgba(0,255,136,0.68)"
+                          ? "rgba(255,23,68,0.68)"
                           : cell % 3 === 0
-                            ? "rgba(0,255,136,0.42)"
-                            : "rgba(0,255,136,0.18)",
+                            ? "rgba(255,23,68,0.42)"
+                            : "rgba(255,23,68,0.18)",
                   }}
                 />
               ))}

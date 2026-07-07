@@ -59,8 +59,8 @@ export default function SocialSidebar() {
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 1.1 + index * 0.08 }}
-            className={`block transition-all duration-300 hover:scale-125 hover:text-[#00d4ff] hover:drop-shadow-[0_0_8px_#00d4ff] ${
-              index === 0 ? "text-[#00d4ff] drop-shadow-[0_0_10px_#00d4ff]" : "text-white/55"
+            className={`block transition-all duration-300 hover:scale-125 hover:text-[#ff1744] hover:drop-shadow-[0_0_8px_#ff1744] ${
+              index === 0 ? "text-[#ff1744] drop-shadow-[0_0_10px_#ff1744]" : "text-white/55"
             }`}
           >
             {social.icon}
