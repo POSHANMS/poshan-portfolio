@@ -58,15 +58,15 @@ void main() {
   float fogShape = pow(cloudA, 3.2) * 0.58 + pow(cloudB, 3.8) * 0.72 + pow(cloudC, 5.0) * 0.42;
   fogShape *= upperMask * horizonMask;
 
-  vec3 blueFog = vec3(0.0, 0.18, 0.72) * pow(cloudA, 4.2) * 0.22;
-  vec3 violetFog = vec3(0.38, 0.06, 0.85) * pow(cloudB, 4.4) * 0.18;
-  vec3 magentaFog = vec3(0.9, 0.06, 0.42) * pow(cloudC, 5.4) * 0.16;
-  vec3 cyanEdge = vec3(0.0, 0.85, 1.0) * galaxyArms * 0.35;
-  vec3 purpleCore = vec3(0.55, 0.15, 1.0) * galaxyCore * 0.42;
-  vec3 faceGlow = vec3(0.18, 0.03, 0.55) * faceSilhouette * 0.08;
+  vec3 blueFog = vec3(0.55, 0.02, 0.08) * pow(cloudA, 4.2) * 0.15;
+  vec3 violetFog = vec3(0.35, 0.01, 0.05) * pow(cloudB, 4.4) * 0.12;
+  vec3 magentaFog = vec3(0.20, 0.0, 0.03) * pow(cloudC, 5.4) * 0.08;
+  vec3 cyanEdge = vec3(0.72, 0.05, 0.12) * galaxyArms * 0.18;
+  vec3 purpleCore = vec3(0.95, 0.02, 0.18) * galaxyCore * 0.26;
+  vec3 faceGlow = vec3(0.18, 0.01, 0.03) * faceSilhouette * 0.05;
 
   float horizonGlow = exp(-pow(uv.y - 0.22, 2.0) * 58.0);
-  vec3 horizonColor = vec3(0.0, 0.3, 0.8) * horizonGlow * 0.06 + vec3(0.8, 0.04, 0.5) * horizonGlow * 0.03;
+  vec3 horizonColor = vec3(0.55, 0.02, 0.08) * horizonGlow * 0.03 + vec3(0.3, 0.0, 0.02) * horizonGlow * 0.01;
 
   vec3 color = blueFog + violetFog + magentaFog + cyanEdge + purpleCore + faceGlow + horizonColor;
   color = clamp(color, 0.0, 1.35);

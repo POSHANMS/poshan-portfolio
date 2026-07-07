@@ -37,9 +37,9 @@ void main() {
   // Fades out rings as they expand outward
   float fade = max(0.0, 1.0 - (r * 1.55));
   
-  // Cyberpunk colors: Electric blue at the center, shifting to violet/pink on edges
-  vec3 innerColor = vec3(0.0, 0.83, 1.0); // Cyan/Electric Blue
-  vec3 outerColor = vec3(1.0, 0.18, 0.47); // Hot Pink
+  // Cyberpunk colors: Crimson at the center, shifting to burgundy on edges
+  vec3 innerColor = vec3(1.0, 0.09, 0.27); // Crimson
+  vec3 outerColor = vec3(0.50, 0.0, 0.06); // Burgundy
   vec3 ringColor = mix(innerColor, outerColor, r * 2.0);
   
   // Apply mask, fade, and increase brightness for bloom

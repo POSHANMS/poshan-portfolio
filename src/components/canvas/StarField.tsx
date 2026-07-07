@@ -23,10 +23,10 @@ export default function StarField() {
     const sizes = new Float32Array(count);
     const palette = [
       new THREE.Color("#ffffff"),
-      new THREE.Color("#00d4ff"),
-      new THREE.Color("#8b5cf6"),
-      new THREE.Color("#ff2d78"),
-      new THREE.Color("#00ff88"),
+      new THREE.Color("#f5f0e8"),
+      new THREE.Color("#ffd89a"),
+      new THREE.Color("#cfe8ff"),
+      new THREE.Color("#ffffff"),
     ];
 
     for (let i = 0; i < count; i++) {
@@ -48,16 +48,17 @@ export default function StarField() {
     const count = 600;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
-    const cyan = new THREE.Color("#00d4ff");
-    const violet = new THREE.Color("#8b5cf6");
-    const pink = new THREE.Color("#ff2d78");
+    const white = new THREE.Color("#ffffff");
+    const warmWhite = new THREE.Color("#f5f0e8");
+    const gold = new THREE.Color("#ffd89a");
+    const iceBlue = new THREE.Color("#cfe8ff");
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
       const radius = Math.pow(Math.random(), 0.58) * 11;
       const arm = Math.random() > 0.5 ? 0 : Math.PI;
       const angle = radius * 0.58 + arm + (Math.random() - 0.5) * 0.8;
-      const color = i % 3 === 0 ? pink : i % 3 === 1 ? violet : cyan;
+      const color = i % 4 === 0 ? white : i % 4 === 1 ? warmWhite : i % 4 === 2 ? gold : iceBlue;
 
       positions[i3] = 21 + Math.cos(angle) * radius * 1.45;
       positions[i3 + 1] = 20 + Math.sin(angle) * radius * 0.55;
@@ -74,11 +75,11 @@ export default function StarField() {
     const nodes: ConstellationNode[] = [];
     const nodeCount = 100;
     const colors = [
-      new THREE.Color("#00d4ff"),
-      new THREE.Color("#8b5cf6"),
-      new THREE.Color("#ff2d78"),
-      new THREE.Color("#00ff88"),
-      new THREE.Color("#f0f0f0"),
+      new THREE.Color("#ff1744"),
+      new THREE.Color("#800010"),
+      new THREE.Color("#ff1744"),
+      new THREE.Color("#800010"),
+      new THREE.Color("#ffffff"),
     ];
 
     for (let i = 0; i < nodeCount; i++) {

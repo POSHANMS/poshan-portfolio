@@ -47,7 +47,7 @@ export default function NebulaBackground() {
         depthWrite={false}
         depthTest={false}
         blending={THREE.NormalBlending}
-        opacity={0.38}
+        opacity={0.22}
       />
     </mesh>
   );

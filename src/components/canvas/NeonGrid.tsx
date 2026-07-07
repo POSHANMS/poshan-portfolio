@@ -27,12 +27,12 @@ export default function NeonGrid() {
         position={[0, 0.012, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         cellSize={1.1}
-        cellThickness={0.22}
-        cellColor="#00d4ff"
+        cellThickness={0.35}
+        cellColor="#ff1744"
         sectionSize={7}
-        sectionThickness={0.62}
-        sectionColor="#8b5cf6"
-        fadeDistance={80}
+        sectionThickness={0.55}
+        sectionColor="#5a0010"
+        fadeDistance={32}
         fadeStrength={1.1}
         infiniteGrid
       />
@@ -42,13 +42,13 @@ export default function NeonGrid() {
         position={[0, 0.016, 0]}
         rotation={[-Math.PI / 2, 0.22, 0]}
         cellSize={4.2}
-        cellThickness={0.16}
-        cellColor="#ff2d78"
+        cellThickness={0.22}
+        cellColor="#800010"
         sectionSize={16}
-        sectionThickness={0.45}
-        sectionColor="#ff2d78"
-        fadeDistance={72}
-        fadeStrength={1.35}
+        sectionThickness={0.38}
+        sectionColor="#800010"
+        fadeDistance={28}
+        fadeStrength={1.2}
         infiniteGrid
       />
 
@@ -56,9 +56,9 @@ export default function NeonGrid() {
         <mesh key={radius} position={[2.45, 0.025 + index * 0.003, -0.55]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[radius, radius + 0.045, 160]} />
           <meshBasicMaterial
-            color={index % 2 === 0 ? "#00d4ff" : "#ff2d78"}
+            color={index % 2 === 0 ? "#ff1744" : "#800010"}
             transparent
-            opacity={0.18 - index * 0.025}
+            opacity={(0.18 - index * 0.025) * 0.11}
             side={THREE.DoubleSide}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
@@ -68,7 +68,7 @@ export default function NeonGrid() {
 
       <mesh position={[7.4, 0.035, -8]} rotation={[-Math.PI / 2, 0.1, -0.07]}>
         <planeGeometry args={[0.06, 34]} />
-        <meshBasicMaterial color="#ff2d78" transparent opacity={0.34} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color="#ff1744" transparent opacity={0.34} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
     </group>
   );

@@ -44,16 +44,16 @@ export default function Scene({ scrollProgress }: SceneProps) {
       >
         <CinematicCamera scrollProgress={scrollProgress} />
         <color attach="background" args={["#000000"]} />
-        <fog attach="fog" args={["#010106", 26, 68]} />
+        <fog attach="fog" args={["#000000", 10, 62]} />
         <Environment preset="city" background={false} blur={0.8} />
 
-        <ambientLight intensity={0.22} color="#06112a" />
-        <pointLight position={[4.8, 1.4, 4.8]} intensity={3.2} color="#00f5ff" distance={34} decay={2} />
-        <pointLight position={[3.6, -1.4, 3.2]} intensity={2.6} color="#ff3ed1" distance={30} decay={2} />
-        <pointLight position={[-4.8, 4.8, 2.6]} intensity={1.85} color="#8a2eff" distance={30} decay={2} />
-        <pointLight position={[0.2, 4.2, -8]} intensity={1.55} color="#2bd9ff" distance={38} decay={2} />
-        <spotLight position={[1.8, 5.8, 5]} angle={0.45} penumbra={0.8} intensity={2.2} color="#00f5ff" distance={34} />
-        <spotLight position={[5.6, 2.0, 2.4]} angle={0.5} penumbra={0.85} intensity={1.7} color="#ff3ed1" distance={28} />
+        <ambientLight intensity={0.16} color="#0c0406" />
+        <pointLight position={[4.8, 1.4, 4.8]} intensity={2.8} color="#ff1744" distance={34} decay={2} />
+        <pointLight position={[3.6, -1.4, 3.2]} intensity={1.8} color="#800010" distance={30} decay={2} />
+        <pointLight position={[-4.8, 4.8, 2.6]} intensity={1.4} color="#2a2a30" distance={30} decay={2} />
+        <pointLight position={[0.2, 4.2, -8]} intensity={1.2} color="#800010" distance={38} decay={2} />
+        <spotLight position={[1.8, 5.8, 5]} angle={0.45} penumbra={0.8} intensity={1.8} color="#ff1744" distance={34} />
+        <spotLight position={[5.6, 2.0, 2.4]} angle={0.5} penumbra={0.85} intensity={1.2} color="#3a3a42" distance={28} />
 
         <Suspense fallback={null}>
           <ImageBackground />
