@@ -48,17 +48,22 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="relative min-h-[500vh] bg-[#050508]">
+    <main className="relative min-h-[500vh] bg-[#0a0002]">
       <Scene scrollProgress={scrollProgress} />
       <SocialSidebar />
       <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
-      <div className="relative z-10 -mt-px bg-[linear-gradient(180deg,rgba(5,5,8,0.38)_0%,rgba(5,5,8,0.82)_18%,rgba(5,5,8,0.94)_100%)]">
+      <div className="relative z-10 -mt-px bg-[linear-gradient(180deg,rgba(10,0,2,0.38)_0%,rgba(10,0,2,0.82)_18%,rgba(10,0,2,0.94)_100%)]">
         <About />
         <Skills />
         <Projects />
         <Experience />
         <Contact />
       </div>
+      
+      {/* Cyberpunk CRT screen texture overlays */}
+      <div className="scanlines-overlay" />
+      <div className="vignette-overlay" />
+      <div className="grain-overlay" />
     </main>
   );
 }
