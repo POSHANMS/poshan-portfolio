@@ -1,7 +1,7 @@
 "use client";
 
-import React, { Suspense, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import React, { Suspense } from "react";
+import { Canvas } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
@@ -18,43 +18,12 @@ import VolumetricRays from "./VolumetricRays";
 import FloatingHexParticles from "./FloatingHexParticles";
 import PostProcessing from "./PostProcessing";
 
-// Mouse parallax group
-function ParallaxGroup({ children, factor = 1 }: { children: React.ReactNode; factor?: number }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const mouseRef = useRef({ x: 0, y: 0 });
-
-  React.useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      mouseRef.current.x = (e.clientX / window.innerWidth - 0.5) * 2;
-      mouseRef.current.y = (e.clientY / window.innerHeight - 0.5) * 2;
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
-
-  useFrame(() => {
-    if (!groupRef.current) return;
-    groupRef.current.position.x = THREE.MathUtils.lerp(
-      groupRef.current.position.x,
-      mouseRef.current.x * factor,
-      0.03
-    );
-    groupRef.current.position.y = THREE.MathUtils.lerp(
-      groupRef.current.position.y,
-      mouseRef.current.y * factor * 0.5,
-      0.03
-    );
-  });
-
-  return <group ref={groupRef}>{children}</group>;
-}
-
 interface SceneProps {
   scrollProgress: number;
 }
 
 export default function Scene({ scrollProgress }: SceneProps) {
-  const { deviceTier, reducedMotion } = useDeviceSize();
+  const { deviceTier } = useDeviceSize();
   const isMobile = deviceTier === "mobile";
 
   return (
@@ -76,10 +45,10 @@ export default function Scene({ scrollProgress }: SceneProps) {
         }}
       >
         <CinematicCamera scrollProgress={scrollProgress} />
-        
+
         <color attach="background" args={["#050001"]} />
         <fog attach="fog" args={["#050001", 30, 100]} />
-        
+
         <Environment preset="city" background={false} blur={2} />
 
         <ambientLight intensity={0.12} color="#1a0004" />
@@ -90,30 +59,22 @@ export default function Scene({ scrollProgress }: SceneProps) {
         <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={2.5} color="#ff1744" distance={50} />
 
         <Suspense fallback={null}>
-          {/* DEEPEST LAYER — slowest parallax */}
-          <ParallaxGroup factor={0.3}>
-            <NebulaBackground />
-            <StarField />
-          </ParallaxGroup>
+          {/* BACKGROUND LAYERS — no parallax */}
+          <NebulaBackground />
+          <StarField />
+          <DeepSpaceGlobe />
+          <VolumetricRays />
 
           {/* MID LAYER */}
-          <ParallaxGroup factor={0.6}>
-            <DeepSpaceGlobe />
-            <VolumetricRays />
-          </ParallaxGroup>
+          <ParticleNetwork />
+          <FloatingHexParticles />
+          <TechCubes />
+          <FloatingLaptop />
 
-          {/* NEAR LAYER — faster parallax */}
-          <ParallaxGroup factor={1.0}>
-            <ParticleNetwork />
-            <FloatingHexParticles />
-            <TechCubes />
-            <FloatingLaptop />
-          </ParallaxGroup>
-
-          {/* FOREGROUND — no parallax (anchored) */}
+          {/* FLOOR — anchored, never moves */}
           <NeonGrid />
           <FloorRings />
-          
+
           <PostProcessing />
         </Suspense>
       </Canvas>

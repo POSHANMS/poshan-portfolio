@@ -64,23 +64,23 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
           <meshBasicMaterial color={color} transparent opacity={0.16} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
         <MeshTransmissionMaterial
-          color={new THREE.Color(color).lerp(new THREE.Color("#fff0f0"), 0.6)}
-          transmission={0.95}        // More transparent
-          thickness={0.15}           // Thicker glass
-          roughness={0.005}          // Smoother
-          metalness={0.1}
-          ior={1.5}                  // Glass-like refraction
-          chromaticAberration={0.05} // Add RGB split
-          anisotropicBlur={0.1}
-          distortion={0.2}
-          distortionScale={0.5}
-          temporalDistortion={0.1}
-          attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#fff5f5"), 0.5)}
-          attenuationDistance={1.2}
+          color={new THREE.Color(color).lerp(new THREE.Color("#f7fbff"), 0.72)}
+          transmission={1}
+          thickness={0.08}
+          roughness={0.012}
+          metalness={0}
+          ior={1.24}
+          chromaticAberration={0.011}
+          anisotropicBlur={0}
+          distortion={0}
+          distortionScale={0}
+          temporalDistortion={0}
+          attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#f0fbff"), 0.35)}
+          attenuationDistance={0.95}
           emissive={glow}
-          emissiveIntensity={hovered ? 0.6 : 0.35}
-          envMapIntensity={3}
-          side={THREE.DoubleSide}    // See through both sides
+          emissiveIntensity={hovered ? 0.52 : 0.28}
+          envMapIntensity={2.35}
+          side={THREE.FrontSide}
         />
       </RoundedBox>
 
