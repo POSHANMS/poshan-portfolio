@@ -59,11 +59,6 @@ export default function Home() {
         <Experience />
         <Contact />
       </div>
-      
-      {/* Cyberpunk CRT screen texture overlays */}
-      <div className="scanlines-overlay" />
-      <div className="vignette-overlay" />
-      <div className="grain-overlay" />
     </main>
   );
 }

@@ -69,16 +69,18 @@ export default function ParticleNetwork() {
       const dz = -pz;
       const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-      if (distToMouse < 8.5 && distToMouse > 0.001) {
+      if (distToMouse < 12.0 && distToMouse > 0.001) {
         const dirX = dx / distToMouse;
         const dirY = dy / distToMouse;
         const dirZ = dz / distToMouse;
 
+        // Tangential (orbit) force instead of direct pull
         const tangentX = -dirY;
         const tangentY = dirX;
 
-        const force = (8.5 - distToMouse) * 0.0042;
-        const drift = (8.5 - distToMouse) * 0.0032;
+        // Weaker attraction, stronger tangential spread
+        const force = (12.0 - distToMouse) * 0.002;
+        const drift = (12.0 - distToMouse) * 0.005;
 
         posArray[idx] += dirX * force + tangentX * drift;
         posArray[idx + 1] += dirY * force + tangentY * drift;
