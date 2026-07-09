@@ -1,105 +1,205 @@
 "use client";
 
-import React from "react";
-import { Grid } from "@react-three/drei";
+import React, { useRef, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
+function createGridTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext("2d")!;
+  
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, 1024, 1024);
+  
+  // FEWER lines — was 16, now 8
+  ctx.strokeStyle = "#ff1744";
+  ctx.lineWidth = 1.5; // Thinner
+  
+  const step = 128; // 8 lines per texture (was 64)
+  for (let i = 0; i <= 1024; i += step) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, 1024);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(1024, i);
+    ctx.stroke();
+  }
+  
+  // Major lines
+  ctx.strokeStyle = "#ff4444";
+  ctx.lineWidth = 2;
+  for (let i = 0; i <= 1024; i += step * 4) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, 1024);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(1024, i);
+    ctx.stroke();
+  }
+  
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(30, 30); // Less repeat (was 50)
+  return tex;
+}
+
 export default function NeonGrid() {
-  const streaks = [
-    [-11.5, -18, 0.75, 7.8, 0.09],
-    [-4.2, -21, 0.52, 5.6, 0.06],
-    [3.4, -19.5, 0.62, 6.2, 0.07],
-    [10.8, -23, 0.88, 8.4, 0.1],
-    [18.5, -27, 0.46, 5.2, 0.055],
-  ] as const;
+  const gridRef = useRef<THREE.Mesh>(null);
+  const ringsRef = useRef<THREE.Group>(null);
+
+  const gridTexture = useMemo(() => createGridTexture(), []);
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    
+    // Animate grid texture for moving effect
+    if (gridRef.current) {
+      const mat = gridRef.current.material as THREE.MeshBasicMaterial;
+      if (mat.map) {
+        mat.map.offset.y = t * 0.02;
+      }
+    }
+    
+    // Pulse rings
+    if (ringsRef.current) {
+      ringsRef.current.children.forEach((child, i) => {
+        const mesh = child as THREE.Mesh;
+        const scale = 1 + Math.sin(t * 2 + i * 0.5) * 0.02;
+        mesh.scale.set(scale, scale, 1);
+      });
+    }
+  });
 
   return (
-    <group position={[0, -1.82, 0]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.12, 0]}>
-        <planeGeometry args={[220, 220]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.78} depthWrite={false} />
+    <group position={[0, -2.0, 0]}>
+      {/* SOLID BLACK FLOOR BASE */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]}>
+        <planeGeometry args={[1000, 1000]} />
+        <meshBasicMaterial color="#030001" depthWrite={true} />
       </mesh>
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]}>
-        <planeGeometry args={[220, 220]} />
-        <meshBasicMaterial color="#ff1744" transparent opacity={0.018} blending={THREE.AdditiveBlending} depthWrite={false} />
-      </mesh>
-
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
-        <planeGeometry args={[220, 220]} />
-        <meshBasicMaterial color="#800010" transparent opacity={0.012} blending={THREE.AdditiveBlending} depthWrite={false} />
-      </mesh>
-
-      <group position={[0, 0.055, 0]}>
-        <Grid
-          args={[220, 220]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          cellSize={1.1}
-          cellThickness={0.05}
-          cellColor="#ff1744"
-          sectionSize={7}
-          sectionThickness={0.09}
-          sectionColor="#5a0010"
-          fadeDistance={46}
-          fadeStrength={1.65}
-          infiniteGrid
+      {/* RED GRID — using texture for visibility */}
+      <mesh 
+        ref={gridRef}
+        rotation={[-Math.PI / 2, 0, 0]} 
+        position={[0, 0, 0]}
+      >
+        <planeGeometry args={[1000, 1000]} />
+        <meshBasicMaterial
+          map={gridTexture}
+          transparent
+          opacity={0.35}  // Was 0.6
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
         />
+      </mesh>
 
-        <Grid
-          args={[220, 220]}
-          position={[0, 0.004, 0]}
-          rotation={[-Math.PI / 2, 0.22, 0]}
-          cellSize={4.2}
-          cellThickness={0.038}
-          cellColor="#800010"
-          sectionSize={16}
-          sectionThickness={0.07}
-          sectionColor="#800010"
-          fadeDistance={42}
-          fadeStrength={1.8}
-          infiniteGrid
+      {/* SECONDARY GRID — offset */}
+      <mesh rotation={[-Math.PI / 2, 0.2, 0]} position={[0, 0.01, 0]}>
+        <planeGeometry args={[1000, 1000]} />
+        <meshBasicMaterial
+          map={gridTexture}
+          transparent
+          opacity={0.25}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
         />
+      </mesh>
+
+      {/* CONCENTRIC RINGS under laptop */}
+      <group ref={ringsRef} position={[2.5, 0.02, -0.5]}>
+        {[1.5, 2.5, 3.5, 5, 7, 9, 12].map((radius, i) => (
+          <mesh key={radius} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[radius, radius + 0.08, 128]} />
+            <meshBasicMaterial
+              color={i % 2 === 0 ? "#ff1744" : "#ff6b6b"}
+              transparent
+              opacity={0.2 - i * 0.02}
+              side={THREE.DoubleSide}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+        ))}
       </group>
 
-      {[2.15, 3.2, 4.75, 6.3].map((radius, index) => (
-        <mesh key={radius} position={[2.45, 0.025 + index * 0.003, -0.55]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[radius, radius + 0.035, 160]} />
-          <meshBasicMaterial
-            color={index % 2 === 0 ? "#ff1744" : "#800010"}
-            transparent
-            opacity={(0.14 - index * 0.02) * 0.11}
-            side={THREE.DoubleSide}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-
-      {[2.15, 3.2, 4.75, 6.3].map((radius, index) => (
-        <mesh key={`ref-${radius}`} position={[2.45, -0.08 - index * 0.003, -0.55]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[radius, radius + 0.05, 120]} />
-          <meshBasicMaterial
-            color="#ff1744"
-            transparent
-            opacity={(0.08 - index * 0.015) * 0.08}
-            side={THREE.DoubleSide}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-
-      <mesh position={[7.4, 0.08, -8]} rotation={[-Math.PI / 2, 0.1, -0.07]}>
-        <planeGeometry args={[0.045, 34]} />
-        <meshBasicMaterial color="#ff1744" transparent opacity={0.2} blending={THREE.AdditiveBlending} depthWrite={false} />
+      {/* GLOWING CIRCLE under laptop */}
+      <mesh position={[2.5, 0.01, -0.5]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[6, 64]} />
+        <meshBasicMaterial
+          color="#ff1744"
+          transparent
+          opacity={0.08}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
       </mesh>
 
-      {streaks.map(([x, z, width, height, opacity]) => (
-        <mesh key={`${x}-${z}`} position={[x, 0.09, z]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[width, height]} />
-          <meshBasicMaterial color="#ff1744" transparent opacity={opacity} blending={THREE.AdditiveBlending} depthWrite={false} />
+      {/* VERTICAL LIGHT BEAMS */}
+      <mesh position={[8, 2, -5]} rotation={[-Math.PI / 2, 0.05, 0]}>
+        <planeGeometry args={[0.08, 60]} />
+        <meshBasicMaterial 
+          color="#ff1744" 
+          transparent 
+          opacity={0.25} 
+          blending={THREE.AdditiveBlending} 
+          depthWrite={false} 
+        />
+      </mesh>
+
+      <mesh position={[-7, 2, -8]} rotation={[-Math.PI / 2, -0.05, 0]}>
+        <planeGeometry args={[0.05, 50]} />
+        <meshBasicMaterial 
+          color="#800010" 
+          transparent 
+          opacity={0.15} 
+          blending={THREE.AdditiveBlending} 
+          depthWrite={false} 
+        />
+      </mesh>
+
+      {/* HORIZONTAL DATA STREAKS */}
+      {[
+        [-15, -22, 1, 10, 0.12],
+        [-6, -25, 0.7, 7, 0.08],
+        [5, -20, 0.8, 8, 0.1],
+        [14, -26, 1.1, 11, 0.14],
+        [22, -30, 0.6, 6, 0.07],
+      ].map(([x, z, w, h, op], i) => (
+        <mesh key={i} position={[x as number, 0.05, z as number]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[w as number, h as number]} />
+          <meshBasicMaterial 
+            color="#ff1744" 
+            transparent 
+            opacity={op as number} 
+            blending={THREE.AdditiveBlending} 
+            depthWrite={false} 
+          />
         </mesh>
       ))}
+
+      {/* REFLECTION PLANE — subtle red tint */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]}>
+        <planeGeometry args={[1000, 1000]} />
+        <meshBasicMaterial
+          color="#ff1744"
+          transparent
+          opacity={0.015}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
     </group>
   );
 }

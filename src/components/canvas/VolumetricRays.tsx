@@ -17,39 +17,36 @@ const fragmentShader = `
   varying vec2 vUv;
 
   void main() {
-    vec2 uv = vUv - 0.5;
-    float r = length(uv);
+    vec2 uv = vUv;
     
-    // Multiple expanding ring waves
-    float ring1 = sin(r * 35.0 - uTime * 3.0);
-    float ring2 = sin(r * 50.0 - uTime * 5.0 + 2.0);
-    float ring3 = sin(r * 25.0 - uTime * 2.0 + 4.0);
+    // Light source from upper right
+    vec2 lightPos = vec2(0.75, 0.7);
+    vec2 toLight = lightPos - uv;
+    float dist = length(toLight);
+    float angle = atan(toLight.y, toLight.x);
     
-    // Sharp rings
-    float mask1 = smoothstep(0.9, 0.98, ring1);
-    float mask2 = smoothstep(0.88, 0.96, ring2) * 0.6;
-    float mask3 = smoothstep(0.92, 0.99, ring3) * 0.4;
+    // Ray beams
+    float rays = 0.0;
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      float rayAngle = angle + fi * 0.4 + uTime * 0.05;
+      float ray = pow(sin(rayAngle * 8.0 + fi * 2.0) * 0.5 + 0.5, 8.0);
+      float rayWidth = 0.02 + fi * 0.005;
+      float rayMask = smoothstep(rayWidth, 0.0, abs(ray - 0.5) * 2.0);
+      rays += rayMask * (1.0 - dist) * (0.6 - fi * 0.1);
+    }
     
-    // Fade outward
-    float fade = max(0.0, 1.0 - r * 1.5);
+    // Fade with distance from light
+    float fade = smoothstep(0.0, 0.8, 1.0 - dist);
     
-    // Colors
-    vec3 inner = vec3(1.0, 0.08, 0.15);
-    vec3 outer = vec3(0.5, 0.0, 0.05);
-    vec3 color = mix(inner, outer, r * 2.0);
-    
-    float alpha = (mask1 + mask2 + mask3) * fade * 0.7;
-    
-    // Core glow
-    alpha += exp(-r * r * 6.0) * 0.3;
-    
-    if (alpha < 0.01) discard;
+    vec3 color = vec3(1.0, 0.08, 0.15) * rays * fade * 0.3;
+    float alpha = rays * fade * 0.15;
     
     gl_FragColor = vec4(color, alpha);
   }
 `;
 
-export default function FloorRings() {
+export default function VolumetricRays() {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
 
   const uniforms = React.useMemo(
@@ -66,11 +63,8 @@ export default function FloorRings() {
   });
 
   return (
-    <mesh 
-      position={[2.5, -1.82, -0.5]}
-      rotation={[-Math.PI / 2, 0, 0]}
-    >
-      <planeGeometry args={[18, 18]} />
+    <mesh position={[5, 5, -20]} renderOrder={-50}>
+      <planeGeometry args={[40, 30]} />
       <shaderMaterial
         ref={materialRef}
         vertexShader={vertexShader}
@@ -78,6 +72,7 @@ export default function FloorRings() {
         uniforms={uniforms}
         transparent
         depthWrite={false}
+        depthTest={false}
         blending={THREE.AdditiveBlending}
         side={THREE.DoubleSide}
       />

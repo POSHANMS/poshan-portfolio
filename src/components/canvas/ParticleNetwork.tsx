@@ -7,7 +7,7 @@ import * as THREE from "three";
 export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 1800;
+  const particleCount = 3500; // Was 1800
 
   const [positions, velocities, sizes] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
@@ -110,7 +110,7 @@ export default function ParticleNetwork() {
       float dist = length(coord);
       if (dist > 0.5) discard;
       float alpha = smoothstep(0.5, 0.02, dist);
-      vec3 color = mix(uColor, vec3(1.0, 0.18, 0.47), smoothstep(0.1, 0.5, coord.x + 0.5));
+      vec3 color = mix(uColor, vec3(1.0, 0.3, 0.4), smoothstep(0.1, 0.5, coord.x + 0.5));
       gl_FragColor = vec4(color, alpha * 0.72);
     }
   `;

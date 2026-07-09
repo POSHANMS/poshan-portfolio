@@ -23,7 +23,7 @@ float fbm(vec2 p) {
   float value = 0.0;
   float amplitude = 0.5;
 
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 5; i++) {  // Increased from 4 to 5 octaves
     value += amplitude * noise(p);
     p *= 2.0;
     amplitude *= 0.5;
@@ -36,43 +36,64 @@ void main() {
   vec2 uv = vUv;
   vec2 aspectUv = vec2((uv.x - 0.5) * (uResolution.x / uResolution.y), uv.y - 0.5);
 
-  vec2 slowDrift = vec2(uTime * 0.018, -uTime * 0.009);
-  float cloudA = fbm(uv * 3.1 + slowDrift);
-  float cloudB = fbm(uv * 4.4 - slowDrift * 1.4 + vec2(8.2, 2.7));
-  float cloudC = fbm(uv * 7.0 + vec2(-uTime * 0.012, uTime * 0.016));
+  // Much slower drift for majestic feel
+  vec2 slowDrift = vec2(uTime * 0.012, -uTime * 0.006);
+  float cloudA = fbm(uv * 2.8 + slowDrift);
+  float cloudB = fbm(uv * 3.8 - slowDrift * 1.2 + vec2(8.2, 2.7));
+  float cloudC = fbm(uv * 6.0 + vec2(-uTime * 0.008, uTime * 0.012));
+  float cloudD = fbm(uv * 9.0 + vec2(uTime * 0.004, -uTime * 0.008)); // Extra detail layer
 
-  float upperMask = smoothstep(0.18, 0.58, uv.y);
-  float horizonMask = smoothstep(0.08, 0.28, uv.y);
+  // Upper mask — allow more fog to show
+  float upperMask = smoothstep(0.12, 0.65, uv.y);
+  float horizonMask = smoothstep(0.06, 0.35, uv.y);
 
-  vec2 galaxyCenter = vec2(0.64, 0.75);
+  // Galaxy swirl — positioned upper right like reference
+  vec2 galaxyCenter = vec2(0.72, 0.68);
   vec2 galaxyVector = uv - galaxyCenter;
   float galaxyRadius = length(galaxyVector);
   float galaxyAngle = atan(galaxyVector.y, galaxyVector.x);
-  float spiral = 0.5 + 0.5 * cos(galaxyAngle * 3.0 - 10.0 * galaxyRadius + uTime * 0.18);
-  float galaxyCore = exp(-galaxyRadius * galaxyRadius * 42.0);
-  float galaxyArms = exp(-galaxyRadius * galaxyRadius * 9.0) * pow(spiral, 2.2);
+  float spiral = 0.5 + 0.5 * cos(galaxyAngle * 4.0 - 12.0 * galaxyRadius + uTime * 0.12);
+  float galaxyCore = exp(-galaxyRadius * galaxyRadius * 55.0);
+  float galaxyArms = exp(-galaxyRadius * galaxyRadius * 12.0) * pow(spiral, 2.5);
 
-  vec2 faceCenter = vec2(-0.58, 0.2);
-  float faceSilhouette = exp(-length(aspectUv - faceCenter) * 3.2) * smoothstep(0.24, 0.72, uv.y);
+  // Data stream lines on left (like reference image)
+  float streamLines = smoothstep(0.48, 0.52, sin(uv.y * 40.0 + uTime * 0.3)) * 
+                      smoothstep(0.0, 0.25, uv.x) * 
+                      smoothstep(1.0, 0.7, uv.x) * 0.5;
 
-  float fogShape = pow(cloudA, 3.2) * 0.58 + pow(cloudB, 3.8) * 0.72 + pow(cloudC, 5.0) * 0.42;
+  // Fog density — MUCH denser than before
+  float fogShape = pow(cloudA, 2.8) * 0.7 + pow(cloudB, 3.2) * 0.8 + 
+                   pow(cloudC, 4.5) * 0.5 + pow(cloudD, 5.0) * 0.3;
   fogShape *= upperMask * horizonMask;
 
-  vec3 blueFog = vec3(0.72, 0.02, 0.08) * pow(cloudA, 3.4) * 0.26;
-  vec3 violetFog = vec3(0.48, 0.01, 0.05) * pow(cloudB, 3.7) * 0.2;
-  vec3 magentaFog = vec3(0.34, 0.0, 0.03) * pow(cloudC, 4.6) * 0.13;
-  vec3 cyanEdge = vec3(0.95, 0.05, 0.12) * galaxyArms * 0.28;
-  vec3 purpleCore = vec3(1.0, 0.02, 0.18) * galaxyCore * 0.36;
-  vec3 faceGlow = vec3(0.28, 0.01, 0.03) * faceSilhouette * 0.07;
+  // RICH RED COLOR PALETTE (matching reference)
+  // Deep crimson core
+  vec3 crimsonCore = vec3(0.95, 0.02, 0.08) * pow(cloudA, 2.5) * 0.35;
+  // Burgundy mid-tones  
+  vec3 burgundyMid = vec3(0.55, 0.0, 0.04) * pow(cloudB, 3.0) * 0.28;
+  // Dark wine shadows
+  vec3 wineShadow = vec3(0.25, 0.0, 0.02) * pow(cloudC, 4.0) * 0.18;
+  // Bright red highlights
+  vec3 redHighlight = vec3(1.0, 0.08, 0.15) * galaxyArms * 0.45;
+  // Hot pink core glow
+  vec3 pinkCore = vec3(1.0, 0.15, 0.35) * galaxyCore * 0.55;
+  // Data stream glow
+  vec3 streamGlow = vec3(0.9, 0.05, 0.12) * streamLines * 0.25;
+  
+  // Horizon glow — red sunset feel
+  float horizonGlow = exp(-pow(uv.y - 0.18, 2.0) * 45.0);
+  vec3 horizonColor = vec3(0.85, 0.02, 0.06) * horizonGlow * 0.12 + 
+                      vec3(0.4, 0.0, 0.02) * horizonGlow * 0.06;
 
-  float horizonGlow = exp(-pow(uv.y - 0.22, 2.0) * 58.0);
-  vec3 horizonColor = vec3(0.8, 0.02, 0.08) * horizonGlow * 0.08 + vec3(0.45, 0.0, 0.02) * horizonGlow * 0.03;
+  vec3 color = crimsonCore + burgundyMid + wineShadow + redHighlight + pinkCore + streamGlow + horizonColor;
+  
+  // Boost overall brightness
+  color = clamp(color, 0.0, 1.8);
 
-  vec3 color = blueFog + violetFog + magentaFog + cyanEdge + purpleCore + faceGlow + horizonColor;
-  color = clamp(color, 0.0, 1.35);
-
-  float alpha = clamp(fogShape * 0.24 + galaxyCore * 0.18 + galaxyArms * 0.13 + horizonGlow * 0.1 + faceSilhouette * 0.05, 0.0, 0.38);
-  alpha *= smoothstep(0.02, 0.18, uv.y);
+  // Alpha — much more visible
+  float alpha = clamp(fogShape * 0.35 + galaxyCore * 0.25 + galaxyArms * 0.18 + 
+                      horizonGlow * 0.12 + streamLines * 0.08, 0.0, 0.55);
+  alpha *= smoothstep(0.01, 0.12, uv.y);
 
   gl_FragColor = vec4(color, alpha);
 }

@@ -1,264 +1,238 @@
 "use client";
 
 import React, { useMemo, useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
-import { Line } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-type AuthoredNode = [number, number, number];
-type AuthoredConnection = [number, number];
-
-const authoredNodes: AuthoredNode[] = [
-  [-16.5, 8.2, -24],
-  [-14.1, 10.6, -25.5],
-  [-11.2, 8.9, -24.8],
-  [-12.7, 6.4, -26.2],
-  [-2.8, 13.2, -32],
-  [-0.6, 15.1, -33.4],
-  [2.4, 13.8, -32.6],
-  [0.8, 11.4, -34.2],
-  [11.8, 10.1, -28.5],
-  [14.2, 12.2, -29.2],
-  [17.1, 10.8, -30.4],
-  [15.6, 7.8, -29.6],
-  [23.5, 17.4, -38],
-  [26.2, 19.2, -39.5],
-  [29.6, 17.8, -40.8],
-  [27.5, 15.4, -39.8],
-  [-25.6, 18.4, -42],
-  [-22.8, 20.1, -43.5],
-  [-19.6, 17.5, -42.4],
-  [34.5, 6.8, -35.2],
-  [38.1, 8.7, -36.4],
-  [41.0, 6.0, -37.2],
+// TIGHT LOCAL CLUSTERS — only nearby stars connected
+const clusters = [
+  // Cluster 1: Upper left
+  {
+    nodes: [[-10, 9, -22], [-8, 11, -24], [-7, 8, -21], [-11, 7, -25], [-9, 10, -23]] as [number, number, number][],
+    connections: [[0,1], [1,2], [2,3], [3,0], [1,3], [0,4], [4,2]] as [number, number][]
+  },
+  // Cluster 2: Upper right (near globe)
+  {
+    nodes: [[14, 10, -26], [16, 12, -28], [17, 9, -27], [13, 8, -29], [15, 11, -25]] as [number, number, number][],
+    connections: [[0,1], [1,2], [2,3], [3,0], [0,4], [4,1]] as [number, number][]
+  },
+  // Cluster 3: Center
+  {
+    nodes: [[0, 8, -19], [2, 10, -21], [-1, 6, -20], [1, 9, -18]] as [number, number, number][],
+    connections: [[0,1], [1,2], [2,3], [3,0]] as [number, number][]
+  },
+  // Cluster 4: Left mid
+  {
+    nodes: [[-6, 12, -28], [-4, 14, -30], [-7, 10, -27]] as [number, number, number][],
+    connections: [[0,1], [1,2], [2,0]] as [number, number][]
+  },
+  // Cluster 5: Right mid
+  {
+    nodes: [[10, 6, -23], [12, 8, -25], [9, 5, -24]] as [number, number, number][],
+    connections: [[0,1], [1,2]] as [number, number][]
+  },
+  // Cluster 6: Far left
+  {
+    nodes: [[-14, 8, -32], [-16, 10, -34], [-13, 6, -30]] as [number, number, number][],
+    connections: [[0,1], [1,2]] as [number, number][]
+  },
+  // Cluster 7: Far right
+  {
+    nodes: [[20, 9, -35], [22, 11, -37], [19, 7, -33]] as [number, number, number][],
+    connections: [[0,1], [1,2]] as [number, number][]
+  },
 ];
 
-const authoredConnections: AuthoredConnection[] = [
-  [0, 1],
-  [1, 2],
-  [1, 3],
-  [4, 5],
-  [5, 6],
-  [6, 7],
-  [8, 9],
-  [9, 10],
-  [9, 11],
-  [12, 13],
-  [13, 14],
-  [13, 15],
-  [16, 17],
-  [17, 18],
-  [19, 20],
-  [20, 21],
-];
+// Flatten all nodes for rendering
+const allNodes = clusters.flatMap(c => c.nodes);
+
+// Build global connections (only short ones between nearby clusters)
+const interConnections: [number, number][] = [];
+// Connect cluster 1 to cluster 3 (short jump)
+interConnections.push([3, 10]); // -11,7,-25 to -1,6,-20
+// Connect cluster 2 to cluster 5 (short jump)
+interConnections.push([5, 17]); // 16,12,-28 to 12,8,-25
+// Connect cluster 3 to cluster 5 (short jump)
+interConnections.push([9, 15]); // 2,10,-21 to 10,6,-23
 
 function seededRandom(seed: number) {
-  let value = seed;
+  let s = seed;
   return () => {
-    value = (value * 1664525 + 1013904223) % 4294967296;
-    return value / 4294967296;
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
   };
 }
 
-function createStarShader(opacity: number) {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      uOpacity: { value: opacity },
-      uTime: { value: 0 },
-    },
-    vertexShader: `
-      uniform float uTime;
-      attribute float aSize;
-      attribute float aPhase;
-      attribute vec3 color;
-      varying vec3 vColor;
-      varying float vTwinkle;
-
-      void main() {
-        vColor = color;
-        vTwinkle = 0.72 + 0.28 * sin(uTime * 1.45 + aPhase);
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        gl_Position = projectionMatrix * mvPosition;
-        gl_PointSize = aSize * vTwinkle * (52.0 / max(1.0, -mvPosition.z));
-      }
-    `,
-    fragmentShader: `
-      uniform float uOpacity;
-      varying vec3 vColor;
-      varying float vTwinkle;
-
-      void main() {
-        vec2 uv = gl_PointCoord - vec2(0.5);
-        float d = length(uv);
-        float core = smoothstep(0.5, 0.04, d);
-        float halo = smoothstep(0.5, 0.16, d) * 0.52;
-        if (core <= 0.001) discard;
-        vec3 glow = mix(vColor, vec3(1.0, 0.18, 0.28), halo * 0.32);
-        gl_FragColor = vec4(glow, (core + halo) * uOpacity * vTwinkle);
-      }
-    `,
-    transparent: true,
-    vertexColors: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-}
-
 export default function StarField() {
-  const ambientStarsRef = useRef<THREE.Points>(null);
-  const heroStarsRef = useRef<THREE.Points>(null);
-  const constellationRef = useRef<THREE.LineSegments>(null);
-  const { camera } = useThree();
+  const starsRef = useRef<THREE.Points>(null);
 
-  const [ambientPositions, ambientColors, ambientSizes, ambientPhases] = useMemo(() => {
-    const random = seededRandom(7331);
-    const count = 2600;
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    const sizes = new Float32Array(count);
-    const phases = new Float32Array(count);
+  // 5000 ambient stars
+  const { positions, colors, sizes, phases } = useMemo(() => {
+    const rand = seededRandom(42);
+    const count = 5000;
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    const sz = new Float32Array(count);
+    const ph = new Float32Array(count);
+
     const palette = [
-      new THREE.Color("#ffffff"),
-      new THREE.Color("#f5f0e8"),
-      new THREE.Color("#ffffff"),
-      new THREE.Color("#f5f0e8"),
-      new THREE.Color("#ffd89a"),
-      new THREE.Color("#cfe8ff"),
+      new THREE.Color(1.0, 0.9, 0.9),
+      new THREE.Color(1.0, 0.7, 0.7),
+      new THREE.Color(1.0, 0.5, 0.5),
+      new THREE.Color(1.0, 0.3, 0.3),
+      new THREE.Color(1.0, 0.15, 0.2),
+      new THREE.Color(0.9, 0.4, 0.45),
     ];
 
-    const exclusionZones = [
-      { x1: -0.98, x2: -0.36, y1: -0.42, y2: 0.72 },
-      { x1: -0.28, x2: 0.12, y1: -0.2, y2: 0.78 },
-      { x1: 0.48, x2: 0.98, y1: -0.52, y2: 0.76 },
-    ];
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+      pos[i3] = (rand() - 0.5) * 100;
+      pos[i3 + 1] = rand() * 20 - 2;
+      pos[i3 + 2] = -8 - rand() * 60;
 
-    const candidate = new THREE.Vector3();
-    let accepted = 0;
-    let attempts = 0;
+      const color = palette[Math.floor(rand() * palette.length)];
+      col[i3] = color.r;
+      col[i3 + 1] = color.g;
+      col[i3 + 2] = color.b;
 
-    while (accepted < count && attempts < count * 12) {
-      attempts += 1;
-      candidate.set((random() - 0.5) * 128, random() * 44 - 2, -18 - random() * 58);
-      const ndc = candidate.clone().project(camera);
-      const blocked = exclusionZones.some((zone) => ndc.x > zone.x1 && ndc.x < zone.x2 && ndc.y > zone.y1 && ndc.y < zone.y2);
-      if (blocked) continue;
+      // MORE size variation
+      const r = rand();
+      if (r > 0.98) sz[i] = 0.6 + rand() * 0.4;      // Very bright
+      else if (r > 0.9) sz[i] = 0.3 + rand() * 0.2;  // Bright
+      else if (r > 0.7) sz[i] = 0.15 + rand() * 0.1; // Medium
+      else sz[i] = 0.06 + rand() * 0.06;             // Dim
 
-      const i3 = accepted * 3;
-      const color = palette[Math.floor(random() * palette.length)];
-      const hero = random() > 0.94;
-
-      positions[i3] = candidate.x;
-      positions[i3 + 1] = candidate.y;
-      positions[i3 + 2] = candidate.z;
-      colors[i3] = color.r;
-      colors[i3 + 1] = color.g;
-      colors[i3 + 2] = color.b;
-      sizes[accepted] = hero ? 0.24 + random() * 0.18 : 0.055 + random() * 0.105;
-      phases[accepted] = random() * Math.PI * 2;
-      accepted += 1;
+      ph[i] = rand() * Math.PI * 2;
     }
 
-    return [positions, colors, sizes, phases];
-  }, [camera]);
-
-  const [heroPositions, heroColors, heroSizes, heroPhases] = useMemo(() => {
-    const positions = new Float32Array(authoredNodes.length * 3);
-    const colors = new Float32Array(authoredNodes.length * 3);
-    const sizes = new Float32Array(authoredNodes.length);
-    const phases = new Float32Array(authoredNodes.length);
-    const starColors = [new THREE.Color("#ffffff"), new THREE.Color("#f5f0e8"), new THREE.Color("#ffd89a"), new THREE.Color("#cfe8ff")];
-
-    authoredNodes.forEach((node, index) => {
-      const i3 = index * 3;
-      const color = starColors[index % starColors.length];
-      positions[i3] = node[0];
-      positions[i3 + 1] = node[1];
-      positions[i3 + 2] = node[2];
-      colors[i3] = color.r;
-      colors[i3 + 1] = color.g;
-      colors[i3 + 2] = color.b;
-      sizes[index] = index % 5 === 0 ? 0.42 : 0.26;
-      phases[index] = index * 0.73;
-    });
-
-    return [positions, colors, sizes, phases];
+    return { positions: pos, colors: col, sizes: sz, phases: ph };
   }, []);
 
-  const constellationGeometry = useMemo(() => {
+  // Build line geometry from clusters
+  const lineGeometry = useMemo(() => {
     const positions: number[] = [];
     const colors: number[] = [];
-    const crimson = new THREE.Color("#ff1744");
-    const burgundy = new THREE.Color("#800010");
 
-    authoredConnections.forEach(([start, end], index) => {
-      const a = authoredNodes[start];
-      const b = authoredNodes[end];
-      const color = index % 3 === 0 ? burgundy : crimson;
-      positions.push(a[0], a[1], a[2], b[0], b[1], b[2]);
-      colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+    // Intra-cluster connections (tight)
+    clusters.forEach(cluster => {
+      cluster.connections.forEach(([a, b]) => {
+        const p1 = cluster.nodes[a];
+        const p2 = cluster.nodes[b];
+        positions.push(...p1, ...p2);
+        colors.push(1.0, 0.15, 0.2, 1.0, 0.15, 0.2);
+      });
     });
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-    return geometry;
+    // Inter-cluster connections (few, deliberate)
+    interConnections.forEach(([a, b]) => {
+      const p1 = allNodes[a];
+      const p2 = allNodes[b];
+      positions.push(...p1, ...p2);
+      colors.push(0.8, 0.1, 0.15, 0.8, 0.1, 0.15);
+    });
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    return geo;
   }, []);
 
-  const ambientMaterial = useMemo(() => createStarShader(0.78), []);
-  const heroMaterial = useMemo(() => createStarShader(0.95), []);
+  // Constellation star points (brighter)
+  const { heroPositions, heroColors, heroSizes } = useMemo(() => {
+    const pos = new Float32Array(allNodes.length * 3);
+    const col = new Float32Array(allNodes.length * 3);
+    const sz = new Float32Array(allNodes.length);
+
+    allNodes.forEach((node, i) => {
+      pos[i * 3] = node[0];
+      pos[i * 3 + 1] = node[1];
+      pos[i * 3 + 2] = node[2];
+      col[i * 3] = 1.0;
+      col[i * 3 + 1] = 0.5 + Math.random() * 0.3;
+      col[i * 3 + 2] = 0.5 + Math.random() * 0.3;
+      sz[i] = 0.8 + Math.random() * 0.5;
+    });
+
+    return { heroPositions: pos, heroColors: col, heroSizes: sz };
+  }, []);
+
+  const starMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `
+        attribute float aSize;
+        attribute float aPhase;
+        varying float vAlpha;
+        uniform float uTime;
+        void main() {
+          float twinkle = 0.5 + 0.5 * sin(uTime * 1.2 + aPhase);
+          vAlpha = twinkle;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mv;
+          gl_PointSize = aSize * twinkle * (60.0 / max(1.0, -mv.z));
+        }
+      `,
+      fragmentShader: `
+        varying float vAlpha;
+        void main() {
+          vec2 uv = gl_PointCoord - 0.5;
+          float d = length(uv);
+          float core = smoothstep(0.5, 0.0, d);
+          float glow = smoothstep(0.5, 0.1, d) * 0.6;
+          if (core < 0.005) discard;
+          gl_FragColor = vec4(1.0, 0.85, 0.85, (core + glow) * vAlpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+  }, []);
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
-    ambientMaterial.uniforms.uTime.value = t;
-    heroMaterial.uniforms.uTime.value = t;
-    if (ambientStarsRef.current) ambientStarsRef.current.rotation.y = t * 0.0025;
-    if (heroStarsRef.current) heroStarsRef.current.rotation.y = Math.sin(t * 0.12) * 0.008;
-    if (constellationRef.current) {
-      const material = constellationRef.current.material as THREE.LineBasicMaterial;
-      material.opacity = 0.48 + Math.sin(t * 0.65) * 0.08;
-    }
+    starMaterial.uniforms.uTime.value = t;
+    if (starsRef.current) starsRef.current.rotation.y = t * 0.0005;
   });
 
   return (
     <group>
-      <points ref={ambientStarsRef}>
+      {/* Ambient star field */}
+      <points ref={starsRef}>
         <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[ambientPositions, 3]} />
-          <bufferAttribute attach="attributes-color" args={[ambientColors, 3]} />
-          <bufferAttribute attach="attributes-aSize" args={[ambientSizes, 1]} />
-          <bufferAttribute attach="attributes-aPhase" args={[ambientPhases, 1]} />
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+          <bufferAttribute attach="attributes-color" args={[colors, 3]} />
+          <bufferAttribute attach="attributes-aSize" args={[sizes, 1]} />
+          <bufferAttribute attach="attributes-aPhase" args={[phases, 1]} />
         </bufferGeometry>
-        <primitive object={ambientMaterial} attach="material" />
+        <primitive object={starMaterial} attach="material" />
       </points>
 
-      <lineSegments ref={constellationRef} geometry={constellationGeometry}>
-        <lineBasicMaterial vertexColors transparent opacity={0.52} blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} />
+      <lineSegments geometry={lineGeometry}>
+        <lineBasicMaterial 
+          vertexColors 
+          transparent 
+          opacity={0.45} 
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
       </lineSegments>
 
-      <group>
-        {authoredConnections.map(([start, end], index) => (
-          <Line
-            key={`${start}-${end}`}
-            points={[authoredNodes[start], authoredNodes[end]]}
-            color={index % 3 === 0 ? "#800010" : "#ff1744"}
-            lineWidth={index % 3 === 0 ? 0.85 : 1.15}
-            transparent
-            opacity={index % 3 === 0 ? 0.42 : 0.68}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            depthTest={false}
-          />
-        ))}
-      </group>
-
-      <points ref={heroStarsRef}>
+      <points>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[heroPositions, 3]} />
           <bufferAttribute attach="attributes-color" args={[heroColors, 3]} />
           <bufferAttribute attach="attributes-aSize" args={[heroSizes, 1]} />
-          <bufferAttribute attach="attributes-aPhase" args={[heroPhases, 1]} />
         </bufferGeometry>
-        <primitive object={heroMaterial} attach="material" />
+        <pointsMaterial
+          size={0.9}
+          vertexColors
+          transparent
+          opacity={0.95}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          sizeAttenuation
+        />
       </points>
     </group>
   );
