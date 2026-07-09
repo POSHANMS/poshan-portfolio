@@ -36,8 +36,8 @@ export default function NebulaBackground() {
   });
 
   return (
-    <mesh position={[0, 1.6, -34]} renderOrder={-12}>
-      <planeGeometry args={[360, 180]} />
+    <mesh position={[0, 1.4, -70]} renderOrder={-18}>
+      <planeGeometry args={[420, 210]} />
       <shaderMaterial
         ref={materialRef}
         vertexShader={nebulaVertex}
@@ -47,7 +47,7 @@ export default function NebulaBackground() {
         depthWrite={false}
         depthTest={false}
         blending={THREE.AdditiveBlending}
-        opacity={0.42}
+        opacity={0.2}
       />
     </mesh>
   );

@@ -46,12 +46,17 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
     >
-      <pointLight ref={lightRef} color={glowColor} intensity={6.6} distance={7.5} decay={2} />
+      <pointLight ref={lightRef} color={glowColor} intensity={5.2} distance={5.6} decay={2} />
 
-      <mesh scale={[1.58, 1.58, 1.58]}>
+      <mesh scale={[1.1, 1.1, 1.1]}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color={glowColor} transparent opacity={hovered ? 0.1 : 0.055} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} transparent opacity={hovered ? 0.11 : 0.045} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
+
+      <lineSegments scale={[1.08, 1.08, 1.08]}>
+        <edgesGeometry args={[edgeGeometry]} />
+        <lineBasicMaterial color={glowColor} transparent opacity={hovered ? 0.48 : 0.28} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </lineSegments>
 
       <RoundedBox args={[1, 1, 1]} radius={0.075} smoothness={6} castShadow>
         <mesh>
@@ -73,7 +78,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
           attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#f0fbff"), 0.35)}
           attenuationDistance={0.95}
           emissive={glow}
-          emissiveIntensity={hovered ? 0.44 : 0.22}
+          emissiveIntensity={hovered ? 0.52 : 0.28}
           envMapIntensity={2.35}
           side={THREE.FrontSide}
         />
@@ -81,7 +86,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
 
       <lineSegments>
         <edgesGeometry args={[edgeGeometry]} />
-        <lineBasicMaterial color="#d8faff" transparent opacity={hovered ? 0.56 : 0.32} />
+        <lineBasicMaterial color="#ffd6dc" transparent opacity={hovered ? 0.5 : 0.28} blending={THREE.AdditiveBlending} depthWrite={false} />
       </lineSegments>
 
       <mesh position={[0, 0, 0.535]}>
@@ -104,9 +109,9 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
         <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.1 : 0.05} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
-      <mesh position={[0, -0.78, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.65, 1.65, 1]}>
+      <mesh position={[0, -0.78, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.28, 1.28, 1]}>
         <circleGeometry args={[0.72, 48]} />
-        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.16 : 0.085} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.15 : 0.075} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
     </group>
   );

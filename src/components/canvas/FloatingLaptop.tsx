@@ -89,7 +89,7 @@ export default function FloatingLaptop() {
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.10}
+            opacity={0.16}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -101,7 +101,7 @@ export default function FloatingLaptop() {
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.12}
+            opacity={0.18}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -113,7 +113,7 @@ export default function FloatingLaptop() {
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.07}
+            opacity={0.11}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -125,17 +125,17 @@ export default function FloatingLaptop() {
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.05}
+            opacity={0.075}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
 
         {/* Lights */}
-        <pointLight position={[0, 1.8, -1.2]}   intensity={6.8} distance={12} color="#ff1744" decay={2} />
-        <pointLight position={[-2.1, 0.65, 0.45]} intensity={3.8} distance={9}  color="#ff1744" decay={2} />
-        <pointLight position={[0.8, -1.15, 0.95]} intensity={3.4} distance={8}  color="#800010" decay={2} />
-        <pointLight position={[0, 0.5, 1.5]}      intensity={2.9} distance={8}  color="#ff1744" decay={2} />
+        <pointLight position={[0, 1.8, -1.2]}   intensity={7.5} distance={12} color="#ff1744" decay={2} />
+        <pointLight position={[-2.1, 0.65, 0.45]} intensity={4.4} distance={9}  color="#ff1744" decay={2} />
+        <pointLight position={[0.8, -1.15, 0.95]} intensity={3.8} distance={8}  color="#800010" decay={2} />
+        <pointLight position={[0, 0.5, 1.5]}      intensity={3.2} distance={8}  color="#ff1744" decay={2} />
       </group>
     </group>
   );
