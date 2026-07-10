@@ -13,9 +13,9 @@ function createGridTexture() {
   // TRANSPARENT background
   ctx.clearRect(0, 0, 1024, 1024);
 
-  // MUCH thinner lines
+  // HAIRLINE thin — reference has very thin lines
   ctx.strokeStyle = "#ff1744";
-  ctx.lineWidth = 0.6; // Was 1.8 — hairline thin
+  ctx.lineWidth = 0.5;
 
   const step = 128;
   for (let i = 0; i <= 1024; i += step) {
@@ -30,9 +30,9 @@ function createGridTexture() {
     ctx.stroke();
   }
 
-  // Major lines — still thin
+  // Major lines — slightly more visible but still thin
   ctx.strokeStyle = "#ff3344";
-  ctx.lineWidth = 1.0; // Was 2.2
+  ctx.lineWidth = 0.8;
   for (let i = 0; i <= 1024; i += step * 4) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
@@ -48,7 +48,7 @@ function createGridTexture() {
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(12, 12); // Sparser
+  tex.repeat.set(14, 14);
   return tex;
 }
 
@@ -102,6 +102,18 @@ export default function NeonGrid() {
           blending={THREE.NormalBlending}
           depthWrite={false}
           side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* GLOWING CIRCLE under laptop — dimmer */}
+      <mesh position={[2.5, 0.005, -0.5]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[3.5, 64]} />
+        <meshBasicMaterial
+          color="#ff1744"
+          transparent
+          opacity={0.02}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </mesh>
 
