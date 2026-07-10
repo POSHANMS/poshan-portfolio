@@ -20,28 +20,31 @@ const fragmentShader = `
     vec2 uv = vUv - 0.5;
     float r = length(uv);
     
-    // HARD CUTOFF - only show very close to center
-    if (r > 0.25) discard;
+    // Contain to center area
+    if (r > 0.3) discard;
     
-    // Just 2 slow rings
-    float ring1 = sin(r * 50.0 - uTime * 0.8);
+    // 2 rings, slow
+    float ring1 = sin(r * 35.0 - uTime * 1.5);
+    float ring2 = sin(r * 50.0 - uTime * 2.5 + 2.0);
     
-    // Very thin, sharp
-    float mask1 = smoothstep(0.97, 0.998, ring1) * 0.12;
+    // Sharp but dim
+    float mask1 = smoothstep(0.93, 0.99, ring1) * 0.2;
+    float mask2 = smoothstep(0.92, 0.98, ring2) * 0.1;
     
-    // Fade out quickly from center
-    float fade = max(0.0, 1.0 - r * 4.0);
+    // Fade from center
+    float fade = max(0.0, 1.0 - r * 3.0);
     
-    // Dark red
-    vec3 color = vec3(0.5, 0.03, 0.06);
+    vec3 inner = vec3(0.8, 0.06, 0.12);
+    vec3 outer = vec3(0.35, 0.0, 0.04);
+    vec3 color = mix(inner, outer, r * 2.0);
     
-    float alpha = mask1 * fade * 0.12;
+    float alpha = (mask1 + mask2) * fade * 0.35;
     
-    // Tiny core pulse - very subtle
-    float pulse = sin(uTime * 0.5) * 0.5 + 0.5;
-    alpha += exp(-r * r * 25.0) * 0.03 * pulse;
+    // Core pulse
+    float pulse = sin(uTime * 0.6) * 0.5 + 0.5;
+    alpha += exp(-r * r * 12.0) * 0.08 * pulse;
     
-    if (alpha < 0.005) discard;
+    if (alpha < 0.01) discard;
     
     gl_FragColor = vec4(color, alpha);
   }
@@ -68,7 +71,7 @@ export default function FloorRings() {
       position={[2.5, -1.82, -0.5]}
       rotation={[-Math.PI / 2, 0, 0]}
     >
-      <planeGeometry args={[4, 4]} /> {/* VERY small - only under laptop */}
+      <planeGeometry args={[10, 10]} /> {/* Moderate size */}
       <shaderMaterial
         ref={materialRef}
         vertexShader={vertexShader}
