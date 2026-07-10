@@ -855,6 +855,34 @@ body {
     opacity: 0.78;
   }
 }
+
+/* ─── Additional fixes for background/floor alignment with reference ─── */
+
+/* Ensure the canvas container has correct background */
+.fixed.inset-0.z-0 {
+  background: #030001 !important;
+}
+
+/* Dashboard stage should blend better with 3D scene */
+.dashboard-stage {
+  /* Slightly adjust position to align with 3D floor perspective */
+  top: calc(50% + 8px);
+}
+
+/* Reduce haze intensity for cleaner look */
+.dashboard-haze {
+  background:
+    radial-gradient(circle at 70% 50%, rgba(255, 23, 68, 0.03), transparent 18rem),
+    radial-gradient(circle at 76% 58%, rgba(128, 0, 16, 0.04), transparent 19rem),
+    radial-gradient(circle at 30% 40%, rgba(204, 17, 51, 0.008), transparent 17rem),
+    radial-gradient(circle at 82% 18%, rgba(128, 0, 16, 0.05), transparent 22rem),
+    linear-gradient(180deg, rgba(2, 3, 13, 0.05), rgba(4, 4, 12, 0.01) 56%, rgba(4, 4, 12, 0.15));
+}
+
+/* Reduce scanlines for cleaner look */
+.dashboard-scanlines {
+  opacity: 0.1;
+}
 ```
 
 ## File: `src/app/layout.tsx`
@@ -1558,43 +1586,43 @@ const nebulaFragmentShader = `
     vec2 uv = vUv;
     float t = uTime * 0.015;
     vec2 drift = vec2(t, -t * 0.5);
-    
+
     float n1 = fbm(uv * 2.5 + drift);
     float n2 = fbm(uv * 4.0 - drift * 1.2 + vec2(5.2, 1.3));
     float n3 = fbm(uv * 7.0 + vec2(-t * 0.3, t * 0.4));
-    
-    // Galaxy swirl upper right — REDUCED
+
+    // Galaxy swirl upper right
     vec2 galaxyUv = uv - vec2(0.72, 0.68);
     float galaxyDist = length(galaxyUv);
     float galaxyAngle = atan(galaxyUv.y, galaxyUv.x);
     float spiral = cos(galaxyAngle * 3.0 + galaxyDist * 12.0 - uTime * 0.08);
     float galaxy = exp(-galaxyDist * galaxyDist * 30.0) * (0.5 + 0.5 * spiral);
-    
-    // Fog density — LOWER for subtlety
+
+    // Fog density
     float fog = pow(n1, 2.5) * 0.4 + pow(n2, 3.0) * 0.3 + pow(n3, 4.0) * 0.2;
     fog += galaxy * 0.5;
-    
-    // Mask — more transparent at bottom
+
+    // Mask
     float topMask = smoothstep(0.0, 0.12, uv.y);
     float bottomFade = smoothstep(0.0, 0.4, uv.y);
     fog *= topMask * bottomFade;
-    
-    // DARKER RED COLORS — not blowing out to white
+
+    // Darker red colors
     vec3 col1 = vec3(0.7, 0.02, 0.06) * pow(n1, 2.5) * 0.5;
     vec3 col2 = vec3(0.5, 0.0, 0.03) * pow(n2, 3.0) * 0.35;
     vec3 col3 = vec3(0.3, 0.0, 0.02) * pow(n3, 4.0) * 0.2;
     vec3 col4 = vec3(0.6, 0.08, 0.15) * galaxy * 0.4;
-    
+
     vec3 color = col1 + col2 + col3 + col4;
-    
+
     // Subtle horizon
     float horizon = exp(-pow(uv.y - 0.22, 2.0) * 40.0);
     color += vec3(0.5, 0.01, 0.03) * horizon * 0.15;
-    
-    // LOWER alpha — was 0.85, now max 0.3
-    float alpha = clamp(fog * 0.2 + galaxy * 0.15 + horizon * 0.06, 0.0, 0.3);
+
+    // Alpha - slightly reduced from original 0.85 to 0.5 for cleaner look
+    float alpha = clamp(fog * 0.2 + galaxy * 0.15 + horizon * 0.06, 0.0, 0.5);
     alpha *= smoothstep(0.0, 0.1, uv.y);
-    
+
     gl_FragColor = vec4(color, alpha);
   }
 `;
@@ -1650,28 +1678,26 @@ function createGridTexture() {
   canvas.width = 1024;
   canvas.height = 1024;
   const ctx = canvas.getContext("2d")!;
-  
+
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, 1024, 1024);
-  
-  // FEWER lines — was 16, now 8
+
   ctx.strokeStyle = "#ff1744";
-  ctx.lineWidth = 1.5; // Thinner
-  
-  const step = 128; // 8 lines per texture (was 64)
+  ctx.lineWidth = 1.5;
+
+  const step = 128;
   for (let i = 0; i <= 1024; i += step) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
     ctx.lineTo(i, 1024);
     ctx.stroke();
-    
+
     ctx.beginPath();
     ctx.moveTo(0, i);
     ctx.lineTo(1024, i);
     ctx.stroke();
   }
-  
-  // Major lines
+
   ctx.strokeStyle = "#ff4444";
   ctx.lineWidth = 2;
   for (let i = 0; i <= 1024; i += step * 4) {
@@ -1679,17 +1705,17 @@ function createGridTexture() {
     ctx.moveTo(i, 0);
     ctx.lineTo(i, 1024);
     ctx.stroke();
-    
+
     ctx.beginPath();
     ctx.moveTo(0, i);
     ctx.lineTo(1024, i);
     ctx.stroke();
   }
-  
+
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(30, 30); // Less repeat (was 50)
+  tex.repeat.set(30, 30);
   return tex;
 }
 
@@ -1701,16 +1727,14 @@ export default function NeonGrid() {
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
-    
-    // Animate grid texture for moving effect
+
     if (gridRef.current) {
       const mat = gridRef.current.material as THREE.MeshBasicMaterial;
       if (mat.map) {
         mat.map.offset.y = t * 0.02;
       }
     }
-    
-    // Pulse rings
+
     if (ringsRef.current) {
       ringsRef.current.children.forEach((child, i) => {
         const mesh = child as THREE.Mesh;
@@ -1728,24 +1752,24 @@ export default function NeonGrid() {
         <meshBasicMaterial color="#030001" depthWrite={true} />
       </mesh>
 
-      {/* RED GRID — using texture for visibility */}
-      <mesh 
+      {/* RED GRID */}
+      <mesh
         ref={gridRef}
-        rotation={[-Math.PI / 2, 0, 0]} 
+        rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0, 0]}
       >
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial
           map={gridTexture}
           transparent
-          opacity={0.35}  // Was 0.6
+          opacity={0.4}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* SECONDARY GRID — offset */}
+      {/* SECONDARY GRID */}
       <mesh rotation={[-Math.PI / 2, 0.2, 0]} position={[0, 0.01, 0]}>
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial
@@ -1790,23 +1814,23 @@ export default function NeonGrid() {
       {/* VERTICAL LIGHT BEAMS */}
       <mesh position={[8, 2, -5]} rotation={[-Math.PI / 2, 0.05, 0]}>
         <planeGeometry args={[0.08, 60]} />
-        <meshBasicMaterial 
-          color="#ff1744" 
-          transparent 
-          opacity={0.25} 
-          blending={THREE.AdditiveBlending} 
-          depthWrite={false} 
+        <meshBasicMaterial
+          color="#ff1744"
+          transparent
+          opacity={0.25}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </mesh>
 
       <mesh position={[-7, 2, -8]} rotation={[-Math.PI / 2, -0.05, 0]}>
         <planeGeometry args={[0.05, 50]} />
-        <meshBasicMaterial 
-          color="#800010" 
-          transparent 
-          opacity={0.15} 
-          blending={THREE.AdditiveBlending} 
-          depthWrite={false} 
+        <meshBasicMaterial
+          color="#800010"
+          transparent
+          opacity={0.15}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </mesh>
 
@@ -1820,17 +1844,17 @@ export default function NeonGrid() {
       ].map(([x, z, w, h, op], i) => (
         <mesh key={i} position={[x as number, 0.05, z as number]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[w as number, h as number]} />
-          <meshBasicMaterial 
-            color="#ff1744" 
-            transparent 
-            opacity={op as number} 
-            blending={THREE.AdditiveBlending} 
-            depthWrite={false} 
+          <meshBasicMaterial
+            color="#ff1744"
+            transparent
+            opacity={op as number}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
           />
         </mesh>
       ))}
 
-      {/* REFLECTION PLANE — subtle red tint */}
+      {/* REFLECTION PLANE */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]}>
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial
@@ -1858,7 +1882,7 @@ import * as THREE from "three";
 export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 3500; // Was 1800
+  const particleCount = 3500;
 
   const [positions, velocities, sizes] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
@@ -1925,11 +1949,9 @@ export default function ParticleNetwork() {
         const dirY = dy / distToMouse;
         const dirZ = dz / distToMouse;
 
-        // Tangential (orbit) force instead of direct pull
         const tangentX = -dirY;
         const tangentY = dirX;
 
-        // Weaker attraction, stronger tangential spread
         const force = (12.0 - distToMouse) * 0.002;
         const drift = (12.0 - distToMouse) * 0.005;
 
@@ -2103,7 +2125,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
         <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={2.5} color="#ff1744" distance={50} />
 
         <Suspense fallback={null}>
-          {/* BACKGROUND LAYERS — no parallax */}
+          {/* BACKGROUND LAYERS */}
           <NebulaBackground />
           <StarField />
           <DeepSpaceGlobe />
@@ -2115,7 +2137,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
           <TechCubes />
           <FloatingLaptop />
 
-          {/* FLOOR — anchored, never moves */}
+          {/* FLOOR */}
           <NeonGrid />
           <FloorRings />
 
@@ -2139,31 +2161,31 @@ import * as THREE from "three";
 const clusters = [
   {
     nodes: [[-10, 9, -22], [-8, 11, -24], [-7, 8, -21], [-11, 7, -25], [-9, 10, -23]] as [number, number, number][],
-    connections: [[0,1], [1,2], [2,3], [3,0], [1,3], [0,4], [4,2]] as [number, number][]
+    connections: [[0, 1], [1, 2], [2, 3], [3, 0], [1, 3], [0, 4], [4, 2]] as [number, number][]
   },
   {
     nodes: [[14, 10, -26], [16, 12, -28], [17, 9, -27], [13, 8, -29], [15, 11, -25]] as [number, number, number][],
-    connections: [[0,1], [1,2], [2,3], [3,0], [0,4], [4,1]] as [number, number][]
+    connections: [[0, 1], [1, 2], [2, 3], [3, 0], [0, 4], [4, 1]] as [number, number][]
   },
   {
     nodes: [[0, 8, -19], [2, 10, -21], [-1, 6, -20], [1, 9, -18]] as [number, number, number][],
-    connections: [[0,1], [1,2], [2,3], [3,0]] as [number, number][]
+    connections: [[0, 1], [1, 2], [2, 3], [3, 0]] as [number, number][]
   },
   {
     nodes: [[-6, 12, -28], [-4, 14, -30], [-7, 10, -27]] as [number, number, number][],
-    connections: [[0,1], [1,2], [2,0]] as [number, number][]
+    connections: [[0, 1], [1, 2], [2, 0]] as [number, number][]
   },
   {
     nodes: [[10, 6, -23], [12, 8, -25], [9, 5, -24]] as [number, number, number][],
-    connections: [[0,1], [1,2]] as [number, number][]
+    connections: [[0, 1], [1, 2]] as [number, number][]
   },
   {
     nodes: [[-14, 8, -32], [-16, 10, -34], [-13, 6, -30]] as [number, number, number][],
-    connections: [[0,1], [1,2]] as [number, number][]
+    connections: [[0, 1], [1, 2]] as [number, number][]
   },
   {
     nodes: [[20, 9, -35], [22, 11, -37], [19, 7, -33]] as [number, number, number][],
-    connections: [[0,1], [1,2]] as [number, number][]
+    connections: [[0, 1], [1, 2]] as [number, number][]
   },
 ];
 
@@ -2180,6 +2202,7 @@ function seededRandom(seed: number) {
 
 export default function StarField() {
   const starsRef = useRef<THREE.Points>(null);
+  const heroStarsRef = useRef<THREE.Points>(null);
 
   const { positions, colors, sizes, phases } = useMemo(() => {
     const rand = seededRandom(42);
@@ -2247,10 +2270,14 @@ export default function StarField() {
     return geo;
   }, []);
 
-  const { heroPositions, heroColors, heroSizes } = useMemo(() => {
+  // NOTE: heroSizes toned down from the broken attempt (was 24 + rand*16 = up to 40).
+  // Those were meant as gl_PointSize multipliers, not raw pixel sizes, and combined with
+  // an unclamped distance term they were blowing out into giant flares.
+  const { heroPositions, heroColors, heroSizes, heroPhases } = useMemo(() => {
     const pos = new Float32Array(allNodes.length * 3);
     const col = new Float32Array(allNodes.length * 3);
     const sz = new Float32Array(allNodes.length);
+    const ph = new Float32Array(allNodes.length);
 
     allNodes.forEach((node, i) => {
       pos[i * 3] = node[0];
@@ -2259,13 +2286,14 @@ export default function StarField() {
       col[i * 3] = 1.0;
       col[i * 3 + 1] = 0.5 + Math.random() * 0.3;
       col[i * 3 + 2] = 0.5 + Math.random() * 0.3;
-      sz[i] = 24 + Math.random() * 16;
+      sz[i] = 6 + Math.random() * 4;
+      ph[i] = Math.random() * Math.PI * 2;
     });
 
-    return { heroPositions: pos, heroColors: col, heroSizes: sz };
+    return { heroPositions: pos, heroColors: col, heroSizes: sz, heroPhases: ph };
   }, []);
 
-  // Circular star shader — uses length(uv) so stars are round, not square
+  // Main star field shader - circular (unchanged, this one already works correctly)
   const starMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 } },
@@ -2279,7 +2307,6 @@ export default function StarField() {
           vAlpha = twinkle;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * mv;
-          // aSize already in pixel units, twinkle modulates brightness not size
           gl_PointSize = aSize;
         }
       `,
@@ -2288,7 +2315,6 @@ export default function StarField() {
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
           float d = length(uv);
-          // Circular discard — anything outside radius 0.5 is transparent
           float core = smoothstep(0.5, 0.0, d);
           float glow = smoothstep(0.5, 0.2, d) * 0.4;
           if (core + glow < 0.01) discard;
@@ -2301,15 +2327,55 @@ export default function StarField() {
     });
   }, []);
 
+  // Hero star shader - circular with glow, distance scaled and SAFELY CLAMPED
+  // so a star near the camera plane cannot make -mv.z shrink toward zero and
+  // blow gl_PointSize up into a giant flare (that was the "3 bright lights" bug).
+  const heroStarMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `
+        attribute float aSize;
+        attribute float aPhase;
+        varying float vAlpha;
+        uniform float uTime;
+        void main() {
+          float twinkle = 0.6 + 0.4 * sin(uTime * 0.8 + aPhase);
+          vAlpha = twinkle;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mv;
+          float safeDist = max(8.0, -mv.z);
+          gl_PointSize = aSize * (60.0 / safeDist);
+        }
+      `,
+      fragmentShader: `
+        varying float vAlpha;
+        void main() {
+          vec2 uv = gl_PointCoord - vec2(0.5);
+          float d = length(uv);
+          float core = smoothstep(0.5, 0.0, d);
+          float glow = smoothstep(0.5, 0.1, d) * 0.6;
+          float ring = smoothstep(0.55, 0.45, d) * smoothstep(0.35, 0.45, d) * 0.3;
+          if (core + glow + ring < 0.01) discard;
+          vec3 color = mix(vec3(1.0, 0.9, 0.9), vec3(1.0, 0.5, 0.5), glow);
+          gl_FragColor = vec4(color, (core + glow + ring) * vAlpha * 0.85);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+  }, []);
+
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     starMaterial.uniforms.uTime.value = t;
+    heroStarMaterial.uniforms.uTime.value = t;
     if (starsRef.current) starsRef.current.rotation.y = t * 0.0005;
+    if (heroStarsRef.current) heroStarsRef.current.rotation.y = t * 0.0005;
   });
 
   return (
     <group>
-      {/* Main star field — custom circular shader */}
       <points ref={starsRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[positions, 3]} />
@@ -2320,7 +2386,6 @@ export default function StarField() {
         <primitive object={starMaterial} attach="material" />
       </points>
 
-      {/* Constellation lines — local clusters only */}
       <lineSegments geometry={lineGeometry}>
         <lineBasicMaterial
           vertexColors
@@ -2331,22 +2396,14 @@ export default function StarField() {
         />
       </lineSegments>
 
-      {/* Constellation node hero stars */}
-      <points>
+      <points ref={heroStarsRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[heroPositions, 3]} />
           <bufferAttribute attach="attributes-color" args={[heroColors, 3]} />
           <bufferAttribute attach="attributes-aSize" args={[heroSizes, 1]} />
+          <bufferAttribute attach="attributes-aPhase" args={[heroPhases, 1]} />
         </bufferGeometry>
-        <pointsMaterial
-          size={0.9}
-          vertexColors
-          transparent
-          opacity={0.95}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          sizeAttenuation
-        />
+        <primitive object={heroStarMaterial} attach="material" />
       </points>
     </group>
   );
@@ -2586,14 +2643,14 @@ const fragmentShader = `
 
   void main() {
     vec2 uv = vUv;
-    
+
     // Light source from upper right
     vec2 lightPos = vec2(0.75, 0.7);
     vec2 toLight = lightPos - uv;
     float dist = length(toLight);
     float angle = atan(toLight.y, toLight.x);
-    
-    // Ray beams
+
+    // Ray beams - REDUCED intensity
     float rays = 0.0;
     for (int i = 0; i < 5; i++) {
       float fi = float(i);
@@ -2603,13 +2660,13 @@ const fragmentShader = `
       float rayMask = smoothstep(rayWidth, 0.0, abs(ray - 0.5) * 2.0);
       rays += rayMask * (1.0 - dist) * (0.6 - fi * 0.1);
     }
-    
+
     // Fade with distance from light
     float fade = smoothstep(0.0, 0.8, 1.0 - dist);
-    
+
     vec3 color = vec3(1.0, 0.08, 0.15) * rays * fade * 0.3;
     float alpha = rays * fade * 0.15;
-    
+
     gl_FragColor = vec4(color, alpha);
   }
 `;
