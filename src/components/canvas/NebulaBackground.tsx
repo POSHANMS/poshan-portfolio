@@ -34,9 +34,9 @@ const nebulaFragmentShader = `
   float fbm(vec2 p) {
     float v = 0.0;
     float a = 0.5;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
       v += a * noise(p);
-      p *= 2.0;
+      p *= 2.2;
       a *= 0.5;
     }
     return v;
@@ -44,44 +44,44 @@ const nebulaFragmentShader = `
 
   void main() {
     vec2 uv = vUv;
-    float t = uTime * 0.008;
+    float t = uTime * 0.015;
+    vec2 drift = vec2(t, -t * 0.5);
 
-    // Very subtle drift
-    vec2 drift = vec2(t, -t * 0.3);
+    float n1 = fbm(uv * 2.5 + drift);
+    float n2 = fbm(uv * 4.0 - drift * 1.2 + vec2(5.2, 1.3));
+    float n3 = fbm(uv * 7.0 + vec2(-t * 0.3, t * 0.4));
 
-    float n1 = fbm(uv * 1.8 + drift);
-    float n2 = fbm(uv * 3.0 - drift * 0.8 + vec2(5.2, 1.3));
-
-    // Subtle galaxy swirl upper right — VERY REDUCED
-    vec2 galaxyUv = uv - vec2(0.75, 0.72);
+    // Galaxy swirl upper right
+    vec2 galaxyUv = uv - vec2(0.72, 0.68);
     float galaxyDist = length(galaxyUv);
     float galaxyAngle = atan(galaxyUv.y, galaxyUv.x);
-    float spiral = cos(galaxyAngle * 2.0 + galaxyDist * 8.0 - uTime * 0.05);
-    float galaxy = exp(-galaxyDist * galaxyDist * 25.0) * (0.5 + 0.5 * spiral);
+    float spiral = cos(galaxyAngle * 3.0 + galaxyDist * 12.0 - uTime * 0.08);
+    float galaxy = exp(-galaxyDist * galaxyDist * 30.0) * (0.5 + 0.5 * spiral);
 
-    // Minimal fog — just enough for depth
-    float fog = pow(n1, 3.0) * 0.15 + pow(n2, 4.0) * 0.1;
-    fog += galaxy * 0.15;
+    // Fog density
+    float fog = pow(n1, 2.5) * 0.4 + pow(n2, 3.0) * 0.3 + pow(n3, 4.0) * 0.2;
+    fog += galaxy * 0.5;
 
-    // Fade at bottom to not interfere with floor
-    float bottomFade = smoothstep(0.0, 0.35, uv.y);
-    float topFade = smoothstep(1.0, 0.85, uv.y);
-    fog *= bottomFade * topFade;
+    // Mask
+    float topMask = smoothstep(0.0, 0.12, uv.y);
+    float bottomFade = smoothstep(0.0, 0.4, uv.y);
+    fog *= topMask * bottomFade;
 
-    // Dark red colors — subtle
-    vec3 col1 = vec3(0.6, 0.02, 0.05) * pow(n1, 3.0) * 0.25;
-    vec3 col2 = vec3(0.35, 0.0, 0.02) * pow(n2, 4.0) * 0.15;
-    vec3 col3 = vec3(0.5, 0.05, 0.1) * galaxy * 0.2;
+    // Darker red colors
+    vec3 col1 = vec3(0.7, 0.02, 0.06) * pow(n1, 2.5) * 0.5;
+    vec3 col2 = vec3(0.5, 0.0, 0.03) * pow(n2, 3.0) * 0.35;
+    vec3 col3 = vec3(0.3, 0.0, 0.02) * pow(n3, 4.0) * 0.2;
+    vec3 col4 = vec3(0.6, 0.08, 0.15) * galaxy * 0.4;
 
-    vec3 color = col1 + col2 + col3;
+    vec3 color = col1 + col2 + col3 + col4;
 
-    // Very subtle horizon line
-    float horizon = exp(-pow(uv.y - 0.28, 2.0) * 60.0);
-    color += vec3(0.4, 0.01, 0.03) * horizon * 0.08;
+    // Subtle horizon
+    float horizon = exp(-pow(uv.y - 0.22, 2.0) * 40.0);
+    color += vec3(0.5, 0.01, 0.03) * horizon * 0.15;
 
-    // VERY LOW alpha — background should be mostly transparent/black
-    float alpha = clamp(fog * 0.12 + galaxy * 0.08 + horizon * 0.04, 0.0, 0.18);
-    alpha *= smoothstep(0.0, 0.08, uv.y);
+    // Alpha - slightly reduced from original 0.85 to 0.5 for cleaner look
+    float alpha = clamp(fog * 0.2 + galaxy * 0.15 + horizon * 0.06, 0.0, 0.5);
+    alpha *= smoothstep(0.0, 0.1, uv.y);
 
     gl_FragColor = vec4(color, alpha);
   }
@@ -106,8 +106,8 @@ export default function NebulaBackground() {
   });
 
   return (
-    <mesh position={[0, 5, -40]} renderOrder={-100}>
-      <planeGeometry args={[120, 70]} />
+    <mesh position={[0, 4, -50]} renderOrder={-100}>
+      <planeGeometry args={[100, 60]} />
       <shaderMaterial
         ref={materialRef}
         vertexShader={nebulaVertexShader}
