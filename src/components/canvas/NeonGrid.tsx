@@ -10,10 +10,8 @@ function createGridTexture() {
   canvas.height = 1024;
   const ctx = canvas.getContext("2d")!;
 
-  // TRANSPARENT background
   ctx.clearRect(0, 0, 1024, 1024);
 
-  // Main grid — medium thickness, visible but not thick
   ctx.strokeStyle = "#ff1744";
   ctx.lineWidth = 1.0;
 
@@ -30,7 +28,6 @@ function createGridTexture() {
     ctx.stroke();
   }
 
-  // Major grid lines — slightly brighter
   ctx.strokeStyle = "#ff3344";
   ctx.lineWidth = 1.6;
   for (let i = 0; i <= 1024; i += step * 4) {
@@ -85,7 +82,7 @@ export default function NeonGrid() {
         <meshBasicMaterial color="#010001" depthWrite={true} />
       </mesh>
 
-      {/* PRIMARY GRID — moderate opacity, normal blending */}
+      {/* PRIMARY GRID */}
       <mesh
         ref={gridRef}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -102,7 +99,7 @@ export default function NeonGrid() {
         />
       </mesh>
 
-      {/* SECONDARY GRID — offset angle for depth perception */}
+      {/* SECONDARY GRID */}
       <mesh rotation={[-Math.PI / 2, 0.12, 0]} position={[0, 0.003, 0]}>
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial
@@ -115,7 +112,7 @@ export default function NeonGrid() {
         />
       </mesh>
 
-      {/* CONCENTRIC RINGS — restored but dimmer, under laptop only */}
+      {/* CONCENTRIC RINGS — keep but very dim */}
       <group ref={ringsRef} position={[2.5, 0.01, -0.5]}>
         {[1.5, 2.5, 3.5, 5, 7].map((radius, i) => (
           <mesh key={radius} rotation={[-Math.PI / 2, 0, 0]}>
@@ -123,7 +120,7 @@ export default function NeonGrid() {
             <meshBasicMaterial
               color={i % 2 === 0 ? "#ff1744" : "#ff4444"}
               transparent
-              opacity={0.1 - i * 0.015}
+              opacity={0.08 - i * 0.012}
               side={THREE.DoubleSide}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
@@ -132,25 +129,25 @@ export default function NeonGrid() {
         ))}
       </group>
 
-      {/* GLOWING CIRCLE under laptop — restored, moderate */}
+      {/* GLOWING CIRCLE — much smaller, dimmer */}
       <mesh position={[2.5, 0.005, -0.5]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[5, 64]} />
+        <circleGeometry args={[3, 64]} />
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.05}
+          opacity={0.025}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
 
-      {/* VERTICAL LIGHT BEAMS — restored, moderate */}
+      {/* VERTICAL LIGHT BEAMS */}
       <mesh position={[8, 2, -5]} rotation={[-Math.PI / 2, 0.05, 0]}>
         <planeGeometry args={[0.06, 60]} />
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.18}
+          opacity={0.15}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -161,19 +158,19 @@ export default function NeonGrid() {
         <meshBasicMaterial
           color="#800010"
           transparent
-          opacity={0.1}
+          opacity={0.08}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
 
-      {/* HORIZONTAL DATA STREAKS — restored */}
+      {/* HORIZONTAL DATA STREAKS */}
       {[
-        [-15, -22, 1, 10, 0.1],
-        [-6, -25, 0.7, 7, 0.06],
-        [5, -20, 0.8, 8, 0.08],
-        [14, -26, 1.1, 11, 0.12],
-        [22, -30, 0.6, 6, 0.05],
+        [-15, -22, 1, 10, 0.08],
+        [-6, -25, 0.7, 7, 0.05],
+        [5, -20, 0.8, 8, 0.06],
+        [14, -26, 1.1, 11, 0.1],
+        [22, -30, 0.6, 6, 0.04],
       ].map(([x, z, w, h, op], i) => (
         <mesh key={i} position={[x as number, 0.03, z as number]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[w as number, h as number]} />
@@ -187,38 +184,28 @@ export default function NeonGrid() {
         </mesh>
       ))}
 
-      {/* REFLECTION PLANE — very subtle surface sheen */}
+      {/* REFLECTION PLANE */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.01}
+          opacity={0.008}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
 
-      {/* NEW: Floor surface glow — subtle red tint on the floor itself */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <planeGeometry args={[1000, 1000]} />
-        <meshBasicMaterial
-          color="#1a0003"
-          transparent
-          opacity={0.4}
-          blending={THREE.NormalBlending}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
+      {/* REMOVED: Floor surface tint — was causing red wash */}
+      {/* REMOVED: Large horizon fade plane */}
 
-      {/* HORIZON FADE — soft black gradient to hide grid at distance */}
-      <mesh position={[0, 0.02, -55]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[200, 50]} />
+      {/* NEW: Subtle horizon fog — black gradient only */}
+      <mesh position={[0, 0.02, -60]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[200, 40]} />
         <meshBasicMaterial
-          color="#020001"
+          color="#010001"
           transparent
-          opacity={0.6}
+          opacity={0.5}
           blending={THREE.NormalBlending}
           depthWrite={false}
         />
