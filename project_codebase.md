@@ -325,20 +325,20 @@ body {
 
 .dashboard-haze {
   background:
-    radial-gradient(circle at 70% 50%, rgba(255, 23, 68, 0.05), transparent 18rem),
-    radial-gradient(circle at 76% 58%, rgba(128, 0, 16, 0.07), transparent 19rem),
-    radial-gradient(circle at 30% 40%, rgba(204, 17, 51, 0.015), transparent 17rem),
-    radial-gradient(circle at 82% 18%, rgba(128, 0, 16, 0.09), transparent 22rem),
-    linear-gradient(180deg, rgba(2, 3, 13, 0.08), rgba(4, 4, 12, 0.02) 56%, rgba(4, 4, 12, 0.28));
+    radial-gradient(circle at 70% 50%, rgba(255, 23, 68, 0.04), transparent 18rem),
+    radial-gradient(circle at 76% 58%, rgba(128, 0, 16, 0.05), transparent 19rem),
+    radial-gradient(circle at 30% 40%, rgba(204, 17, 51, 0.008), transparent 17rem),
+    radial-gradient(circle at 82% 18%, rgba(128, 0, 16, 0.06), transparent 22rem),
+    linear-gradient(180deg, rgba(2, 3, 13, 0.05), rgba(4, 4, 12, 0.01) 56%, rgba(4, 4, 12, 0.18));
   mix-blend-mode: screen;
 }
 
 .dashboard-scanlines {
-  opacity: 0.18;
+  opacity: 0.12; /* Was 0.18 */
   background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 23, 68, 0.02) 1px, transparent 1px),
-    radial-gradient(circle at 74% 18%, rgba(255, 23, 68, 0.09), transparent 12rem);
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 23, 68, 0.015) 1px, transparent 1px),
+    radial-gradient(circle at 74% 18%, rgba(255, 23, 68, 0.06), transparent 12rem);
   background-size: 72px 72px, 72px 72px, 100% 100%;
   mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
 }
@@ -379,7 +379,7 @@ body {
   width: 520px;
   height: 320px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 23, 68, 0.075), rgba(128, 0, 16, 0.025) 38%, transparent 72%);
+  background: radial-gradient(circle, rgba(255, 23, 68, 0.06), rgba(128, 0, 16, 0.02) 38%, transparent 72%);
   filter: blur(82px);
   opacity: 0.1;
   mix-blend-mode: screen;
@@ -391,11 +391,11 @@ body {
   width: 650px;
   height: 410px;
   background:
-    radial-gradient(circle at 55% 48%, rgba(255, 23, 68, 0.18), transparent 38%),
-    radial-gradient(circle at 72% 62%, rgba(128, 0, 16, 0.12), transparent 44%),
-    radial-gradient(circle at 48% 78%, rgba(204, 17, 51, 0.12), transparent 52%);
+    radial-gradient(circle at 55% 48%, rgba(255, 23, 68, 0.14), transparent 38%),
+    radial-gradient(circle at 72% 62%, rgba(128, 0, 16, 0.09), transparent 44%),
+    radial-gradient(circle at 48% 78%, rgba(204, 17, 51, 0.09), transparent 52%);
   filter: blur(74px);
-  opacity: 0.58;
+  opacity: 0.45; /* Was 0.58 */
   mix-blend-mode: screen;
 }
 
@@ -1344,35 +1344,9 @@ const fragmentShader = `
   varying vec2 vUv;
 
   void main() {
-    vec2 uv = vUv - 0.5;
-    float r = length(uv);
-    
-    // Multiple expanding ring waves
-    float ring1 = sin(r * 35.0 - uTime * 3.0);
-    float ring2 = sin(r * 50.0 - uTime * 5.0 + 2.0);
-    float ring3 = sin(r * 25.0 - uTime * 2.0 + 4.0);
-    
-    // Sharp rings
-    float mask1 = smoothstep(0.9, 0.98, ring1);
-    float mask2 = smoothstep(0.88, 0.96, ring2) * 0.6;
-    float mask3 = smoothstep(0.92, 0.99, ring3) * 0.4;
-    
-    // Fade outward
-    float fade = max(0.0, 1.0 - r * 1.5);
-    
-    // Colors
-    vec3 inner = vec3(1.0, 0.08, 0.15);
-    vec3 outer = vec3(0.5, 0.0, 0.05);
-    vec3 color = mix(inner, outer, r * 2.0);
-    
-    float alpha = (mask1 + mask2 + mask3) * fade * 0.7;
-    
-    // Core glow
-    alpha += exp(-r * r * 6.0) * 0.3;
-    
-    if (alpha < 0.01) discard;
-    
-    gl_FragColor = vec4(color, alpha);
+    // DISABLED — keep shader code but output nothing
+    // This preserves the file/feature for future use
+    discard;
   }
 `;
 
@@ -1393,11 +1367,11 @@ export default function FloorRings() {
   });
 
   return (
-    <mesh 
+    <mesh
       position={[2.5, -1.82, -0.5]}
       rotation={[-Math.PI / 2, 0, 0]}
     >
-      <planeGeometry args={[18, 18]} />
+      <planeGeometry args={[5, 5]} />
       <shaderMaterial
         ref={materialRef}
         vertexShader={vertexShader}
@@ -1584,43 +1558,43 @@ const nebulaFragmentShader = `
 
   void main() {
     vec2 uv = vUv;
-    float t = uTime * 0.015;
+    float t = uTime * 0.012; // Was 0.015 - slower
     vec2 drift = vec2(t, -t * 0.5);
 
     float n1 = fbm(uv * 2.5 + drift);
     float n2 = fbm(uv * 4.0 - drift * 1.2 + vec2(5.2, 1.3));
     float n3 = fbm(uv * 7.0 + vec2(-t * 0.3, t * 0.4));
 
-    // Galaxy swirl upper right
+    // Galaxy swirl upper right - slightly dimmer
     vec2 galaxyUv = uv - vec2(0.72, 0.68);
     float galaxyDist = length(galaxyUv);
     float galaxyAngle = atan(galaxyUv.y, galaxyUv.x);
     float spiral = cos(galaxyAngle * 3.0 + galaxyDist * 12.0 - uTime * 0.08);
     float galaxy = exp(-galaxyDist * galaxyDist * 30.0) * (0.5 + 0.5 * spiral);
 
-    // Fog density
-    float fog = pow(n1, 2.5) * 0.4 + pow(n2, 3.0) * 0.3 + pow(n3, 4.0) * 0.2;
-    fog += galaxy * 0.5;
+    // Fog density - reduced
+    float fog = pow(n1, 2.5) * 0.35 + pow(n2, 3.0) * 0.25 + pow(n3, 4.0) * 0.15;
+    fog += galaxy * 0.4; // Was 0.5
 
-    // Mask
+    // Mask - slightly tighter
     float topMask = smoothstep(0.0, 0.12, uv.y);
     float bottomFade = smoothstep(0.0, 0.4, uv.y);
     fog *= topMask * bottomFade;
 
     // Darker red colors
-    vec3 col1 = vec3(0.7, 0.02, 0.06) * pow(n1, 2.5) * 0.5;
-    vec3 col2 = vec3(0.5, 0.0, 0.03) * pow(n2, 3.0) * 0.35;
-    vec3 col3 = vec3(0.3, 0.0, 0.02) * pow(n3, 4.0) * 0.2;
-    vec3 col4 = vec3(0.6, 0.08, 0.15) * galaxy * 0.4;
+    vec3 col1 = vec3(0.6, 0.02, 0.06) * pow(n1, 2.5) * 0.4;  // Was 0.7, 0.5
+    vec3 col2 = vec3(0.4, 0.0, 0.03) * pow(n2, 3.0) * 0.3;   // Was 0.5, 0.35
+    vec3 col3 = vec3(0.2, 0.0, 0.02) * pow(n3, 4.0) * 0.18;  // Was 0.3, 0.2
+    vec3 col4 = vec3(0.5, 0.06, 0.12) * galaxy * 0.35;        // Was 0.6, 0.4
 
     vec3 color = col1 + col2 + col3 + col4;
 
-    // Subtle horizon
+    // Subtle horizon - dimmer
     float horizon = exp(-pow(uv.y - 0.22, 2.0) * 40.0);
-    color += vec3(0.5, 0.01, 0.03) * horizon * 0.15;
+    color += vec3(0.4, 0.01, 0.03) * horizon * 0.12; // Was 0.5, 0.15
 
-    // Alpha - slightly reduced from original 0.85 to 0.5 for cleaner look
-    float alpha = clamp(fog * 0.2 + galaxy * 0.15 + horizon * 0.06, 0.0, 0.5);
+    // Alpha - reduced from 0.5 to 0.35
+    float alpha = clamp(fog * 0.15 + galaxy * 0.12 + horizon * 0.05, 0.0, 0.35);
     alpha *= smoothstep(0.0, 0.1, uv.y);
 
     gl_FragColor = vec4(color, alpha);
@@ -1679,11 +1653,10 @@ function createGridTexture() {
   canvas.height = 1024;
   const ctx = canvas.getContext("2d")!;
 
-  ctx.fillStyle = "#000000";
-  ctx.fillRect(0, 0, 1024, 1024);
+  ctx.clearRect(0, 0, 1024, 1024);
 
   ctx.strokeStyle = "#ff1744";
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.0;
 
   const step = 128;
   for (let i = 0; i <= 1024; i += step) {
@@ -1698,8 +1671,8 @@ function createGridTexture() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "#ff4444";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#ff3344";
+  ctx.lineWidth = 1.6;
   for (let i = 0; i <= 1024; i += step * 4) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
@@ -1715,7 +1688,7 @@ function createGridTexture() {
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(30, 30);
+  tex.repeat.set(16, 16);
   return tex;
 }
 
@@ -1731,28 +1704,28 @@ export default function NeonGrid() {
     if (gridRef.current) {
       const mat = gridRef.current.material as THREE.MeshBasicMaterial;
       if (mat.map) {
-        mat.map.offset.y = t * 0.02;
+        mat.map.offset.y = t * 0.015;
       }
     }
 
     if (ringsRef.current) {
       ringsRef.current.children.forEach((child, i) => {
         const mesh = child as THREE.Mesh;
-        const scale = 1 + Math.sin(t * 2 + i * 0.5) * 0.02;
+        const scale = 1 + Math.sin(t * 1.5 + i * 0.5) * 0.015;
         mesh.scale.set(scale, scale, 1);
       });
     }
   });
 
   return (
-    <group position={[0, -2.0, 0]}>
+    <group position={[0, -2.5, 0]}>
       {/* SOLID BLACK FLOOR BASE */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
         <planeGeometry args={[1000, 1000]} />
-        <meshBasicMaterial color="#030001" depthWrite={true} />
+        <meshBasicMaterial color="#010001" depthWrite={true} />
       </mesh>
 
-      {/* RED GRID */}
+      {/* PRIMARY GRID */}
       <mesh
         ref={gridRef}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -1762,35 +1735,35 @@ export default function NeonGrid() {
         <meshBasicMaterial
           map={gridTexture}
           transparent
-          opacity={0.4}
-          blending={THREE.AdditiveBlending}
+          opacity={0.3}
+          blending={THREE.NormalBlending}
           depthWrite={false}
           side={THREE.DoubleSide}
         />
       </mesh>
 
       {/* SECONDARY GRID */}
-      <mesh rotation={[-Math.PI / 2, 0.2, 0]} position={[0, 0.01, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0.12, 0]} position={[0, 0.003, 0]}>
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial
           map={gridTexture}
           transparent
-          opacity={0.25}
-          blending={THREE.AdditiveBlending}
+          opacity={0.15}
+          blending={THREE.NormalBlending}
           depthWrite={false}
           side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* CONCENTRIC RINGS under laptop */}
-      <group ref={ringsRef} position={[2.5, 0.02, -0.5]}>
-        {[1.5, 2.5, 3.5, 5, 7, 9, 12].map((radius, i) => (
+      {/* CONCENTRIC RINGS — reduce to almost nothing */}
+      <group ref={ringsRef} position={[2.5, 0.01, -0.5]}>
+        {[1.5, 2.5, 3.5].map((radius, i) => ( // Only 3, close to laptop
           <mesh key={radius} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[radius, radius + 0.08, 128]} />
+            <ringGeometry args={[radius, radius + 0.04, 128]} />
             <meshBasicMaterial
-              color={i % 2 === 0 ? "#ff1744" : "#ff6b6b"}
+              color={i % 2 === 0 ? "#ff1744" : "#ff4444"}
               transparent
-              opacity={0.2 - i * 0.02}
+              opacity={0.04 - i * 0.008} // Nearly invisible
               side={THREE.DoubleSide}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
@@ -1799,13 +1772,13 @@ export default function NeonGrid() {
         ))}
       </group>
 
-      {/* GLOWING CIRCLE under laptop */}
-      <mesh position={[2.5, 0.01, -0.5]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[6, 64]} />
+      {/* GLOWING CIRCLE — nearly invisible */}
+      <mesh position={[2.5, 0.005, -0.5]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[2.5, 64]} />
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.08}
+          opacity={0.015} // Barely visible
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -1813,20 +1786,9 @@ export default function NeonGrid() {
 
       {/* VERTICAL LIGHT BEAMS */}
       <mesh position={[8, 2, -5]} rotation={[-Math.PI / 2, 0.05, 0]}>
-        <planeGeometry args={[0.08, 60]} />
+        <planeGeometry args={[0.06, 60]} />
         <meshBasicMaterial
           color="#ff1744"
-          transparent
-          opacity={0.25}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      <mesh position={[-7, 2, -8]} rotation={[-Math.PI / 2, -0.05, 0]}>
-        <planeGeometry args={[0.05, 50]} />
-        <meshBasicMaterial
-          color="#800010"
           transparent
           opacity={0.15}
           blending={THREE.AdditiveBlending}
@@ -1834,15 +1796,26 @@ export default function NeonGrid() {
         />
       </mesh>
 
+      <mesh position={[-7, 2, -8]} rotation={[-Math.PI / 2, -0.05, 0]}>
+        <planeGeometry args={[0.04, 50]} />
+        <meshBasicMaterial
+          color="#800010"
+          transparent
+          opacity={0.08}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
       {/* HORIZONTAL DATA STREAKS */}
       {[
-        [-15, -22, 1, 10, 0.12],
-        [-6, -25, 0.7, 7, 0.08],
-        [5, -20, 0.8, 8, 0.1],
-        [14, -26, 1.1, 11, 0.14],
-        [22, -30, 0.6, 6, 0.07],
+        [-15, -22, 1, 10, 0.08],
+        [-6, -25, 0.7, 7, 0.05],
+        [5, -20, 0.8, 8, 0.06],
+        [14, -26, 1.1, 11, 0.1],
+        [22, -30, 0.6, 6, 0.04],
       ].map(([x, z, w, h, op], i) => (
-        <mesh key={i} position={[x as number, 0.05, z as number]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh key={i} position={[x as number, 0.03, z as number]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[w as number, h as number]} />
           <meshBasicMaterial
             color="#ff1744"
@@ -1855,13 +1828,28 @@ export default function NeonGrid() {
       ))}
 
       {/* REFLECTION PLANE */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.015}
+          opacity={0.008}
           blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* REMOVED: Floor surface tint — was causing red wash */}
+      {/* REMOVED: Large horizon fade plane */}
+
+      {/* NEW: Subtle horizon fog — black gradient only */}
+      <mesh position={[0, 0.02, -60]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[200, 40]} />
+        <meshBasicMaterial
+          color="#010001"
+          transparent
+          opacity={0.5}
+          blending={THREE.NormalBlending}
           depthWrite={false}
         />
       </mesh>
@@ -2093,7 +2081,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
   const isMobile = deviceTier === "mobile";
 
   return (
-    <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#050001" }}>
+    <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#020001" }}>
       <Canvas
         shadows
         gl={{
@@ -2101,7 +2089,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
           alpha: false,
           powerPreference: isMobile ? "default" : "high-performance",
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.95,
+          toneMappingExposure: 0.85,
         }}
         camera={{
           position: [0, 2.0, 8.5],
@@ -2112,32 +2100,28 @@ export default function Scene({ scrollProgress }: SceneProps) {
       >
         <CinematicCamera scrollProgress={scrollProgress} />
 
-        <color attach="background" args={["#050001"]} />
-        <fog attach="fog" args={["#050001", 30, 100]} />
+        <color attach="background" args={["#020001"]} />
+        {/* Fog starts at 25, fully black by 80 — this hides floor at horizon */}
+        <fog attach="fog" args={["#020001", 25, 85]} />
 
         <Environment preset="city" background={false} blur={2} />
 
-        <ambientLight intensity={0.12} color="#1a0004" />
-        <pointLight position={[5, 3, 5]} intensity={4} color="#ff1744" distance={60} decay={2} />
-        <pointLight position={[-5, 4, -5]} intensity={2.5} color="#ff4444" distance={50} decay={2} />
-        <pointLight position={[0, -2, 8]} intensity={3} color="#800010" distance={40} decay={2} />
-        <pointLight position={[12, 8, -20]} intensity={5} color="#ff1744" distance={80} decay={2} />
-        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={2.5} color="#ff1744" distance={50} />
+        <ambientLight intensity={0.08} color="#1a0004" />
+        <pointLight position={[5, 3, 5]} intensity={3} color="#ff1744" distance={60} decay={2} />
+        <pointLight position={[-5, 4, -5]} intensity={2} color="#ff4444" distance={50} decay={2} />
+        <pointLight position={[0, -2, 8]} intensity={2} color="#800010" distance={40} decay={2} />
+        <pointLight position={[12, 8, -20]} intensity={4} color="#ff1744" distance={80} decay={2} />
+        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={2} color="#ff1744" distance={50} />
 
         <Suspense fallback={null}>
-          {/* BACKGROUND LAYERS */}
           <NebulaBackground />
           <StarField />
           <DeepSpaceGlobe />
           <VolumetricRays />
-
-          {/* MID LAYER */}
           <ParticleNetwork />
           <FloatingHexParticles />
           <TechCubes />
           <FloatingLaptop />
-
-          {/* FLOOR */}
           <NeonGrid />
           <FloorRings />
 
@@ -2650,7 +2634,7 @@ const fragmentShader = `
     float dist = length(toLight);
     float angle = atan(toLight.y, toLight.x);
 
-    // Ray beams - REDUCED intensity
+    // Ray beams - same count but dimmer
     float rays = 0.0;
     for (int i = 0; i < 5; i++) {
       float fi = float(i);
@@ -2658,14 +2642,14 @@ const fragmentShader = `
       float ray = pow(sin(rayAngle * 8.0 + fi * 2.0) * 0.5 + 0.5, 8.0);
       float rayWidth = 0.02 + fi * 0.005;
       float rayMask = smoothstep(rayWidth, 0.0, abs(ray - 0.5) * 2.0);
-      rays += rayMask * (1.0 - dist) * (0.6 - fi * 0.1);
+      rays += rayMask * (1.0 - dist) * (0.45 - fi * 0.08); // Was 0.6 - dimmer
     }
 
     // Fade with distance from light
     float fade = smoothstep(0.0, 0.8, 1.0 - dist);
 
-    vec3 color = vec3(1.0, 0.08, 0.15) * rays * fade * 0.3;
-    float alpha = rays * fade * 0.15;
+    vec3 color = vec3(1.0, 0.08, 0.15) * rays * fade * 0.2; // Was 0.3
+    float alpha = rays * fade * 0.1; // Was 0.15
 
     gl_FragColor = vec4(color, alpha);
   }

@@ -112,15 +112,15 @@ export default function NeonGrid() {
         />
       </mesh>
 
-      {/* CONCENTRIC RINGS — keep but very dim */}
+      {/* CONCENTRIC RINGS — reduce to almost nothing */}
       <group ref={ringsRef} position={[2.5, 0.01, -0.5]}>
-        {[1.5, 2.5, 3.5, 5, 7].map((radius, i) => (
+        {[1.5, 2.5, 3.5].map((radius, i) => ( // Only 3, close to laptop
           <mesh key={radius} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[radius, radius + 0.06, 128]} />
+            <ringGeometry args={[radius, radius + 0.04, 128]} />
             <meshBasicMaterial
               color={i % 2 === 0 ? "#ff1744" : "#ff4444"}
               transparent
-              opacity={0.08 - i * 0.012}
+              opacity={0.04 - i * 0.008} // Nearly invisible
               side={THREE.DoubleSide}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
@@ -129,13 +129,13 @@ export default function NeonGrid() {
         ))}
       </group>
 
-      {/* GLOWING CIRCLE — much smaller, dimmer */}
+      {/* GLOWING CIRCLE — nearly invisible */}
       <mesh position={[2.5, 0.005, -0.5]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[3, 64]} />
+        <circleGeometry args={[2.5, 64]} />
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.025}
+          opacity={0.015} // Barely visible
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
