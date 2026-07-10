@@ -20,25 +20,26 @@ const fragmentShader = `
     vec2 uv = vUv - 0.5;
     float r = length(uv);
     
-    // Only show rings very close to center
-    if (r > 0.35) discard;
+    // HARD CUTOFF - only show very close to center
+    if (r > 0.25) discard;
     
-    // Very few rings, very slow
-    float ring1 = sin(r * 40.0 - uTime * 1.0);
+    // Just 2 slow rings
+    float ring1 = sin(r * 50.0 - uTime * 0.8);
     
-    // Very sharp, thin
-    float mask1 = smoothstep(0.96, 0.995, ring1) * 0.15;
+    // Very thin, sharp
+    float mask1 = smoothstep(0.97, 0.998, ring1) * 0.12;
     
-    // Fade out quickly
-    float fade = max(0.0, 1.0 - r * 3.0);
+    // Fade out quickly from center
+    float fade = max(0.0, 1.0 - r * 4.0);
     
     // Dark red
-    vec3 color = vec3(0.6, 0.03, 0.08);
+    vec3 color = vec3(0.5, 0.03, 0.06);
     
-    float alpha = mask1 * fade * 0.15;
+    float alpha = mask1 * fade * 0.12;
     
-    // Tiny core glow
-    alpha += exp(-r * r * 20.0) * 0.04;
+    // Tiny core pulse - very subtle
+    float pulse = sin(uTime * 0.5) * 0.5 + 0.5;
+    alpha += exp(-r * r * 25.0) * 0.03 * pulse;
     
     if (alpha < 0.005) discard;
     
@@ -63,11 +64,11 @@ export default function FloorRings() {
   });
 
   return (
-    <mesh
+    <mesh 
       position={[2.5, -1.82, -0.5]}
       rotation={[-Math.PI / 2, 0, 0]}
     >
-      <planeGeometry args={[8, 8]} />
+      <planeGeometry args={[4, 4]} /> {/* VERY small - only under laptop */}
       <shaderMaterial
         ref={materialRef}
         vertexShader={vertexShader}
