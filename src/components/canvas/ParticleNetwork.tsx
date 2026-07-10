@@ -7,7 +7,7 @@ import * as THREE from "three";
 export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 3500; // Was 1800
+  const particleCount = 800; // Reduced from 3500
 
   const [positions, velocities, sizes] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
@@ -16,13 +16,17 @@ export default function ParticleNetwork() {
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
-      pos[idx] = (Math.random() - 0.5) * 26;
-      pos[idx + 1] = (Math.random() - 0.5) * 16;
-      pos[idx + 2] = (Math.random() - 0.5) * 11;
-      vel[idx] = (Math.random() - 0.5) * 0.01;
-      vel[idx + 1] = (Math.random() - 0.5) * 0.01;
-      vel[idx + 2] = (Math.random() - 0.5) * 0.004;
-      sz[i] = 0.18 + Math.random() * 0.84;
+      // Spread in upper area, not on floor
+      pos[idx] = (Math.random() - 0.5) * 30;
+      pos[idx + 1] = Math.random() * 12 + 1;
+      pos[idx + 2] = (Math.random() - 0.5) * 20 - 5;
+
+      // Very slow drift
+      vel[idx] = (Math.random() - 0.5) * 0.003;
+      vel[idx + 1] = (Math.random() - 0.5) * 0.002;
+      vel[idx + 2] = (Math.random() - 0.5) * 0.001;
+
+      sz[i] = 0.12 + Math.random() * 0.35;
     }
 
     return [pos, vel, sz];
@@ -43,15 +47,8 @@ export default function ParticleNetwork() {
     const geo = pointsRef.current.geometry;
     const posAttr = geo.attributes.position;
     const posArray = posAttr.array as Float32Array;
-    const targetX = state.pointer.x * 10.5;
-    const targetY = state.pointer.y * 6.4;
 
     materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
-    materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.x, targetX, 0.09);
-    materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.y, targetY, 0.09);
-
-    const mx = materialRef.current.uniforms.uMouse.value.x;
-    const my = materialRef.current.uniforms.uMouse.value.y;
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
@@ -60,36 +57,10 @@ export default function ParticleNetwork() {
       posArray[idx + 1] += velocities[idx + 1];
       posArray[idx + 2] += velocities[idx + 2];
 
-      const px = posArray[idx];
-      const py = posArray[idx + 1];
-      const pz = posArray[idx + 2];
-
-      const dx = mx - px;
-      const dy = my - py;
-      const dz = -pz;
-      const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-      if (distToMouse < 12.0 && distToMouse > 0.001) {
-        const dirX = dx / distToMouse;
-        const dirY = dy / distToMouse;
-        const dirZ = dz / distToMouse;
-
-        // Tangential (orbit) force instead of direct pull
-        const tangentX = -dirY;
-        const tangentY = dirX;
-
-        // Weaker attraction, stronger tangential spread
-        const force = (12.0 - distToMouse) * 0.002;
-        const drift = (12.0 - distToMouse) * 0.005;
-
-        posArray[idx] += dirX * force + tangentX * drift;
-        posArray[idx + 1] += dirY * force + tangentY * drift;
-        posArray[idx + 2] += dirZ * force;
-      }
-
-      if (Math.abs(posArray[idx]) > 15) posArray[idx] = -posArray[idx];
-      if (Math.abs(posArray[idx + 1]) > 9) posArray[idx + 1] = -posArray[idx + 1];
-      if (Math.abs(posArray[idx + 2]) > 6.5) posArray[idx + 2] = -posArray[idx + 2];
+      // Wrap around boundaries
+      if (Math.abs(posArray[idx]) > 18) posArray[idx] *= -0.9;
+      if (posArray[idx + 1] > 16 || posArray[idx + 1] < 0.5) velocities[idx + 1] *= -1;
+      if (Math.abs(posArray[idx + 2]) > 15) posArray[idx + 2] *= -0.9;
     }
 
     posAttr.needsUpdate = true;
@@ -101,7 +72,7 @@ export default function ParticleNetwork() {
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
-      gl_PointSize = aSize * (18.0 / -mvPosition.z);
+      gl_PointSize = aSize * (16.0 / -mvPosition.z);
     }
   `;
 
@@ -111,9 +82,8 @@ export default function ParticleNetwork() {
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = length(coord);
       if (dist > 0.5) discard;
-      float alpha = smoothstep(0.5, 0.02, dist);
-      vec3 color = mix(uColor, vec3(1.0, 0.3, 0.4), smoothstep(0.1, 0.5, coord.x + 0.5));
-      gl_FragColor = vec4(color, alpha * 0.72);
+      float alpha = smoothstep(0.5, 0.0, dist);
+      gl_FragColor = vec4(uColor, alpha * 0.55);
     }
   `;
 
