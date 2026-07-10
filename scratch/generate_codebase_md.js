@@ -57,7 +57,6 @@ const rootConfigs = [
   'postcss.config.mjs',
   '.eslintrc.json',
   '.gitignore',
-  'AGENTS.md'
 ];
 
 for (const file of rootConfigs) {
