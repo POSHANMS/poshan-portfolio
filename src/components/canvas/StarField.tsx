@@ -48,6 +48,7 @@ function seededRandom(seed: number) {
 
 export default function StarField() {
   const starsRef = useRef<THREE.Points>(null);
+  const heroStarsRef = useRef<THREE.Points>(null);
 
   const { positions, colors, sizes, phases } = useMemo(() => {
     const rand = seededRandom(42);
@@ -115,10 +116,14 @@ export default function StarField() {
     return geo;
   }, []);
 
-  const { heroPositions, heroColors, heroSizes } = useMemo(() => {
+  // NOTE: heroSizes toned down from the broken attempt (was 24 + rand*16 = up to 40).
+  // Those were meant as gl_PointSize multipliers, not raw pixel sizes, and combined with
+  // an unclamped distance term they were blowing out into giant flares.
+  const { heroPositions, heroColors, heroSizes, heroPhases } = useMemo(() => {
     const pos = new Float32Array(allNodes.length * 3);
     const col = new Float32Array(allNodes.length * 3);
     const sz = new Float32Array(allNodes.length);
+    const ph = new Float32Array(allNodes.length);
 
     allNodes.forEach((node, i) => {
       pos[i * 3] = node[0];
@@ -127,12 +132,14 @@ export default function StarField() {
       col[i * 3] = 1.0;
       col[i * 3 + 1] = 0.5 + Math.random() * 0.3;
       col[i * 3 + 2] = 0.5 + Math.random() * 0.3;
-      sz[i] = 24 + Math.random() * 16;
+      sz[i] = 6 + Math.random() * 4;
+      ph[i] = Math.random() * Math.PI * 2;
     });
 
-    return { heroPositions: pos, heroColors: col, heroSizes: sz };
+    return { heroPositions: pos, heroColors: col, heroSizes: sz, heroPhases: ph };
   }, []);
 
+  // Main star field shader - circular (unchanged, this one already works correctly)
   const starMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 } },
@@ -166,10 +173,51 @@ export default function StarField() {
     });
   }, []);
 
+  // Hero star shader - circular with glow, distance scaled and SAFELY CLAMPED
+  // so a star near the camera plane cannot make -mv.z shrink toward zero and
+  // blow gl_PointSize up into a giant flare (that was the "3 bright lights" bug).
+  const heroStarMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `
+        attribute float aSize;
+        attribute float aPhase;
+        varying float vAlpha;
+        uniform float uTime;
+        void main() {
+          float twinkle = 0.6 + 0.4 * sin(uTime * 0.8 + aPhase);
+          vAlpha = twinkle;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mv;
+          float safeDist = max(8.0, -mv.z);
+          gl_PointSize = aSize * (60.0 / safeDist);
+        }
+      `,
+      fragmentShader: `
+        varying float vAlpha;
+        void main() {
+          vec2 uv = gl_PointCoord - vec2(0.5);
+          float d = length(uv);
+          float core = smoothstep(0.5, 0.0, d);
+          float glow = smoothstep(0.5, 0.1, d) * 0.6;
+          float ring = smoothstep(0.55, 0.45, d) * smoothstep(0.35, 0.45, d) * 0.3;
+          if (core + glow + ring < 0.01) discard;
+          vec3 color = mix(vec3(1.0, 0.9, 0.9), vec3(1.0, 0.5, 0.5), glow);
+          gl_FragColor = vec4(color, (core + glow + ring) * vAlpha * 0.85);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+  }, []);
+
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     starMaterial.uniforms.uTime.value = t;
+    heroStarMaterial.uniforms.uTime.value = t;
     if (starsRef.current) starsRef.current.rotation.y = t * 0.0005;
+    if (heroStarsRef.current) heroStarsRef.current.rotation.y = t * 0.0005;
   });
 
   return (
@@ -194,21 +242,14 @@ export default function StarField() {
         />
       </lineSegments>
 
-      <points>
+      <points ref={heroStarsRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[heroPositions, 3]} />
           <bufferAttribute attach="attributes-color" args={[heroColors, 3]} />
           <bufferAttribute attach="attributes-aSize" args={[heroSizes, 1]} />
+          <bufferAttribute attach="attributes-aPhase" args={[heroPhases, 1]} />
         </bufferGeometry>
-        <pointsMaterial
-          size={0.9}
-          vertexColors
-          transparent
-          opacity={0.95}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          sizeAttenuation
-        />
+        <primitive object={heroStarMaterial} attach="material" />
       </points>
     </group>
   );

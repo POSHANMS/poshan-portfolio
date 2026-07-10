@@ -18,14 +18,14 @@ const fragmentShader = `
 
   void main() {
     vec2 uv = vUv;
-    
+
     // Light source from upper right
     vec2 lightPos = vec2(0.75, 0.7);
     vec2 toLight = lightPos - uv;
     float dist = length(toLight);
     float angle = atan(toLight.y, toLight.x);
-    
-    // Ray beams
+
+    // Ray beams - REDUCED intensity
     float rays = 0.0;
     for (int i = 0; i < 5; i++) {
       float fi = float(i);
@@ -35,13 +35,13 @@ const fragmentShader = `
       float rayMask = smoothstep(rayWidth, 0.0, abs(ray - 0.5) * 2.0);
       rays += rayMask * (1.0 - dist) * (0.6 - fi * 0.1);
     }
-    
+
     // Fade with distance from light
     float fade = smoothstep(0.0, 0.8, 1.0 - dist);
-    
+
     vec3 color = vec3(1.0, 0.08, 0.15) * rays * fade * 0.3;
     float alpha = rays * fade * 0.15;
-    
+
     gl_FragColor = vec4(color, alpha);
   }
 `;
