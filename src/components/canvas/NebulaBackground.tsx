@@ -45,7 +45,7 @@ const nebulaFragmentShader = `
 
   void main() {
     vec2 uv = vUv;
-    float t = uTime * 0.008;
+    float t = uTime * 0.01;
     vec2 drift = vec2(t, -t * 0.5);
 
     float n1 = fbm(uv * 2.5 + drift);
@@ -58,27 +58,24 @@ const nebulaFragmentShader = `
     float spiral = cos(galaxyAngle * 3.0 + galaxyDist * 12.0 - uTime * 0.08);
     float galaxy = exp(-galaxyDist * galaxyDist * 25.0) * (0.5 + 0.5 * spiral);
 
-    // EXTREMELY LOW fog density
-    float fog = pow(n1, 2.5) * 0.04 + pow(n2, 3.0) * 0.03 + pow(n3, 4.0) * 0.015;
-    fog += galaxy * 0.02;
+    float fog = pow(n1, 2.5) * 0.06 + pow(n2, 3.0) * 0.04 + pow(n3, 4.0) * 0.02;
+    fog += galaxy * 0.03;
 
     float topMask = smoothstep(0.0, 0.15, uv.y);
     float bottomFade = smoothstep(0.0, 0.5, uv.y);
     fog *= topMask * bottomFade;
 
-    // Very dark, desaturated red
-    vec3 col1 = vec3(0.25, 0.02, 0.04) * pow(n1, 2.5) * 0.04;
-    vec3 col2 = vec3(0.15, 0.01, 0.02) * pow(n2, 3.0) * 0.03;
-    vec3 col3 = vec3(0.08, 0.0, 0.01) * pow(n3, 4.0) * 0.015;
-    vec3 col4 = vec3(0.20, 0.02, 0.05) * galaxy * 0.02;
+    vec3 col1 = vec3(0.30, 0.03, 0.06) * pow(n1, 2.5) * 0.06;
+    vec3 col2 = vec3(0.18, 0.01, 0.03) * pow(n2, 3.0) * 0.04;
+    vec3 col3 = vec3(0.10, 0.0, 0.02) * pow(n3, 4.0) * 0.02;
+    vec3 col4 = vec3(0.25, 0.03, 0.06) * galaxy * 0.03;
 
     vec3 color = col1 + col2 + col3 + col4;
 
     float horizon = exp(-pow(uv.y - 0.20, 2.0) * 35.0);
-    color += vec3(0.20, 0.01, 0.03) * horizon * 0.02;
+    color += vec3(0.25, 0.02, 0.04) * horizon * 0.03;
 
-    // VERY LOW alpha - barely visible
-    float alpha = clamp(fog * 0.015 + galaxy * 0.008 + horizon * 0.005, 0.0, 0.025);
+    float alpha = clamp(fog * 0.02 + galaxy * 0.01 + horizon * 0.008, 0.0, 0.035);
     alpha *= smoothstep(0.0, 0.12, uv.y);
 
     gl_FragColor = vec4(color, alpha);
