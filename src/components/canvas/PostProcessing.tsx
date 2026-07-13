@@ -15,12 +15,11 @@ export default function PostProcessing() {
     const instance = new EffectComposer(gl);
     const renderPass = new RenderPass(scene, camera);
 
-    // Clean bloom — no chromatic aberration, sharp and focused
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(size.width, size.height),
-      0.25,  // Low strength — only neon edges glow
-      0.3,   // Tight radius — no bleed
-      0.45   // High threshold — only bright things bloom
+      0.20,
+      0.28,
+      0.52
     );
 
     const outputPass = new OutputPass();

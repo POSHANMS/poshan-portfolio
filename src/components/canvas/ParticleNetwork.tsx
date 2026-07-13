@@ -7,7 +7,7 @@ import * as THREE from "three";
 export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 3500;
+  const particleCount = 5000;
 
   const [positions, velocities, sizes] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
@@ -18,11 +18,11 @@ export default function ParticleNetwork() {
       const idx = i * 3;
       pos[idx] = (Math.random() - 0.5) * 26;
       pos[idx + 1] = (Math.random() - 0.5) * 16;
-      pos[idx + 2] = (Math.random() - 0.5) * 11;
+      pos[idx + 2] = -8 - Math.random() * 15;
       vel[idx] = (Math.random() - 0.5) * 0.01;
       vel[idx + 1] = (Math.random() - 0.5) * 0.01;
       vel[idx + 2] = (Math.random() - 0.5) * 0.004;
-      sz[i] = 0.18 + Math.random() * 0.84;
+      sz[i] = 0.15 + Math.random() * 0.65;
     }
 
     return [pos, vel, sz];
@@ -69,7 +69,7 @@ export default function ParticleNetwork() {
       const dz = -pz;
       const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-      if (distToMouse < 12.0 && distToMouse > 0.001) {
+      if (distToMouse < 8.5 && distToMouse > 0.001) {
         const dirX = dx / distToMouse;
         const dirY = dy / distToMouse;
         const dirZ = dz / distToMouse;
@@ -77,8 +77,8 @@ export default function ParticleNetwork() {
         const tangentX = -dirY;
         const tangentY = dirX;
 
-        const force = (12.0 - distToMouse) * 0.002;
-        const drift = (12.0 - distToMouse) * 0.005;
+        const force = (8.5 - distToMouse) * 0.0042;
+        const drift = (8.5 - distToMouse) * 0.0032;
 
         posArray[idx] += dirX * force + tangentX * drift;
         posArray[idx + 1] += dirY * force + tangentY * drift;
@@ -87,7 +87,7 @@ export default function ParticleNetwork() {
 
       if (Math.abs(posArray[idx]) > 15) posArray[idx] = -posArray[idx];
       if (Math.abs(posArray[idx + 1]) > 9) posArray[idx + 1] = -posArray[idx + 1];
-      if (Math.abs(posArray[idx + 2]) > 6.5) posArray[idx + 2] = -posArray[idx + 2];
+      if (Math.abs(posArray[idx + 2]) > 13) posArray[idx + 2] = -posArray[idx + 2];
     }
 
     posAttr.needsUpdate = true;
@@ -99,7 +99,7 @@ export default function ParticleNetwork() {
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
-      gl_PointSize = aSize * (18.0 / -mvPosition.z);
+      gl_PointSize = aSize * (16.0 / -mvPosition.z);
     }
   `;
 
@@ -111,7 +111,7 @@ export default function ParticleNetwork() {
       if (dist > 0.5) discard;
       float alpha = smoothstep(0.5, 0.02, dist);
       vec3 color = mix(uColor, vec3(1.0, 0.3, 0.4), smoothstep(0.1, 0.5, coord.x + 0.5));
-      gl_FragColor = vec4(color, alpha * 0.72);
+      gl_FragColor = vec4(color, alpha * 0.60);
     }
   `;
 

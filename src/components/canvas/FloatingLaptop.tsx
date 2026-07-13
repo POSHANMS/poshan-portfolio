@@ -5,12 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
-// ─────────────────────────────────────────────────────────────
-// Screen texture is BAKED into laptop-baked.glb as Material.004.
-// No runtime CanvasTexture / VideoTexture / CSS3DRenderer needed.
-// ─────────────────────────────────────────────────────────────
-
-const SCREEN_MATERIAL_NAME = "Material.004"; // baked screen in GLB
+const SCREEN_MATERIAL_NAME = "Material.004";
 
 export default function FloatingLaptop() {
   const { scene } = useGLTF("/models/laptop-baked.glb");
@@ -36,16 +31,13 @@ export default function FloatingLaptop() {
       mesh.castShadow    = true;
       mesh.receiveShadow = true;
 
-      // Leave the baked screen material untouched — it already has
-      // the VS Code texture + emissive glow baked in.
       const mat = mesh.material as THREE.MeshStandardMaterial;
       if (mat && mat.name === SCREEN_MATERIAL_NAME) {
-        mat.toneMapped = false; // keep screen colours accurate
+        mat.toneMapped = false;
         mat.needsUpdate = true;
         return;
       }
 
-      // Everything else gets the dark metallic chassis look.
       mesh.material = darkBody;
     });
   }, [scene]);
@@ -60,7 +52,7 @@ export default function FloatingLaptop() {
     if (groupRef.current) {
       groupRef.current.rotation.y = THREE.MathUtils.lerp(
         groupRef.current.rotation.y,
-        -Math.PI / 2 - 0.26 + state.pointer.x * 0.045,
+        -Math.PI / 2 - 0.15 + state.pointer.x * 0.045,
         0.045,
       );
       groupRef.current.rotation.x = THREE.MathUtils.lerp(
@@ -72,70 +64,67 @@ export default function FloatingLaptop() {
   });
 
   const { width } = useThree((state) => state.viewport);
-  const laptopX   = Math.max(1.65, width * 0.145);
+  const laptopX   = Math.max(0.8, width * 0.08);
 
   return (
     <group
       ref={groupRef}
       position={[laptopX, -0.52, -1.34]}
-      rotation={[0.09, -Math.PI / 2 - 0.26, -0.03]}
+      rotation={[0.09, -Math.PI / 2 - 0.15, -0.03]}
     >
       <group ref={bobRef}>
-        <primitive object={scene} scale={1.24} />
+        <primitive object={scene} scale={1.15} />
 
-        {/* Screen back-glow plane */}
         <mesh position={[0.2, 0.78, -0.72]} rotation={[0.05, 0, 0]}>
           <planeGeometry args={[2.2, 1.35]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.16}
+            opacity={0.07}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
 
-        {/* Keyboard glow */}
         <mesh position={[0.36, -0.28, 0.22]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[2.5, 1.0]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.18}
+            opacity={0.08}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
 
-        {/* Floor bounce-light disk */}
         <mesh position={[0.32, -0.9, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[2.35, 72]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.11}
+            opacity={0.04}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
 
-        {/* Concentric platform ring */}
         <mesh position={[0.0, -1.02, 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[1.25, 2.75, 96]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.075}
+            opacity={0.03}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
 
-        {/* Lights */}
-        <pointLight position={[0, 1.8, -1.2]}   intensity={7.5} distance={12} color="#ff1744" decay={2} />
-        <pointLight position={[-2.1, 0.65, 0.45]} intensity={4.4} distance={9}  color="#ff1744" decay={2} />
-        <pointLight position={[0.8, -1.15, 0.95]} intensity={3.8} distance={8}  color="#800010" decay={2} />
-        <pointLight position={[0, 0.5, 1.5]}      intensity={3.2} distance={8}  color="#ff1744" decay={2} />
+        <pointLight position={[0, 1.8, -1.2]}   intensity={4.5} distance={12} color="#ff1744" decay={2} />
+        <pointLight position={[-2.1, 0.65, 0.45]} intensity={2.8} distance={9}  color="#ff1744" decay={2} />
+        <pointLight position={[0.8, -1.15, 0.95]} intensity={2.2} distance={8}  color="#800010" decay={2} />
+        <pointLight position={[0, 0.5, 1.5]}      intensity={2.0} distance={8}  color="#ff1744" decay={2} />
+        
+        <pointLight position={[0, -0.5, 0]} intensity={2.5} distance={8} color="#ff1744" decay={2} />
       </group>
     </group>
   );
