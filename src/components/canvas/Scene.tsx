@@ -34,7 +34,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
           alpha: false,
           powerPreference: isMobile ? "default" : "high-performance",
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.95,
+          toneMappingExposure: 1.0,
         }}
         camera={{
           position: [0, 2.0, 9.5],
@@ -46,23 +46,24 @@ export default function Scene({ scrollProgress }: SceneProps) {
         <CinematicCamera scrollProgress={scrollProgress} />
 
         <color attach="background" args={["#000000"]} />
-        <fog attach="fog" args={["#050002", 20, 60]} />
         
-        <ambientLight intensity={0.04} color="#0a0002" />
+        <ambientLight intensity={0.03} color="#0a0002" />
 
-        <pointLight position={[5, 4, 6]} intensity={2.0} color="#ff1744" distance={70} decay={2} />
-        <pointLight position={[-5, 5, -4]} intensity={1.3} color="#ff4444" distance={55} decay={2} />
-        <pointLight position={[0, -1, 10]} intensity={1.4} color="#800010" distance={45} decay={2} />
-        <pointLight position={[14, 10, -22]} intensity={2.5} color="#ff1744" distance={90} decay={2} />
-        <spotLight position={[4, 7, 5]} angle={0.5} penumbra={0.8} intensity={1.2} color="#ff1744" distance={55} />
+        <pointLight position={[5, 4, 6]} intensity={2.2} color="#ff1744" distance={70} decay={2} />
+        <pointLight position={[-5, 5, -4]} intensity={1.4} color="#ff4444" distance={55} decay={2} />
+        <pointLight position={[0, -1, 10]} intensity={1.6} color="#800010" distance={45} decay={2} />
+        <pointLight position={[14, 10, -22]} intensity={2.8} color="#ff1744" distance={90} decay={2} />
+        <spotLight position={[4, 7, 5]} angle={0.5} penumbra={0.8} intensity={1.4} color="#ff1744" distance={55} />
         
-        <pointLight position={[0.8, -1.2, 0]} intensity={1.8} color="#ff1744" distance={14} decay={2} />
-        <pointLight position={[-2, -0.5, 2]} intensity={0.8} color="#cc1133" distance={10} decay={2} />
+        <pointLight position={[0.8, -1.0, 0]} intensity={2.2} color="#ff1744" distance={14} decay={2} />
+        <pointLight position={[-2, -0.3, 2]} intensity={1.0} color="#cc1133" distance={10} decay={2} />
+        <pointLight position={[0, -1.5, 5]} intensity={1.5} color="#660010" distance={20} decay={2} />
         
-        <pointLight position={[2.5, 1.0, 0.5]} intensity={1.2} color="#ff1744" distance={12} decay={2} />
-        <pointLight position={[-1, 1.5, 3]} intensity={0.6} color="#ff8a80" distance={10} decay={2} />
+        <pointLight position={[2.5, 1.0, 0.5]} intensity={1.4} color="#ff1744" distance={12} decay={2} />
+        <pointLight position={[-1, 1.5, 3]} intensity={0.7} color="#ff8a80" distance={10} decay={2} />
         
-        <pointLight position={[0, 8, -30]} intensity={0.8} color="#ff1744" distance={60} decay={2} />
+        <pointLight position={[0, 8, -30]} intensity={1.0} color="#ff1744" distance={60} decay={2} />
+        <pointLight position={[-8, 3, 2]} intensity={0.4} color="#ff3355" distance={30} decay={2} />
 
         <Suspense fallback={null}>
           <NebulaBackground />

@@ -8,7 +8,7 @@ export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const linesRef = useRef<THREE.LineSegments>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 400;
+  const particleCount = 350;
 
   const [positions, velocities, sizes, connectionIndices] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
@@ -40,7 +40,7 @@ export default function ParticleNetwork() {
         const dz = pos[i3 + 2] - pos[j3 + 2];
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         
-        if (dist < 5.0) {
+        if (dist < 3.5) {
           connections.push(i, j);
           connectionsMade++;
         }
@@ -246,9 +246,9 @@ export default function ParticleNetwork() {
 
       <lineSegments ref={linesRef} geometry={lineGeometry}>
         <lineBasicMaterial
-          color="#661122"
+          color="#441111"
           transparent
-          opacity={0.04}
+          opacity={0.015}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
