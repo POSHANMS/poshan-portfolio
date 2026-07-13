@@ -248,7 +248,7 @@ export const staggerContainer: Variants = {
 @tailwind utilities;
 
 :root {
-  --background: #0a0002;
+  --background: #000000;
   --foreground: #f0f0f0;
   --font-inter: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-jetbrains-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -883,6 +883,43 @@ body {
 .dashboard-scanlines {
   opacity: 0.1;
 }
+
+.fixed.inset-0.z-0 {
+  background: #000000 !important;
+}
+
+
+/* ─── Additional fixes for background/floor alignment with reference ─── */
+
+/* Ensure the canvas container has correct background */
+.fixed.inset-0.z-0 {
+  background: #030001 !important;
+}
+
+/* Dashboard stage should blend better with 3D scene */
+.dashboard-stage {
+  /* Slightly adjust position to align with 3D floor perspective */
+  top: calc(50% + 8px);
+}
+
+/* Reduce haze intensity for cleaner look */
+.dashboard-haze {
+  background:
+    radial-gradient(circle at 70% 50%, rgba(255, 23, 68, 0.03), transparent 18rem),
+    radial-gradient(circle at 76% 58%, rgba(128, 0, 16, 0.04), transparent 19rem),
+    radial-gradient(circle at 30% 40%, rgba(204, 17, 51, 0.008), transparent 17rem),
+    radial-gradient(circle at 82% 18%, rgba(128, 0, 16, 0.05), transparent 22rem),
+    linear-gradient(180deg, rgba(2, 3, 13, 0.05), rgba(4, 4, 12, 0.01) 56%, rgba(4, 4, 12, 0.15));
+}
+
+/* Reduce scanlines for cleaner look */
+.dashboard-scanlines {
+  opacity: 0.1;
+}
+
+.fixed.inset-0.z-0 {
+  background: #000000 !important;
+}
 ```
 
 ## File: `src/app/layout.tsx`
@@ -1020,35 +1057,35 @@ export default function DeepSpaceGlobe() {
     }
   });
 
-  // Positioned upper right like reference image
+  // Positioned upper right like reference image - closer and more visible
   return (
-    <group position={[18, 10, -35]} scale={2.5} renderOrder={-8}>
-      <pointLight position={[0, 0, 2.2]} color="#ff1744" intensity={3.0} distance={15} decay={2} />
-      <pointLight position={[-2.2, 1.8, 0.5]} color="#ff8a80" intensity={0.8} distance={10} decay={2} />
+    <group position={[10, 6, -20]} scale={1.8} renderOrder={-8}>
+      <pointLight position={[0, 0, 2.2]} color="#ff1744" intensity={2.0} distance={15} decay={2} />
+      <pointLight position={[-2.2, 1.8, 0.5]} color="#ff8a80" intensity={0.5} distance={10} decay={2} />
 
       <group ref={globeRef}>
         {/* Main wireframe sphere */}
         <mesh>
           <sphereGeometry args={[1.1, 64, 36]} />
-          <meshBasicMaterial color="#ff1744" wireframe transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color="#ff1744" wireframe transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
 
         {/* Secondary wireframe */}
         <mesh scale={[1.015, 1.015, 1.015]}>
           <sphereGeometry args={[1.1, 32, 18]} />
-          <meshBasicMaterial color="#ff4444" wireframe transparent opacity={0.28} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color="#ff4444" wireframe transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
 
         {/* Equator ring */}
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <sphereGeometry args={[1.105, 48, 16]} />
-          <meshBasicMaterial color="#ff1744" wireframe transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color="#ff1744" wireframe transparent opacity={0.12} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
 
         {/* Inner glow sphere */}
         <mesh>
           <sphereGeometry args={[1.02, 48, 24]} />
-          <meshBasicMaterial color="#800010" transparent opacity={0.05} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color="#800010" transparent opacity={0.04} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
       </group>
 
@@ -1060,7 +1097,7 @@ export default function DeepSpaceGlobe() {
             <meshBasicMaterial
               color={index === 1 ? "#ff1744" : "#ff4444"}
               transparent
-              opacity={index === 1 ? 0.3 : 0.18}
+              opacity={index === 1 ? 0.22 : 0.12}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
             />
@@ -1071,7 +1108,7 @@ export default function DeepSpaceGlobe() {
       {/* Outer atmosphere glow */}
       <mesh scale={[1.75, 1.75, 1.75]}>
         <sphereGeometry args={[1.1, 42, 24]} />
-        <meshBasicMaterial color="#ff1744" transparent opacity={0.04} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color="#ff1744" transparent opacity={0.03} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -1183,12 +1220,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
-// ─────────────────────────────────────────────────────────────
-// Screen texture is BAKED into laptop-baked.glb as Material.004.
-// No runtime CanvasTexture / VideoTexture / CSS3DRenderer needed.
-// ─────────────────────────────────────────────────────────────
-
-const SCREEN_MATERIAL_NAME = "Material.004"; // baked screen in GLB
+const SCREEN_MATERIAL_NAME = "Material.004";
 
 export default function FloatingLaptop() {
   const { scene } = useGLTF("/models/laptop-baked.glb");
@@ -1214,16 +1246,13 @@ export default function FloatingLaptop() {
       mesh.castShadow    = true;
       mesh.receiveShadow = true;
 
-      // Leave the baked screen material untouched — it already has
-      // the VS Code texture + emissive glow baked in.
       const mat = mesh.material as THREE.MeshStandardMaterial;
       if (mat && mat.name === SCREEN_MATERIAL_NAME) {
-        mat.toneMapped = false; // keep screen colours accurate
+        mat.toneMapped = false;
         mat.needsUpdate = true;
         return;
       }
 
-      // Everything else gets the dark metallic chassis look.
       mesh.material = darkBody;
     });
   }, [scene]);
@@ -1238,7 +1267,7 @@ export default function FloatingLaptop() {
     if (groupRef.current) {
       groupRef.current.rotation.y = THREE.MathUtils.lerp(
         groupRef.current.rotation.y,
-        -Math.PI / 2 - 0.26 + state.pointer.x * 0.045,
+        -Math.PI / 2 - 0.15 + state.pointer.x * 0.045,
         0.045,
       );
       groupRef.current.rotation.x = THREE.MathUtils.lerp(
@@ -1250,70 +1279,67 @@ export default function FloatingLaptop() {
   });
 
   const { width } = useThree((state) => state.viewport);
-  const laptopX   = Math.max(1.65, width * 0.145);
+  const laptopX   = Math.max(0.8, width * 0.08);
 
   return (
     <group
       ref={groupRef}
       position={[laptopX, -0.52, -1.34]}
-      rotation={[0.09, -Math.PI / 2 - 0.26, -0.03]}
+      rotation={[0.09, -Math.PI / 2 - 0.15, -0.03]}
     >
       <group ref={bobRef}>
-        <primitive object={scene} scale={1.24} />
+        <primitive object={scene} scale={1.15} />
 
-        {/* Screen back-glow plane */}
         <mesh position={[0.2, 0.78, -0.72]} rotation={[0.05, 0, 0]}>
           <planeGeometry args={[2.2, 1.35]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.16}
+            opacity={0.07}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
 
-        {/* Keyboard glow */}
         <mesh position={[0.36, -0.28, 0.22]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[2.5, 1.0]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.18}
+            opacity={0.08}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
 
-        {/* Floor bounce-light disk */}
         <mesh position={[0.32, -0.9, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[2.35, 72]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.11}
+            opacity={0.04}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
 
-        {/* Concentric platform ring */}
         <mesh position={[0.0, -1.02, 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[1.25, 2.75, 96]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.075}
+            opacity={0.03}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
 
-        {/* Lights */}
-        <pointLight position={[0, 1.8, -1.2]}   intensity={7.5} distance={12} color="#ff1744" decay={2} />
-        <pointLight position={[-2.1, 0.65, 0.45]} intensity={4.4} distance={9}  color="#ff1744" decay={2} />
-        <pointLight position={[0.8, -1.15, 0.95]} intensity={3.8} distance={8}  color="#800010" decay={2} />
-        <pointLight position={[0, 0.5, 1.5]}      intensity={3.2} distance={8}  color="#ff1744" decay={2} />
+        <pointLight position={[0, 1.8, -1.2]}   intensity={4.5} distance={12} color="#ff1744" decay={2} />
+        <pointLight position={[-2.1, 0.65, 0.45]} intensity={2.8} distance={9}  color="#ff1744" decay={2} />
+        <pointLight position={[0.8, -1.15, 0.95]} intensity={2.2} distance={8}  color="#800010" decay={2} />
+        <pointLight position={[0, 0.5, 1.5]}      intensity={2.0} distance={8}  color="#ff1744" decay={2} />
+        
+        <pointLight position={[0, -0.5, 0]} intensity={2.5} distance={8} color="#ff1744" decay={2} />
       </group>
     </group>
   );
@@ -1327,62 +1353,123 @@ useGLTF.preload("/models/laptop-baked.glb");
 ```typescript
 "use client";
 
-import React, { useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-const vertexShader = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const fragmentShader = `
-  uniform float uTime;
-  varying vec2 vUv;
-
-  void main() {
-    // DISABLED — keep shader code but output nothing
-    // This preserves the file/feature for future use
-    discard;
-  }
-`;
-
 export default function FloorRings() {
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
+  const ringsRef = useRef<THREE.Group>(null);
+  const glowRef = useRef<THREE.Group>(null);
 
-  const uniforms = React.useMemo(
-    () => ({
-      uTime: { value: 0.0 },
-    }),
-    []
-  );
+  const ringGeometries = useMemo(() => {
+    const rings: THREE.BufferGeometry[] = [];
+    const radii = [0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2];
+
+    for (const radius of radii) {
+      const points: THREE.Vector3[] = [];
+      const segments = 128;
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        points.push(new THREE.Vector3(
+          Math.cos(angle) * radius,
+          0,
+          Math.sin(angle) * radius
+        ));
+      }
+      rings.push(new THREE.BufferGeometry().setFromPoints(points));
+    }
+    return rings;
+  }, []);
 
   useFrame((state) => {
-    if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
+    if (!ringsRef.current) return;
+    const t = state.clock.getElapsedTime();
+    
+    ringsRef.current.children.forEach((child, i) => {
+      const line = child as THREE.Line;
+      if (line && line.scale) {
+        const scale = 1.0 + Math.sin(t * 0.3 + i * 0.15) * 0.012;
+        line.scale.set(scale, scale, scale);
+      }
+    });
+
+    if (glowRef.current) {
+      glowRef.current.children.forEach((child, i) => {
+        const mesh = child as THREE.Mesh;
+        if (mesh.material) {
+          const mat = mesh.material as THREE.MeshBasicMaterial;
+          mat.opacity = 0.05 + Math.sin(t * 1.5 + i * 2.0) * 0.025;
+        }
+      });
     }
   });
 
   return (
-    <mesh
-      position={[2.5, -1.82, -0.5]}
-      rotation={[-Math.PI / 2, 0, 0]}
-    >
-      <planeGeometry args={[5, 5]} />
-      <shaderMaterial
-        ref={materialRef}
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={uniforms}
-        transparent
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
+    <group position={[0.8, -1.90, 0]}>
+      <group ref={ringsRef}>
+        {ringGeometries.map((geometry, i) => (
+          <primitive 
+            key={i} 
+            object={new THREE.Line(
+              geometry, 
+              new THREE.LineBasicMaterial({
+                color: i % 3 === 0 ? "#880018" : "#55000a",
+                transparent: true,
+                opacity: Math.max(0.03, 0.14 - i * 0.012),
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+              })
+            )} 
+          />
+        ))}
+      </group>
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+        <circleGeometry args={[2.5, 48]} />
+        <meshBasicMaterial
+          color="#440008"
+          transparent
+          opacity={0.05}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
+      <group ref={glowRef}>
+        <mesh position={[-1.2, 0.02, 0.8]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.10, 24]} />
+          <meshBasicMaterial
+            color="#ff1744"
+            transparent
+            opacity={0.06}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+        
+        <mesh position={[0.1, 0.02, 1.2]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.08, 24]} />
+          <meshBasicMaterial
+            color="#cc1133"
+            transparent
+            opacity={0.05}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+        
+        <mesh position={[1.4, 0.02, 0.9]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.12, 24]} />
+          <meshBasicMaterial
+            color="#ff1744"
+            transparent
+            opacity={0.07}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+      </group>
+    </group>
   );
 }
 ```
@@ -1528,6 +1615,7 @@ const nebulaVertexShader = `
 
 const nebulaFragmentShader = `
   uniform float uTime;
+  uniform vec2 uResolution;
   varying vec2 vUv;
 
   float hash(vec2 p) {
@@ -1548,7 +1636,7 @@ const nebulaFragmentShader = `
   float fbm(vec2 p) {
     float v = 0.0;
     float a = 0.5;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 4; i++) {
       v += a * noise(p);
       p *= 2.2;
       a *= 0.5;
@@ -1558,44 +1646,44 @@ const nebulaFragmentShader = `
 
   void main() {
     vec2 uv = vUv;
-    float t = uTime * 0.012; // Was 0.015 - slower
+    float t = uTime * 0.01;
     vec2 drift = vec2(t, -t * 0.5);
 
     float n1 = fbm(uv * 2.5 + drift);
     float n2 = fbm(uv * 4.0 - drift * 1.2 + vec2(5.2, 1.3));
     float n3 = fbm(uv * 7.0 + vec2(-t * 0.3, t * 0.4));
 
-    // Galaxy swirl upper right - slightly dimmer
-    vec2 galaxyUv = uv - vec2(0.72, 0.68);
+    // Very subtle galaxy swirl upper right - barely visible
+    vec2 galaxyUv = uv - vec2(0.70, 0.65);
     float galaxyDist = length(galaxyUv);
     float galaxyAngle = atan(galaxyUv.y, galaxyUv.x);
     float spiral = cos(galaxyAngle * 3.0 + galaxyDist * 12.0 - uTime * 0.08);
-    float galaxy = exp(-galaxyDist * galaxyDist * 30.0) * (0.5 + 0.5 * spiral);
+    float galaxy = exp(-galaxyDist * galaxyDist * 25.0) * (0.5 + 0.5 * spiral);
 
-    // Fog density - reduced
-    float fog = pow(n1, 2.5) * 0.35 + pow(n2, 3.0) * 0.25 + pow(n3, 4.0) * 0.15;
-    fog += galaxy * 0.4; // Was 0.5
+    // Fog density - VERY LOW for near-invisible effect
+    float fog = pow(n1, 2.5) * 0.08 + pow(n2, 3.0) * 0.06 + pow(n3, 4.0) * 0.03;
+    fog += galaxy * 0.05;
 
-    // Mask - slightly tighter
-    float topMask = smoothstep(0.0, 0.12, uv.y);
-    float bottomFade = smoothstep(0.0, 0.4, uv.y);
+    // Mask - allow minimal visibility
+    float topMask = smoothstep(0.0, 0.15, uv.y);
+    float bottomFade = smoothstep(0.0, 0.5, uv.y);
     fog *= topMask * bottomFade;
 
-    // Darker red colors
-    vec3 col1 = vec3(0.6, 0.02, 0.06) * pow(n1, 2.5) * 0.4;  // Was 0.7, 0.5
-    vec3 col2 = vec3(0.4, 0.0, 0.03) * pow(n2, 3.0) * 0.3;   // Was 0.5, 0.35
-    vec3 col3 = vec3(0.2, 0.0, 0.02) * pow(n3, 4.0) * 0.18;  // Was 0.3, 0.2
-    vec3 col4 = vec3(0.5, 0.06, 0.12) * galaxy * 0.35;        // Was 0.6, 0.4
+    // Very dark red colors - barely visible
+    vec3 col1 = vec3(0.4, 0.03, 0.06) * pow(n1, 2.5) * 0.08;
+    vec3 col2 = vec3(0.25, 0.01, 0.03) * pow(n2, 3.0) * 0.06;
+    vec3 col3 = vec3(0.15, 0.0, 0.02) * pow(n3, 4.0) * 0.03;
+    vec3 col4 = vec3(0.35, 0.04, 0.08) * galaxy * 0.05;
 
     vec3 color = col1 + col2 + col3 + col4;
 
-    // Subtle horizon - dimmer
-    float horizon = exp(-pow(uv.y - 0.22, 2.0) * 40.0);
-    color += vec3(0.4, 0.01, 0.03) * horizon * 0.12; // Was 0.5, 0.15
+    // Very subtle horizon glow
+    float horizon = exp(-pow(uv.y - 0.20, 2.0) * 35.0);
+    color += vec3(0.3, 0.02, 0.04) * horizon * 0.04;
 
-    // Alpha - reduced from 0.5 to 0.35
-    float alpha = clamp(fog * 0.15 + galaxy * 0.12 + horizon * 0.05, 0.0, 0.35);
-    alpha *= smoothstep(0.0, 0.1, uv.y);
+    // Alpha - VERY LOW (0.04 max) for barely visible nebula
+    float alpha = clamp(fog * 0.03 + galaxy * 0.015 + horizon * 0.01, 0.0, 0.04);
+    alpha *= smoothstep(0.0, 0.12, uv.y);
 
     gl_FragColor = vec4(color, alpha);
   }
@@ -1620,8 +1708,8 @@ export default function NebulaBackground() {
   });
 
   return (
-    <mesh position={[0, 4, -50]} renderOrder={-100}>
-      <planeGeometry args={[100, 60]} />
+    <mesh position={[0, 3, -45]} renderOrder={-100}>
+      <planeGeometry args={[90, 50]} />
       <shaderMaterial
         ref={materialRef}
         vertexShader={nebulaVertexShader}
@@ -1647,209 +1735,107 @@ import React, { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-function createGridTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1024;
-  canvas.height = 1024;
-  const ctx = canvas.getContext("2d")!;
+const gridVertexShader = `
+  varying vec3 vWorldPosition;
+  varying vec2 vUv;
 
-  ctx.clearRect(0, 0, 1024, 1024);
-
-  ctx.strokeStyle = "#ff1744";
-  ctx.lineWidth = 1.0;
-
-  const step = 128;
-  for (let i = 0; i <= 1024; i += step) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, 1024);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(0, i);
-    ctx.lineTo(1024, i);
-    ctx.stroke();
+  void main() {
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPosition.xyz;
+    vUv = uv;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
   }
+`;
 
-  ctx.strokeStyle = "#ff3344";
-  ctx.lineWidth = 1.6;
-  for (let i = 0; i <= 1024; i += step * 4) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, 1024);
-    ctx.stroke();
+const gridFragmentShader = `
+  uniform float uTime;
+  varying vec3 vWorldPosition;
+  varying vec2 vUv;
 
-    ctx.beginPath();
-    ctx.moveTo(0, i);
-    ctx.lineTo(1024, i);
-    ctx.stroke();
+  void main() {
+    vec2 worldXZ = vWorldPosition.xz;
+    float dist = length(worldXZ);
+    
+    float cellSize = 3.0;
+    vec2 gridCoord = worldXZ / cellSize;
+    vec2 gridFract = fract(gridCoord);
+    vec2 lineDist = abs(gridFract - 0.5) * 2.0;
+    
+    float lineWidth = 0.015;
+    float majorLineWidth = 0.028;
+    
+    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.015, lineDist.x);
+    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.015, lineDist.y);
+    float regularLine = max(lineX, lineZ);
+    
+    float majorCellSize = cellSize * 5.0;
+    vec2 majorCoord = worldXZ / majorCellSize;
+    vec2 majorFract = fract(majorCoord);
+    vec2 majorDist = abs(majorFract - 0.5) * 2.0;
+    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.022, majorDist.x);
+    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.022, majorDist.y);
+    float majorLine = max(majorX, majorZ);
+    
+    float gridPattern = max(regularLine * 0.30, majorLine * 0.55);
+    
+    float horizonFade = 1.0 - smoothstep(25.0, 60.0, dist);
+    
+    float heightFade = smoothstep(-0.3, 0.3, vWorldPosition.y + 2.0);
+    
+    vec3 regularColor = vec3(0.55, 0.07, 0.14);
+    vec3 majorColor = vec3(0.75, 0.10, 0.20);
+    
+    vec3 color = mix(regularColor, majorColor, majorLine) * gridPattern;
+    
+    float glow = exp(-min(lineDist.x, lineDist.y) * 5.0) * 0.04;
+    color += vec3(0.7, 0.08, 0.15) * glow;
+    
+    float alpha = (gridPattern + glow * 0.25) * horizonFade * heightFade;
+    alpha = clamp(alpha, 0.0, 0.45);
+    
+    gl_FragColor = vec4(color, alpha);
   }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(16, 16);
-  return tex;
-}
+`;
 
 export default function NeonGrid() {
-  const gridRef = useRef<THREE.Mesh>(null);
-  const ringsRef = useRef<THREE.Group>(null);
+  const gridMaterialRef = useRef<THREE.ShaderMaterial>(null);
 
-  const gridTexture = useMemo(() => createGridTexture(), []);
+  const gridUniforms = useMemo(
+    () => ({
+      uTime: { value: 0.0 },
+    }),
+    []
+  );
 
   useFrame((state) => {
-    const t = state.clock.getElapsedTime();
-
-    if (gridRef.current) {
-      const mat = gridRef.current.material as THREE.MeshBasicMaterial;
-      if (mat.map) {
-        mat.map.offset.y = t * 0.015;
-      }
-    }
-
-    if (ringsRef.current) {
-      ringsRef.current.children.forEach((child, i) => {
-        const mesh = child as THREE.Mesh;
-        const scale = 1 + Math.sin(t * 1.5 + i * 0.5) * 0.015;
-        mesh.scale.set(scale, scale, 1);
-      });
+    if (gridMaterialRef.current) {
+      gridMaterialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
     }
   });
 
   return (
-    <group position={[0, -2.5, 0]}>
-      {/* SOLID BLACK FLOOR BASE */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]}>
-        <planeGeometry args={[1000, 1000]} />
-        <meshBasicMaterial color="#010001" depthWrite={true} />
-      </mesh>
-
-      {/* PRIMARY GRID */}
-      <mesh
-        ref={gridRef}
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0, 0]}
-      >
-        <planeGeometry args={[1000, 1000]} />
-        <meshBasicMaterial
-          map={gridTexture}
+    <group position={[0, -1.90, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+        <planeGeometry args={[300, 300, 1, 1]} />
+        <shaderMaterial
+          ref={gridMaterialRef}
+          vertexShader={gridVertexShader}
+          fragmentShader={gridFragmentShader}
+          uniforms={gridUniforms}
           transparent
-          opacity={0.3}
-          blending={THREE.NormalBlending}
           depthWrite={false}
           side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      {/* SECONDARY GRID */}
-      <mesh rotation={[-Math.PI / 2, 0.12, 0]} position={[0, 0.003, 0]}>
-        <planeGeometry args={[1000, 1000]} />
-        <meshBasicMaterial
-          map={gridTexture}
-          transparent
-          opacity={0.15}
-          blending={THREE.NormalBlending}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      {/* CONCENTRIC RINGS — reduce to almost nothing */}
-      <group ref={ringsRef} position={[2.5, 0.01, -0.5]}>
-        {[1.5, 2.5, 3.5].map((radius, i) => ( // Only 3, close to laptop
-          <mesh key={radius} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[radius, radius + 0.04, 128]} />
-            <meshBasicMaterial
-              color={i % 2 === 0 ? "#ff1744" : "#ff4444"}
-              transparent
-              opacity={0.04 - i * 0.008} // Nearly invisible
-              side={THREE.DoubleSide}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-            />
-          </mesh>
-        ))}
-      </group>
-
-      {/* GLOWING CIRCLE — nearly invisible */}
-      <mesh position={[2.5, 0.005, -0.5]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[2.5, 64]} />
-        <meshBasicMaterial
-          color="#ff1744"
-          transparent
-          opacity={0.015} // Barely visible
           blending={THREE.AdditiveBlending}
-          depthWrite={false}
         />
       </mesh>
-
-      {/* VERTICAL LIGHT BEAMS */}
-      <mesh position={[8, 2, -5]} rotation={[-Math.PI / 2, 0.05, 0]}>
-        <planeGeometry args={[0.06, 60]} />
+      
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+        <planeGeometry args={[150, 150]} />
         <meshBasicMaterial
-          color="#ff1744"
+          color="#050001"
           transparent
-          opacity={0.15}
+          opacity={0.22}
           blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      <mesh position={[-7, 2, -8]} rotation={[-Math.PI / 2, -0.05, 0]}>
-        <planeGeometry args={[0.04, 50]} />
-        <meshBasicMaterial
-          color="#800010"
-          transparent
-          opacity={0.08}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* HORIZONTAL DATA STREAKS */}
-      {[
-        [-15, -22, 1, 10, 0.08],
-        [-6, -25, 0.7, 7, 0.05],
-        [5, -20, 0.8, 8, 0.06],
-        [14, -26, 1.1, 11, 0.1],
-        [22, -30, 0.6, 6, 0.04],
-      ].map(([x, z, w, h, op], i) => (
-        <mesh key={i} position={[x as number, 0.03, z as number]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[w as number, h as number]} />
-          <meshBasicMaterial
-            color="#ff1744"
-            transparent
-            opacity={op as number}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-
-      {/* REFLECTION PLANE */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
-        <planeGeometry args={[1000, 1000]} />
-        <meshBasicMaterial
-          color="#ff1744"
-          transparent
-          opacity={0.008}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* REMOVED: Floor surface tint — was causing red wash */}
-      {/* REMOVED: Large horizon fade plane */}
-
-      {/* NEW: Subtle horizon fog — black gradient only */}
-      <mesh position={[0, 0.02, -60]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[200, 40]} />
-        <meshBasicMaterial
-          color="#010001"
-          transparent
-          opacity={0.5}
-          blending={THREE.NormalBlending}
           depthWrite={false}
         />
       </mesh>
@@ -1870,7 +1856,7 @@ import * as THREE from "three";
 export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 3500;
+  const particleCount = 5000;
 
   const [positions, velocities, sizes] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
@@ -1881,11 +1867,11 @@ export default function ParticleNetwork() {
       const idx = i * 3;
       pos[idx] = (Math.random() - 0.5) * 26;
       pos[idx + 1] = (Math.random() - 0.5) * 16;
-      pos[idx + 2] = (Math.random() - 0.5) * 11;
+      pos[idx + 2] = -8 - Math.random() * 15;
       vel[idx] = (Math.random() - 0.5) * 0.01;
       vel[idx + 1] = (Math.random() - 0.5) * 0.01;
       vel[idx + 2] = (Math.random() - 0.5) * 0.004;
-      sz[i] = 0.18 + Math.random() * 0.84;
+      sz[i] = 0.15 + Math.random() * 0.65;
     }
 
     return [pos, vel, sz];
@@ -1932,7 +1918,7 @@ export default function ParticleNetwork() {
       const dz = -pz;
       const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-      if (distToMouse < 12.0 && distToMouse > 0.001) {
+      if (distToMouse < 8.5 && distToMouse > 0.001) {
         const dirX = dx / distToMouse;
         const dirY = dy / distToMouse;
         const dirZ = dz / distToMouse;
@@ -1940,8 +1926,8 @@ export default function ParticleNetwork() {
         const tangentX = -dirY;
         const tangentY = dirX;
 
-        const force = (12.0 - distToMouse) * 0.002;
-        const drift = (12.0 - distToMouse) * 0.005;
+        const force = (8.5 - distToMouse) * 0.0042;
+        const drift = (8.5 - distToMouse) * 0.0032;
 
         posArray[idx] += dirX * force + tangentX * drift;
         posArray[idx + 1] += dirY * force + tangentY * drift;
@@ -1950,7 +1936,7 @@ export default function ParticleNetwork() {
 
       if (Math.abs(posArray[idx]) > 15) posArray[idx] = -posArray[idx];
       if (Math.abs(posArray[idx + 1]) > 9) posArray[idx + 1] = -posArray[idx + 1];
-      if (Math.abs(posArray[idx + 2]) > 6.5) posArray[idx + 2] = -posArray[idx + 2];
+      if (Math.abs(posArray[idx + 2]) > 13) posArray[idx + 2] = -posArray[idx + 2];
     }
 
     posAttr.needsUpdate = true;
@@ -1962,7 +1948,7 @@ export default function ParticleNetwork() {
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
-      gl_PointSize = aSize * (18.0 / -mvPosition.z);
+      gl_PointSize = aSize * (16.0 / -mvPosition.z);
     }
   `;
 
@@ -1974,7 +1960,7 @@ export default function ParticleNetwork() {
       if (dist > 0.5) discard;
       float alpha = smoothstep(0.5, 0.02, dist);
       vec3 color = mix(uColor, vec3(1.0, 0.3, 0.4), smoothstep(0.1, 0.5, coord.x + 0.5));
-      gl_FragColor = vec4(color, alpha * 0.72);
+      gl_FragColor = vec4(color, alpha * 0.60);
     }
   `;
 
@@ -2018,12 +2004,11 @@ export default function PostProcessing() {
     const instance = new EffectComposer(gl);
     const renderPass = new RenderPass(scene, camera);
 
-    // Clean bloom — no chromatic aberration, sharp and focused
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(size.width, size.height),
-      0.25,  // Low strength — only neon edges glow
-      0.3,   // Tight radius — no bleed
-      0.45   // High threshold — only bright things bloom
+      0.20,
+      0.28,
+      0.52
     );
 
     const outputPass = new OutputPass();
@@ -2056,7 +2041,6 @@ export default function PostProcessing() {
 
 import React, { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
 import { useDeviceSize } from "@/hooks/useDeviceSize";
@@ -2065,12 +2049,12 @@ import StarField from "./StarField";
 import NeonGrid from "./NeonGrid";
 import FloatingLaptop from "./FloatingLaptop";
 import TechCubes from "./TechCubes";
-import FloorRings from "./FloorRings";
 import DeepSpaceGlobe from "./DeepSpaceGlobe";
 import ParticleNetwork from "./ParticleNetwork";
 import VolumetricRays from "./VolumetricRays";
 import FloatingHexParticles from "./FloatingHexParticles";
 import PostProcessing from "./PostProcessing";
+import FloorRings from "./FloorRings";
 
 interface SceneProps {
   scrollProgress: number;
@@ -2081,7 +2065,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
   const isMobile = deviceTier === "mobile";
 
   return (
-    <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#020001" }}>
+    <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#000000" }}>
       <Canvas
         shadows
         gl={{
@@ -2089,29 +2073,28 @@ export default function Scene({ scrollProgress }: SceneProps) {
           alpha: false,
           powerPreference: isMobile ? "default" : "high-performance",
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.85,
+          toneMappingExposure: 0.82,
         }}
         camera={{
-          position: [0, 2.0, 8.5],
-          fov: 50,
+          position: [0, 2.3, 8.8],
+          fov: 48,
           near: 0.1,
           far: 300,
         }}
       >
         <CinematicCamera scrollProgress={scrollProgress} />
 
-        <color attach="background" args={["#020001"]} />
-        {/* Fog starts at 25, fully black by 80 — this hides floor at horizon */}
-        <fog attach="fog" args={["#020001", 25, 85]} />
-
-        <Environment preset="city" background={false} blur={2} />
-
-        <ambientLight intensity={0.08} color="#1a0004" />
-        <pointLight position={[5, 3, 5]} intensity={3} color="#ff1744" distance={60} decay={2} />
-        <pointLight position={[-5, 4, -5]} intensity={2} color="#ff4444" distance={50} decay={2} />
-        <pointLight position={[0, -2, 8]} intensity={2} color="#800010" distance={40} decay={2} />
-        <pointLight position={[12, 8, -20]} intensity={4} color="#ff1744" distance={80} decay={2} />
-        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={2} color="#ff1744" distance={50} />
+        <color attach="background" args={["#000000"]} />
+        
+        <ambientLight intensity={0.035} color="#0a0002" />
+        
+        <pointLight position={[5, 3, 5]} intensity={1.8} color="#ff1744" distance={60} decay={2} />
+        <pointLight position={[-5, 4, -5]} intensity={1.3} color="#ff4444" distance={50} decay={2} />
+        <pointLight position={[0, -2, 8]} intensity={1.3} color="#800010" distance={40} decay={2} />
+        <pointLight position={[12, 8, -20]} intensity={2.3} color="#ff1744" distance={80} decay={2} />
+        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={1.1} color="#ff1744" distance={50} />
+        
+        <pointLight position={[0.8, -1.5, 0]} intensity={1.8} color="#ff1744" distance={12} decay={2} />
 
         <Suspense fallback={null}>
           <NebulaBackground />
@@ -2433,7 +2416,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
 
     if (lightRef.current) {
       const pulse = Math.sin(t * 2.2 + position[0]) * 0.5 + 0.5;
-      lightRef.current.intensity = hovered ? 10.5 + pulse * 3.6 : 6.6 + pulse * 2.2;
+      lightRef.current.intensity = hovered ? 8.0 + pulse * 2.5 : 5.0 + pulse * 1.5;
     }
   });
 
@@ -2445,22 +2428,22 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
     >
-      <pointLight ref={lightRef} color={glowColor} intensity={5.2} distance={5.6} decay={2} />
+      <pointLight ref={lightRef} color={glowColor} intensity={4.0} distance={5.6} decay={2} />
 
       <mesh scale={[1.1, 1.1, 1.1]}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color={glowColor} transparent opacity={hovered ? 0.11 : 0.045} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} transparent opacity={hovered ? 0.08 : 0.03} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
       <lineSegments scale={[1.08, 1.08, 1.08]}>
         <edgesGeometry args={[edgeGeometry]} />
-        <lineBasicMaterial color={glowColor} transparent opacity={hovered ? 0.48 : 0.28} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <lineBasicMaterial color={glowColor} transparent opacity={hovered ? 0.35 : 0.18} blending={THREE.AdditiveBlending} depthWrite={false} />
       </lineSegments>
 
       <RoundedBox args={[1, 1, 1]} radius={0.075} smoothness={6} castShadow>
         <mesh>
           <boxGeometry args={[0.94, 0.94, 0.94]} />
-          <meshBasicMaterial color={color} transparent opacity={0.16} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color={color} transparent opacity={0.1} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
         <MeshTransmissionMaterial
           color={new THREE.Color(color).lerp(new THREE.Color("#f7fbff"), 0.72)}
@@ -2477,7 +2460,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
           attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#f0fbff"), 0.35)}
           attenuationDistance={0.95}
           emissive={glow}
-          emissiveIntensity={hovered ? 0.52 : 0.28}
+          emissiveIntensity={hovered ? 0.35 : 0.18}
           envMapIntensity={2.35}
           side={THREE.FrontSide}
         />
@@ -2485,32 +2468,32 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
 
       <lineSegments>
         <edgesGeometry args={[edgeGeometry]} />
-        <lineBasicMaterial color="#ffd6dc" transparent opacity={hovered ? 0.5 : 0.28} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <lineBasicMaterial color="#ffd6dc" transparent opacity={hovered ? 0.4 : 0.2} blending={THREE.AdditiveBlending} depthWrite={false} />
       </lineSegments>
 
       <mesh position={[0, 0, 0.535]}>
         <planeGeometry args={[0.68, 0.68]} />
-        <meshBasicMaterial map={logoTex} transparent opacity={0.42} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial map={logoTex} transparent opacity={0.32} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, 0, -0.535]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[0.68, 0.68]} />
-        <meshBasicMaterial map={logoTex} transparent opacity={0.12} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial map={logoTex} transparent opacity={0.08} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, 0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.48, 0.515, 4]} />
-        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.16 : 0.08} side={THREE.DoubleSide} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.12 : 0.05} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, -0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.48, 0.515, 4]} />
-        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.1 : 0.05} side={THREE.DoubleSide} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.08 : 0.03} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, -0.78, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.28, 1.28, 1]}>
         <circleGeometry args={[0.72, 48]} />
-        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.15 : 0.075} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.1 : 0.05} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -2634,22 +2617,22 @@ const fragmentShader = `
     float dist = length(toLight);
     float angle = atan(toLight.y, toLight.x);
 
-    // Ray beams - same count but dimmer
+    // Ray beams - fewer, dimmer
     float rays = 0.0;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 4; i++) {
       float fi = float(i);
-      float rayAngle = angle + fi * 0.4 + uTime * 0.05;
-      float ray = pow(sin(rayAngle * 8.0 + fi * 2.0) * 0.5 + 0.5, 8.0);
-      float rayWidth = 0.02 + fi * 0.005;
+      float rayAngle = angle + fi * 0.4 + uTime * 0.03;
+      float ray = pow(sin(rayAngle * 6.0 + fi * 2.0) * 0.5 + 0.5, 10.0);
+      float rayWidth = 0.015 + fi * 0.004;
       float rayMask = smoothstep(rayWidth, 0.0, abs(ray - 0.5) * 2.0);
-      rays += rayMask * (1.0 - dist) * (0.45 - fi * 0.08); // Was 0.6 - dimmer
+      rays += rayMask * (1.0 - dist) * (0.25 - fi * 0.05);
     }
 
     // Fade with distance from light
     float fade = smoothstep(0.0, 0.8, 1.0 - dist);
 
-    vec3 color = vec3(1.0, 0.08, 0.15) * rays * fade * 0.2; // Was 0.3
-    float alpha = rays * fade * 0.1; // Was 0.15
+    vec3 color = vec3(0.8, 0.05, 0.1) * rays * fade * 0.08;
+    float alpha = rays * fade * 0.04;
 
     gl_FragColor = vec4(color, alpha);
   }
@@ -6245,5 +6228,56 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+```
+
+## File: `README.md`
+
+```markdown
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+
+## File: `next-env.d.ts`
+
+```typescript
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/building-your-application/configuring/typescript for more information.
 ```
 

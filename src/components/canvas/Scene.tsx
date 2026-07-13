@@ -2,7 +2,6 @@
 
 import React, { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
 import { useDeviceSize } from "@/hooks/useDeviceSize";
@@ -11,12 +10,12 @@ import StarField from "./StarField";
 import NeonGrid from "./NeonGrid";
 import FloatingLaptop from "./FloatingLaptop";
 import TechCubes from "./TechCubes";
-import FloorRings from "./FloorRings";
 import DeepSpaceGlobe from "./DeepSpaceGlobe";
 import ParticleNetwork from "./ParticleNetwork";
 import VolumetricRays from "./VolumetricRays";
 import FloatingHexParticles from "./FloatingHexParticles";
 import PostProcessing from "./PostProcessing";
+import FloorRings from "./FloorRings";
 
 interface SceneProps {
   scrollProgress: number;
@@ -27,7 +26,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
   const isMobile = deviceTier === "mobile";
 
   return (
-    <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#020001" }}>
+    <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#000000" }}>
       <Canvas
         shadows
         gl={{
@@ -35,29 +34,28 @@ export default function Scene({ scrollProgress }: SceneProps) {
           alpha: false,
           powerPreference: isMobile ? "default" : "high-performance",
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.85,
+          toneMappingExposure: 0.82,
         }}
         camera={{
-          position: [0, 2.0, 8.5],
-          fov: 50,
+          position: [0, 2.3, 8.8],
+          fov: 48,
           near: 0.1,
           far: 300,
         }}
       >
         <CinematicCamera scrollProgress={scrollProgress} />
 
-        <color attach="background" args={["#020001"]} />
-        {/* Fog starts at 25, fully black by 80 — this hides floor at horizon */}
-        <fog attach="fog" args={["#020001", 25, 85]} />
-
-        <Environment preset="city" background={false} blur={2} />
-
-        <ambientLight intensity={0.08} color="#1a0004" />
-        <pointLight position={[5, 3, 5]} intensity={3} color="#ff1744" distance={60} decay={2} />
-        <pointLight position={[-5, 4, -5]} intensity={2} color="#ff4444" distance={50} decay={2} />
-        <pointLight position={[0, -2, 8]} intensity={2} color="#800010" distance={40} decay={2} />
-        <pointLight position={[12, 8, -20]} intensity={4} color="#ff1744" distance={80} decay={2} />
-        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={2} color="#ff1744" distance={50} />
+        <color attach="background" args={["#000000"]} />
+        
+        <ambientLight intensity={0.035} color="#0a0002" />
+        
+        <pointLight position={[5, 3, 5]} intensity={1.8} color="#ff1744" distance={60} decay={2} />
+        <pointLight position={[-5, 4, -5]} intensity={1.3} color="#ff4444" distance={50} decay={2} />
+        <pointLight position={[0, -2, 8]} intensity={1.3} color="#800010" distance={40} decay={2} />
+        <pointLight position={[12, 8, -20]} intensity={2.3} color="#ff1744" distance={80} decay={2} />
+        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={1.1} color="#ff1744" distance={50} />
+        
+        <pointLight position={[0.8, -1.5, 0]} intensity={1.8} color="#ff1744" distance={12} decay={2} />
 
         <Suspense fallback={null}>
           <NebulaBackground />

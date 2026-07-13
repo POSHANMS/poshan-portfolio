@@ -25,22 +25,22 @@ const fragmentShader = `
     float dist = length(toLight);
     float angle = atan(toLight.y, toLight.x);
 
-    // Ray beams - same count but dimmer
+    // Ray beams - fewer, dimmer
     float rays = 0.0;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 4; i++) {
       float fi = float(i);
-      float rayAngle = angle + fi * 0.4 + uTime * 0.05;
-      float ray = pow(sin(rayAngle * 8.0 + fi * 2.0) * 0.5 + 0.5, 8.0);
-      float rayWidth = 0.02 + fi * 0.005;
+      float rayAngle = angle + fi * 0.4 + uTime * 0.03;
+      float ray = pow(sin(rayAngle * 6.0 + fi * 2.0) * 0.5 + 0.5, 10.0);
+      float rayWidth = 0.015 + fi * 0.004;
       float rayMask = smoothstep(rayWidth, 0.0, abs(ray - 0.5) * 2.0);
-      rays += rayMask * (1.0 - dist) * (0.45 - fi * 0.08); // Was 0.6 - dimmer
+      rays += rayMask * (1.0 - dist) * (0.25 - fi * 0.05);
     }
 
     // Fade with distance from light
     float fade = smoothstep(0.0, 0.8, 1.0 - dist);
 
-    vec3 color = vec3(1.0, 0.08, 0.15) * rays * fade * 0.2; // Was 0.3
-    float alpha = rays * fade * 0.1; // Was 0.15
+    vec3 color = vec3(0.8, 0.05, 0.1) * rays * fade * 0.08;
+    float alpha = rays * fade * 0.04;
 
     gl_FragColor = vec4(color, alpha);
   }

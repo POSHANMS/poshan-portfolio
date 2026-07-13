@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --background: #0a0002;
+  --background: #000000;
   --foreground: #f0f0f0;
   --font-inter: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-jetbrains-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -637,4 +637,41 @@ body {
 /* Reduce scanlines for cleaner look */
 .dashboard-scanlines {
   opacity: 0.1;
+}
+
+.fixed.inset-0.z-0 {
+  background: #000000 !important;
+}
+
+
+/* ─── Additional fixes for background/floor alignment with reference ─── */
+
+/* Ensure the canvas container has correct background */
+.fixed.inset-0.z-0 {
+  background: #030001 !important;
+}
+
+/* Dashboard stage should blend better with 3D scene */
+.dashboard-stage {
+  /* Slightly adjust position to align with 3D floor perspective */
+  top: calc(50% + 8px);
+}
+
+/* Reduce haze intensity for cleaner look */
+.dashboard-haze {
+  background:
+    radial-gradient(circle at 70% 50%, rgba(255, 23, 68, 0.03), transparent 18rem),
+    radial-gradient(circle at 76% 58%, rgba(128, 0, 16, 0.04), transparent 19rem),
+    radial-gradient(circle at 30% 40%, rgba(204, 17, 51, 0.008), transparent 17rem),
+    radial-gradient(circle at 82% 18%, rgba(128, 0, 16, 0.05), transparent 22rem),
+    linear-gradient(180deg, rgba(2, 3, 13, 0.05), rgba(4, 4, 12, 0.01) 56%, rgba(4, 4, 12, 0.15));
+}
+
+/* Reduce scanlines for cleaner look */
+.dashboard-scanlines {
+  opacity: 0.1;
+}
+
+.fixed.inset-0.z-0 {
+  background: #000000 !important;
 }

@@ -5,7 +5,7 @@ const rootDir = path.resolve(__dirname, '..');
 const outputFile = path.join(rootDir, 'project_codebase.md');
 
 const ignoreDirs = ['.next', 'node_modules', '.git', '.pnpm-store'];
-const ignoreExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.glb', '.ttf', '.tsbuildinfo', '.svg', '.pdf', '.mp3'];
+const ignoreExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.glb', '.ttf', '.tsbuildinfo', '.svg', '.pdf', '.mp3', '.log', '.pid'];
 
 function shouldProcess(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -57,6 +57,8 @@ const rootConfigs = [
   'postcss.config.mjs',
   '.eslintrc.json',
   '.gitignore',
+  'README.md',
+  'next-env.d.ts',
 ];
 
 for (const file of rootConfigs) {
