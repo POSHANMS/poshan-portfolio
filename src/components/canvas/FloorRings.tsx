@@ -35,7 +35,7 @@ export default function FloorRings() {
     ringsRef.current.children.forEach((child, i) => {
       const line = child as THREE.Line;
       if (line && line.scale) {
-        const scale = 1.0 + Math.sin(t * 0.3 + i * 0.15) * 0.012;
+        const scale = 1.0 + Math.sin(t * 0.3 + i * 0.15) * 0.005;
         line.scale.set(scale, scale, scale);
       }
     });
@@ -45,14 +45,14 @@ export default function FloorRings() {
         const mesh = child as THREE.Mesh;
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshBasicMaterial;
-          mat.opacity = 0.05 + Math.sin(t * 1.5 + i * 2.0) * 0.025;
+          mat.opacity = 0.015 + Math.sin(t * 1.5 + i * 2.0) * 0.010;
         }
       });
     }
   });
 
   return (
-    <group position={[0.8, -1.90, 0]}>
+    <group position={[0.8, -1.95, 0]}>
       <group ref={ringsRef}>
         {ringGeometries.map((geometry, i) => (
           <primitive 
@@ -60,9 +60,9 @@ export default function FloorRings() {
             object={new THREE.Line(
               geometry, 
               new THREE.LineBasicMaterial({
-                color: i % 3 === 0 ? "#880018" : "#55000a",
+                color: i % 3 === 0 ? "#55000a" : "#330005",
                 transparent: true,
-                opacity: Math.max(0.03, 0.14 - i * 0.012),
+                opacity: Math.max(0.015, 0.05 - i * 0.006),
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
               })
@@ -71,46 +71,48 @@ export default function FloorRings() {
         ))}
       </group>
 
+      {/* Minimal center glow */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <circleGeometry args={[2.5, 48]} />
         <meshBasicMaterial
-          color="#440008"
+          color="#110002"
           transparent
-          opacity={0.05}
+          opacity={0.02}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
 
+      {/* ALMOST INVISIBLE pinpoint glow spots */}
       <group ref={glowRef}>
         <mesh position={[-1.2, 0.02, 0.8]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.10, 24]} />
+          <circleGeometry args={[0.025, 16]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.06}
+            opacity={0.02}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
         
         <mesh position={[0.1, 0.02, 1.2]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.08, 24]} />
+          <circleGeometry args={[0.02, 16]} />
           <meshBasicMaterial
             color="#cc1133"
             transparent
-            opacity={0.05}
+            opacity={0.015}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
         
         <mesh position={[1.4, 0.02, 0.9]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.12, 24]} />
+          <circleGeometry args={[0.03, 16]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.07}
+            opacity={0.02}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
