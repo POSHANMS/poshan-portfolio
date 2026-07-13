@@ -1359,6 +1359,7 @@ import * as THREE from "three";
 
 export default function FloorRings() {
   const ringsRef = useRef<THREE.Group>(null);
+  const energyRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Group>(null);
 
   const ringGeometries = useMemo(() => {
@@ -1381,41 +1382,90 @@ export default function FloorRings() {
     return rings;
   }, []);
 
+  // Energy segment geometries - partial arcs that travel
+  const energyGeometries = useMemo(() => {
+    const segments: THREE.BufferGeometry[] = [];
+    const radii = [0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2];
+    
+    for (const radius of radii) {
+      const points: THREE.Vector3[] = [];
+      const arcLength = Math.PI * 0.3; // 54 degree arc
+      const segments_count = 32;
+      for (let i = 0; i <= segments_count; i++) {
+        const angle = (i / segments_count) * arcLength;
+        points.push(new THREE.Vector3(
+          Math.cos(angle) * radius,
+          0,
+          Math.sin(angle) * radius
+        ));
+      }
+      segments.push(new THREE.BufferGeometry().setFromPoints(points));
+    }
+    return segments;
+  }, []);
+
   useFrame((state) => {
-    if (!ringsRef.current) return;
     const t = state.clock.getElapsedTime();
     
+    if (!ringsRef.current) return;
+    
+    // Base rings pulse
     ringsRef.current.children.forEach((child, i) => {
       const line = child as THREE.Line;
       if (line && line.scale) {
-        const scale = 1.0 + Math.sin(t * 0.3 + i * 0.15) * 0.012;
-        line.scale.set(scale, scale, scale);
+        const heartbeat = 1.0 + Math.sin(t * 0.8 + i * 0.3) * 0.015;
+        line.scale.set(heartbeat, heartbeat, heartbeat);
+      }
+      if (line.material) {
+        const mat = line.material as THREE.LineBasicMaterial;
+        mat.opacity = Math.max(0.02, 0.06 - i * 0.005 + Math.sin(t * 0.5 + i) * 0.015);
       }
     });
 
+    // Energy segments rotate around rings
+    if (energyRef.current) {
+      energyRef.current.children.forEach((child, i) => {
+        const line = child as THREE.Line;
+        if (line) {
+          const speed = 0.3 + i * 0.1;
+          line.rotation.y = t * speed + i * 1.5;
+        }
+        if (line.material) {
+          const mat = line.material as THREE.LineBasicMaterial;
+          mat.opacity = 0.15 + Math.sin(t * 2.0 + i * 2.5) * 0.08;
+        }
+      });
+    }
+
+    // Glow spots pulse with heartbeat
     if (glowRef.current) {
       glowRef.current.children.forEach((child, i) => {
         const mesh = child as THREE.Mesh;
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshBasicMaterial;
-          mat.opacity = 0.05 + Math.sin(t * 1.5 + i * 2.0) * 0.025;
+          const pulse = Math.sin(t * 1.2 + i * 2.0) * 0.5 + 0.5;
+          mat.opacity = 0.02 + pulse * 0.04;
+          // Scale pulse
+          const scale = 1.0 + pulse * 0.3;
+          mesh.scale.set(scale, scale, scale);
         }
       });
     }
   });
 
   return (
-    <group position={[0.8, -1.90, 0]}>
+    <group position={[0.8, -1.95, 0]}>
+      {/* Base rings */}
       <group ref={ringsRef}>
         {ringGeometries.map((geometry, i) => (
           <primitive 
-            key={i} 
+            key={`ring-${i}`}
             object={new THREE.Line(
               geometry, 
               new THREE.LineBasicMaterial({
-                color: i % 3 === 0 ? "#880018" : "#55000a",
+                color: i % 3 === 0 ? "#660010" : "#440008",
                 transparent: true,
-                opacity: Math.max(0.03, 0.14 - i * 0.012),
+                opacity: Math.max(0.02, 0.06 - i * 0.005),
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
               })
@@ -1424,46 +1474,68 @@ export default function FloorRings() {
         ))}
       </group>
 
+      {/* Traveling energy segments */}
+      <group ref={energyRef}>
+        {energyGeometries.map((geometry, i) => (
+          <primitive
+            key={`energy-${i}`}
+            object={new THREE.Line(
+              geometry,
+              new THREE.LineBasicMaterial({
+                color: "#ff1744",
+                transparent: true,
+                opacity: 0.15,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                linewidth: 2,
+              })
+            )}
+          />
+        ))}
+      </group>
+
+      {/* Center glow */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <circleGeometry args={[2.5, 48]} />
         <meshBasicMaterial
-          color="#440008"
+          color="#220004"
           transparent
-          opacity={0.05}
+          opacity={0.04}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
 
+      {/* Pulsing energy nodes */}
       <group ref={glowRef}>
         <mesh position={[-1.2, 0.02, 0.8]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.10, 24]} />
+          <circleGeometry args={[0.04, 24]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.06}
+            opacity={0.04}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
         
         <mesh position={[0.1, 0.02, 1.2]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.08, 24]} />
+          <circleGeometry args={[0.03, 24]} />
           <meshBasicMaterial
-            color="#cc1133"
+            color="#ff3355"
             transparent
-            opacity={0.05}
+            opacity={0.03}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
         
         <mesh position={[1.4, 0.02, 0.9]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.12, 24]} />
+          <circleGeometry args={[0.05, 24]} />
           <meshBasicMaterial
             color="#ff1744"
             transparent
-            opacity={0.07}
+            opacity={0.04}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -1653,36 +1725,30 @@ const nebulaFragmentShader = `
     float n2 = fbm(uv * 4.0 - drift * 1.2 + vec2(5.2, 1.3));
     float n3 = fbm(uv * 7.0 + vec2(-t * 0.3, t * 0.4));
 
-    // Very subtle galaxy swirl upper right - barely visible
     vec2 galaxyUv = uv - vec2(0.70, 0.65);
     float galaxyDist = length(galaxyUv);
     float galaxyAngle = atan(galaxyUv.y, galaxyUv.x);
     float spiral = cos(galaxyAngle * 3.0 + galaxyDist * 12.0 - uTime * 0.08);
     float galaxy = exp(-galaxyDist * galaxyDist * 25.0) * (0.5 + 0.5 * spiral);
 
-    // Fog density - VERY LOW for near-invisible effect
-    float fog = pow(n1, 2.5) * 0.08 + pow(n2, 3.0) * 0.06 + pow(n3, 4.0) * 0.03;
-    fog += galaxy * 0.05;
+    float fog = pow(n1, 2.5) * 0.06 + pow(n2, 3.0) * 0.04 + pow(n3, 4.0) * 0.02;
+    fog += galaxy * 0.03;
 
-    // Mask - allow minimal visibility
     float topMask = smoothstep(0.0, 0.15, uv.y);
     float bottomFade = smoothstep(0.0, 0.5, uv.y);
     fog *= topMask * bottomFade;
 
-    // Very dark red colors - barely visible
-    vec3 col1 = vec3(0.4, 0.03, 0.06) * pow(n1, 2.5) * 0.08;
-    vec3 col2 = vec3(0.25, 0.01, 0.03) * pow(n2, 3.0) * 0.06;
-    vec3 col3 = vec3(0.15, 0.0, 0.02) * pow(n3, 4.0) * 0.03;
-    vec3 col4 = vec3(0.35, 0.04, 0.08) * galaxy * 0.05;
+    vec3 col1 = vec3(0.30, 0.03, 0.06) * pow(n1, 2.5) * 0.06;
+    vec3 col2 = vec3(0.18, 0.01, 0.03) * pow(n2, 3.0) * 0.04;
+    vec3 col3 = vec3(0.10, 0.0, 0.02) * pow(n3, 4.0) * 0.02;
+    vec3 col4 = vec3(0.25, 0.03, 0.06) * galaxy * 0.03;
 
     vec3 color = col1 + col2 + col3 + col4;
 
-    // Very subtle horizon glow
     float horizon = exp(-pow(uv.y - 0.20, 2.0) * 35.0);
-    color += vec3(0.3, 0.02, 0.04) * horizon * 0.04;
+    color += vec3(0.25, 0.02, 0.04) * horizon * 0.03;
 
-    // Alpha - VERY LOW (0.04 max) for barely visible nebula
-    float alpha = clamp(fog * 0.03 + galaxy * 0.015 + horizon * 0.01, 0.0, 0.04);
+    float alpha = clamp(fog * 0.02 + galaxy * 0.01 + horizon * 0.008, 0.0, 0.035);
     alpha *= smoothstep(0.0, 0.12, uv.y);
 
     gl_FragColor = vec4(color, alpha);
@@ -1738,11 +1804,13 @@ import * as THREE from "three";
 const gridVertexShader = `
   varying vec3 vWorldPosition;
   varying vec2 vUv;
+  varying float vDist;
 
   void main() {
     vec4 worldPosition = modelMatrix * vec4(position, 1.0);
     vWorldPosition = worldPosition.xyz;
     vUv = uv;
+    vDist = length(worldPosition.xz);
     gl_Position = projectionMatrix * viewMatrix * worldPosition;
   }
 `;
@@ -1751,47 +1819,63 @@ const gridFragmentShader = `
   uniform float uTime;
   varying vec3 vWorldPosition;
   varying vec2 vUv;
+  varying float vDist;
 
   void main() {
     vec2 worldXZ = vWorldPosition.xz;
     float dist = length(worldXZ);
     
-    float cellSize = 3.0;
+    // Cell size
+    float cellSize = 4.0;
     vec2 gridCoord = worldXZ / cellSize;
     vec2 gridFract = fract(gridCoord);
     vec2 lineDist = abs(gridFract - 0.5) * 2.0;
     
-    float lineWidth = 0.015;
-    float majorLineWidth = 0.028;
+    // Line widths
+    float lineWidth = 0.005;
+    float majorLineWidth = 0.012;
     
-    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.015, lineDist.x);
-    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.015, lineDist.y);
+    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.x);
+    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.y);
     float regularLine = max(lineX, lineZ);
     
+    // Major lines
     float majorCellSize = cellSize * 5.0;
     vec2 majorCoord = worldXZ / majorCellSize;
     vec2 majorFract = fract(majorCoord);
     vec2 majorDist = abs(majorFract - 0.5) * 2.0;
-    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.022, majorDist.x);
-    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.022, majorDist.y);
+    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.015, majorDist.x);
+    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.015, majorDist.y);
     float majorLine = max(majorX, majorZ);
     
-    float gridPattern = max(regularLine * 0.30, majorLine * 0.55);
+    // DATA FLOW PULSE: traveling dots along grid lines
+    float pulseSpeed = 1.5;
+    float pulseX = sin(gridCoord.x * 6.28 + uTime * pulseSpeed) * 0.5 + 0.5;
+    float pulseZ = sin(gridCoord.y * 6.28 + uTime * pulseSpeed * 0.7) * 0.5 + 0.5;
+    float dataPulse = max(pulseX * lineX, pulseZ * lineZ) * 0.4;
     
-    float horizonFade = 1.0 - smoothstep(25.0, 60.0, dist);
+    // Grid pattern with pulse
+    float gridPattern = max(regularLine * 0.18, majorLine * 0.30) + dataPulse;
     
-    float heightFade = smoothstep(-0.3, 0.3, vWorldPosition.y + 2.0);
+    // NODE GLOW at intersections
+    float nodeGlow = exp(-length(lineDist) * 8.0) * 0.15;
     
-    vec3 regularColor = vec3(0.55, 0.07, 0.14);
-    vec3 majorColor = vec3(0.75, 0.10, 0.20);
+    // Perspective fade
+    float horizonFade = 1.0 - smoothstep(15.0, 50.0, dist);
+    float heightFade = smoothstep(-0.4, 0.0, vWorldPosition.y + 2.0);
     
-    vec3 color = mix(regularColor, majorColor, majorLine) * gridPattern;
+    // Colors: deep crimson with bright pulse
+    vec3 baseColor = vec3(0.40, 0.05, 0.10);
+    vec3 pulseColor = vec3(0.80, 0.10, 0.20);
+    vec3 majorColor = vec3(0.55, 0.08, 0.15);
     
-    float glow = exp(-min(lineDist.x, lineDist.y) * 5.0) * 0.04;
-    color += vec3(0.7, 0.08, 0.15) * glow;
+    vec3 color = mix(baseColor, majorColor, majorLine) * gridPattern;
+    color += pulseColor * dataPulse;
+    color += vec3(0.70, 0.12, 0.20) * nodeGlow;
     
-    float alpha = (gridPattern + glow * 0.25) * horizonFade * heightFade;
-    alpha = clamp(alpha, 0.0, 0.45);
+    // Alpha
+    float alpha = (gridPattern + nodeGlow * 0.5) * horizonFade * heightFade;
+    alpha = clamp(alpha, 0.0, 0.32);
     
     gl_FragColor = vec4(color, alpha);
   }
@@ -1814,7 +1898,7 @@ export default function NeonGrid() {
   });
 
   return (
-    <group position={[0, -1.90, 0]}>
+    <group position={[0, -1.95, 0]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[300, 300, 1, 1]} />
         <shaderMaterial
@@ -1826,17 +1910,6 @@ export default function NeonGrid() {
           depthWrite={false}
           side={THREE.DoubleSide}
           blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-      
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
-        <planeGeometry args={[150, 150]} />
-        <meshBasicMaterial
-          color="#050001"
-          transparent
-          opacity={0.22}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
         />
       </mesh>
     </group>
@@ -1855,56 +1928,118 @@ import * as THREE from "three";
 
 export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
+  const linesRef = useRef<THREE.LineSegments>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 5000;
+  const particleCount = 350;
 
-  const [positions, velocities, sizes] = useMemo(() => {
+  const [positions, velocities, sizes, connectionIndices] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
     const vel = new Float32Array(particleCount * 3);
     const sz = new Float32Array(particleCount);
+    const connections: number[] = [];
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
-      pos[idx] = (Math.random() - 0.5) * 26;
-      pos[idx + 1] = (Math.random() - 0.5) * 16;
-      pos[idx + 2] = -8 - Math.random() * 15;
-      vel[idx] = (Math.random() - 0.5) * 0.01;
-      vel[idx + 1] = (Math.random() - 0.5) * 0.01;
-      vel[idx + 2] = (Math.random() - 0.5) * 0.004;
-      sz[i] = 0.15 + Math.random() * 0.65;
+      // Spread in mid-ground
+      pos[idx] = (Math.random() - 0.5) * 30;
+      pos[idx + 1] = (Math.random() - 0.5) * 10;
+      pos[idx + 2] = -6 - Math.random() * 22;
+      
+      // Very slow drift
+      vel[idx] = (Math.random() - 0.5) * 0.004;
+      vel[idx + 1] = (Math.random() - 0.5) * 0.004;
+      vel[idx + 2] = (Math.random() - 0.5) * 0.001;
+      
+      sz[i] = 0.08 + Math.random() * 0.30;
     }
 
-    return [pos, vel, sz];
+    // Create connections between close particles
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      let connectionsMade = 0;
+      
+      for (let j = i + 1; j < particleCount && connectionsMade < 2; j++) {
+        const j3 = j * 3;
+        const dx = pos[i3] - pos[j3];
+        const dy = pos[i3 + 1] - pos[j3 + 1];
+        const dz = pos[i3 + 2] - pos[j3 + 2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        
+        if (dist < 4.5) {
+          connections.push(i, j);
+          connectionsMade++;
+        }
+      }
+    }
+
+    return [pos, vel, sz, connections];
   }, []);
+
+  const lineGeometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const linePositions = new Float32Array(connectionIndices.length * 3);
+    
+    for (let i = 0; i < connectionIndices.length; i++) {
+      const particleIdx = connectionIndices[i];
+      const p3 = particleIdx * 3;
+      linePositions[i * 3] = positions[p3];
+      linePositions[i * 3 + 1] = positions[p3 + 1];
+      linePositions[i * 3 + 2] = positions[p3 + 2];
+    }
+    
+    geo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+    return geo;
+  }, [connectionIndices, positions]);
 
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
       uMouse: { value: new THREE.Vector2(0, 0) },
-      uColor: { value: new THREE.Color("#ff1744") },
+      uMouseActive: { value: 0.0 },
+      uColor: { value: new THREE.Color("#ff4455") },
     }),
     []
   );
 
   useFrame((state) => {
-    if (!pointsRef.current || !materialRef.current) return;
+    if (!pointsRef.current || !materialRef.current || !linesRef.current) return;
 
     const geo = pointsRef.current.geometry;
     const posAttr = geo.attributes.position;
     const posArray = posAttr.array as Float32Array;
-    const targetX = state.pointer.x * 10.5;
-    const targetY = state.pointer.y * 6.4;
+    
+    const lineGeo = linesRef.current.geometry;
+    const linePosAttr = lineGeo.attributes.position;
+    const linePosArray = linePosAttr.array as Float32Array;
+    
+    const targetX = state.pointer.x * 12;
+    const targetY = state.pointer.y * 8;
 
     materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
-    materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.x, targetX, 0.09);
-    materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.y, targetY, 0.09);
+    materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(
+      materialRef.current.uniforms.uMouse.value.x, targetX, 0.07
+    );
+    materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(
+      materialRef.current.uniforms.uMouse.value.y, targetY, 0.07
+    );
 
     const mx = materialRef.current.uniforms.uMouse.value.x;
     const my = materialRef.current.uniforms.uMouse.value.y;
+    
+    // Detect mouse movement for scatter effect
+    const mouseDelta = Math.abs(state.pointer.x - state.pointer.x) + Math.abs(state.pointer.y - state.pointer.y);
+    const isMouseMoving = mouseDelta > 0.001;
+    materialRef.current.uniforms.uMouseActive.value = THREE.MathUtils.lerp(
+      materialRef.current.uniforms.uMouseActive.value,
+      isMouseMoving ? 1.0 : 0.0,
+      0.05
+    );
+    const mouseActive = materialRef.current.uniforms.uMouseActive.value;
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
 
+      // Gentle drift
       posArray[idx] += velocities[idx];
       posArray[idx + 1] += velocities[idx + 1];
       posArray[idx + 2] += velocities[idx + 2];
@@ -1915,71 +2050,125 @@ export default function ParticleNetwork() {
 
       const dx = mx - px;
       const dy = my - py;
-      const dz = -pz;
-      const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const distToMouse = Math.sqrt(dx * dx + dy * dy);
 
-      if (distToMouse < 8.5 && distToMouse > 0.001) {
-        const dirX = dx / distToMouse;
-        const dirY = dy / distToMouse;
-        const dirZ = dz / distToMouse;
-
-        const tangentX = -dirY;
-        const tangentY = dirX;
-
-        const force = (8.5 - distToMouse) * 0.0042;
-        const drift = (8.5 - distToMouse) * 0.0032;
-
-        posArray[idx] += dirX * force + tangentX * drift;
-        posArray[idx + 1] += dirY * force + tangentY * drift;
-        posArray[idx + 2] += dirZ * force;
+      if (distToMouse < 10.0) {
+        if (mouseActive > 0.3) {
+          // MOUSE MOVING: SCATTER particles away
+          const scatterForce = (10.0 - distToMouse) * 0.015 * mouseActive;
+          posArray[idx] -= (dx / distToMouse) * scatterForce;
+          posArray[idx + 1] -= (dy / distToMouse) * scatterForce;
+        } else {
+          // MOUSE STILL: ATTRACT and ORBIT in small circles
+          if (distToMouse > 0.5) {
+            const attractStrength = 0.004;
+            posArray[idx] += (dx / distToMouse) * attractStrength;
+            posArray[idx + 1] += (dy / distToMouse) * attractStrength;
+            
+            // Small circular orbit
+            const orbitSpeed = 0.012;
+            const tangentX = -dy / distToMouse;
+            const tangentY = dx / distToMouse;
+            posArray[idx] += tangentX * orbitSpeed * (10.0 - distToMouse);
+            posArray[idx + 1] += tangentY * orbitSpeed * (10.0 - distToMouse);
+          }
+        }
       }
 
-      if (Math.abs(posArray[idx]) > 15) posArray[idx] = -posArray[idx];
-      if (Math.abs(posArray[idx + 1]) > 9) posArray[idx + 1] = -posArray[idx + 1];
-      if (Math.abs(posArray[idx + 2]) > 13) posArray[idx + 2] = -posArray[idx + 2];
+      // Soft boundaries
+      if (Math.abs(posArray[idx]) > 18) {
+        posArray[idx] *= 0.95;
+        velocities[idx] *= -0.5;
+      }
+      if (Math.abs(posArray[idx + 1]) > 7) {
+        posArray[idx + 1] *= 0.95;
+        velocities[idx + 1] *= -0.5;
+      }
+      if (posArray[idx + 2] > -3 || posArray[idx + 2] < -28) {
+        velocities[idx + 2] *= -0.5;
+      }
+    }
+
+    // Update line positions
+    for (let i = 0; i < connectionIndices.length; i++) {
+      const particleIdx = connectionIndices[i];
+      const p3 = particleIdx * 3;
+      linePosArray[i * 3] = posArray[p3];
+      linePosArray[i * 3 + 1] = posArray[p3 + 1];
+      linePosArray[i * 3 + 2] = posArray[p3 + 2];
     }
 
     posAttr.needsUpdate = true;
+    linePosAttr.needsUpdate = true;
   });
 
   const vertexShader = `
     attribute float aSize;
     uniform float uTime;
+    uniform float uMouseActive;
+    varying float vAlpha;
+    varying float vMouseActive;
+    
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
-      gl_PointSize = aSize * (16.0 / -mvPosition.z);
+      float twinkle = 0.4 + 0.35 * sin(uTime * 1.5 + position.x * 8.0);
+      vAlpha = twinkle;
+      vMouseActive = uMouseActive;
+      gl_PointSize = aSize * (20.0 / -mvPosition.z);
     }
   `;
 
   const fragmentShader = `
     uniform vec3 uColor;
+    varying float vAlpha;
+    varying float vMouseActive;
+    
     void main() {
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = length(coord);
       if (dist > 0.5) discard;
-      float alpha = smoothstep(0.5, 0.02, dist);
-      vec3 color = mix(uColor, vec3(1.0, 0.3, 0.4), smoothstep(0.1, 0.5, coord.x + 0.5));
+      float alpha = smoothstep(0.5, 0.12, dist) * vAlpha;
+      
+      // Color shifts when mouse is active
+      vec3 calmColor = mix(vec3(1.0, 0.85, 0.85), vec3(1.0, 0.5, 0.5), smoothstep(0.0, 0.35, dist));
+      vec3 activeColor = mix(vec3(1.0, 0.6, 0.6), vec3(1.0, 0.2, 0.3), smoothstep(0.0, 0.35, dist));
+      vec3 color = mix(calmColor, activeColor, vMouseActive);
+      
       gl_FragColor = vec4(color, alpha * 0.60);
     }
   `;
 
   return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-        <bufferAttribute attach="attributes-aSize" args={[sizes, 1]} />
-      </bufferGeometry>
-      <shaderMaterial
-        ref={materialRef}
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={uniforms}
-        transparent
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
+    <group>
+      {/* Particle points */}
+      <points ref={pointsRef}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+          <bufferAttribute attach="attributes-aSize" args={[sizes, 1]} />
+        </bufferGeometry>
+        <shaderMaterial
+          ref={materialRef}
+          vertexShader={vertexShader}
+          fragmentShader={fragmentShader}
+          uniforms={uniforms}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </points>
+
+      {/* Connection lines - subtle */}
+      <lineSegments ref={linesRef} geometry={lineGeometry}>
+        <lineBasicMaterial
+          color="#881122"
+          transparent
+          opacity={0.06}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </lineSegments>
+    </group>
   );
 }
 ```
@@ -2006,9 +2195,9 @@ export default function PostProcessing() {
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(size.width, size.height),
-      0.20,
-      0.28,
-      0.52
+      0.18,
+      0.26,
+      0.53
     );
 
     const outputPass = new OutputPass();
@@ -2086,15 +2275,20 @@ export default function Scene({ scrollProgress }: SceneProps) {
 
         <color attach="background" args={["#000000"]} />
         
-        <ambientLight intensity={0.035} color="#0a0002" />
-        
-        <pointLight position={[5, 3, 5]} intensity={1.8} color="#ff1744" distance={60} decay={2} />
-        <pointLight position={[-5, 4, -5]} intensity={1.3} color="#ff4444" distance={50} decay={2} />
-        <pointLight position={[0, -2, 8]} intensity={1.3} color="#800010" distance={40} decay={2} />
-        <pointLight position={[12, 8, -20]} intensity={2.3} color="#ff1744" distance={80} decay={2} />
-        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={1.1} color="#ff1744" distance={50} />
-        
-        <pointLight position={[0.8, -1.5, 0]} intensity={1.8} color="#ff1744" distance={12} decay={2} />
+        {/* Lighting - brighter for visibility */}
+        <ambientLight intensity={0.06} color="#0a0002" />
+
+        {/* Main scene lights */}
+        <pointLight position={[5, 3, 5]} intensity={1.6} color="#ff1744" distance={60} decay={2} />
+        <pointLight position={[-5, 4, -5]} intensity={1.1} color="#ff4444" distance={50} decay={2} />
+        <pointLight position={[0, -2, 8]} intensity={1.1} color="#800010" distance={40} decay={2} />
+        <pointLight position={[12, 8, -20]} intensity={2.0} color="#ff1744" distance={80} decay={2} />
+        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={1.0} color="#ff1744" distance={50} />
+        <pointLight position={[0.8, -1.5, 0]} intensity={1.4} color="#ff1744" distance={12} decay={2} />
+
+        {/* Fill light for laptop area */}
+        <pointLight position={[2, 0.5, 0]} intensity={0.8} color="#ff1744" distance={10} decay={2} />
+        <pointLight position={[-1, 1, 2]} intensity={0.5} color="#ff8a80" distance={8} decay={2} />
 
         <Suspense fallback={null}>
           <NebulaBackground />
