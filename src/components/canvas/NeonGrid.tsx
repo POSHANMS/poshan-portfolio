@@ -28,51 +28,57 @@ const gridFragmentShader = `
     vec2 worldXZ = vWorldPosition.xz;
     float dist = length(worldXZ);
     
-    // Cell size for perspective grid
+    // Cell size
     float cellSize = 4.0;
     vec2 gridCoord = worldXZ / cellSize;
     vec2 gridFract = fract(gridCoord);
     vec2 lineDist = abs(gridFract - 0.5) * 2.0;
     
-    // Thin but VISIBLE lines
-    float lineWidth = 0.006;
-    float majorLineWidth = 0.015;
+    // Line widths
+    float lineWidth = 0.005;
+    float majorLineWidth = 0.012;
     
-    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.008, lineDist.x);
-    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.008, lineDist.y);
+    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.x);
+    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.y);
     float regularLine = max(lineX, lineZ);
     
-    // Major lines every 5 cells
+    // Major lines
     float majorCellSize = cellSize * 5.0;
     vec2 majorCoord = worldXZ / majorCellSize;
     vec2 majorFract = fract(majorCoord);
     vec2 majorDist = abs(majorFract - 0.5) * 2.0;
-    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.018, majorDist.x);
-    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.018, majorDist.y);
+    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.015, majorDist.x);
+    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.015, majorDist.y);
     float majorLine = max(majorX, majorZ);
     
-    // VISIBLE but elegant opacity
-    float gridPattern = max(regularLine * 0.22, majorLine * 0.38);
+    // DATA FLOW PULSE: traveling dots along grid lines
+    float pulseSpeed = 1.5;
+    float pulseX = sin(gridCoord.x * 6.28 + uTime * pulseSpeed) * 0.5 + 0.5;
+    float pulseZ = sin(gridCoord.y * 6.28 + uTime * pulseSpeed * 0.7) * 0.5 + 0.5;
+    float dataPulse = max(pulseX * lineX, pulseZ * lineZ) * 0.4;
     
-    // Perspective fade - stronger at horizon, visible in foreground
-    float horizonFade = 1.0 - smoothstep(18.0, 55.0, dist);
+    // Grid pattern with pulse
+    float gridPattern = max(regularLine * 0.18, majorLine * 0.30) + dataPulse;
     
-    // Height fade for clean horizon
+    // NODE GLOW at intersections
+    float nodeGlow = exp(-length(lineDist) * 8.0) * 0.15;
+    
+    // Perspective fade
+    float horizonFade = 1.0 - smoothstep(15.0, 50.0, dist);
     float heightFade = smoothstep(-0.4, 0.0, vWorldPosition.y + 2.0);
     
-    // Dark crimson red - VISIBLE but not bright
-    vec3 regularColor = vec3(0.45, 0.06, 0.12);
-    vec3 majorColor = vec3(0.60, 0.10, 0.18);
+    // Colors: deep crimson with bright pulse
+    vec3 baseColor = vec3(0.40, 0.05, 0.10);
+    vec3 pulseColor = vec3(0.80, 0.10, 0.20);
+    vec3 majorColor = vec3(0.55, 0.08, 0.15);
     
-    vec3 color = mix(regularColor, majorColor, majorLine) * gridPattern;
+    vec3 color = mix(baseColor, majorColor, majorLine) * gridPattern;
+    color += pulseColor * dataPulse;
+    color += vec3(0.70, 0.12, 0.20) * nodeGlow;
     
-    // Soft glow on lines
-    float glow = exp(-min(lineDist.x, lineDist.y) * 6.0) * 0.025;
-    color += vec3(0.55, 0.08, 0.15) * glow;
-    
-    // Alpha - visible but not overwhelming
-    float alpha = (gridPattern + glow * 0.15) * horizonFade * heightFade;
-    alpha = clamp(alpha, 0.0, 0.35);
+    // Alpha
+    float alpha = (gridPattern + nodeGlow * 0.5) * horizonFade * heightFade;
+    alpha = clamp(alpha, 0.0, 0.32);
     
     gl_FragColor = vec4(color, alpha);
   }
@@ -96,7 +102,6 @@ export default function NeonGrid() {
 
   return (
     <group position={[0, -1.95, 0]}>
-      {/* Main grid */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[300, 300, 1, 1]} />
         <shaderMaterial
@@ -108,30 +113,6 @@ export default function NeonGrid() {
           depthWrite={false}
           side={THREE.DoubleSide}
           blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-      
-      {/* Floor base - subtle dark red tint */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
-        <planeGeometry args={[120, 120]} />
-        <meshBasicMaterial
-          color="#0a0002"
-          transparent
-          opacity={0.20}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      {/* Horizon glow band */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -30]}>
-        <planeGeometry args={[200, 40]} />
-        <meshBasicMaterial
-          color="#330008"
-          transparent
-          opacity={0.08}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
         />
       </mesh>
     </group>
