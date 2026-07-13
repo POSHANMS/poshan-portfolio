@@ -17,9 +17,9 @@ export default function PostProcessing() {
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(size.width, size.height),
-      0.18,
-      0.26,
-      0.53
+      0.28,
+      0.3,
+      0.45
     );
 
     const outputPass = new OutputPass();
