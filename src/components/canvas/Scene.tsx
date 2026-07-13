@@ -47,18 +47,20 @@ export default function Scene({ scrollProgress }: SceneProps) {
 
         <color attach="background" args={["#000000"]} />
         
-        {/* Lighting */}
-        <ambientLight intensity={0.05} color="#0a0002" />
+        {/* Lighting - brighter for visibility */}
+        <ambientLight intensity={0.06} color="#0a0002" />
 
-        <pointLight position={[5, 3, 5]} intensity={1.5} color="#ff1744" distance={60} decay={2} />
-        <pointLight position={[-5, 4, -5]} intensity={1.0} color="#ff4444" distance={50} decay={2} />
-        <pointLight position={[0, -2, 8]} intensity={1.0} color="#800010" distance={40} decay={2} />
-        <pointLight position={[12, 8, -20]} intensity={1.8} color="#ff1744" distance={80} decay={2} />
-        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={0.9} color="#ff1744" distance={50} />
-        <pointLight position={[0.8, -1.5, 0]} intensity={1.2} color="#ff1744" distance={12} decay={2} />
+        {/* Main scene lights */}
+        <pointLight position={[5, 3, 5]} intensity={1.6} color="#ff1744" distance={60} decay={2} />
+        <pointLight position={[-5, 4, -5]} intensity={1.1} color="#ff4444" distance={50} decay={2} />
+        <pointLight position={[0, -2, 8]} intensity={1.1} color="#800010" distance={40} decay={2} />
+        <pointLight position={[12, 8, -20]} intensity={2.0} color="#ff1744" distance={80} decay={2} />
+        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={1.0} color="#ff1744" distance={50} />
+        <pointLight position={[0.8, -1.5, 0]} intensity={1.4} color="#ff1744" distance={12} decay={2} />
 
-        {/* Extra fill light for laptop area */}
-        <pointLight position={[2, 0, 0]} intensity={0.6} color="#ff1744" distance={15} decay={2} />
+        {/* Fill light for laptop area */}
+        <pointLight position={[2, 0.5, 0]} intensity={0.8} color="#ff1744" distance={10} decay={2} />
+        <pointLight position={[-1, 1, 2]} intensity={0.5} color="#ff8a80" distance={8} decay={2} />
 
         <Suspense fallback={null}>
           <NebulaBackground />

@@ -7,11 +7,13 @@ import * as THREE from "three";
 const gridVertexShader = `
   varying vec3 vWorldPosition;
   varying vec2 vUv;
+  varying float vDist;
 
   void main() {
     vec4 worldPosition = modelMatrix * vec4(position, 1.0);
     vWorldPosition = worldPosition.xyz;
     vUv = uv;
+    vDist = length(worldPosition.xz);
     gl_Position = projectionMatrix * viewMatrix * worldPosition;
   }
 `;
@@ -20,23 +22,24 @@ const gridFragmentShader = `
   uniform float uTime;
   varying vec3 vWorldPosition;
   varying vec2 vUv;
+  varying float vDist;
 
   void main() {
     vec2 worldXZ = vWorldPosition.xz;
     float dist = length(worldXZ);
     
-    // Very wide cell size for sparse grid
-    float cellSize = 5.5;
+    // Cell size for perspective grid
+    float cellSize = 4.0;
     vec2 gridCoord = worldXZ / cellSize;
     vec2 gridFract = fract(gridCoord);
     vec2 lineDist = abs(gridFract - 0.5) * 2.0;
     
-    // EXTREMELY THIN lines - hairlines
-    float lineWidth = 0.003;
-    float majorLineWidth = 0.008;
+    // Thin but VISIBLE lines
+    float lineWidth = 0.006;
+    float majorLineWidth = 0.015;
     
-    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.005, lineDist.x);
-    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.005, lineDist.y);
+    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.008, lineDist.x);
+    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.008, lineDist.y);
     float regularLine = max(lineX, lineZ);
     
     // Major lines every 5 cells
@@ -44,32 +47,32 @@ const gridFragmentShader = `
     vec2 majorCoord = worldXZ / majorCellSize;
     vec2 majorFract = fract(majorCoord);
     vec2 majorDist = abs(majorFract - 0.5) * 2.0;
-    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.010, majorDist.x);
-    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.010, majorDist.y);
+    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.018, majorDist.x);
+    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.018, majorDist.y);
     float majorLine = max(majorX, majorZ);
     
-    // VERY LOW opacity - barely visible
-    float gridPattern = max(regularLine * 0.08, majorLine * 0.15);
+    // VISIBLE but elegant opacity
+    float gridPattern = max(regularLine * 0.22, majorLine * 0.38);
     
-    // Strong horizon fade
-    float horizonFade = 1.0 - smoothstep(15.0, 50.0, dist);
+    // Perspective fade - stronger at horizon, visible in foreground
+    float horizonFade = 1.0 - smoothstep(18.0, 55.0, dist);
     
-    // Fade near horizon line
-    float heightFade = smoothstep(-0.3, 0.0, vWorldPosition.y + 2.0);
+    // Height fade for clean horizon
+    float heightFade = smoothstep(-0.4, 0.0, vWorldPosition.y + 2.0);
     
-    // Very dark, desaturated red
-    vec3 regularColor = vec3(0.25, 0.03, 0.06);
-    vec3 majorColor = vec3(0.35, 0.05, 0.09);
+    // Dark crimson red - VISIBLE but not bright
+    vec3 regularColor = vec3(0.45, 0.06, 0.12);
+    vec3 majorColor = vec3(0.60, 0.10, 0.18);
     
     vec3 color = mix(regularColor, majorColor, majorLine) * gridPattern;
     
-    // Minimal glow
-    float glow = exp(-min(lineDist.x, lineDist.y) * 10.0) * 0.015;
-    color += vec3(0.30, 0.04, 0.08) * glow;
+    // Soft glow on lines
+    float glow = exp(-min(lineDist.x, lineDist.y) * 6.0) * 0.025;
+    color += vec3(0.55, 0.08, 0.15) * glow;
     
-    // Very low max alpha
-    float alpha = (gridPattern + glow * 0.1) * horizonFade * heightFade;
-    alpha = clamp(alpha, 0.0, 0.18);
+    // Alpha - visible but not overwhelming
+    float alpha = (gridPattern + glow * 0.15) * horizonFade * heightFade;
+    alpha = clamp(alpha, 0.0, 0.35);
     
     gl_FragColor = vec4(color, alpha);
   }
@@ -93,6 +96,7 @@ export default function NeonGrid() {
 
   return (
     <group position={[0, -1.95, 0]}>
+      {/* Main grid */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[300, 300, 1, 1]} />
         <shaderMaterial
@@ -107,13 +111,25 @@ export default function NeonGrid() {
         />
       </mesh>
       
-      {/* Very subtle floor base */}
+      {/* Floor base - subtle dark red tint */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
-        <planeGeometry args={[150, 150]} />
+        <planeGeometry args={[120, 120]} />
         <meshBasicMaterial
-          color="#020001"
+          color="#0a0002"
           transparent
-          opacity={0.10}
+          opacity={0.20}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Horizon glow band */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -30]}>
+        <planeGeometry args={[200, 40]} />
+        <meshBasicMaterial
+          color="#330008"
+          transparent
+          opacity={0.08}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />

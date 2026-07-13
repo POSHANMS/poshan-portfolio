@@ -8,7 +8,7 @@ export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const linesRef = useRef<THREE.LineSegments>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 300;
+  const particleCount = 400;
 
   const [positions, velocities, sizes, connectionIndices] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
@@ -18,21 +18,17 @@ export default function ParticleNetwork() {
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
-      // Spread in background area
-      pos[idx] = (Math.random() - 0.5) * 35;
+      pos[idx] = (Math.random() - 0.5) * 32;
       pos[idx + 1] = (Math.random() - 0.5) * 10;
-      pos[idx + 2] = -8 - Math.random() * 25;
+      pos[idx + 2] = -6 - Math.random() * 22;
       
-      // Very slow drift
-      vel[idx] = (Math.random() - 0.5) * 0.005;
-      vel[idx + 1] = (Math.random() - 0.5) * 0.005;
+      vel[idx] = (Math.random() - 0.5) * 0.006;
+      vel[idx + 1] = (Math.random() - 0.5) * 0.006;
       vel[idx + 2] = (Math.random() - 0.5) * 0.002;
       
-      // Small particles
-      sz[i] = 0.08 + Math.random() * 0.25;
+      sz[i] = 0.10 + Math.random() * 0.35;
     }
 
-    // VERY FEW connections — only closest neighbors
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
       let connectionsMade = 0;
@@ -44,7 +40,7 @@ export default function ParticleNetwork() {
         const dz = pos[i3 + 2] - pos[j3 + 2];
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         
-        if (dist < 4.0) {
+        if (dist < 5.0) {
           connections.push(i, j);
           connectionsMade++;
         }
@@ -74,7 +70,7 @@ export default function ParticleNetwork() {
     () => ({
       uTime: { value: 0 },
       uMouse: { value: new THREE.Vector2(0, 0) },
-      uColor: { value: new THREE.Color("#cc1133") },
+      uColor: { value: new THREE.Color("#ff3344") },
     }),
     []
   );
@@ -90,15 +86,15 @@ export default function ParticleNetwork() {
     const linePosAttr = lineGeo.attributes.position;
     const linePosArray = linePosAttr.array as Float32Array;
     
-    const targetX = state.pointer.x * 10;
-    const targetY = state.pointer.y * 6;
+    const targetX = state.pointer.x * 12;
+    const targetY = state.pointer.y * 8;
 
     materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
     materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(
-      materialRef.current.uniforms.uMouse.value.x, targetX, 0.06
+      materialRef.current.uniforms.uMouse.value.x, targetX, 0.07
     );
     materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(
-      materialRef.current.uniforms.uMouse.value.y, targetY, 0.06
+      materialRef.current.uniforms.uMouse.value.y, targetY, 0.07
     );
 
     const mx = materialRef.current.uniforms.uMouse.value.x;
@@ -115,24 +111,23 @@ export default function ParticleNetwork() {
       const py = posArray[idx + 1];
       const pz = posArray[idx + 2];
 
-      // Subtle mouse attraction with orbit
       const dx = mx - px;
       const dy = my - py;
       const distToMouse = Math.sqrt(dx * dx + dy * dy);
 
-      if (distToMouse < 8.0 && distToMouse > 0.5) {
-        const attractStrength = 0.005;
+      if (distToMouse < 10.0 && distToMouse > 0.5) {
+        const attractStrength = 0.006;
         posArray[idx] += (dx / distToMouse) * attractStrength;
         posArray[idx + 1] += (dy / distToMouse) * attractStrength;
         
-        const orbitSpeed = 0.015;
+        const orbitSpeed = 0.018;
         const tangentX = -dy / distToMouse;
         const tangentY = dx / distToMouse;
-        posArray[idx] += tangentX * orbitSpeed * (8.0 - distToMouse);
-        posArray[idx + 1] += tangentY * orbitSpeed * (8.0 - distToMouse);
+        posArray[idx] += tangentX * orbitSpeed * (10.0 - distToMouse);
+        posArray[idx + 1] += tangentY * orbitSpeed * (10.0 - distToMouse);
       }
 
-      if (Math.abs(posArray[idx]) > 20) {
+      if (Math.abs(posArray[idx]) > 18) {
         posArray[idx] *= 0.95;
         velocities[idx] *= -0.5;
       }
@@ -140,7 +135,7 @@ export default function ParticleNetwork() {
         posArray[idx + 1] *= 0.95;
         velocities[idx + 1] *= -0.5;
       }
-      if (posArray[idx + 2] > -3 || posArray[idx + 2] < -30) {
+      if (posArray[idx + 2] > -3 || posArray[idx + 2] < -28) {
         velocities[idx + 2] *= -0.5;
       }
     }
@@ -165,9 +160,9 @@ export default function ParticleNetwork() {
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
-      float twinkle = 0.4 + 0.3 * sin(uTime * 1.5 + position.x * 8.0);
+      float twinkle = 0.5 + 0.4 * sin(uTime * 1.8 + position.x * 8.0);
       vAlpha = twinkle;
-      gl_PointSize = aSize * (18.0 / -mvPosition.z);
+      gl_PointSize = aSize * (22.0 / -mvPosition.z);
     }
   `;
 
@@ -179,9 +174,9 @@ export default function ParticleNetwork() {
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = length(coord);
       if (dist > 0.5) discard;
-      float alpha = smoothstep(0.5, 0.15, dist) * vAlpha;
-      vec3 color = mix(vec3(0.9, 0.7, 0.7), vec3(1.0, 0.9, 0.9), smoothstep(0.0, 0.4, dist));
-      gl_FragColor = vec4(color, alpha * 0.55);
+      float alpha = smoothstep(0.5, 0.12, dist) * vAlpha;
+      vec3 color = mix(vec3(1.0, 0.85, 0.85), vec3(1.0, 0.5, 0.5), smoothstep(0.0, 0.35, dist));
+      gl_FragColor = vec4(color, alpha * 0.65);
     }
   `;
 
@@ -203,12 +198,12 @@ export default function ParticleNetwork() {
         />
       </points>
 
-      {/* VERY SUBTLE connection lines */}
+      {/* VISIBLE connection lines */}
       <lineSegments ref={linesRef} geometry={lineGeometry}>
         <lineBasicMaterial
-          color="#660010"
+          color="#aa1122"
           transparent
-          opacity={0.03}
+          opacity={0.08}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
