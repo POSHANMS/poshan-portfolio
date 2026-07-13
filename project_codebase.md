@@ -920,6 +920,109 @@ body {
 .fixed.inset-0.z-0 {
   background: #000000 !important;
 }
+
+/* ═══════ ENHANCED ATMOSPHERIC EFFECTS ═══════ */
+
+.dashboard-haze {
+  background:
+    radial-gradient(circle at 70% 50%, rgba(255, 23, 68, 0.06), transparent 20rem),
+    radial-gradient(circle at 76% 58%, rgba(128, 0, 16, 0.08), transparent 21rem),
+    radial-gradient(circle at 30% 40%, rgba(204, 17, 51, 0.012), transparent 18rem),
+    radial-gradient(circle at 82% 18%, rgba(128, 0, 16, 0.08), transparent 24rem),
+    radial-gradient(circle at 50% 85%, rgba(255, 23, 68, 0.04), transparent 30rem),
+    linear-gradient(180deg, rgba(2, 3, 13, 0.08), rgba(4, 4, 12, 0.02) 50%, rgba(4, 4, 12, 0.22));
+  mix-blend-mode: screen;
+}
+
+.dashboard-scanlines {
+  opacity: 0.15;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 23, 68, 0.02) 1px, transparent 1px),
+    radial-gradient(circle at 74% 18%, rgba(255, 23, 68, 0.08), transparent 14rem);
+  background-size: 72px 72px, 72px 72px, 100% 100%;
+  mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+}
+
+.dashboard-floor-glow {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40vh;
+  background:
+    radial-gradient(ellipse at 50% 100%, rgba(255, 23, 68, 0.08), transparent 60%);
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.dashboard-depth-lines {
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(255, 23, 68, 0.015) 50%, transparent 100%);
+  background-size: 100% 100%;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%);
+  opacity: 0.5;
+}
+
+.fixed.inset-0.z-0 {
+  background: #000000 !important;
+}
+
+.dashboard-stage {
+  top: calc(50% + 6px);
+}
+
+/* ═══════ CRITICAL: DASHBOARD ATMOSPHERIC EFFECTS ═══════ */
+
+.dashboard-haze {
+  background:
+    radial-gradient(circle at 70% 50%, rgba(255, 23, 68, 0.07), transparent 20rem),
+    radial-gradient(circle at 76% 58%, rgba(128, 0, 16, 0.09), transparent 21rem),
+    radial-gradient(circle at 30% 40%, rgba(204, 17, 51, 0.015), transparent 18rem),
+    radial-gradient(circle at 82% 18%, rgba(128, 0, 16, 0.09), transparent 24rem),
+    radial-gradient(circle at 50% 85%, rgba(255, 23, 68, 0.05), transparent 30rem),
+    linear-gradient(180deg, rgba(2, 3, 13, 0.10), rgba(4, 4, 12, 0.03) 50%, rgba(4, 4, 12, 0.28));
+  mix-blend-mode: screen;
+}
+
+.dashboard-scanlines {
+  opacity: 0.18;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 23, 68, 0.025) 1px, transparent 1px),
+    radial-gradient(circle at 74% 18%, rgba(255, 23, 68, 0.10), transparent 14rem);
+  background-size: 72px 72px, 72px 72px, 100% 100%;
+  mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+}
+
+.dashboard-floor-glow {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 45vh;
+  background:
+    radial-gradient(ellipse at 50% 100%, rgba(255, 23, 68, 0.10), transparent 55%),
+    radial-gradient(ellipse at 60% 100%, rgba(128, 0, 16, 0.06), transparent 50%);
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.dashboard-depth-lines {
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(255, 23, 68, 0.02) 50%, transparent 100%);
+  background-size: 100% 100%;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
+  opacity: 0.6;
+}
+
+.fixed.inset-0.z-0 {
+  background: #000000 !important;
+}
+
+.dashboard-stage {
+  top: calc(50% + 6px);
+}
 ```
 
 ## File: `src/app/layout.tsx`
@@ -1361,14 +1464,15 @@ export default function FloorRings() {
   const ringsRef = useRef<THREE.Group>(null);
   const energyRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Group>(null);
+  const secondaryRingsRef = useRef<THREE.Group>(null);
 
   const ringGeometries = useMemo(() => {
     const rings: THREE.BufferGeometry[] = [];
-    const radii = [0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2];
+    const radii = [0.4, 0.8, 1.3, 1.9, 2.6, 3.4, 4.3, 5.3, 6.4, 7.7];
 
     for (const radius of radii) {
       const points: THREE.Vector3[] = [];
-      const segments = 128;
+      const segments = Math.max(80, Math.floor(radius * 40));
       for (let i = 0; i <= segments; i++) {
         const angle = (i / segments) * Math.PI * 2;
         points.push(new THREE.Vector3(
@@ -1382,15 +1486,34 @@ export default function FloorRings() {
     return rings;
   }, []);
 
-  // Energy segment geometries - partial arcs that travel
+  const secondaryRingGeometries = useMemo(() => {
+    const rings: THREE.BufferGeometry[] = [];
+    const radii = [0.6, 1.05, 1.55, 2.2, 2.9, 3.8, 4.8, 5.8, 7.0];
+
+    for (const radius of radii) {
+      const points: THREE.Vector3[] = [];
+      const segments = Math.max(64, Math.floor(radius * 32));
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        points.push(new THREE.Vector3(
+          Math.cos(angle) * radius,
+          0,
+          Math.sin(angle) * radius
+        ));
+      }
+      rings.push(new THREE.BufferGeometry().setFromPoints(points));
+    }
+    return rings;
+  }, []);
+
   const energyGeometries = useMemo(() => {
     const segments: THREE.BufferGeometry[] = [];
-    const radii = [0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2];
+    const radii = [0.8, 1.5, 2.4, 3.5, 4.7, 6.1, 7.4];
     
     for (const radius of radii) {
       const points: THREE.Vector3[] = [];
-      const arcLength = Math.PI * 0.3; // 54 degree arc
-      const segments_count = 32;
+      const arcLength = Math.PI * 0.5;
+      const segments_count = 48;
       for (let i = 0; i <= segments_count; i++) {
         const angle = (i / segments_count) * arcLength;
         points.push(new THREE.Vector3(
@@ -1404,49 +1527,70 @@ export default function FloorRings() {
     return segments;
   }, []);
 
+  const rippleGeometries = useMemo(() => {
+    const ripples: THREE.BufferGeometry[] = [];
+    for (let r = 0; r < 6; r++) {
+      const points: THREE.Vector3[] = [];
+      const segments = 160;
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        points.push(new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)));
+      }
+      ripples.push(new THREE.BufferGeometry().setFromPoints(points));
+    }
+    return ripples;
+  }, []);
+
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     
-    if (!ringsRef.current) return;
-    
-    // Base rings pulse
-    ringsRef.current.children.forEach((child, i) => {
-      const line = child as THREE.Line;
-      if (line && line.scale) {
-        const heartbeat = 1.0 + Math.sin(t * 0.8 + i * 0.3) * 0.015;
-        line.scale.set(heartbeat, heartbeat, heartbeat);
-      }
-      if (line.material) {
-        const mat = line.material as THREE.LineBasicMaterial;
-        mat.opacity = Math.max(0.02, 0.06 - i * 0.005 + Math.sin(t * 0.5 + i) * 0.015);
-      }
-    });
-
-    // Energy segments rotate around rings
-    if (energyRef.current) {
-      energyRef.current.children.forEach((child, i) => {
+    if (ringsRef.current) {
+      ringsRef.current.children.forEach((child, i) => {
         const line = child as THREE.Line;
-        if (line) {
-          const speed = 0.3 + i * 0.1;
-          line.rotation.y = t * speed + i * 1.5;
+        if (line && line.scale) {
+          const heartbeat = 1.0 + Math.sin(t * 0.5 + i * 0.35) * 0.015;
+          line.scale.set(heartbeat, heartbeat, heartbeat);
         }
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
-          mat.opacity = 0.15 + Math.sin(t * 2.0 + i * 2.5) * 0.08;
+          const baseOpacity = Math.max(0.06, 0.18 - i * 0.01);
+          mat.opacity = baseOpacity + Math.sin(t * 0.35 + i * 0.7) * 0.04;
         }
       });
     }
 
-    // Glow spots pulse with heartbeat
+    if (secondaryRingsRef.current) {
+      secondaryRingsRef.current.children.forEach((child, i) => {
+        const line = child as THREE.Line;
+        if (line.material) {
+          const mat = line.material as THREE.LineBasicMaterial;
+          mat.opacity = 0.06 + Math.sin(t * 0.6 + i * 1.0) * 0.03;
+        }
+      });
+    }
+
+    if (energyRef.current) {
+      energyRef.current.children.forEach((child, i) => {
+        const line = child as THREE.Line;
+        if (line) {
+          const speed = 0.35 + i * 0.12;
+          line.rotation.y = t * speed + i * 1.8;
+        }
+        if (line.material) {
+          const mat = line.material as THREE.LineBasicMaterial;
+          mat.opacity = 0.35 + Math.sin(t * 2.5 + i * 2.0) * 0.15;
+        }
+      });
+    }
+
     if (glowRef.current) {
       glowRef.current.children.forEach((child, i) => {
         const mesh = child as THREE.Mesh;
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshBasicMaterial;
-          const pulse = Math.sin(t * 1.2 + i * 2.0) * 0.5 + 0.5;
-          mat.opacity = 0.02 + pulse * 0.04;
-          // Scale pulse
-          const scale = 1.0 + pulse * 0.3;
+          const pulse = Math.sin(t * 0.4 + i * 1.2) * 0.5 + 0.5;
+          mat.opacity = 0.04 + pulse * 0.08;
+          const scale = 1.0 + pulse * 0.6;
           mesh.scale.set(scale, scale, scale);
         }
       });
@@ -1454,8 +1598,7 @@ export default function FloorRings() {
   });
 
   return (
-    <group position={[0.8, -1.95, 0]}>
-      {/* Base rings */}
+    <group position={[0.8, -2.12, 0]}>
       <group ref={ringsRef}>
         {ringGeometries.map((geometry, i) => (
           <primitive 
@@ -1463,9 +1606,9 @@ export default function FloorRings() {
             object={new THREE.Line(
               geometry, 
               new THREE.LineBasicMaterial({
-                color: i % 3 === 0 ? "#660010" : "#440008",
+                color: i % 4 === 0 ? "#ff1744" : i % 3 === 0 ? "#ff3355" : "#cc1133",
                 transparent: true,
-                opacity: Math.max(0.02, 0.06 - i * 0.005),
+                opacity: Math.max(0.06, 0.18 - i * 0.01),
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
               })
@@ -1474,7 +1617,24 @@ export default function FloorRings() {
         ))}
       </group>
 
-      {/* Traveling energy segments */}
+      <group ref={secondaryRingsRef}>
+        {secondaryRingGeometries.map((geometry, i) => (
+          <primitive 
+            key={`secondary-${i}`}
+            object={new THREE.Line(
+              geometry, 
+              new THREE.LineBasicMaterial({
+                color: "#880022",
+                transparent: true,
+                opacity: 0.06,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+              })
+            )} 
+          />
+        ))}
+      </group>
+
       <group ref={energyRef}>
         {energyGeometries.map((geometry, i) => (
           <primitive
@@ -1482,65 +1642,78 @@ export default function FloorRings() {
             object={new THREE.Line(
               geometry,
               new THREE.LineBasicMaterial({
-                color: "#ff1744",
+                color: i % 2 === 0 ? "#ff1744" : "#ff6688",
                 transparent: true,
-                opacity: 0.15,
+                opacity: 0.35,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
-                linewidth: 2,
               })
             )}
           />
         ))}
       </group>
 
-      {/* Center glow */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <circleGeometry args={[2.5, 48]} />
+      <group ref={glowRef}>
+        {rippleGeometries.map((_, i) => (
+          <mesh key={`ripple-${i}`} rotation={[-Math.PI / 2, 0, 0]} scale={[0.4 + i * 1.3, 0.4 + i * 1.3, 1]}>
+            <ringGeometry args={[0.97, 1.0, 128]} />
+            <meshBasicMaterial
+              color="#ff1744"
+              transparent
+              opacity={0.04}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        ))}
+      </group>
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <circleGeometry args={[3.5, 64]} />
         <meshBasicMaterial
-          color="#220004"
+          color="#ff1744"
           transparent
-          opacity={0.04}
+          opacity={0.08}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
 
-      {/* Pulsing energy nodes */}
-      <group ref={glowRef}>
-        <mesh position={[-1.2, 0.02, 0.8]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.04, 24]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+        <circleGeometry args={[1.2, 48]} />
+        <meshBasicMaterial
+          color="#ff4466"
+          transparent
+          opacity={0.15}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
+      <pointLight position={[0, 0.5, 0]} intensity={3.0} color="#ff1744" distance={10} decay={2} />
+
+      {[
+        [-1.5, 0.02, 1.0],
+        [0.2, 0.02, 1.8],
+        [1.6, 0.02, 0.6],
+        [-0.8, 0.02, -0.5],
+        [2.2, 0.02, 1.5],
+        [-2.0, 0.02, 0.3],
+        [1.0, 0.02, -1.0],
+        [-1.2, 0.02, 2.0],
+      ].map((pos, i) => (
+        <mesh key={`node-${i}`} position={pos as [number, number, number]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.05 + (i % 3) * 0.01, 24]} />
           <meshBasicMaterial
-            color="#ff1744"
+            color={i % 2 === 0 ? "#ff1744" : "#ff4466"}
             transparent
-            opacity={0.04}
+            opacity={0.08}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </mesh>
-        
-        <mesh position={[0.1, 0.02, 1.2]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.03, 24]} />
-          <meshBasicMaterial
-            color="#ff3355"
-            transparent
-            opacity={0.03}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-        
-        <mesh position={[1.4, 0.02, 0.9]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.05, 24]} />
-          <meshBasicMaterial
-            color="#ff1744"
-            transparent
-            opacity={0.04}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      </group>
+      ))}
     </group>
   );
 }
@@ -1708,7 +1881,7 @@ const nebulaFragmentShader = `
   float fbm(vec2 p) {
     float v = 0.0;
     float a = 0.5;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
       v += a * noise(p);
       p *= 2.2;
       a *= 0.5;
@@ -1718,38 +1891,46 @@ const nebulaFragmentShader = `
 
   void main() {
     vec2 uv = vUv;
-    float t = uTime * 0.01;
+    float t = uTime * 0.012;
     vec2 drift = vec2(t, -t * 0.5);
 
-    float n1 = fbm(uv * 2.5 + drift);
-    float n2 = fbm(uv * 4.0 - drift * 1.2 + vec2(5.2, 1.3));
-    float n3 = fbm(uv * 7.0 + vec2(-t * 0.3, t * 0.4));
+    float n1 = fbm(uv * 1.8 + drift);
+    float n2 = fbm(uv * 3.2 - drift * 1.2 + vec2(5.2, 1.3));
+    float n3 = fbm(uv * 5.5 + vec2(-t * 0.3, t * 0.4));
+    float n4 = fbm(uv * 8.0 + vec2(t * 0.15, -t * 0.25));
 
-    vec2 galaxyUv = uv - vec2(0.70, 0.65);
+    vec2 galaxyUv = uv - vec2(0.72, 0.68);
     float galaxyDist = length(galaxyUv);
     float galaxyAngle = atan(galaxyUv.y, galaxyUv.x);
-    float spiral = cos(galaxyAngle * 3.0 + galaxyDist * 12.0 - uTime * 0.08);
+    float spiral = cos(galaxyAngle * 4.0 + galaxyDist * 12.0 - uTime * 0.08);
     float galaxy = exp(-galaxyDist * galaxyDist * 25.0) * (0.5 + 0.5 * spiral);
+    float galaxyArms = exp(-galaxyDist * galaxyDist * 8.0) * pow(spiral * 0.5 + 0.5, 2.0);
 
-    float fog = pow(n1, 2.5) * 0.06 + pow(n2, 3.0) * 0.04 + pow(n3, 4.0) * 0.02;
-    fog += galaxy * 0.03;
+    float fog = pow(n1, 2.0) * 0.10 + pow(n2, 2.5) * 0.08 + pow(n3, 3.2) * 0.06 + pow(n4, 4.0) * 0.03;
+    fog += galaxy * 0.06 + galaxyArms * 0.04;
 
-    float topMask = smoothstep(0.0, 0.15, uv.y);
-    float bottomFade = smoothstep(0.0, 0.5, uv.y);
-    fog *= topMask * bottomFade;
+    float topMask = smoothstep(0.0, 0.10, uv.y);
+    float bottomFade = smoothstep(0.0, 0.50, uv.y);
+    float sideFade = smoothstep(0.0, 0.08, uv.x) * smoothstep(1.0, 0.92, uv.x);
+    fog *= topMask * bottomFade * sideFade;
 
-    vec3 col1 = vec3(0.30, 0.03, 0.06) * pow(n1, 2.5) * 0.06;
-    vec3 col2 = vec3(0.18, 0.01, 0.03) * pow(n2, 3.0) * 0.04;
-    vec3 col3 = vec3(0.10, 0.0, 0.02) * pow(n3, 4.0) * 0.02;
-    vec3 col4 = vec3(0.25, 0.03, 0.06) * galaxy * 0.03;
+    vec3 col1 = vec3(1.0, 0.06, 0.12) * pow(n1, 2.0) * 0.10;
+    vec3 col2 = vec3(0.65, 0.02, 0.06) * pow(n2, 2.5) * 0.08;
+    vec3 col3 = vec3(0.35, 0.0, 0.03) * pow(n3, 3.2) * 0.06;
+    vec3 col4 = vec3(0.22, 0.0, 0.02) * pow(n4, 4.0) * 0.03;
+    vec3 col5 = vec3(1.0, 0.10, 0.20) * galaxy * 0.06;
+    vec3 col6 = vec3(0.85, 0.06, 0.14) * galaxyArms * 0.04;
 
-    vec3 color = col1 + col2 + col3 + col4;
+    vec3 color = col1 + col2 + col3 + col4 + col5 + col6;
 
     float horizon = exp(-pow(uv.y - 0.20, 2.0) * 35.0);
-    color += vec3(0.25, 0.02, 0.04) * horizon * 0.03;
+    color += vec3(0.70, 0.03, 0.08) * horizon * 0.06;
+    
+    float upperGlow = exp(-pow(uv.y - 0.70, 2.0) * 12.0) * 0.4;
+    color += vec3(0.45, 0.02, 0.05) * upperGlow * 0.04;
 
-    float alpha = clamp(fog * 0.02 + galaxy * 0.01 + horizon * 0.008, 0.0, 0.035);
-    alpha *= smoothstep(0.0, 0.12, uv.y);
+    float alpha = clamp(fog * 0.06 + galaxy * 0.03 + galaxyArms * 0.02 + horizon * 0.02, 0.0, 0.08);
+    alpha *= smoothstep(0.0, 0.08, uv.y);
 
     gl_FragColor = vec4(color, alpha);
   }
@@ -1774,8 +1955,8 @@ export default function NebulaBackground() {
   });
 
   return (
-    <mesh position={[0, 3, -45]} renderOrder={-100}>
-      <planeGeometry args={[90, 50]} />
+    <mesh position={[0, 1, -45]} renderOrder={-100}>
+      <planeGeometry args={[100, 60]} />
       <shaderMaterial
         ref={materialRef}
         vertexShader={nebulaVertexShader}
@@ -1825,21 +2006,21 @@ const gridFragmentShader = `
     vec2 worldXZ = vWorldPosition.xz;
     float dist = length(worldXZ);
     
-    // Cell size
-    float cellSize = 4.0;
+    float cellSize = 2.0 + dist * 0.06;
     vec2 gridCoord = worldXZ / cellSize;
     vec2 gridFract = fract(gridCoord);
     vec2 lineDist = abs(gridFract - 0.5) * 2.0;
     
-    // Line widths
-    float lineWidth = 0.005;
-    float majorLineWidth = 0.012;
+    float perspectiveFade = 1.0 - smoothstep(5.0, 30.0, dist);
+    float nearFade = smoothstep(0.0, 4.0, dist);
+    
+    float lineWidth = 0.002 + 0.003 * perspectiveFade;
+    float majorLineWidth = 0.006 + 0.008 * perspectiveFade;
     
     float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.x);
     float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.y);
     float regularLine = max(lineX, lineZ);
     
-    // Major lines
     float majorCellSize = cellSize * 5.0;
     vec2 majorCoord = worldXZ / majorCellSize;
     vec2 majorFract = fract(majorCoord);
@@ -1848,34 +2029,34 @@ const gridFragmentShader = `
     float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.015, majorDist.y);
     float majorLine = max(majorX, majorZ);
     
-    // DATA FLOW PULSE: traveling dots along grid lines
-    float pulseSpeed = 1.5;
-    float pulseX = sin(gridCoord.x * 6.28 + uTime * pulseSpeed) * 0.5 + 0.5;
-    float pulseZ = sin(gridCoord.y * 6.28 + uTime * pulseSpeed * 0.7) * 0.5 + 0.5;
-    float dataPulse = max(pulseX * lineX, pulseZ * lineZ) * 0.4;
+    float pulseSpeed = 1.8;
+    float pulseX = sin(gridCoord.x * 6.283 + uTime * pulseSpeed) * 0.5 + 0.5;
+    float pulseZ = sin(gridCoord.y * 6.283 + uTime * pulseSpeed * 0.7 + 1.5) * 0.5 + 0.5;
+    float dataPulse = max(pulseX * lineX, pulseZ * lineZ) * 0.35;
     
-    // Grid pattern with pulse
-    float gridPattern = max(regularLine * 0.18, majorLine * 0.30) + dataPulse;
+    float gridPattern = max(regularLine * 0.10, majorLine * 0.22) * perspectiveFade;
+    gridPattern += dataPulse * perspectiveFade;
     
-    // NODE GLOW at intersections
-    float nodeGlow = exp(-length(lineDist) * 8.0) * 0.15;
+    float nodeGlow = exp(-length(lineDist) * 8.0) * 0.12 * perspectiveFade;
     
-    // Perspective fade
-    float horizonFade = 1.0 - smoothstep(15.0, 50.0, dist);
-    float heightFade = smoothstep(-0.4, 0.0, vWorldPosition.y + 2.0);
+    float horizonFade = 1.0 - smoothstep(4.0, 35.0, dist);
+    float heightFade = smoothstep(-0.5, 0.0, vWorldPosition.y + 2.0);
     
-    // Colors: deep crimson with bright pulse
-    vec3 baseColor = vec3(0.40, 0.05, 0.10);
-    vec3 pulseColor = vec3(0.80, 0.10, 0.20);
-    vec3 majorColor = vec3(0.55, 0.08, 0.15);
+    float centerGlow = exp(-dist * dist * 0.12) * 0.05;
+    
+    vec3 baseColor = vec3(0.35, 0.03, 0.08);
+    vec3 pulseColor = vec3(0.80, 0.06, 0.15);
+    vec3 majorColor = vec3(0.50, 0.04, 0.10);
+    vec3 nodeColor = vec3(0.90, 0.08, 0.18);
     
     vec3 color = mix(baseColor, majorColor, majorLine) * gridPattern;
-    color += pulseColor * dataPulse;
-    color += vec3(0.70, 0.12, 0.20) * nodeGlow;
+    color += pulseColor * dataPulse * 0.6;
+    color += nodeColor * nodeGlow;
+    color += vec3(0.60, 0.03, 0.08) * centerGlow;
+    color += vec3(0.08, 0.005, 0.015) * horizonFade * 0.4;
     
-    // Alpha
-    float alpha = (gridPattern + nodeGlow * 0.5) * horizonFade * heightFade;
-    alpha = clamp(alpha, 0.0, 0.32);
+    float alpha = (gridPattern + nodeGlow * 0.3 + centerGlow) * horizonFade * heightFade * nearFade;
+    alpha = clamp(alpha, 0.0, 0.22);
     
     gl_FragColor = vec4(color, alpha);
   }
@@ -1898,9 +2079,9 @@ export default function NeonGrid() {
   });
 
   return (
-    <group position={[0, -1.95, 0]}>
+    <group position={[0, -2.15, 0]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[300, 300, 1, 1]} />
+        <planeGeometry args={[200, 200, 1, 1]} />
         <shaderMaterial
           ref={gridMaterialRef}
           vertexShader={gridVertexShader}
@@ -1910,6 +2091,28 @@ export default function NeonGrid() {
           depthWrite={false}
           side={THREE.DoubleSide}
           blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+      
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]}>
+        <planeGeometry args={[50, 50]} />
+        <meshBasicMaterial
+          color="#0a0002"
+          transparent
+          opacity={0.25}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      <mesh position={[0, -2.14, -25]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[100, 0.3]} />
+        <meshBasicMaterial
+          color="#ff1744"
+          transparent
+          opacity={0.04}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </mesh>
     </group>
@@ -1940,32 +2143,29 @@ export default function ParticleNetwork() {
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
-      // Spread in mid-ground
-      pos[idx] = (Math.random() - 0.5) * 30;
-      pos[idx + 1] = (Math.random() - 0.5) * 10;
-      pos[idx + 2] = -6 - Math.random() * 22;
+      pos[idx] = (Math.random() - 0.5) * 40;
+      pos[idx + 1] = (Math.random() - 0.5) * 12;
+      pos[idx + 2] = -8 - Math.random() * 28;
       
-      // Very slow drift
-      vel[idx] = (Math.random() - 0.5) * 0.004;
-      vel[idx + 1] = (Math.random() - 0.5) * 0.004;
+      vel[idx] = (Math.random() - 0.5) * 0.003;
+      vel[idx + 1] = (Math.random() - 0.5) * 0.003;
       vel[idx + 2] = (Math.random() - 0.5) * 0.001;
       
-      sz[i] = 0.08 + Math.random() * 0.30;
+      sz[i] = 0.06 + Math.random() * 0.35;
     }
 
-    // Create connections between close particles
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
       let connectionsMade = 0;
       
-      for (let j = i + 1; j < particleCount && connectionsMade < 2; j++) {
+      for (let j = i + 1; j < particleCount && connectionsMade < 1; j++) {
         const j3 = j * 3;
         const dx = pos[i3] - pos[j3];
         const dy = pos[i3 + 1] - pos[j3 + 1];
         const dz = pos[i3 + 2] - pos[j3 + 2];
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         
-        if (dist < 4.5) {
+        if (dist < 3.5) {
           connections.push(i, j);
           connectionsMade++;
         }
@@ -2001,6 +2201,9 @@ export default function ParticleNetwork() {
     []
   );
 
+  const prevMouseRef = useRef({ x: 0, y: 0 });
+  const mouseVelRef = useRef({ x: 0, y: 0 });
+
   useFrame((state) => {
     if (!pointsRef.current || !materialRef.current || !linesRef.current) return;
 
@@ -2012,34 +2215,40 @@ export default function ParticleNetwork() {
     const linePosAttr = lineGeo.attributes.position;
     const linePosArray = linePosAttr.array as Float32Array;
     
-    const targetX = state.pointer.x * 12;
-    const targetY = state.pointer.y * 8;
+    const targetX = state.pointer.x * 15;
+    const targetY = state.pointer.y * 10;
 
     materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
     materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(
-      materialRef.current.uniforms.uMouse.value.x, targetX, 0.07
+      materialRef.current.uniforms.uMouse.value.x, targetX, 0.06
     );
     materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(
-      materialRef.current.uniforms.uMouse.value.y, targetY, 0.07
+      materialRef.current.uniforms.uMouse.value.y, targetY, 0.06
     );
 
     const mx = materialRef.current.uniforms.uMouse.value.x;
     const my = materialRef.current.uniforms.uMouse.value.y;
     
-    // Detect mouse movement for scatter effect
-    const mouseDelta = Math.abs(state.pointer.x - state.pointer.x) + Math.abs(state.pointer.y - state.pointer.y);
-    const isMouseMoving = mouseDelta > 0.001;
+    const mouseVelX = state.pointer.x - prevMouseRef.current.x;
+    const mouseVelY = state.pointer.y - prevMouseRef.current.y;
+    mouseVelRef.current.x = THREE.MathUtils.lerp(mouseVelRef.current.x, mouseVelX, 0.1);
+    mouseVelRef.current.y = THREE.MathUtils.lerp(mouseVelRef.current.y, mouseVelY, 0.1);
+    prevMouseRef.current.x = state.pointer.x;
+    prevMouseRef.current.y = state.pointer.y;
+    
+    const mouseSpeed = Math.sqrt(mouseVelRef.current.x * mouseVelRef.current.x + mouseVelRef.current.y * mouseVelRef.current.y);
+    const isMouseMoving = mouseSpeed > 0.002;
+    
     materialRef.current.uniforms.uMouseActive.value = THREE.MathUtils.lerp(
       materialRef.current.uniforms.uMouseActive.value,
       isMouseMoving ? 1.0 : 0.0,
-      0.05
+      0.08
     );
     const mouseActive = materialRef.current.uniforms.uMouseActive.value;
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
 
-      // Gentle drift
       posArray[idx] += velocities[idx];
       posArray[idx + 1] += velocities[idx + 1];
       posArray[idx + 2] += velocities[idx + 2];
@@ -2052,44 +2261,40 @@ export default function ParticleNetwork() {
       const dy = my - py;
       const distToMouse = Math.sqrt(dx * dx + dy * dy);
 
-      if (distToMouse < 10.0) {
-        if (mouseActive > 0.3) {
-          // MOUSE MOVING: SCATTER particles away
-          const scatterForce = (10.0 - distToMouse) * 0.015 * mouseActive;
-          posArray[idx] -= (dx / distToMouse) * scatterForce;
-          posArray[idx + 1] -= (dy / distToMouse) * scatterForce;
+      if (distToMouse < 12.0) {
+        if (mouseActive > 0.2) {
+          const scatterForce = (12.0 - distToMouse) * 0.025 * mouseActive;
+          posArray[idx] -= (dx / (distToMouse + 0.1)) * scatterForce;
+          posArray[idx + 1] -= (dy / (distToMouse + 0.1)) * scatterForce;
         } else {
-          // MOUSE STILL: ATTRACT and ORBIT in small circles
-          if (distToMouse > 0.5) {
-            const attractStrength = 0.004;
-            posArray[idx] += (dx / distToMouse) * attractStrength;
-            posArray[idx + 1] += (dy / distToMouse) * attractStrength;
+          if (distToMouse > 1.0) {
+            const attractStrength = 0.006;
+            posArray[idx] += (dx / (distToMouse + 0.1)) * attractStrength;
+            posArray[idx + 1] += (dy / (distToMouse + 0.1)) * attractStrength;
             
-            // Small circular orbit
-            const orbitSpeed = 0.012;
-            const tangentX = -dy / distToMouse;
-            const tangentY = dx / distToMouse;
-            posArray[idx] += tangentX * orbitSpeed * (10.0 - distToMouse);
-            posArray[idx + 1] += tangentY * orbitSpeed * (10.0 - distToMouse);
+            const orbitSpeed = 0.02;
+            const tangentX = -dy / (distToMouse + 0.1);
+            const tangentY = dx / (distToMouse + 0.1);
+            const orbitStrength = Math.min(1.0, 12.0 / (distToMouse + 1.0));
+            posArray[idx] += tangentX * orbitSpeed * orbitStrength;
+            posArray[idx + 1] += tangentY * orbitSpeed * orbitStrength;
           }
         }
       }
 
-      // Soft boundaries
-      if (Math.abs(posArray[idx]) > 18) {
-        posArray[idx] *= 0.95;
-        velocities[idx] *= -0.5;
+      if (Math.abs(posArray[idx]) > 22) {
+        posArray[idx] *= 0.98;
+        velocities[idx] *= -0.3;
       }
-      if (Math.abs(posArray[idx + 1]) > 7) {
-        posArray[idx + 1] *= 0.95;
-        velocities[idx + 1] *= -0.5;
+      if (Math.abs(posArray[idx + 1]) > 8) {
+        posArray[idx + 1] *= 0.98;
+        velocities[idx + 1] *= -0.3;
       }
-      if (posArray[idx + 2] > -3 || posArray[idx + 2] < -28) {
-        velocities[idx + 2] *= -0.5;
+      if (posArray[idx + 2] > -2 || posArray[idx + 2] < -35) {
+        velocities[idx + 2] *= -0.3;
       }
     }
 
-    // Update line positions
     for (let i = 0; i < connectionIndices.length; i++) {
       const particleIdx = connectionIndices[i];
       const p3 = particleIdx * 3;
@@ -2108,14 +2313,16 @@ export default function ParticleNetwork() {
     uniform float uMouseActive;
     varying float vAlpha;
     varying float vMouseActive;
+    varying float vDist;
     
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
-      float twinkle = 0.4 + 0.35 * sin(uTime * 1.5 + position.x * 8.0);
+      float twinkle = 0.35 + 0.4 * sin(uTime * 1.2 + position.x * 6.0 + position.y * 4.0);
       vAlpha = twinkle;
       vMouseActive = uMouseActive;
-      gl_PointSize = aSize * (20.0 / -mvPosition.z);
+      vDist = length(position.xy);
+      gl_PointSize = aSize * (25.0 / max(2.0, -mvPosition.z));
     }
   `;
 
@@ -2123,25 +2330,29 @@ export default function ParticleNetwork() {
     uniform vec3 uColor;
     varying float vAlpha;
     varying float vMouseActive;
+    varying float vDist;
     
     void main() {
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = length(coord);
       if (dist > 0.5) discard;
-      float alpha = smoothstep(0.5, 0.12, dist) * vAlpha;
       
-      // Color shifts when mouse is active
-      vec3 calmColor = mix(vec3(1.0, 0.85, 0.85), vec3(1.0, 0.5, 0.5), smoothstep(0.0, 0.35, dist));
-      vec3 activeColor = mix(vec3(1.0, 0.6, 0.6), vec3(1.0, 0.2, 0.3), smoothstep(0.0, 0.35, dist));
+      float core = smoothstep(0.5, 0.0, dist);
+      float glow = smoothstep(0.5, 0.15, dist) * 0.5;
+      float alpha = (core + glow) * vAlpha;
+      
+      vec3 calmColor = mix(vec3(1.0, 0.80, 0.80), vec3(1.0, 0.45, 0.45), smoothstep(0.0, 0.4, dist));
+      vec3 activeColor = mix(vec3(1.0, 0.55, 0.55), vec3(1.0, 0.15, 0.25), smoothstep(0.0, 0.4, dist));
       vec3 color = mix(calmColor, activeColor, vMouseActive);
       
-      gl_FragColor = vec4(color, alpha * 0.60);
+      color = mix(color, vec3(1.0, 0.3, 0.3), smoothstep(10.0, 25.0, vDist) * 0.3);
+      
+      gl_FragColor = vec4(color, alpha * 0.65);
     }
   `;
 
   return (
     <group>
-      {/* Particle points */}
       <points ref={pointsRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[positions, 3]} />
@@ -2158,12 +2369,11 @@ export default function ParticleNetwork() {
         />
       </points>
 
-      {/* Connection lines - subtle */}
       <lineSegments ref={linesRef} geometry={lineGeometry}>
         <lineBasicMaterial
-          color="#881122"
+          color="#441111"
           transparent
-          opacity={0.06}
+          opacity={0.015}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -2195,9 +2405,9 @@ export default function PostProcessing() {
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(size.width, size.height),
-      0.18,
-      0.26,
-      0.53
+      0.32,
+      0.35,
+      0.40
     );
 
     const outputPass = new OutputPass();
@@ -2262,11 +2472,11 @@ export default function Scene({ scrollProgress }: SceneProps) {
           alpha: false,
           powerPreference: isMobile ? "default" : "high-performance",
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.82,
+          toneMappingExposure: 1.0,
         }}
         camera={{
-          position: [0, 2.3, 8.8],
-          fov: 48,
+          position: [0, 2.0, 9.5],
+          fov: 50,
           near: 0.1,
           far: 300,
         }}
@@ -2275,20 +2485,23 @@ export default function Scene({ scrollProgress }: SceneProps) {
 
         <color attach="background" args={["#000000"]} />
         
-        {/* Lighting - brighter for visibility */}
-        <ambientLight intensity={0.06} color="#0a0002" />
+        <ambientLight intensity={0.03} color="#0a0002" />
 
-        {/* Main scene lights */}
-        <pointLight position={[5, 3, 5]} intensity={1.6} color="#ff1744" distance={60} decay={2} />
-        <pointLight position={[-5, 4, -5]} intensity={1.1} color="#ff4444" distance={50} decay={2} />
-        <pointLight position={[0, -2, 8]} intensity={1.1} color="#800010" distance={40} decay={2} />
-        <pointLight position={[12, 8, -20]} intensity={2.0} color="#ff1744" distance={80} decay={2} />
-        <spotLight position={[3, 6, 4]} angle={0.5} penumbra={0.8} intensity={1.0} color="#ff1744" distance={50} />
-        <pointLight position={[0.8, -1.5, 0]} intensity={1.4} color="#ff1744" distance={12} decay={2} />
-
-        {/* Fill light for laptop area */}
-        <pointLight position={[2, 0.5, 0]} intensity={0.8} color="#ff1744" distance={10} decay={2} />
-        <pointLight position={[-1, 1, 2]} intensity={0.5} color="#ff8a80" distance={8} decay={2} />
+        <pointLight position={[5, 4, 6]} intensity={2.2} color="#ff1744" distance={70} decay={2} />
+        <pointLight position={[-5, 5, -4]} intensity={1.4} color="#ff4444" distance={55} decay={2} />
+        <pointLight position={[0, -1, 10]} intensity={1.6} color="#800010" distance={45} decay={2} />
+        <pointLight position={[14, 10, -22]} intensity={2.8} color="#ff1744" distance={90} decay={2} />
+        <spotLight position={[4, 7, 5]} angle={0.5} penumbra={0.8} intensity={1.4} color="#ff1744" distance={55} />
+        
+        <pointLight position={[0.8, -1.0, 0]} intensity={2.2} color="#ff1744" distance={14} decay={2} />
+        <pointLight position={[-2, -0.3, 2]} intensity={1.0} color="#cc1133" distance={10} decay={2} />
+        <pointLight position={[0, -1.5, 5]} intensity={1.5} color="#660010" distance={20} decay={2} />
+        
+        <pointLight position={[2.5, 1.0, 0.5]} intensity={1.4} color="#ff1744" distance={12} decay={2} />
+        <pointLight position={[-1, 1.5, 3]} intensity={0.7} color="#ff8a80" distance={10} decay={2} />
+        
+        <pointLight position={[0, 8, -30]} intensity={1.0} color="#ff1744" distance={60} decay={2} />
+        <pointLight position={[-8, 3, 2]} intensity={0.4} color="#ff3355" distance={30} decay={2} />
 
         <Suspense fallback={null}>
           <NebulaBackground />

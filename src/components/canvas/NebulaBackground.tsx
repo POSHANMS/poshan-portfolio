@@ -45,46 +45,46 @@ const nebulaFragmentShader = `
 
   void main() {
     vec2 uv = vUv;
-    float t = uTime * 0.015;
-    vec2 drift = vec2(t, -t * 0.6);
+    float t = uTime * 0.012;
+    vec2 drift = vec2(t, -t * 0.5);
 
-    float n1 = fbm(uv * 2.0 + drift);
-    float n2 = fbm(uv * 3.5 - drift * 1.3 + vec2(5.2, 1.3));
-    float n3 = fbm(uv * 6.0 + vec2(-t * 0.4, t * 0.5));
-    float n4 = fbm(uv * 9.0 + vec2(t * 0.2, -t * 0.3));
+    float n1 = fbm(uv * 1.8 + drift);
+    float n2 = fbm(uv * 3.2 - drift * 1.2 + vec2(5.2, 1.3));
+    float n3 = fbm(uv * 5.5 + vec2(-t * 0.3, t * 0.4));
+    float n4 = fbm(uv * 8.0 + vec2(t * 0.15, -t * 0.25));
 
     vec2 galaxyUv = uv - vec2(0.72, 0.68);
     float galaxyDist = length(galaxyUv);
     float galaxyAngle = atan(galaxyUv.y, galaxyUv.x);
-    float spiral = cos(galaxyAngle * 4.0 + galaxyDist * 14.0 - uTime * 0.1);
-    float galaxy = exp(-galaxyDist * galaxyDist * 30.0) * (0.5 + 0.5 * spiral);
-    float galaxyArms = exp(-galaxyDist * galaxyDist * 10.0) * pow(spiral * 0.5 + 0.5, 2.0);
+    float spiral = cos(galaxyAngle * 4.0 + galaxyDist * 12.0 - uTime * 0.08);
+    float galaxy = exp(-galaxyDist * galaxyDist * 25.0) * (0.5 + 0.5 * spiral);
+    float galaxyArms = exp(-galaxyDist * galaxyDist * 8.0) * pow(spiral * 0.5 + 0.5, 2.0);
 
-    float fog = pow(n1, 2.2) * 0.08 + pow(n2, 2.8) * 0.06 + pow(n3, 3.5) * 0.04 + pow(n4, 4.5) * 0.02;
-    fog += galaxy * 0.05 + galaxyArms * 0.03;
+    float fog = pow(n1, 2.0) * 0.10 + pow(n2, 2.5) * 0.08 + pow(n3, 3.2) * 0.06 + pow(n4, 4.0) * 0.03;
+    fog += galaxy * 0.06 + galaxyArms * 0.04;
 
-    float topMask = smoothstep(0.0, 0.12, uv.y);
-    float bottomFade = smoothstep(0.0, 0.45, uv.y);
-    float sideFade = smoothstep(0.0, 0.1, uv.x) * smoothstep(1.0, 0.9, uv.x);
+    float topMask = smoothstep(0.0, 0.10, uv.y);
+    float bottomFade = smoothstep(0.0, 0.50, uv.y);
+    float sideFade = smoothstep(0.0, 0.08, uv.x) * smoothstep(1.0, 0.92, uv.x);
     fog *= topMask * bottomFade * sideFade;
 
-    vec3 col1 = vec3(0.90, 0.05, 0.10) * pow(n1, 2.2) * 0.08;
-    vec3 col2 = vec3(0.55, 0.02, 0.06) * pow(n2, 2.8) * 0.06;
-    vec3 col3 = vec3(0.30, 0.0, 0.03) * pow(n3, 3.5) * 0.04;
-    vec3 col4 = vec3(0.20, 0.0, 0.02) * pow(n4, 4.5) * 0.02;
-    vec3 col5 = vec3(1.0, 0.08, 0.18) * galaxy * 0.05;
-    vec3 col6 = vec3(0.80, 0.05, 0.12) * galaxyArms * 0.03;
+    vec3 col1 = vec3(1.0, 0.06, 0.12) * pow(n1, 2.0) * 0.10;
+    vec3 col2 = vec3(0.65, 0.02, 0.06) * pow(n2, 2.5) * 0.08;
+    vec3 col3 = vec3(0.35, 0.0, 0.03) * pow(n3, 3.2) * 0.06;
+    vec3 col4 = vec3(0.22, 0.0, 0.02) * pow(n4, 4.0) * 0.03;
+    vec3 col5 = vec3(1.0, 0.10, 0.20) * galaxy * 0.06;
+    vec3 col6 = vec3(0.85, 0.06, 0.14) * galaxyArms * 0.04;
 
     vec3 color = col1 + col2 + col3 + col4 + col5 + col6;
 
-    float horizon = exp(-pow(uv.y - 0.22, 2.0) * 40.0);
-    color += vec3(0.60, 0.03, 0.08) * horizon * 0.05;
+    float horizon = exp(-pow(uv.y - 0.20, 2.0) * 35.0);
+    color += vec3(0.70, 0.03, 0.08) * horizon * 0.06;
     
-    float upperGlow = exp(-pow(uv.y - 0.75, 2.0) * 15.0) * 0.5;
-    color += vec3(0.40, 0.02, 0.05) * upperGlow * 0.03;
+    float upperGlow = exp(-pow(uv.y - 0.70, 2.0) * 12.0) * 0.4;
+    color += vec3(0.45, 0.02, 0.05) * upperGlow * 0.04;
 
-    float alpha = clamp(fog * 0.04 + galaxy * 0.02 + galaxyArms * 0.015 + horizon * 0.015, 0.0, 0.06);
-    alpha *= smoothstep(0.0, 0.1, uv.y);
+    float alpha = clamp(fog * 0.06 + galaxy * 0.03 + galaxyArms * 0.02 + horizon * 0.02, 0.0, 0.08);
+    alpha *= smoothstep(0.0, 0.08, uv.y);
 
     gl_FragColor = vec4(color, alpha);
   }
@@ -109,8 +109,8 @@ export default function NebulaBackground() {
   });
 
   return (
-    <mesh position={[0, 2, -50]} renderOrder={-100}>
-      <planeGeometry args={[120, 70]} />
+    <mesh position={[0, 1, -45]} renderOrder={-100}>
+      <planeGeometry args={[100, 60]} />
       <shaderMaterial
         ref={materialRef}
         vertexShader={nebulaVertexShader}
