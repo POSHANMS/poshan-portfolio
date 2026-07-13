@@ -8,7 +8,7 @@ export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const linesRef = useRef<THREE.LineSegments>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 350;
+  const particleCount = 400;
 
   const [positions, velocities, sizes, connectionIndices] = useMemo(() => {
     const pos = new Float32Array(particleCount * 3);
@@ -18,32 +18,29 @@ export default function ParticleNetwork() {
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
-      // Spread in mid-ground
-      pos[idx] = (Math.random() - 0.5) * 30;
-      pos[idx + 1] = (Math.random() - 0.5) * 10;
-      pos[idx + 2] = -6 - Math.random() * 22;
+      pos[idx] = (Math.random() - 0.5) * 40;
+      pos[idx + 1] = (Math.random() - 0.5) * 12;
+      pos[idx + 2] = -8 - Math.random() * 28;
       
-      // Very slow drift
-      vel[idx] = (Math.random() - 0.5) * 0.004;
-      vel[idx + 1] = (Math.random() - 0.5) * 0.004;
+      vel[idx] = (Math.random() - 0.5) * 0.003;
+      vel[idx + 1] = (Math.random() - 0.5) * 0.003;
       vel[idx + 2] = (Math.random() - 0.5) * 0.001;
       
-      sz[i] = 0.08 + Math.random() * 0.30;
+      sz[i] = 0.06 + Math.random() * 0.35;
     }
 
-    // Create connections between close particles
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
       let connectionsMade = 0;
       
-      for (let j = i + 1; j < particleCount && connectionsMade < 2; j++) {
+      for (let j = i + 1; j < particleCount && connectionsMade < 1; j++) {
         const j3 = j * 3;
         const dx = pos[i3] - pos[j3];
         const dy = pos[i3 + 1] - pos[j3 + 1];
         const dz = pos[i3 + 2] - pos[j3 + 2];
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         
-        if (dist < 4.5) {
+        if (dist < 5.0) {
           connections.push(i, j);
           connectionsMade++;
         }
@@ -79,6 +76,9 @@ export default function ParticleNetwork() {
     []
   );
 
+  const prevMouseRef = useRef({ x: 0, y: 0 });
+  const mouseVelRef = useRef({ x: 0, y: 0 });
+
   useFrame((state) => {
     if (!pointsRef.current || !materialRef.current || !linesRef.current) return;
 
@@ -90,34 +90,40 @@ export default function ParticleNetwork() {
     const linePosAttr = lineGeo.attributes.position;
     const linePosArray = linePosAttr.array as Float32Array;
     
-    const targetX = state.pointer.x * 12;
-    const targetY = state.pointer.y * 8;
+    const targetX = state.pointer.x * 15;
+    const targetY = state.pointer.y * 10;
 
     materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
     materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(
-      materialRef.current.uniforms.uMouse.value.x, targetX, 0.07
+      materialRef.current.uniforms.uMouse.value.x, targetX, 0.06
     );
     materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(
-      materialRef.current.uniforms.uMouse.value.y, targetY, 0.07
+      materialRef.current.uniforms.uMouse.value.y, targetY, 0.06
     );
 
     const mx = materialRef.current.uniforms.uMouse.value.x;
     const my = materialRef.current.uniforms.uMouse.value.y;
     
-    // Detect mouse movement for scatter effect
-    const mouseDelta = Math.abs(state.pointer.x - state.pointer.x) + Math.abs(state.pointer.y - state.pointer.y);
-    const isMouseMoving = mouseDelta > 0.001;
+    const mouseVelX = state.pointer.x - prevMouseRef.current.x;
+    const mouseVelY = state.pointer.y - prevMouseRef.current.y;
+    mouseVelRef.current.x = THREE.MathUtils.lerp(mouseVelRef.current.x, mouseVelX, 0.1);
+    mouseVelRef.current.y = THREE.MathUtils.lerp(mouseVelRef.current.y, mouseVelY, 0.1);
+    prevMouseRef.current.x = state.pointer.x;
+    prevMouseRef.current.y = state.pointer.y;
+    
+    const mouseSpeed = Math.sqrt(mouseVelRef.current.x * mouseVelRef.current.x + mouseVelRef.current.y * mouseVelRef.current.y);
+    const isMouseMoving = mouseSpeed > 0.002;
+    
     materialRef.current.uniforms.uMouseActive.value = THREE.MathUtils.lerp(
       materialRef.current.uniforms.uMouseActive.value,
       isMouseMoving ? 1.0 : 0.0,
-      0.05
+      0.08
     );
     const mouseActive = materialRef.current.uniforms.uMouseActive.value;
 
     for (let i = 0; i < particleCount; i++) {
       const idx = i * 3;
 
-      // Gentle drift
       posArray[idx] += velocities[idx];
       posArray[idx + 1] += velocities[idx + 1];
       posArray[idx + 2] += velocities[idx + 2];
@@ -130,44 +136,40 @@ export default function ParticleNetwork() {
       const dy = my - py;
       const distToMouse = Math.sqrt(dx * dx + dy * dy);
 
-      if (distToMouse < 10.0) {
-        if (mouseActive > 0.3) {
-          // MOUSE MOVING: SCATTER particles away
-          const scatterForce = (10.0 - distToMouse) * 0.015 * mouseActive;
-          posArray[idx] -= (dx / distToMouse) * scatterForce;
-          posArray[idx + 1] -= (dy / distToMouse) * scatterForce;
+      if (distToMouse < 12.0) {
+        if (mouseActive > 0.2) {
+          const scatterForce = (12.0 - distToMouse) * 0.025 * mouseActive;
+          posArray[idx] -= (dx / (distToMouse + 0.1)) * scatterForce;
+          posArray[idx + 1] -= (dy / (distToMouse + 0.1)) * scatterForce;
         } else {
-          // MOUSE STILL: ATTRACT and ORBIT in small circles
-          if (distToMouse > 0.5) {
-            const attractStrength = 0.004;
-            posArray[idx] += (dx / distToMouse) * attractStrength;
-            posArray[idx + 1] += (dy / distToMouse) * attractStrength;
+          if (distToMouse > 1.0) {
+            const attractStrength = 0.006;
+            posArray[idx] += (dx / (distToMouse + 0.1)) * attractStrength;
+            posArray[idx + 1] += (dy / (distToMouse + 0.1)) * attractStrength;
             
-            // Small circular orbit
-            const orbitSpeed = 0.012;
-            const tangentX = -dy / distToMouse;
-            const tangentY = dx / distToMouse;
-            posArray[idx] += tangentX * orbitSpeed * (10.0 - distToMouse);
-            posArray[idx + 1] += tangentY * orbitSpeed * (10.0 - distToMouse);
+            const orbitSpeed = 0.02;
+            const tangentX = -dy / (distToMouse + 0.1);
+            const tangentY = dx / (distToMouse + 0.1);
+            const orbitStrength = Math.min(1.0, 12.0 / (distToMouse + 1.0));
+            posArray[idx] += tangentX * orbitSpeed * orbitStrength;
+            posArray[idx + 1] += tangentY * orbitSpeed * orbitStrength;
           }
         }
       }
 
-      // Soft boundaries
-      if (Math.abs(posArray[idx]) > 18) {
-        posArray[idx] *= 0.95;
-        velocities[idx] *= -0.5;
+      if (Math.abs(posArray[idx]) > 22) {
+        posArray[idx] *= 0.98;
+        velocities[idx] *= -0.3;
       }
-      if (Math.abs(posArray[idx + 1]) > 7) {
-        posArray[idx + 1] *= 0.95;
-        velocities[idx + 1] *= -0.5;
+      if (Math.abs(posArray[idx + 1]) > 8) {
+        posArray[idx + 1] *= 0.98;
+        velocities[idx + 1] *= -0.3;
       }
-      if (posArray[idx + 2] > -3 || posArray[idx + 2] < -28) {
-        velocities[idx + 2] *= -0.5;
+      if (posArray[idx + 2] > -2 || posArray[idx + 2] < -35) {
+        velocities[idx + 2] *= -0.3;
       }
     }
 
-    // Update line positions
     for (let i = 0; i < connectionIndices.length; i++) {
       const particleIdx = connectionIndices[i];
       const p3 = particleIdx * 3;
@@ -186,14 +188,16 @@ export default function ParticleNetwork() {
     uniform float uMouseActive;
     varying float vAlpha;
     varying float vMouseActive;
+    varying float vDist;
     
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
-      float twinkle = 0.4 + 0.35 * sin(uTime * 1.5 + position.x * 8.0);
+      float twinkle = 0.35 + 0.4 * sin(uTime * 1.2 + position.x * 6.0 + position.y * 4.0);
       vAlpha = twinkle;
       vMouseActive = uMouseActive;
-      gl_PointSize = aSize * (20.0 / -mvPosition.z);
+      vDist = length(position.xy);
+      gl_PointSize = aSize * (25.0 / max(2.0, -mvPosition.z));
     }
   `;
 
@@ -201,25 +205,29 @@ export default function ParticleNetwork() {
     uniform vec3 uColor;
     varying float vAlpha;
     varying float vMouseActive;
+    varying float vDist;
     
     void main() {
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = length(coord);
       if (dist > 0.5) discard;
-      float alpha = smoothstep(0.5, 0.12, dist) * vAlpha;
       
-      // Color shifts when mouse is active
-      vec3 calmColor = mix(vec3(1.0, 0.85, 0.85), vec3(1.0, 0.5, 0.5), smoothstep(0.0, 0.35, dist));
-      vec3 activeColor = mix(vec3(1.0, 0.6, 0.6), vec3(1.0, 0.2, 0.3), smoothstep(0.0, 0.35, dist));
+      float core = smoothstep(0.5, 0.0, dist);
+      float glow = smoothstep(0.5, 0.15, dist) * 0.5;
+      float alpha = (core + glow) * vAlpha;
+      
+      vec3 calmColor = mix(vec3(1.0, 0.80, 0.80), vec3(1.0, 0.45, 0.45), smoothstep(0.0, 0.4, dist));
+      vec3 activeColor = mix(vec3(1.0, 0.55, 0.55), vec3(1.0, 0.15, 0.25), smoothstep(0.0, 0.4, dist));
       vec3 color = mix(calmColor, activeColor, vMouseActive);
       
-      gl_FragColor = vec4(color, alpha * 0.60);
+      color = mix(color, vec3(1.0, 0.3, 0.3), smoothstep(10.0, 25.0, vDist) * 0.3);
+      
+      gl_FragColor = vec4(color, alpha * 0.65);
     }
   `;
 
   return (
     <group>
-      {/* Particle points */}
       <points ref={pointsRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[positions, 3]} />
@@ -236,12 +244,11 @@ export default function ParticleNetwork() {
         />
       </points>
 
-      {/* Connection lines - subtle */}
       <lineSegments ref={linesRef} geometry={lineGeometry}>
         <lineBasicMaterial
-          color="#881122"
+          color="#661122"
           transparent
-          opacity={0.06}
+          opacity={0.04}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
