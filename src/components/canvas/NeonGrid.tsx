@@ -28,43 +28,46 @@ const gridFragmentShader = `
     vec2 worldXZ = vWorldPosition.xz;
     float dist = length(worldXZ);
     
-    float cellSize = 2.0 + dist * 0.06;
+    // Crisp grid cells, size = 2.0 units
+    float cellSize = 2.0;
     vec2 gridCoord = worldXZ / cellSize;
     vec2 gridFract = fract(gridCoord);
     vec2 lineDist = abs(gridFract - 0.5) * 2.0;
     
-    float perspectiveFade = 1.0 - smoothstep(5.0, 30.0, dist);
-    float nearFade = smoothstep(0.0, 4.0, dist);
+    float perspectiveFade = 1.0 - smoothstep(12.0, 50.0, dist);
     
-    float lineWidth = 0.002 + 0.003 * perspectiveFade;
-    float majorLineWidth = 0.006 + 0.008 * perspectiveFade;
+    // Very thin hairline grid lines
+    float lineWidth = 0.008 * perspectiveFade;
+    float majorLineWidth = 0.018 * perspectiveFade;
     
-    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.x);
-    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.y);
+    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.004, lineDist.x);
+    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.004, lineDist.y);
     float regularLine = max(lineX, lineZ);
     
+    // Major lines every 5 cells
     float majorCellSize = cellSize * 5.0;
     vec2 majorCoord = worldXZ / majorCellSize;
     vec2 majorFract = fract(majorCoord);
     vec2 majorDist = abs(majorFract - 0.5) * 2.0;
-    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.015, majorDist.x);
-    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.015, majorDist.y);
+    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.008, majorDist.x);
+    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.008, majorDist.y);
     float majorLine = max(majorX, majorZ);
     
-    float pulseSpeed = 1.8;
+    // Pulse animation lines
+    float pulseSpeed = 1.5;
     float pulseX = sin(gridCoord.x * 6.283 + uTime * pulseSpeed) * 0.5 + 0.5;
-    float pulseZ = sin(gridCoord.y * 6.283 + uTime * pulseSpeed * 0.7 + 1.5) * 0.5 + 0.5;
-    float dataPulse = max(pulseX * lineX, pulseZ * lineZ) * 0.35;
+    float pulseZ = sin(gridCoord.y * 6.283 + uTime * pulseSpeed * 0.7 + 1.0) * 0.5 + 0.5;
+    float dataPulse = max(pulseX * lineX, pulseZ * lineZ) * 0.22;
     
-    float gridPattern = max(regularLine * 0.10, majorLine * 0.22) * perspectiveFade;
+    float gridPattern = max(regularLine * 0.15, majorLine * 0.35) * perspectiveFade;
     gridPattern += dataPulse * perspectiveFade;
     
-    float nodeGlow = exp(-length(lineDist) * 8.0) * 0.12 * perspectiveFade;
+    float nodeGlow = exp(-length(lineDist) * 9.0) * 0.06 * perspectiveFade;
     
-    float horizonFade = 1.0 - smoothstep(4.0, 35.0, dist);
-    float heightFade = smoothstep(-0.5, 0.0, vWorldPosition.y + 2.0);
+    float horizonFade = 1.0 - smoothstep(5.0, 40.0, dist);
+    float heightFade = smoothstep(-0.5, 0.0, vWorldPosition.y + 2.2);
     
-    float centerGlow = exp(-dist * dist * 0.12) * 0.05;
+    float centerGlow = exp(-dist * dist * 0.08) * 0.04;
     
     vec3 baseColor = vec3(0.35, 0.03, 0.08);
     vec3 pulseColor = vec3(0.80, 0.06, 0.15);
@@ -72,13 +75,13 @@ const gridFragmentShader = `
     vec3 nodeColor = vec3(0.90, 0.08, 0.18);
     
     vec3 color = mix(baseColor, majorColor, majorLine) * gridPattern;
-    color += pulseColor * dataPulse * 0.6;
+    color += pulseColor * dataPulse * 0.5;
     color += nodeColor * nodeGlow;
     color += vec3(0.60, 0.03, 0.08) * centerGlow;
-    color += vec3(0.08, 0.005, 0.015) * horizonFade * 0.4;
+    color += vec3(0.08, 0.005, 0.015) * horizonFade * 0.3;
     
-    float alpha = (gridPattern + nodeGlow * 0.3 + centerGlow) * horizonFade * heightFade * nearFade;
-    alpha = clamp(alpha, 0.0, 0.22);
+    float alpha = (gridPattern + nodeGlow * 0.25 + centerGlow) * horizonFade * heightFade;
+    alpha = clamp(alpha, 0.0, 0.45);
     
     gl_FragColor = vec4(color, alpha);
   }
@@ -101,7 +104,8 @@ export default function NeonGrid() {
   });
 
   return (
-    <group position={[0, -2.15, 0]}>
+    <group position={[0, -2.14, 0]}>
+      {/* Primary Grid Mesh */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[200, 200, 1, 1]} />
         <shaderMaterial
@@ -116,23 +120,24 @@ export default function NeonGrid() {
         />
       </mesh>
       
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]}>
-        <planeGeometry args={[50, 50]} />
+      {/* Dark background base floor plane to prevent lookthrough */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+        <planeGeometry args={[100, 100]} />
         <meshBasicMaterial
-          color="#0a0002"
+          color="#020001"
           transparent
-          opacity={0.25}
-          blending={THREE.AdditiveBlending}
+          opacity={0.35}
           depthWrite={false}
         />
       </mesh>
       
-      <mesh position={[0, -2.14, -25]} rotation={[0, 0, 0]}>
-        <planeGeometry args={[100, 0.3]} />
+      {/* Horizon Accent line */}
+      <mesh position={[0, 0.01, -30]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[120, 0.2]} />
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.04}
+          opacity={0.03}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />

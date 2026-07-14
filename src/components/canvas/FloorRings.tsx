@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
 export default function FloorRings() {
@@ -85,6 +85,9 @@ export default function FloorRings() {
     return ripples;
   }, []);
 
+  const { viewport } = useThree();
+  const laptopX = Math.max(0.8, viewport.width * 0.08);
+
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     
@@ -92,13 +95,13 @@ export default function FloorRings() {
       ringsRef.current.children.forEach((child, i) => {
         const line = child as THREE.Line;
         if (line && line.scale) {
-          const heartbeat = 1.0 + Math.sin(t * 0.5 + i * 0.35) * 0.015;
+          const heartbeat = 1.0 + Math.sin(t * 0.85 + i * 0.45) * 0.035;
           line.scale.set(heartbeat, heartbeat, heartbeat);
         }
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
           const baseOpacity = Math.max(0.06, 0.18 - i * 0.01);
-          mat.opacity = baseOpacity + Math.sin(t * 0.35 + i * 0.7) * 0.04;
+          mat.opacity = baseOpacity + Math.sin(t * 0.55 + i * 0.65) * 0.06;
         }
       });
     }
@@ -108,7 +111,7 @@ export default function FloorRings() {
         const line = child as THREE.Line;
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
-          mat.opacity = 0.06 + Math.sin(t * 0.6 + i * 1.0) * 0.03;
+          mat.opacity = 0.06 + Math.sin(t * 0.7 + i * 1.0) * 0.04;
         }
       });
     }
@@ -117,12 +120,12 @@ export default function FloorRings() {
       energyRef.current.children.forEach((child, i) => {
         const line = child as THREE.Line;
         if (line) {
-          const speed = 0.35 + i * 0.12;
+          const speed = 0.42 + i * 0.15;
           line.rotation.y = t * speed + i * 1.8;
         }
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
-          mat.opacity = 0.35 + Math.sin(t * 2.5 + i * 2.0) * 0.15;
+          mat.opacity = 0.35 + Math.sin(t * 2.8 + i * 2.0) * 0.18;
         }
       });
     }
@@ -132,9 +135,9 @@ export default function FloorRings() {
         const mesh = child as THREE.Mesh;
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshBasicMaterial;
-          const pulse = Math.sin(t * 0.4 + i * 1.2) * 0.5 + 0.5;
-          mat.opacity = 0.04 + pulse * 0.08;
-          const scale = 1.0 + pulse * 0.6;
+          const pulse = Math.sin(t * 0.5 + i * 1.2) * 0.5 + 0.5;
+          mat.opacity = 0.04 + pulse * 0.10;
+          const scale = 1.0 + pulse * 0.7;
           mesh.scale.set(scale, scale, scale);
         }
       });
@@ -142,7 +145,7 @@ export default function FloorRings() {
   });
 
   return (
-    <group position={[0.8, -2.12, 0]}>
+    <group position={[laptopX + 0.2, -2.14, -1.24]}>
       <group ref={ringsRef}>
         {ringGeometries.map((geometry, i) => (
           <primitive 
