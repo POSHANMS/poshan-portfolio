@@ -11,7 +11,7 @@ import NeonGrid from "./NeonGrid";
 import FloatingLaptop from "./FloatingLaptop";
 import TechCubes from "./TechCubes";
 import DeepSpaceGlobe from "./DeepSpaceGlobe";
-import ParticleNetwork from "./ParticleNetwork";
+import MagneticParticles from "./MagneticParticles";
 import VolumetricRays from "./VolumetricRays";
 import FloatingHexParticles from "./FloatingHexParticles";
 import PostProcessing from "./PostProcessing";
@@ -70,7 +70,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
           <StarField />
           <DeepSpaceGlobe />
           <VolumetricRays />
-          <ParticleNetwork />
+          <MagneticParticles />
           <FloatingHexParticles />
           <TechCubes />
           <FloatingLaptop />

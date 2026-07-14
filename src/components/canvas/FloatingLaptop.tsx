@@ -75,6 +75,8 @@ export default function FloatingLaptop() {
       <group ref={bobRef}>
         <primitive object={scene} scale={1.15} />
 
+        {/* Screen glow plane — commented out, was visually dissecting through the laptop */}
+        {/*
         <mesh position={[0.2, 0.78, -0.72]} rotation={[0.05, 0, 0]}>
           <planeGeometry args={[2.2, 1.35]} />
           <meshBasicMaterial
@@ -85,7 +87,10 @@ export default function FloatingLaptop() {
             depthWrite={false}
           />
         </mesh>
+        */}
 
+        {/* Keyboard glow plane — commented out, was dissecting the keyboard visually */}
+        {/*
         <mesh position={[0.36, -0.28, 0.22]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[2.5, 1.0]} />
           <meshBasicMaterial
@@ -96,7 +101,9 @@ export default function FloatingLaptop() {
             depthWrite={false}
           />
         </mesh>
+        */}
 
+        {/* 
         <mesh position={[0.32, -0.9, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[2.35, 72]} />
           <meshBasicMaterial
@@ -118,6 +125,7 @@ export default function FloatingLaptop() {
             depthWrite={false}
           />
         </mesh>
+        */}
 
         <pointLight position={[0, 1.8, -1.2]}   intensity={4.5} distance={12} color="#ff1744" decay={2} />
         <pointLight position={[-2.1, 0.65, 0.45]} intensity={2.8} distance={9}  color="#ff1744" decay={2} />

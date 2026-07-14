@@ -1841,6 +1841,146 @@ export default function HeroName3D({ stageScale = 1 }: { stageScale?: number }) 
 }
 ```
 
+## File: `src/components/canvas/MagneticParticles.tsx`
+
+```typescript
+"use client";
+
+import React, { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+
+export default function ParticleNetwork() {
+  const pointsRef = useRef<THREE.Points>(null);
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
+  const particleCount = 3000;
+
+  const [positions, velocities, sizes] = useMemo(() => {
+    const pos = new Float32Array(particleCount * 3);
+    const vel = new Float32Array(particleCount * 3);
+    const sz = new Float32Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      const idx = i * 3;
+      pos[idx] = (Math.random() - 0.5) * 26;
+      pos[idx + 1] = (Math.random() - 0.5) * 16;
+      pos[idx + 2] = (Math.random() - 0.5) * 11;
+      vel[idx] = (Math.random() - 0.5) * 0.01;
+      vel[idx + 1] = (Math.random() - 0.5) * 0.01;
+      vel[idx + 2] = (Math.random() - 0.5) * 0.004;
+      sz[i] = 0.18 + Math.random() * 0.84;
+    }
+
+    return [pos, vel, sz];
+  }, []);
+
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uMouse: { value: new THREE.Vector2(0, 0) },
+      uColor: { value: new THREE.Color("#ff1744") },
+    }),
+    []
+  );
+
+  useFrame((state) => {
+    if (!pointsRef.current || !materialRef.current) return;
+
+    const geo = pointsRef.current.geometry;
+    const posAttr = geo.attributes.position;
+    const posArray = posAttr.array as Float32Array;
+    const targetX = state.pointer.x * 10.5;
+    const targetY = state.pointer.y * 6.4;
+
+    materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
+    materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.x, targetX, 0.09);
+    materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.y, targetY, 0.09);
+
+    const mx = materialRef.current.uniforms.uMouse.value.x;
+    const my = materialRef.current.uniforms.uMouse.value.y;
+
+    for (let i = 0; i < particleCount; i++) {
+      const idx = i * 3;
+
+      posArray[idx] += velocities[idx];
+      posArray[idx + 1] += velocities[idx + 1];
+      posArray[idx + 2] += velocities[idx + 2];
+
+      const px = posArray[idx];
+      const py = posArray[idx + 1];
+      const pz = posArray[idx + 2];
+
+      const dx = mx - px;
+      const dy = my - py;
+      const dz = -pz;
+      const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (distToMouse < 8.5 && distToMouse > 0.001) {
+        const dirX = dx / distToMouse;
+        const dirY = dy / distToMouse;
+        const dirZ = dz / distToMouse;
+
+        const tangentX = -dirY;
+        const tangentY = dirX;
+
+        const force = (8.5 - distToMouse) * 0.0042;
+        const drift = (8.5 - distToMouse) * 0.0032;
+
+        posArray[idx] += dirX * force + tangentX * drift;
+        posArray[idx + 1] += dirY * force + tangentY * drift;
+        posArray[idx + 2] += dirZ * force;
+      }
+
+      if (Math.abs(posArray[idx]) > 15) posArray[idx] = -posArray[idx];
+      if (Math.abs(posArray[idx + 1]) > 9) posArray[idx + 1] = -posArray[idx + 1];
+      if (Math.abs(posArray[idx + 2]) > 6.5) posArray[idx + 2] = -posArray[idx + 2];
+    }
+
+    posAttr.needsUpdate = true;
+  });
+
+  const vertexShader = `
+    attribute float aSize;
+    uniform float uTime;
+    void main() {
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mvPosition;
+      gl_PointSize = aSize * (18.0 / -mvPosition.z);
+    }
+  `;
+
+  const fragmentShader = `
+    uniform vec3 uColor;
+    void main() {
+      vec2 coord = gl_PointCoord - vec2(0.5);
+      float dist = length(coord);
+      if (dist > 0.5) discard;
+      float alpha = smoothstep(0.5, 0.02, dist);
+      vec3 color = mix(uColor, vec3(1.0, 0.18, 0.47), smoothstep(0.1, 0.5, coord.x + 0.5));
+      gl_FragColor = vec4(color, alpha * 0.72);
+    }
+  `;
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-aSize" args={[sizes, 1]} />
+      </bufferGeometry>
+      <shaderMaterial
+        ref={materialRef}
+        vertexShader={vertexShader}
+        fragmentShader={fragmentShader}
+        uniforms={uniforms}
+        transparent
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+}
+```
+
 ## File: `src/components/canvas/NebulaBackground.tsx`
 
 ```typescript
@@ -2120,269 +2260,6 @@ export default function NeonGrid() {
 }
 ```
 
-## File: `src/components/canvas/ParticleNetwork.tsx`
-
-```typescript
-"use client";
-
-import React, { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
-import * as THREE from "three";
-
-export default function ParticleNetwork() {
-  const pointsRef = useRef<THREE.Points>(null);
-  const linesRef = useRef<THREE.LineSegments>(null);
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 350;
-
-  const [positions, velocities, sizes, connectionIndices] = useMemo(() => {
-    const pos = new Float32Array(particleCount * 3);
-    const vel = new Float32Array(particleCount * 3);
-    const sz = new Float32Array(particleCount);
-    const connections: number[] = [];
-
-    for (let i = 0; i < particleCount; i++) {
-      const idx = i * 3;
-      pos[idx] = (Math.random() - 0.5) * 40;
-      pos[idx + 1] = (Math.random() - 0.5) * 12;
-      pos[idx + 2] = -8 - Math.random() * 28;
-      
-      vel[idx] = (Math.random() - 0.5) * 0.003;
-      vel[idx + 1] = (Math.random() - 0.5) * 0.003;
-      vel[idx + 2] = (Math.random() - 0.5) * 0.001;
-      
-      sz[i] = 0.06 + Math.random() * 0.35;
-    }
-
-    for (let i = 0; i < particleCount; i++) {
-      const i3 = i * 3;
-      let connectionsMade = 0;
-      
-      for (let j = i + 1; j < particleCount && connectionsMade < 1; j++) {
-        const j3 = j * 3;
-        const dx = pos[i3] - pos[j3];
-        const dy = pos[i3 + 1] - pos[j3 + 1];
-        const dz = pos[i3 + 2] - pos[j3 + 2];
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        
-        if (dist < 3.5) {
-          connections.push(i, j);
-          connectionsMade++;
-        }
-      }
-    }
-
-    return [pos, vel, sz, connections];
-  }, []);
-
-  const lineGeometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry();
-    const linePositions = new Float32Array(connectionIndices.length * 3);
-    
-    for (let i = 0; i < connectionIndices.length; i++) {
-      const particleIdx = connectionIndices[i];
-      const p3 = particleIdx * 3;
-      linePositions[i * 3] = positions[p3];
-      linePositions[i * 3 + 1] = positions[p3 + 1];
-      linePositions[i * 3 + 2] = positions[p3 + 2];
-    }
-    
-    geo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
-    return geo;
-  }, [connectionIndices, positions]);
-
-  const uniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uMouse: { value: new THREE.Vector2(0, 0) },
-      uMouseActive: { value: 0.0 },
-      uColor: { value: new THREE.Color("#ff4455") },
-    }),
-    []
-  );
-
-  const prevMouseRef = useRef({ x: 0, y: 0 });
-  const mouseVelRef = useRef({ x: 0, y: 0 });
-
-  useFrame((state) => {
-    if (!pointsRef.current || !materialRef.current || !linesRef.current) return;
-
-    const geo = pointsRef.current.geometry;
-    const posAttr = geo.attributes.position;
-    const posArray = posAttr.array as Float32Array;
-    
-    const lineGeo = linesRef.current.geometry;
-    const linePosAttr = lineGeo.attributes.position;
-    const linePosArray = linePosAttr.array as Float32Array;
-    
-    const targetX = state.pointer.x * 15;
-    const targetY = state.pointer.y * 10;
-
-    materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
-    materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(
-      materialRef.current.uniforms.uMouse.value.x, targetX, 0.06
-    );
-    materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(
-      materialRef.current.uniforms.uMouse.value.y, targetY, 0.06
-    );
-
-    const mx = materialRef.current.uniforms.uMouse.value.x;
-    const my = materialRef.current.uniforms.uMouse.value.y;
-    
-    const mouseVelX = state.pointer.x - prevMouseRef.current.x;
-    const mouseVelY = state.pointer.y - prevMouseRef.current.y;
-    mouseVelRef.current.x = THREE.MathUtils.lerp(mouseVelRef.current.x, mouseVelX, 0.1);
-    mouseVelRef.current.y = THREE.MathUtils.lerp(mouseVelRef.current.y, mouseVelY, 0.1);
-    prevMouseRef.current.x = state.pointer.x;
-    prevMouseRef.current.y = state.pointer.y;
-    
-    const mouseSpeed = Math.sqrt(mouseVelRef.current.x * mouseVelRef.current.x + mouseVelRef.current.y * mouseVelRef.current.y);
-    const isMouseMoving = mouseSpeed > 0.002;
-    
-    materialRef.current.uniforms.uMouseActive.value = THREE.MathUtils.lerp(
-      materialRef.current.uniforms.uMouseActive.value,
-      isMouseMoving ? 1.0 : 0.0,
-      0.08
-    );
-    const mouseActive = materialRef.current.uniforms.uMouseActive.value;
-
-    for (let i = 0; i < particleCount; i++) {
-      const idx = i * 3;
-
-      posArray[idx] += velocities[idx];
-      posArray[idx + 1] += velocities[idx + 1];
-      posArray[idx + 2] += velocities[idx + 2];
-
-      const px = posArray[idx];
-      const py = posArray[idx + 1];
-      const pz = posArray[idx + 2];
-
-      const dx = mx - px;
-      const dy = my - py;
-      const distToMouse = Math.sqrt(dx * dx + dy * dy);
-
-      if (distToMouse < 12.0) {
-        if (mouseActive > 0.2) {
-          const scatterForce = (12.0 - distToMouse) * 0.025 * mouseActive;
-          posArray[idx] -= (dx / (distToMouse + 0.1)) * scatterForce;
-          posArray[idx + 1] -= (dy / (distToMouse + 0.1)) * scatterForce;
-        } else {
-          if (distToMouse > 1.0) {
-            const attractStrength = 0.006;
-            posArray[idx] += (dx / (distToMouse + 0.1)) * attractStrength;
-            posArray[idx + 1] += (dy / (distToMouse + 0.1)) * attractStrength;
-            
-            const orbitSpeed = 0.02;
-            const tangentX = -dy / (distToMouse + 0.1);
-            const tangentY = dx / (distToMouse + 0.1);
-            const orbitStrength = Math.min(1.0, 12.0 / (distToMouse + 1.0));
-            posArray[idx] += tangentX * orbitSpeed * orbitStrength;
-            posArray[idx + 1] += tangentY * orbitSpeed * orbitStrength;
-          }
-        }
-      }
-
-      if (Math.abs(posArray[idx]) > 22) {
-        posArray[idx] *= 0.98;
-        velocities[idx] *= -0.3;
-      }
-      if (Math.abs(posArray[idx + 1]) > 8) {
-        posArray[idx + 1] *= 0.98;
-        velocities[idx + 1] *= -0.3;
-      }
-      if (posArray[idx + 2] > -2 || posArray[idx + 2] < -35) {
-        velocities[idx + 2] *= -0.3;
-      }
-    }
-
-    for (let i = 0; i < connectionIndices.length; i++) {
-      const particleIdx = connectionIndices[i];
-      const p3 = particleIdx * 3;
-      linePosArray[i * 3] = posArray[p3];
-      linePosArray[i * 3 + 1] = posArray[p3 + 1];
-      linePosArray[i * 3 + 2] = posArray[p3 + 2];
-    }
-
-    posAttr.needsUpdate = true;
-    linePosAttr.needsUpdate = true;
-  });
-
-  const vertexShader = `
-    attribute float aSize;
-    uniform float uTime;
-    uniform float uMouseActive;
-    varying float vAlpha;
-    varying float vMouseActive;
-    varying float vDist;
-    
-    void main() {
-      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-      gl_Position = projectionMatrix * mvPosition;
-      float twinkle = 0.35 + 0.4 * sin(uTime * 1.2 + position.x * 6.0 + position.y * 4.0);
-      vAlpha = twinkle;
-      vMouseActive = uMouseActive;
-      vDist = length(position.xy);
-      gl_PointSize = aSize * (25.0 / max(2.0, -mvPosition.z));
-    }
-  `;
-
-  const fragmentShader = `
-    uniform vec3 uColor;
-    varying float vAlpha;
-    varying float vMouseActive;
-    varying float vDist;
-    
-    void main() {
-      vec2 coord = gl_PointCoord - vec2(0.5);
-      float dist = length(coord);
-      if (dist > 0.5) discard;
-      
-      float core = smoothstep(0.5, 0.0, dist);
-      float glow = smoothstep(0.5, 0.15, dist) * 0.5;
-      float alpha = (core + glow) * vAlpha;
-      
-      vec3 calmColor = mix(vec3(1.0, 0.80, 0.80), vec3(1.0, 0.45, 0.45), smoothstep(0.0, 0.4, dist));
-      vec3 activeColor = mix(vec3(1.0, 0.55, 0.55), vec3(1.0, 0.15, 0.25), smoothstep(0.0, 0.4, dist));
-      vec3 color = mix(calmColor, activeColor, vMouseActive);
-      
-      color = mix(color, vec3(1.0, 0.3, 0.3), smoothstep(10.0, 25.0, vDist) * 0.3);
-      
-      gl_FragColor = vec4(color, alpha * 0.65);
-    }
-  `;
-
-  return (
-    <group>
-      <points ref={pointsRef}>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-          <bufferAttribute attach="attributes-aSize" args={[sizes, 1]} />
-        </bufferGeometry>
-        <shaderMaterial
-          ref={materialRef}
-          vertexShader={vertexShader}
-          fragmentShader={fragmentShader}
-          uniforms={uniforms}
-          transparent
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </points>
-
-      <lineSegments ref={linesRef} geometry={lineGeometry}>
-        <lineBasicMaterial
-          color="#441111"
-          transparent
-          opacity={0.015}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </lineSegments>
-    </group>
-  );
-}
-```
-
 ## File: `src/components/canvas/PostProcessing.tsx`
 
 ```typescript
@@ -2449,7 +2326,7 @@ import NeonGrid from "./NeonGrid";
 import FloatingLaptop from "./FloatingLaptop";
 import TechCubes from "./TechCubes";
 import DeepSpaceGlobe from "./DeepSpaceGlobe";
-import ParticleNetwork from "./ParticleNetwork";
+import MagneticParticles from "./MagneticParticles";
 import VolumetricRays from "./VolumetricRays";
 import FloatingHexParticles from "./FloatingHexParticles";
 import PostProcessing from "./PostProcessing";
@@ -2508,7 +2385,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
           <StarField />
           <DeepSpaceGlobe />
           <VolumetricRays />
-          <ParticleNetwork />
+          <MagneticParticles />
           <FloatingHexParticles />
           <TechCubes />
           <FloatingLaptop />
@@ -3541,7 +3418,6 @@ import { useAudio } from "@/hooks/useAudio";
 const techStack = ["Next.js", "TypeScript", "Node.js", "MongoDB", "Tailwind CSS", "AWS"];
 const heatmapCells = Array.from({ length: 96 }, (_, index) => index);
 
-/* ── Typewriter hook ── */
 function useTypewriter(text: string) {
   const [value, setValue] = useState("");
   useEffect(() => {
@@ -3555,7 +3431,6 @@ function useTypewriter(text: string) {
   return value;
 }
 
-/* ── Live clock hook ── */
 function useLiveClock() {
   const [time, setTime] = useState("");
   useEffect(() => {
@@ -3576,7 +3451,6 @@ function useLiveClock() {
   return time;
 }
 
-/* ── Glass panel ── */
 function GlassPanel({
   children,
   className = "",
@@ -3593,7 +3467,6 @@ function GlassPanel({
   );
 }
 
-/* ── Section header ── */
 function MiniHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <p className={`font-mono text-[10px] uppercase tracking-[0.22em] text-white/52 ${className}`}>
@@ -3602,7 +3475,6 @@ function MiniHeader({ children, className = "" }: { children: React.ReactNode; c
   );
 }
 
-/* ── Skill bar ── */
 function SkillBar({ label, value }: { label: string; value: number }) {
   return (
     <div className="space-y-1">
@@ -3620,7 +3492,6 @@ function SkillBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-/* ── GitHub icon ── */
 function GitHubMark() {
   return (
     <svg className="h-3.5 w-3.5 text-white/38" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -3635,29 +3506,6 @@ function GitHubMark() {
   );
 }
 
-/* ── CSS 3D Extruded Hero Name ──
-   Uses 28 stacked layers + face to create depth effect matching reference image */
-function ExtrudedHeroTitle() {
-  const layers = Array.from({ length: 28 }, (_, index) => index);
-  return (
-    <div className="hero-title-stack" aria-hidden="true">
-      {layers.map((layer) => (
-        <div key={layer} className="hero-title-layer" style={{ ["--layer" as string]: layer }}>
-          <span>POSHAN</span>
-          <span className="hero-title-layer-ms">MS</span>
-        </div>
-      ))}
-      <div className="hero-title-face">
-        <span>POSHAN</span>
-        <span className="hero-title-layer-ms">MS</span>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════
-   MAIN COMPONENT
-════════════════════════════════════════════════════════════ */
 export default function DashboardHero({
   scrollProgress,
   stageScale,
@@ -3679,41 +3527,35 @@ export default function DashboardHero({
 
   return (
     <section id="home" className="pointer-events-none relative z-10 h-screen">
-      {/* Atmospheric overlays */}
+      {/* Atmospheric overlays - ALL ENABLED */}
       <div className="dashboard-haze pointer-events-none absolute inset-0" />
       <div className="dashboard-scanlines pointer-events-none absolute inset-0" />
       <div className="dashboard-depth-lines pointer-events-none absolute inset-0" />
+      <div className="dashboard-vignette pointer-events-none absolute inset-0" />
       <div className="dashboard-floor-glow pointer-events-none absolute inset-x-0 bottom-0" />
+      <div className="dashboard-horizon-fade pointer-events-none absolute inset-x-0 bottom-0" />
 
-      {/* ── THE STAGE ── fixed-size container scaled to viewport */}
       <div
         className="dashboard-stage"
         style={{ transform: `translate(-50%, -50%) scale(${stageScale})` }}
       >
-
-        {/* ═══════ LEFT HERO COLUMN (cols 1-4, row 1) ═══════ */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="stage-left-copy"
         >
-          {/* Hello typewriter */}
           <p className="mb-2 font-mono text-lg font-semibold tracking-[0.04em] text-[var(--electric-blue)] text-glow-blue">
             {hello}
             <span className="ml-1 inline-block h-5 w-[2px] translate-y-0.5 animate-pulse bg-[var(--electric-blue)]" />
           </p>
 
-          {/* 3D extruded CSS name */}
           <h1 className="sr-only">Poshan MS — Full Stack Engineer</h1>
-          {/* <ExtrudedHeroTitle /> */}
 
-          {/* Sub-title */}
           <p className="mt-3 font-mono text-lg font-bold uppercase tracking-[0.24em] text-[var(--electric-blue)] text-glow-blue">
             Full Stack Engineer <span className="animate-pulse">_</span>
           </p>
 
-          {/* Tagline */}
           <p className="mt-2 max-w-[28rem] font-mono text-[14px] leading-7 text-[#f5f0e8]/72">
             I build{" "}
             <span className="font-semibold text-[#ff1744]">scalable</span>{" "}
@@ -3723,7 +3565,6 @@ export default function DashboardHero({
             beautiful digital experiences.
           </p>
 
-          {/* CTA buttons */}
           <div className="pointer-events-auto mt-5 flex gap-4">
             <a href="#projects" className="dashboard-button dashboard-button-primary">
               View My Work <ArrowUpRight className="h-4 w-4" />
@@ -3733,7 +3574,6 @@ export default function DashboardHero({
             </a>
           </div>
 
-          {/* Status bar */}
           <div className="mt-5 flex flex-wrap items-center gap-4 font-mono text-[10px] uppercase tracking-[0.14em] text-white/55">
             <span className="flex items-center gap-2">
               <span className="h-2 w-2 animate-pulse rounded-full bg-[#ff1744] shadow-[0_0_10px_rgba(255,23,68,0.8)]" />
@@ -3747,252 +3587,7 @@ export default function DashboardHero({
             </span>
           </div>
         </motion.div>
-
-        {/* ═══════ CENTER-LEFT: Current Status + Tech Stack (cols 5-6, row 1) ═══════ */}
-        {/* <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.15 }}
-          className="stage-center-cards"
-        >
-          <GlassPanel accent="pink" className="p-5">
-            <MiniHeader>{"// Current Status"}</MiniHeader>
-            <p className="mt-3 font-mono text-base leading-7 text-[var(--terminal-green)] text-glow-green">
-              Available for<br />new projects
-            </p>
-            <button
-              suppressHydrationWarning
-              className="pointer-events-auto mt-3 flex items-center gap-2 rounded border border-white/16 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/70 transition hover:border-[var(--hot-pink)] hover:text-white"
-            >
-              View Schedule <CalendarDays className="h-3 w-3 text-[var(--hot-pink)]" />
-            </button>
-          </GlassPanel>
-
-          <GlassPanel accent="blue" className="p-5">
-            <MiniHeader>{"// Tech Stack"}</MiniHeader>
-            <div className="mt-3 space-y-2.5">
-              {techStack.map((tech, index) => (
-                <div key={tech} className="flex items-center gap-3 font-mono text-[12px] text-white/76">
-                  <span className={`tech-badge tech-badge-${index}`}>{tech.slice(0, 2)}</span>
-                  {tech}
-                </div>
-              ))}
-            </div>
-          </GlassPanel>
-        </motion.div> */}
-
-        {/* ═══════ CENTER: Welcome Code Card (cols 7-10, row 1) ═══════ */}
-        {/* <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.25 }}
-          className="stage-code-card"
-        >
-          <GlassPanel accent="blue" className="pointer-events-auto p-6">
-            <MiniHeader>{"// Welcome to my portfolio"}</MiniHeader>
-            <pre className="mt-3 font-mono text-[12px] leading-[1.8] text-cyan-100/80">
-              <code>{`const developer = {
-  name: "Poshan MS",
-  role: "Full Stack Engineer",
-  passion: "Building digital experiences",
-  skills: ["React", "Node.js", "Next.js", "MongoDB"]
-};
-
-// Let's build something amazing!`}</code>
-            </pre>
-            <a
-              href="#projects"
-              className="mt-4 inline-flex items-center gap-2 rounded border border-white/16 px-6 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/72 transition hover:border-[var(--hot-pink)] hover:text-[var(--hot-pink)]"
-            >
-              Explore Projects →
-            </a>
-          </GlassPanel>
-        </motion.div> */}
-
-        {/* ═══════ RIGHT PANELS (cols 11-12, rows 1-3) ═══════ */}
-        {/* <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-          className="stage-right-panels"
-        >
-          <GlassPanel className="p-5" accent="blue">
-            <div className="flex items-center justify-between">
-              <MiniHeader>{"// GitHub Activity"}</MiniHeader>
-              <GitHubMark />
-            </div>
-            <div className="mt-3 grid gap-[3px]" style={{ gridTemplateColumns: "repeat(16, minmax(0, 1fr))" }}>
-              {heatmapCells.map((cell) => (
-                <span
-                  key={cell}
-                  className="h-2 w-2 rounded-[2px]"
-                  style={{
-                    background:
-                      cell % 7 === 0
-                        ? "rgba(255,23,68,0.95)"
-                        : cell % 5 === 0
-                          ? "rgba(255,23,68,0.68)"
-                          : cell % 3 === 0
-                            ? "rgba(255,23,68,0.42)"
-                            : "rgba(255,23,68,0.18)",
-                  }}
-                />
-              ))}
-            </div>
-            <p className="mt-3 font-mono text-[11px] text-white/72">1,247 Contributions this year</p>
-          </GlassPanel>
-
-          <GlassPanel className="p-5" accent="violet">
-            <MiniHeader className="text-yellow-200/80">{"// Achievements"}</MiniHeader>
-            <div className="mt-4 space-y-3 font-mono text-[12px] text-white/76">
-              <p className="flex items-center gap-3">
-                <Trophy className="h-4 w-4 text-yellow-300" /> Top 10% in Hackathon 2024
-              </p>
-              <p className="flex items-center gap-3">
-                <Star className="h-4 w-4 text-yellow-300" /> 500+ GitHub Stars
-              </p>
-              <p className="flex items-center gap-3">
-                <Zap className="h-4 w-4 text-[var(--electric-blue)]" /> Open Source Contributor
-              </p>
-            </div>
-          </GlassPanel>
-
-          <GlassPanel className="p-5" accent="blue">
-            <MiniHeader>{"// Testimonial"}</MiniHeader>
-            <p className="mt-3 font-mono text-[11px] leading-6 text-white/68">
-              &ldquo;Poshan is an exceptional developer with a keen eye for detail and problem-solving skills that are truly next level.&rdquo;
-            </p>
-            <p className="mt-3 font-mono text-[10px] text-[var(--hot-pink)]">— Tech Project Collaborator</p>
-          </GlassPanel>
-
-          <GlassPanel className="p-5" accent="pink">
-            <MiniHeader className="text-[var(--hot-pink)]">{"// Let's Build Together"}</MiniHeader>
-            <p className="mt-3 font-mono text-[12px] leading-6 text-white/72">
-              Have a project in mind?<br />Let&apos;s create something<br />amazing together!
-            </p>
-            <a
-              href="mailto:siddeshwaraprasanna5@gmail.com"
-              className="pointer-events-auto mt-4 inline-flex items-center gap-2 rounded border border-[var(--electric-blue)] px-5 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white transition hover:border-[var(--hot-pink)] hover:text-[var(--hot-pink)]"
-            >
-              Get In Touch →
-            </a>
-          </GlassPanel>
-        </motion.div> */}
-
-        {/* ═══════ STATS BAR (cols 1-10, row 2) ═══════ */}
-        {/* <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.35 }}
-        >
-          <GlassPanel className="stage-stats grid grid-cols-4 items-center p-4" accent="violet">
-            {[
-              ["2+", "Years Experience"],
-              ["25+", "Projects Completed"],
-              ["15+", "Technologies"],
-              ["100%", "Client Satisfaction"],
-            ].map(([number, label], index) => (
-              <div key={label} className={`flex items-center gap-3 px-4 ${index > 0 ? "border-l border-white/10" : ""}`}>
-                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--electric-blue)]/35 bg-[var(--electric-blue)]/8 text-[var(--electric-blue)]">
-                  <Cpu className="h-3.5 w-3.5" />
-                </span>
-                <span>
-                  <strong className="block font-mono text-2xl font-bold text-white">{number}</strong>
-                  <small className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/50">{label}</small>
-                </span>
-              </div>
-            ))}
-          </GlassPanel>
-        </motion.div> */}
-
-        {/* ═══════ MUSIC PLAYER (col 1-2, row 3) ═══════ */}
-        {/* <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          <GlassPanel className="stage-music p-4" accent="blue">
-            <MiniHeader>Currently Listening</MiniHeader>
-            <div className="mt-3 flex items-start gap-3">
-              <button
-                type="button"
-                onClick={toggleMusic}
-                suppressHydrationWarning
-                className="music-art pointer-events-auto"
-                aria-label={isMusicPlaying ? "Pause" : "Play"}
-              >
-                <Radio className="h-8 w-8 text-[var(--electric-blue)]" />
-              </button>
-              <div className="min-w-0">
-                <p className="font-mono text-sm text-white">Synthwave Radio</p>
-                <p className="font-mono text-[10px] text-white/48">Ambient cyberpunk loop</p>
-                <div className={`waveform mt-3 ${isMusicPlaying ? "" : "waveform-paused"}`}>
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <span key={i} style={{ height: `${6 + ((i * 7) % 22)}px` }} />
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center gap-3 text-white/60">
-                  <Music2 className="h-3 w-3" />
-                  <button
-                    type="button"
-                    onClick={toggleMusic}
-                    suppressHydrationWarning
-                    className="pointer-events-auto text-[var(--electric-blue)] transition hover:text-[var(--hot-pink)]"
-                    aria-label={isMusicPlaying ? "Pause" : "Play"}
-                  >
-                    {isMusicPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </GlassPanel>
-        </motion.div> */}
-
-        {/* ═══════ FEATURED PROJECT (cols 3-6, row 3) ═══════ */}
-        {/* <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.45 }}
-        >
-          <GlassPanel className="stage-featured p-5" accent="pink">
-            <MiniHeader>Featured Project</MiniHeader>
-            <h3 className="mt-2 font-mono text-xl font-bold uppercase tracking-[0.14em] text-white">
-              FindIt <span className="text-[var(--terminal-green)]">●</span>
-            </h3>
-            <p className="mt-2 font-mono text-[12px] leading-5 text-white/62">
-              Campus lost &amp; found portal with real-time notifications, auth, image upload, and Dockerized backend.
-            </p>
-            <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.1em] text-white/50">
-              React &nbsp;·&nbsp; Flask &nbsp;·&nbsp; PostgreSQL &nbsp;·&nbsp; Redis &nbsp;·&nbsp; Docker
-            </p>
-            <a
-              href="#projects"
-              className="pointer-events-auto mt-3 inline-flex items-center gap-1 rounded border border-[var(--electric-blue)]/40 px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--electric-blue)] transition hover:border-[var(--hot-pink)] hover:text-[var(--hot-pink)]"
-            >
-              Live Preview →
-            </a>
-          </GlassPanel>
-        </motion.div> */}
-
-        {/* ═══════ SKILLS OVERVIEW (cols 7-10, row 3) ═══════ */}
-        {/* <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-        >
-          <GlassPanel className="stage-skills p-5" accent="blue">
-            <MiniHeader>{"// Skills Overview"}</MiniHeader>
-            <div className="mt-4 space-y-3">
-              <SkillBar label="Frontend Development" value={95} />
-              <SkillBar label="Backend Development" value={90} />
-              <SkillBar label="UI / UX Design" value={85} />
-              <SkillBar label="DevOps & Cloud" value={88} />
-              <SkillBar label="Problem Solving" value={95} />
-            </div>
-          </GlassPanel>
-        </motion.div> */}
-
-      </div>{/* end .dashboard-stage */}
+      </div>
     </section>
   );
 }
@@ -5563,6 +5158,10 @@ declare module '*.frag' {
 
 declare module '*.glsl' {
   const content: string;
+  export default content;
+}
+declare module '*.tsx' {
+  const content: any;
   export default content;
 }
 ```
