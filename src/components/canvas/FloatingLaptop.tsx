@@ -4,6 +4,7 @@ import React, { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { useMousePosition } from "@/hooks/useMousePosition";
 
 const SCREEN_MATERIAL_NAME = "Material.004";
 
@@ -12,6 +13,8 @@ export default function FloatingLaptop() {
 
   const groupRef = useRef<THREE.Group>(null);
   const bobRef   = useRef<THREE.Group>(null);
+  const kbLightRef = useRef<THREE.PointLight>(null);
+  const mouse = useMousePosition(0.08);
 
   useMemo(() => {
     const darkBody = new THREE.MeshStandardMaterial({
@@ -60,6 +63,16 @@ export default function FloatingLaptop() {
         0.09 - state.pointer.y * 0.035,
         0.045,
       );
+    }
+
+    if (kbLightRef.current) {
+      const dx = mouse.x - 0.25;
+      const dy = mouse.y + 0.15;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const proximity = Math.exp(-dist * dist * 4.0); // 1.0 close, 0.0 far
+      
+      kbLightRef.current.intensity = 1.5 + proximity * 5.0; // Glows up to 6.5!
+      kbLightRef.current.distance = 2.5 + proximity * 3.5;
     }
   });
 
@@ -138,7 +151,7 @@ export default function FloatingLaptop() {
         {/* General body illumination */}
         <pointLight position={[0, -0.5, 0]} intensity={4.0} distance={10} color="#ff1744" decay={2} />
         {/* Keyboard backlight — low, close to keyboard deck surface, subtle warm glow */}
-        <pointLight position={[0.3, -0.15, 0.35]} intensity={3.5} distance={4} color="#ff6680" decay={2} />
+        <pointLight ref={kbLightRef} position={[0.3, -0.15, 0.35]} intensity={3.5} distance={4} color="#ff6680" decay={2} />
         {/* Right-side rim light — catches the right edge of laptop body */}
         <pointLight position={[2.0, 0.3, 0.2]} intensity={2.8} distance={8} color="#ff3355" decay={2} />
       </group>

@@ -34,7 +34,7 @@ export function useMousePosition(lerpSpeed = 0.08) {
       // Update state to trigger re-renders only when coordinates change significantly
       const diffX = Math.abs(currentRef.current.x - coords.x);
       const diffY = Math.abs(currentRef.current.y - coords.y);
-      
+
       if (diffX > 0.001 || diffY > 0.001) {
         setCoords({
           x: currentRef.current.x,
