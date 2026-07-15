@@ -7,36 +7,29 @@ import * as THREE from "three";
 
 const sceneCoordinates = [
   {
-    camera: new THREE.Vector3(0.2, 2.2, 7.85),
-    lookAt: new THREE.Vector3(0.15, 1.62, 0),
-    fov: 43,
-  },
-  {
-    camera: new THREE.Vector3(2.5, 0.45, 2.6),
-    lookAt: new THREE.Vector3(2.45, 0.35, -0.2),
+    // Station 1 — Close/Low: intimate view near the laptop, slightly looking up at globe behind
+    camera: new THREE.Vector3(0.5, 0.5, 8.0),
+    lookAt: new THREE.Vector3(0.8, 0.0, -1.0),
     fov: 45,
   },
   {
-    camera: new THREE.Vector3(-2.0, 1.2, 9),
-    lookAt: new THREE.Vector3(0, 0.5, 0),
-    fov: 55,
+    // Station 2 — Mid Swing: dynamic lateral swing to the left, mathematically positioned for full globe ring headroom
+    camera: new THREE.Vector3(-3.5, 2.8, 9.0),
+    lookAt: new THREE.Vector3(1.2, 1.3, -1.5),
+    fov: 58,
   },
   {
-    camera: new THREE.Vector3(3.5, 2.0, 8),
-    lookAt: new THREE.Vector3(0, 0.5, 0),
+    // Station 3 — Wide Establishing: centered high angle, pulled in slightly closer to keep group unified
+    camera: new THREE.Vector3(0.0, 3.8, 12.5),
+    lookAt: new THREE.Vector3(0.5, 0.2, -2.5),
     fov: 52,
-  },
-  {
-    camera: new THREE.Vector3(0, 2.0, 14),
-    lookAt: new THREE.Vector3(0, 0, 0),
-    fov: 65,
   },
 ];
 
 export function CinematicCamera({ scrollProgress }: { scrollProgress: number }) {
-  const currentPos = useRef(new THREE.Vector3(0.2, 2.2, 7.85));
-  const currentLookAt = useRef(new THREE.Vector3(0.15, 1.62, 0));
-  const currentFov = useRef(43);
+  const currentPos = useRef(new THREE.Vector3(0.5, 0.5, 8));
+  const currentLookAt = useRef(new THREE.Vector3(0.8, 0, -1));
+  const currentFov = useRef(45);
 
   useFrame((state) => {
     const segmentCount = sceneCoordinates.length - 1;

@@ -12,7 +12,7 @@ export default function TechCubes() {
     () => [
       {
         id: "react",
-        position: [1.45, 2.85, -0.15] as [number, number, number],
+        position: [-2.5, 1.2, -2.0] as [number, number, number],
         scale: 0.78,
         color: "#ffb0b0",
         glowColor: "#ff1744",
@@ -20,7 +20,7 @@ export default function TechCubes() {
       },
       {
         id: "node",
-        position: [3.85, 1.05, 0.1] as [number, number, number],
+        position: [3.2, 0.8, -3.0] as [number, number, number],
         scale: 0.72,
         color: "#ffaaaa",
         glowColor: "#cc1133",
@@ -28,7 +28,7 @@ export default function TechCubes() {
       },
       {
         id: "typescript",
-        position: [2.95, -1.25, 0.75] as [number, number, number],
+        position: [-1.5, -0.8, 1.5] as [number, number, number],
         scale: 0.52,
         color: "#e8a0a0",
         glowColor: "#800010",
@@ -36,7 +36,7 @@ export default function TechCubes() {
       },
       {
         id: "next",
-        position: [-0.75, 0.85, 0.65] as [number, number, number],
+        position: [2.8, 2.0, -1.5] as [number, number, number],
         scale: 0.42,
         color: "#f0d0d0",
         glowColor: "#660008",

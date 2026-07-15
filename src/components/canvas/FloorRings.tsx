@@ -3,12 +3,15 @@
 import React, { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { useMousePosition } from "@/hooks/useMousePosition";
 
 export default function FloorRings() {
   const ringsRef = useRef<THREE.Group>(null);
   const energyRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Group>(null);
   const secondaryRingsRef = useRef<THREE.Group>(null);
+  const timeRef = useRef(0);
+  const mouse = useMousePosition(0.08);
 
   const ringGeometries = useMemo(() => {
     const rings: THREE.BufferGeometry[] = [];
@@ -89,7 +92,18 @@ export default function FloorRings() {
   const laptopX = Math.max(0.8, viewport.width * 0.08);
 
   useFrame((state) => {
-    const t = state.clock.getElapsedTime();
+    const dt = state.clock.getDelta();
+    
+    // Proximity to laptop base on floor
+    const dx = mouse.x - 0.25;
+    const dy = mouse.y + 0.15;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const proximity = Math.exp(-dist * dist * 4.0); // 1.0 close, 0.0 far
+    
+    // Rings pulse up to 2.2x faster near mouse
+    const speedFactor = 1.0 + proximity * 1.2;
+    timeRef.current += dt * speedFactor;
+    const t = timeRef.current;
     
     if (ringsRef.current) {
       ringsRef.current.children.forEach((child, i) => {

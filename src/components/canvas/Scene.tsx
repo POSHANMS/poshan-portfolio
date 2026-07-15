@@ -38,8 +38,8 @@ export default function Scene({ scrollProgress }: SceneProps) {
           toneMappingExposure: 1.0,
         }}
         camera={{
-          position: [0, 2.0, 9.5],
-          fov: 50,
+          position: [0.5, 0.5, 8],
+          fov: 45,
           near: 0.1,
           far: 300,
         }}
@@ -70,7 +70,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
           <NebulaBackground />
           <StarField />
           <ShootingStars />
-          <DeepSpaceGlobe />
+          <DeepSpaceGlobe scrollProgress={scrollProgress} />
           <VolumetricRays />
           <MagneticParticles />
           <FloatingHexParticles />

@@ -11,6 +11,16 @@ const gridVertexShader = `
 
   void main() {
     vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    
+    // Gravitational warp towards the laptop base position
+    vec2 center = vec2(0.8, -1.24);
+    vec2 toCenter = worldPosition.xz - center;
+    float distToCenter = length(toCenter);
+    
+    // Smooth grid deformation
+    float warp = exp(-distToCenter * distToCenter * 0.08) * 0.65;
+    worldPosition.xz -= normalize(toCenter) * warp * min(distToCenter, 4.0);
+    
     vWorldPosition = worldPosition.xyz;
     vUv = uv;
     vDist = length(worldPosition.xz);
