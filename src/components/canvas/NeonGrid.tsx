@@ -20,6 +20,7 @@ const gridVertexShader = `
 
 const gridFragmentShader = `
   uniform float uTime;
+  uniform vec3 uMouseFloor;
   varying vec3 vWorldPosition;
   varying vec2 vUv;
   varying float vDist;
@@ -36,9 +37,9 @@ const gridFragmentShader = `
     
     float perspectiveFade = 1.0 - smoothstep(12.0, 50.0, dist);
     
-    // Very thin hairline grid lines
-    float lineWidth = 0.008 * perspectiveFade;
-    float majorLineWidth = 0.018 * perspectiveFade;
+    // Visible but refined grid lines
+    float lineWidth = 0.014 * perspectiveFade;
+    float majorLineWidth = 0.028 * perspectiveFade;
     
     float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.004, lineDist.x);
     float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.004, lineDist.y);
@@ -59,7 +60,7 @@ const gridFragmentShader = `
     float pulseZ = sin(gridCoord.y * 6.283 + uTime * pulseSpeed * 0.7 + 1.0) * 0.5 + 0.5;
     float dataPulse = max(pulseX * lineX, pulseZ * lineZ) * 0.22;
     
-    float gridPattern = max(regularLine * 0.15, majorLine * 0.35) * perspectiveFade;
+    float gridPattern = max(regularLine * 0.25, majorLine * 0.50) * perspectiveFade;
     gridPattern += dataPulse * perspectiveFade;
     
     float nodeGlow = exp(-length(lineDist) * 9.0) * 0.06 * perspectiveFade;
@@ -80,19 +81,34 @@ const gridFragmentShader = `
     color += vec3(0.60, 0.03, 0.08) * centerGlow;
     color += vec3(0.08, 0.005, 0.015) * horizonFade * 0.3;
     
-    float alpha = (gridPattern + nodeGlow * 0.25 + centerGlow) * horizonFade * heightFade;
-    alpha = clamp(alpha, 0.0, 0.45);
+    // Add mouse glow highlight to grid lines
+    float distToMouseFloor = length(vWorldPosition - uMouseFloor);
+    float mouseFloorGlow = exp(-distToMouseFloor * distToMouseFloor * 0.18) * 0.45;
+    color += vec3(1.0, 0.18, 0.28) * mouseFloorGlow * (regularLine + majorLine * 1.5) * perspectiveFade;
+    
+    float alpha = (gridPattern + nodeGlow * 0.35 + centerGlow) * horizonFade * heightFade;
+    alpha += mouseFloorGlow * 0.40 * perspectiveFade;
+    alpha = clamp(alpha, 0.0, 0.65);
     
     gl_FragColor = vec4(color, alpha);
   }
 `;
 
+import { useMousePosition } from "@/hooks/useMousePosition";
+
 export default function NeonGrid() {
   const gridMaterialRef = useRef<THREE.ShaderMaterial>(null);
+  const mouse = useMousePosition(0.08);
+
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 2.14), []);
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const mouseVec = useMemo(() => new THREE.Vector2(), []);
+  const intersection = useMemo(() => new THREE.Vector3(), []);
 
   const gridUniforms = useMemo(
     () => ({
       uTime: { value: 0.0 },
+      uMouseFloor: { value: new THREE.Vector3(0, 0, 0) },
     }),
     []
   );
@@ -100,6 +116,13 @@ export default function NeonGrid() {
   useFrame((state) => {
     if (gridMaterialRef.current) {
       gridMaterialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
+
+      // Raycast cursor onto floor plane to get world intersection coordinate
+      mouseVec.set(mouse.x, mouse.y);
+      raycaster.setFromCamera(mouseVec, state.camera);
+      if (raycaster.ray.intersectPlane(plane, intersection)) {
+        gridMaterialRef.current.uniforms.uMouseFloor.value.copy(intersection);
+      }
     }
   });
 

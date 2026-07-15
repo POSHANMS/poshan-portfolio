@@ -16,10 +16,10 @@ export default function FloatingLaptop() {
   useMemo(() => {
     const darkBody = new THREE.MeshStandardMaterial({
       color:             "#09091a",
-      metalness:          0.92,
-      roughness:          0.1,
-      emissive:          "#06142f",
-      emissiveIntensity:  0.16,
+      metalness:          0.85,
+      roughness:          0.15,
+      emissive:          "#1a0a2a",
+      emissiveIntensity:  0.25,
     });
 
     scene.updateMatrixWorld(true);
@@ -127,12 +127,20 @@ export default function FloatingLaptop() {
         </mesh>
         */}
 
-        <pointLight position={[0, 1.8, -1.2]}   intensity={4.5} distance={12} color="#ff1744" decay={2} />
-        <pointLight position={[-2.1, 0.65, 0.45]} intensity={2.8} distance={9}  color="#ff1744" decay={2} />
-        <pointLight position={[0.8, -1.15, 0.95]} intensity={2.2} distance={8}  color="#800010" decay={2} />
-        <pointLight position={[0, 0.5, 1.5]}      intensity={2.0} distance={8}  color="#ff1744" decay={2} />
-        
-        <pointLight position={[0, -0.5, 0]} intensity={2.5} distance={8} color="#ff1744" decay={2} />
+        {/* Key light — behind screen, illuminates top edge and screen halo */}
+        <pointLight position={[0, 1.8, -1.2]}   intensity={7.5} distance={14} color="#ff1744" decay={2} />
+        {/* Fill light — left side, illuminates hinge and left body */}
+        <pointLight position={[-2.1, 0.65, 0.45]} intensity={4.5} distance={11} color="#ff1744" decay={2} />
+        {/* Under-glow — bottom accent, pink tint */}
+        <pointLight position={[0.8, -1.15, 0.95]} intensity={3.5} distance={10} color="#800010" decay={2} />
+        {/* Front fill — viewer-facing, softens shadows */}
+        <pointLight position={[0, 0.5, 1.5]}      intensity={3.2} distance={10} color="#ff1744" decay={2} />
+        {/* General body illumination */}
+        <pointLight position={[0, -0.5, 0]} intensity={4.0} distance={10} color="#ff1744" decay={2} />
+        {/* Keyboard backlight — low, close to keyboard deck surface, subtle warm glow */}
+        <pointLight position={[0.3, -0.15, 0.35]} intensity={3.5} distance={4} color="#ff6680" decay={2} />
+        {/* Right-side rim light — catches the right edge of laptop body */}
+        <pointLight position={[2.0, 0.3, 0.2]} intensity={2.8} distance={8} color="#ff3355" decay={2} />
       </group>
     </group>
   );

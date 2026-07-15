@@ -64,7 +64,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
           <meshBasicMaterial color={color} transparent opacity={0.1} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
         <MeshTransmissionMaterial
-          color={new THREE.Color(color).lerp(new THREE.Color("#f7fbff"), 0.72)}
+          color={new THREE.Color(color).lerp(new THREE.Color("#fff0f0"), 0.72)}
           transmission={1}
           thickness={0.08}
           roughness={0.012}
@@ -75,7 +75,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
           distortion={0}
           distortionScale={0}
           temporalDistortion={0}
-          attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#f0fbff"), 0.35)}
+          attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#fff0f0"), 0.35)}
           attenuationDistance={0.95}
           emissive={glow}
           emissiveIntensity={hovered ? 0.35 : 0.18}
@@ -100,12 +100,12 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
       </mesh>
 
       <mesh position={[0, 0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.48, 0.515, 4]} />
+        <ringGeometry args={[0.48, 0.515, 32]} />
         <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.12 : 0.05} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, -0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.48, 0.515, 4]} />
+        <ringGeometry args={[0.48, 0.515, 32]} />
         <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.08 : 0.03} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
