@@ -100,8 +100,8 @@ export default function FloorRings() {
         }
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
-          const baseOpacity = Math.max(0.06, 0.18 - i * 0.01);
-          mat.opacity = baseOpacity + Math.sin(t * 0.55 + i * 0.65) * 0.06;
+          const baseOpacity = Math.max(0.04, 0.12 - i * 0.008);
+          mat.opacity = baseOpacity + Math.sin(t * 0.55 + i * 0.65) * 0.04;
         }
       });
     }
@@ -111,7 +111,7 @@ export default function FloorRings() {
         const line = child as THREE.Line;
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
-          mat.opacity = 0.06 + Math.sin(t * 0.7 + i * 1.0) * 0.04;
+          mat.opacity = 0.04 + Math.sin(t * 0.7 + i * 1.0) * 0.025;
         }
       });
     }
@@ -125,7 +125,7 @@ export default function FloorRings() {
         }
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
-          mat.opacity = 0.35 + Math.sin(t * 2.8 + i * 2.0) * 0.18;
+          mat.opacity = 0.22 + Math.sin(t * 2.8 + i * 2.0) * 0.12;
         }
       });
     }
@@ -136,7 +136,7 @@ export default function FloorRings() {
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshBasicMaterial;
           const pulse = Math.sin(t * 0.5 + i * 1.2) * 0.5 + 0.5;
-          mat.opacity = 0.04 + pulse * 0.10;
+          mat.opacity = 0.025 + pulse * 0.065;
           const scale = 1.0 + pulse * 0.7;
           mesh.scale.set(scale, scale, scale);
         }
@@ -155,7 +155,7 @@ export default function FloorRings() {
               new THREE.LineBasicMaterial({
                 color: i % 4 === 0 ? "#ff1744" : i % 3 === 0 ? "#ff3355" : "#cc1133",
                 transparent: true,
-                opacity: Math.max(0.06, 0.18 - i * 0.01),
+                opacity: Math.max(0.04, 0.12 - i * 0.008),
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
               })
@@ -173,7 +173,7 @@ export default function FloorRings() {
               new THREE.LineBasicMaterial({
                 color: "#880022",
                 transparent: true,
-                opacity: 0.06,
+                opacity: 0.04,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
               })
@@ -191,7 +191,7 @@ export default function FloorRings() {
               new THREE.LineBasicMaterial({
                 color: i % 2 === 0 ? "#ff1744" : "#ff6688",
                 transparent: true,
-                opacity: 0.35,
+                opacity: 0.22,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
               })
@@ -207,7 +207,7 @@ export default function FloorRings() {
             <meshBasicMaterial
               color="#ff1744"
               transparent
-              opacity={0.04}
+              opacity={0.025}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
               side={THREE.DoubleSide}
@@ -221,7 +221,7 @@ export default function FloorRings() {
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.08}
+          opacity={0.05}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -232,13 +232,13 @@ export default function FloorRings() {
         <meshBasicMaterial
           color="#ff4466"
           transparent
-          opacity={0.15}
+          opacity={0.10}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
 
-      <pointLight position={[0, 0.5, 0]} intensity={3.0} color="#ff1744" distance={10} decay={2} />
+      <pointLight position={[0, 0.5, 0]} intensity={2.0} color="#ff1744" distance={10} decay={2} />
 
       {[
         [-1.5, 0.02, 1.0],

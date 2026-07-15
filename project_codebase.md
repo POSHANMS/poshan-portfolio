@@ -1135,6 +1135,108 @@ export default function Home() {
 }
 ```
 
+## File: `src/components/canvas/AuroraRibbons.tsx`
+
+```typescript
+"use client";
+
+import React, { useRef, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+
+const auroraVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const auroraFragmentShader = `
+  uniform float uTime;
+  varying vec2 vUv;
+
+  // Sinuous sine-wave noise for aurora ribbons
+  float ribbonNoise(vec2 p, float time) {
+    float v = 0.0;
+    v += sin(p.x * 2.5 + time * 1.2) * 0.45;
+    v += sin(p.x * 5.0 - time * 0.8) * 0.22;
+    v += sin(p.x * 9.5 + time * 1.5) * 0.12;
+    return v;
+  }
+
+  void main() {
+    vec2 uv = vUv;
+    float t = uTime * 0.4;
+    
+    // Wave 1
+    float wave1 = ribbonNoise(uv, t);
+    float dist1 = abs(uv.y - 0.5 - wave1 * 0.22);
+    float ribbon1 = smoothstep(0.18, 0.0, dist1);
+    
+    // Wave 2 (offset for multi-ribbon layer)
+    float wave2 = ribbonNoise(uv + vec2(1.8, 0.3), t * 0.7);
+    float dist2 = abs(uv.y - 0.42 - wave2 * 0.18);
+    float ribbon2 = smoothstep(0.15, 0.0, dist2);
+    
+    // Combine ribbons
+    float intensity = ribbon1 * 0.65 + ribbon2 * 0.45;
+    
+    // Smooth fade borders so it blends into space
+    float edgeFade = smoothstep(0.0, 0.2, uv.x) * smoothstep(1.0, 0.8, uv.x) *
+                     smoothstep(0.0, 0.25, uv.y) * smoothstep(1.0, 0.75, uv.y);
+                     
+    intensity *= edgeFade;
+    
+    // Neon Red/Violet glowing aurora colors
+    vec3 color1 = vec3(0.95, 0.02, 0.08); // pure crimson
+    vec3 color2 = vec3(0.55, 0.01, 0.28); // deep violet-red
+    vec3 color = mix(color1, color2, wave1 * 0.5 + 0.5) * intensity;
+    
+    // Bright neon-pink peaks
+    color += vec3(1.0, 0.3, 0.4) * pow(intensity, 2.5) * 0.4;
+
+    if (intensity < 0.005) discard;
+
+    gl_FragColor = vec4(color, intensity * 0.15); // soft opacity
+  }
+`;
+
+export default function AuroraRibbons() {
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
+
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0.0 },
+    }),
+    []
+  );
+
+  useFrame((state) => {
+    if (materialRef.current) {
+      materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
+    }
+  });
+
+  return (
+    <mesh position={[0, 9, -38]} renderOrder={-96}>
+      <planeGeometry args={[95, 30]} />
+      <shaderMaterial
+        ref={materialRef}
+        vertexShader={auroraVertexShader}
+        fragmentShader={auroraFragmentShader}
+        uniforms={uniforms}
+        transparent
+        depthWrite={false}
+        depthTest={false}
+        blending={THREE.AdditiveBlending}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+```
+
 ## File: `src/components/canvas/DeepSpaceGlobe.tsx`
 
 ```typescript
@@ -1214,6 +1316,100 @@ export default function DeepSpaceGlobe() {
         <meshBasicMaterial color="#ff1744" transparent opacity={0.03} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
     </group>
+  );
+}
+```
+
+## File: `src/components/canvas/FloatingDebris.tsx`
+
+```typescript
+"use client";
+
+import React, { useRef, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+
+export default function FloatingDebris() {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const count = 32;
+
+  // Generate random trajectories for each debris chunk
+  const debrisData = useMemo(() => {
+    const data = [];
+    for (let i = 0; i < count; i++) {
+      data.push({
+        position: new THREE.Vector3(
+          (Math.random() - 0.5) * 32,
+          (Math.random() - 0.5) * 16,
+          -10 - Math.random() * 20
+        ),
+        rotation: new THREE.Euler(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+          0
+        ),
+        rotSpeed: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.4,
+          (Math.random() - 0.5) * 0.4,
+          (Math.random() - 0.5) * 0.4
+        ),
+        drift: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.02,
+          (Math.random() - 0.5) * 0.02,
+          (Math.random() - 0.5) * 0.01
+        ),
+        scale: 0.15 + Math.random() * 0.35,
+      });
+    }
+    return data;
+  }, []);
+
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  useFrame((state) => {
+    if (!meshRef.current) return;
+    const t = state.clock.getElapsedTime();
+
+    debrisData.forEach((data, i) => {
+      // Slowly drift positions
+      data.position.x += data.drift.x;
+      data.position.y += data.drift.y;
+      data.position.z += data.drift.z;
+
+      // Wrap boundaries to keep inside scene
+      if (Math.abs(data.position.x) > 20) data.position.x = -data.position.x;
+      if (Math.abs(data.position.y) > 12) data.position.y = -data.position.y;
+      if (data.position.z > -8) data.position.z = -30;
+      if (data.position.z < -30) data.position.z = -8;
+
+      // Rotate over time
+      data.rotation.x += data.rotSpeed.x * 0.02;
+      data.rotation.y += data.rotSpeed.y * 0.02;
+      data.rotation.z += data.rotSpeed.z * 0.02;
+
+      // Apply transformations to dummy object
+      dummy.position.copy(data.position);
+      dummy.rotation.copy(data.rotation);
+      dummy.scale.setScalar(data.scale * (1.0 + Math.sin(t * 0.4 + i) * 0.08));
+      dummy.updateMatrix();
+      
+      meshRef.current!.setMatrixAt(i, dummy.matrix);
+    });
+
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[null as any, null as any, count]} castShadow receiveShadow>
+      <dodecahedronGeometry args={[0.6, 0]} />
+      <meshStandardMaterial
+        color="#08080c"
+        roughness={0.8}
+        metalness={0.9}
+        emissive="#ff1744"
+        emissiveIntensity={0.15}
+      />
+    </instancedMesh>
   );
 }
 ```
@@ -1334,10 +1530,10 @@ export default function FloatingLaptop() {
   useMemo(() => {
     const darkBody = new THREE.MeshStandardMaterial({
       color:             "#09091a",
-      metalness:          0.92,
-      roughness:          0.1,
-      emissive:          "#06142f",
-      emissiveIntensity:  0.16,
+      metalness:          0.85,
+      roughness:          0.15,
+      emissive:          "#1a0a2a",
+      emissiveIntensity:  0.25,
     });
 
     scene.updateMatrixWorld(true);
@@ -1393,6 +1589,8 @@ export default function FloatingLaptop() {
       <group ref={bobRef}>
         <primitive object={scene} scale={1.15} />
 
+        {/* Screen glow plane — commented out, was visually dissecting through the laptop */}
+        {/*
         <mesh position={[0.2, 0.78, -0.72]} rotation={[0.05, 0, 0]}>
           <planeGeometry args={[2.2, 1.35]} />
           <meshBasicMaterial
@@ -1403,7 +1601,10 @@ export default function FloatingLaptop() {
             depthWrite={false}
           />
         </mesh>
+        */}
 
+        {/* Keyboard glow plane — commented out, was dissecting the keyboard visually */}
+        {/*
         <mesh position={[0.36, -0.28, 0.22]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[2.5, 1.0]} />
           <meshBasicMaterial
@@ -1414,7 +1615,9 @@ export default function FloatingLaptop() {
             depthWrite={false}
           />
         </mesh>
+        */}
 
+        {/* 
         <mesh position={[0.32, -0.9, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[2.35, 72]} />
           <meshBasicMaterial
@@ -1436,13 +1639,22 @@ export default function FloatingLaptop() {
             depthWrite={false}
           />
         </mesh>
+        */}
 
-        <pointLight position={[0, 1.8, -1.2]}   intensity={4.5} distance={12} color="#ff1744" decay={2} />
-        <pointLight position={[-2.1, 0.65, 0.45]} intensity={2.8} distance={9}  color="#ff1744" decay={2} />
-        <pointLight position={[0.8, -1.15, 0.95]} intensity={2.2} distance={8}  color="#800010" decay={2} />
-        <pointLight position={[0, 0.5, 1.5]}      intensity={2.0} distance={8}  color="#ff1744" decay={2} />
-        
-        <pointLight position={[0, -0.5, 0]} intensity={2.5} distance={8} color="#ff1744" decay={2} />
+        {/* Key light — behind screen, illuminates top edge and screen halo */}
+        <pointLight position={[0, 1.8, -1.2]}   intensity={7.5} distance={14} color="#ff1744" decay={2} />
+        {/* Fill light — left side, illuminates hinge and left body */}
+        <pointLight position={[-2.1, 0.65, 0.45]} intensity={4.5} distance={11} color="#ff1744" decay={2} />
+        {/* Under-glow — bottom accent, pink tint */}
+        <pointLight position={[0.8, -1.15, 0.95]} intensity={3.5} distance={10} color="#800010" decay={2} />
+        {/* Front fill — viewer-facing, softens shadows */}
+        <pointLight position={[0, 0.5, 1.5]}      intensity={3.2} distance={10} color="#ff1744" decay={2} />
+        {/* General body illumination */}
+        <pointLight position={[0, -0.5, 0]} intensity={4.0} distance={10} color="#ff1744" decay={2} />
+        {/* Keyboard backlight — low, close to keyboard deck surface, subtle warm glow */}
+        <pointLight position={[0.3, -0.15, 0.35]} intensity={3.5} distance={4} color="#ff6680" decay={2} />
+        {/* Right-side rim light — catches the right edge of laptop body */}
+        <pointLight position={[2.0, 0.3, 0.2]} intensity={2.8} distance={8} color="#ff3355" decay={2} />
       </group>
     </group>
   );
@@ -1457,7 +1669,7 @@ useGLTF.preload("/models/laptop-baked.glb");
 "use client";
 
 import React, { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
 export default function FloorRings() {
@@ -1541,6 +1753,9 @@ export default function FloorRings() {
     return ripples;
   }, []);
 
+  const { viewport } = useThree();
+  const laptopX = Math.max(0.8, viewport.width * 0.08);
+
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     
@@ -1548,13 +1763,13 @@ export default function FloorRings() {
       ringsRef.current.children.forEach((child, i) => {
         const line = child as THREE.Line;
         if (line && line.scale) {
-          const heartbeat = 1.0 + Math.sin(t * 0.5 + i * 0.35) * 0.015;
+          const heartbeat = 1.0 + Math.sin(t * 0.85 + i * 0.45) * 0.035;
           line.scale.set(heartbeat, heartbeat, heartbeat);
         }
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
-          const baseOpacity = Math.max(0.06, 0.18 - i * 0.01);
-          mat.opacity = baseOpacity + Math.sin(t * 0.35 + i * 0.7) * 0.04;
+          const baseOpacity = Math.max(0.04, 0.12 - i * 0.008);
+          mat.opacity = baseOpacity + Math.sin(t * 0.55 + i * 0.65) * 0.04;
         }
       });
     }
@@ -1564,7 +1779,7 @@ export default function FloorRings() {
         const line = child as THREE.Line;
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
-          mat.opacity = 0.06 + Math.sin(t * 0.6 + i * 1.0) * 0.03;
+          mat.opacity = 0.04 + Math.sin(t * 0.7 + i * 1.0) * 0.025;
         }
       });
     }
@@ -1573,12 +1788,12 @@ export default function FloorRings() {
       energyRef.current.children.forEach((child, i) => {
         const line = child as THREE.Line;
         if (line) {
-          const speed = 0.35 + i * 0.12;
+          const speed = 0.42 + i * 0.15;
           line.rotation.y = t * speed + i * 1.8;
         }
         if (line.material) {
           const mat = line.material as THREE.LineBasicMaterial;
-          mat.opacity = 0.35 + Math.sin(t * 2.5 + i * 2.0) * 0.15;
+          mat.opacity = 0.22 + Math.sin(t * 2.8 + i * 2.0) * 0.12;
         }
       });
     }
@@ -1588,9 +1803,9 @@ export default function FloorRings() {
         const mesh = child as THREE.Mesh;
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshBasicMaterial;
-          const pulse = Math.sin(t * 0.4 + i * 1.2) * 0.5 + 0.5;
-          mat.opacity = 0.04 + pulse * 0.08;
-          const scale = 1.0 + pulse * 0.6;
+          const pulse = Math.sin(t * 0.5 + i * 1.2) * 0.5 + 0.5;
+          mat.opacity = 0.025 + pulse * 0.065;
+          const scale = 1.0 + pulse * 0.7;
           mesh.scale.set(scale, scale, scale);
         }
       });
@@ -1598,7 +1813,7 @@ export default function FloorRings() {
   });
 
   return (
-    <group position={[0.8, -2.12, 0]}>
+    <group position={[laptopX + 0.2, -2.14, -1.24]}>
       <group ref={ringsRef}>
         {ringGeometries.map((geometry, i) => (
           <primitive 
@@ -1608,7 +1823,7 @@ export default function FloorRings() {
               new THREE.LineBasicMaterial({
                 color: i % 4 === 0 ? "#ff1744" : i % 3 === 0 ? "#ff3355" : "#cc1133",
                 transparent: true,
-                opacity: Math.max(0.06, 0.18 - i * 0.01),
+                opacity: Math.max(0.04, 0.12 - i * 0.008),
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
               })
@@ -1626,7 +1841,7 @@ export default function FloorRings() {
               new THREE.LineBasicMaterial({
                 color: "#880022",
                 transparent: true,
-                opacity: 0.06,
+                opacity: 0.04,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
               })
@@ -1644,7 +1859,7 @@ export default function FloorRings() {
               new THREE.LineBasicMaterial({
                 color: i % 2 === 0 ? "#ff1744" : "#ff6688",
                 transparent: true,
-                opacity: 0.35,
+                opacity: 0.22,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
               })
@@ -1660,7 +1875,7 @@ export default function FloorRings() {
             <meshBasicMaterial
               color="#ff1744"
               transparent
-              opacity={0.04}
+              opacity={0.025}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
               side={THREE.DoubleSide}
@@ -1674,7 +1889,7 @@ export default function FloorRings() {
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.08}
+          opacity={0.05}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -1685,13 +1900,13 @@ export default function FloorRings() {
         <meshBasicMaterial
           color="#ff4466"
           transparent
-          opacity={0.15}
+          opacity={0.10}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
 
-      <pointLight position={[0, 0.5, 0]} intensity={3.0} color="#ff1744" distance={10} decay={2} />
+      <pointLight position={[0, 0.5, 0]} intensity={2.0} color="#ff1744" distance={10} decay={2} />
 
       {[
         [-1.5, 0.02, 1.0],
@@ -1846,126 +2061,346 @@ export default function HeroName3D({ stageScale = 1 }: { stageScale?: number }) 
 ```typescript
 "use client";
 
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useCallback } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { useMousePosition } from "@/hooks/useMousePosition";
+
+/*
+ * CometTrail Particle System — "Overkill" Edition
+ * 
+ * Two layers working together:
+ * 
+ * 1. AMBIENT FIELD (1200 particles):
+ *    Slowly drifting cosmic dust across the viewport.
+ *    Gentle twinkle. Constant soft glow. Sets the atmosphere.
+ *
+ * 2. COMET TRAIL (400 particles, recycled ring buffer):
+ *    As the user moves their mouse, particles spawn at the cursor
+ *    position and drift away behind the cursor path like a glowing
+ *    comet tail. Features:
+ *    - Speed-sensitive: faster mouse = longer, brighter trail
+ *    - Directional drift: particles eject opposite to mouse velocity
+ *    - Color temperature shift: fresh sparks are bright white-hot,
+ *      they cool down through red → dark crimson as they age
+ *    - Size decay: large bright spark → shrinking dying ember
+ *    - Gravity pull: old particles slowly drift downward
+ *    - Turbulence: subtle random jitter so the trail feels organic
+ *    - Afterglow: particles don't just disappear, they fade out with
+ *      a soft bloom-friendly glow
+ */
+
+const AMBIENT_COUNT = 2500;
+const TRAIL_COUNT = 1500;
+const TOTAL = AMBIENT_COUNT + TRAIL_COUNT;
 
 export default function ParticleNetwork() {
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const particleCount = 3000;
+  const mouse = useMousePosition(0.12);
+  const prevMouseRef = useRef({ x: 0, y: 0 });
+  const trailIndexRef = useRef(0);
+  const velocityRef = useRef({ x: 0, y: 0 });
 
-  const [positions, velocities, sizes] = useMemo(() => {
-    const pos = new Float32Array(particleCount * 3);
-    const vel = new Float32Array(particleCount * 3);
-    const sz = new Float32Array(particleCount);
+  const {
+    positions, sizes, phases, lifetimes, maxLifetimes,
+    trailVelocities, trailColors,
+  } = useMemo(() => {
+    const pos = new Float32Array(TOTAL * 3);
+    const sz = new Float32Array(TOTAL);
+    const ph = new Float32Array(TOTAL);
+    const life = new Float32Array(TOTAL);
+    const maxLife = new Float32Array(TOTAL);
+    const tVel = new Float32Array(TRAIL_COUNT * 3);
+    const tCol = new Float32Array(TOTAL); // 0=ambient, 0-1=trail age
 
-    for (let i = 0; i < particleCount; i++) {
+    // --- Ambient particles ---
+    for (let i = 0; i < AMBIENT_COUNT; i++) {
       const idx = i * 3;
-      pos[idx] = (Math.random() - 0.5) * 26;
-      pos[idx + 1] = (Math.random() - 0.5) * 16;
-      pos[idx + 2] = (Math.random() - 0.5) * 11;
-      vel[idx] = (Math.random() - 0.5) * 0.01;
-      vel[idx + 1] = (Math.random() - 0.5) * 0.01;
-      vel[idx + 2] = (Math.random() - 0.5) * 0.004;
-      sz[i] = 0.18 + Math.random() * 0.84;
+      pos[idx]     = (Math.random() - 0.5) * 38;
+      pos[idx + 1] = (Math.random() - 0.5) * 22;
+      pos[idx + 2] = (Math.random() - 0.5) * 14;
+      // Smaller, delicate background stars
+      sz[i] = 0.2 + Math.random() * 0.6;
+      ph[i] = Math.random() * Math.PI * 2;
+      life[i] = -1; // -1 = ambient, always alive
+      maxLife[i] = -1;
+      tCol[i] = 0;
     }
 
-    return [pos, vel, sz];
+    // --- Trail particles (all start dead) ---
+    for (let i = AMBIENT_COUNT; i < TOTAL; i++) {
+      const idx = i * 3;
+      pos[idx] = 0;
+      pos[idx + 1] = -999; // hidden offscreen
+      pos[idx + 2] = 0;
+      sz[i] = 0;
+      ph[i] = Math.random() * Math.PI * 2;
+      life[i] = 0;
+      maxLife[i] = 0;
+      tCol[i] = 1;
+    }
+
+    return {
+      positions: pos,
+      sizes: sz,
+      phases: ph,
+      lifetimes: life,
+      maxLifetimes: maxLife,
+      trailVelocities: tVel,
+      trailColors: tCol,
+    };
   }, []);
 
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
-      uMouse: { value: new THREE.Vector2(0, 0) },
       uColor: { value: new THREE.Color("#ff1744") },
     }),
     []
   );
 
+  // Spawn trail particles at cursor position
+  const spawnTrail = useCallback(
+    (wx: number, wy: number, vx: number, vy: number, speed: number) => {
+      // Denser trail: spawn 2-12 particles per frame depending on speed
+      const count = Math.min(12, Math.max(2, Math.floor(speed * 18)));
+
+      for (let s = 0; s < count; s++) {
+        const i = AMBIENT_COUNT + trailIndexRef.current;
+        trailIndexRef.current = (trailIndexRef.current + 1) % TRAIL_COUNT;
+
+        const idx = i * 3;
+        const tIdx = (i - AMBIENT_COUNT) * 3;
+
+        // Extremely close scatter to look like a tight, crisp tail
+        const scatter = 0.04 + speed * 0.12;
+        positions[idx]     = wx + (Math.random() - 0.5) * scatter;
+        positions[idx + 1] = wy + (Math.random() - 0.5) * scatter;
+        positions[idx + 2] = (Math.random() - 0.5) * 0.8;
+
+        // Eject opposite to mouse velocity + random turbulence
+        const ejectSpeed = 0.01 + speed * 0.03;
+        const angle = Math.atan2(-vy, -vx) + (Math.random() - 0.5) * 0.9;
+        trailVelocities[tIdx]     = Math.cos(angle) * ejectSpeed + (Math.random() - 0.5) * 0.008;
+        trailVelocities[tIdx + 1] = Math.sin(angle) * ejectSpeed + (Math.random() - 0.5) * 0.008;
+        trailVelocities[tIdx + 2] = (Math.random() - 0.5) * 0.004;
+
+        // Smaller, delicate sparks
+        sizes[i] = 0.4 + speed * 1.5 + Math.random() * 0.6;
+
+        // Shorter lifetime for a snappy tail: 0.8-2 seconds
+        const baseLife = 0.8 + Math.random() * 1.2;
+        maxLifetimes[i] = baseLife;
+        lifetimes[i] = baseLife;
+      }
+    },
+    [positions, sizes, lifetimes, maxLifetimes, trailVelocities]
+  );
+
   useFrame((state) => {
     if (!pointsRef.current || !materialRef.current) return;
+
+    const t = state.clock.getElapsedTime();
+    const dt = Math.min(state.clock.getDelta(), 0.05); // cap delta
+    materialRef.current.uniforms.uTime.value = t;
 
     const geo = pointsRef.current.geometry;
     const posAttr = geo.attributes.position;
     const posArray = posAttr.array as Float32Array;
-    const targetX = state.pointer.x * 10.5;
-    const targetY = state.pointer.y * 6.4;
+    const sizeAttr = geo.attributes.aSize;
+    const sizeArray = sizeAttr.array as Float32Array;
+    const ageAttr = geo.attributes.aAge;
+    const ageArray = ageAttr.array as Float32Array;
 
-    materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
-    materialRef.current.uniforms.uMouse.value.x = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.x, targetX, 0.09);
-    materialRef.current.uniforms.uMouse.value.y = THREE.MathUtils.lerp(materialRef.current.uniforms.uMouse.value.y, targetY, 0.09);
+    // --- Exact Screen-to-World Translation using R3F state viewport ---
+    const { viewport } = state;
+    const mx = (mouse.x * viewport.width) / 2;
+    const my = (mouse.y * viewport.height) / 2;
+    
+    const vx = mx - prevMouseRef.current.x;
+    const vy = my - prevMouseRef.current.y;
+    const speed = Math.sqrt(vx * vx + vy * vy);
 
-    const mx = materialRef.current.uniforms.uMouse.value.x;
-    const my = materialRef.current.uniforms.uMouse.value.y;
+    // Smooth velocity for ejection direction
+    velocityRef.current.x = THREE.MathUtils.lerp(velocityRef.current.x, vx, 0.3);
+    velocityRef.current.y = THREE.MathUtils.lerp(velocityRef.current.y, vy, 0.3);
 
-    for (let i = 0; i < particleCount; i++) {
+    prevMouseRef.current.x = mx;
+    prevMouseRef.current.y = my;
+
+    // Spawn trail if mouse is moving
+    if (speed > 0.01) {
+      spawnTrail(mx, my, velocityRef.current.x, velocityRef.current.y, Math.min(speed, 2.0));
+    }
+
+    // --- Update ambient particles ---
+    for (let i = 0; i < AMBIENT_COUNT; i++) {
       const idx = i * 3;
+      // Gentle organic drift
+      posArray[idx]     += Math.sin(t * 0.18 + phases[i]) * 0.003;
+      posArray[idx + 1] += Math.cos(t * 0.12 + phases[i] * 1.7) * 0.003;
+      posArray[idx + 2] += Math.sin(t * 0.1 + phases[i] * 0.5) * 0.001;
 
-      posArray[idx] += velocities[idx];
-      posArray[idx + 1] += velocities[idx + 1];
-      posArray[idx + 2] += velocities[idx + 2];
+      // Twinkle size
+      sizeArray[i] = sizes[i] * (0.6 + 0.4 * Math.sin(t * 1.2 + phases[i]));
+      ageArray[i] = 0.0; // 0 = ambient (cool, steady glow)
+    }
 
-      const px = posArray[idx];
-      const py = posArray[idx + 1];
-      const pz = posArray[idx + 2];
-
-      const dx = mx - px;
-      const dy = my - py;
-      const dz = -pz;
-      const distToMouse = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-      if (distToMouse < 8.5 && distToMouse > 0.001) {
-        const dirX = dx / distToMouse;
-        const dirY = dy / distToMouse;
-        const dirZ = dz / distToMouse;
-
-        const tangentX = -dirY;
-        const tangentY = dirX;
-
-        const force = (8.5 - distToMouse) * 0.0042;
-        const drift = (8.5 - distToMouse) * 0.0032;
-
-        posArray[idx] += dirX * force + tangentX * drift;
-        posArray[idx + 1] += dirY * force + tangentY * drift;
-        posArray[idx + 2] += dirZ * force;
+    // --- Update trail particles ---
+    for (let i = AMBIENT_COUNT; i < TOTAL; i++) {
+      if (lifetimes[i] <= 0) {
+        // Dead particle — hide offscreen
+        posArray[i * 3 + 1] = -999;
+        sizeArray[i] = 0;
+        ageArray[i] = 1.0;
+        continue;
       }
 
-      if (Math.abs(posArray[idx]) > 15) posArray[idx] = -posArray[idx];
-      if (Math.abs(posArray[idx + 1]) > 9) posArray[idx + 1] = -posArray[idx + 1];
-      if (Math.abs(posArray[idx + 2]) > 6.5) posArray[idx + 2] = -posArray[idx + 2];
+      lifetimes[i] -= dt;
+      const age = 1.0 - (lifetimes[i] / maxLifetimes[i]); // 0=fresh, 1=dying
+      ageArray[i] = age;
+
+      const idx = i * 3;
+      const tIdx = (i - AMBIENT_COUNT) * 3;
+
+      // Apply velocity
+      posArray[idx]     += trailVelocities[tIdx]     * (1.0 - age * 0.7);
+      posArray[idx + 1] += trailVelocities[tIdx + 1] * (1.0 - age * 0.7);
+      posArray[idx + 2] += trailVelocities[tIdx + 2] * (1.0 - age * 0.5);
+
+      // Gravity: old particles drift down slowly
+      posArray[idx + 1] -= age * age * 0.008;
+
+      // Turbulence: subtle random jitter that increases with age
+      const turb = age * 0.012;
+      posArray[idx]     += (Math.random() - 0.5) * turb;
+      posArray[idx + 1] += (Math.random() - 0.5) * turb;
+
+      // Velocity drag (slow down over time)
+      trailVelocities[tIdx]     *= 0.985;
+      trailVelocities[tIdx + 1] *= 0.985;
+      trailVelocities[tIdx + 2] *= 0.98;
+
+      // Size: large spark → shrinking ember
+      const sizeCurve = 1.0 - age * age; // quadratic decay
+      sizeArray[i] = sizes[i] * sizeCurve * (0.3 + 0.7 * (1.0 - age));
     }
 
     posAttr.needsUpdate = true;
+    sizeAttr.needsUpdate = true;
+    ageAttr.needsUpdate = true;
   });
 
+  // --- Shader: vertex ---
   const vertexShader = `
     attribute float aSize;
+    attribute float aPhase;
+    attribute float aAge;
     uniform float uTime;
+    varying float vAge;
+    varying float vTwinkle;
+
     void main() {
+      vAge = aAge;
+      
+      // Ambient particles twinkle; trail particles don't need it
+      vTwinkle = aAge < 0.01 
+        ? 0.5 + 0.5 * sin(uTime * 1.5 + aPhase) 
+        : 1.0;
+      
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
-      gl_PointSize = aSize * (18.0 / -mvPosition.z);
+      
+      // Depth-based sizing
+      gl_PointSize = aSize * vTwinkle * (28.0 / -mvPosition.z);
+      
+      // Clamp so trail sparks don't get absurdly large up close
+      gl_PointSize = min(gl_PointSize, 48.0);
     }
   `;
 
+  // --- Shader: fragment ---
   const fragmentShader = `
     uniform vec3 uColor;
+    uniform float uTime;
+    varying float vAge;
+    varying float vTwinkle;
+
     void main() {
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = length(coord);
+      
+      // Soft circular mask
       if (dist > 0.5) discard;
-      float alpha = smoothstep(0.5, 0.02, dist);
-      vec3 color = mix(uColor, vec3(1.0, 0.18, 0.47), smoothstep(0.1, 0.5, coord.x + 0.5));
-      gl_FragColor = vec4(color, alpha * 0.72);
+      
+      // Radial glow: dense hot core, soft halo edge
+      float core = smoothstep(0.5, 0.0, dist);
+      float halo = smoothstep(0.5, 0.15, dist) * 0.35;
+      float brightness = core + halo;
+      
+      // === COLOR TEMPERATURE based on age ===
+      // age 0.0 = ambient steady glow (cool red)
+      // age 0.01-0.2 = FRESH trail spark (white-hot, blazing)
+      // age 0.2-0.6 = COOLING (bright orange-red)
+      // age 0.6-1.0 = DYING ember (deep dark crimson, fading)
+      
+      vec3 color;
+      float alpha;
+      
+      if (vAge < 0.01) {
+        // Ambient particle — steady crimson glow
+        color = mix(uColor, vec3(1.0, 0.3, 0.4), smoothstep(0.1, 0.45, coord.x + 0.5));
+        alpha = brightness * vTwinkle * 0.72;
+      } else {
+        // Trail particle — temperature-based coloring
+        vec3 whiteHot = vec3(1.0, 0.95, 0.9);        // blazing white
+        vec3 hotOrange = vec3(1.0, 0.4, 0.15);        // hot orange
+        vec3 warmRed = vec3(0.9, 0.12, 0.08);         // warm red
+        vec3 deadEmber = vec3(0.25, 0.02, 0.02);      // dying ember
+        
+        float age = vAge;
+        
+        if (age < 0.15) {
+          // White-hot spark phase
+          float t = age / 0.15;
+          color = mix(whiteHot, hotOrange, t);
+        } else if (age < 0.45) {
+          // Cooling phase
+          float t = (age - 0.15) / 0.30;
+          color = mix(hotOrange, warmRed, t);
+        } else {
+          // Dying ember phase
+          float t = (age - 0.45) / 0.55;
+          color = mix(warmRed, deadEmber, t);
+        }
+        
+        // Fresh sparks are brighter, dying embers are dimmer
+        float ageFade = 1.0 - age * age; // quadratic fadeout
+        alpha = brightness * ageFade * 1.2;
+        
+        // Extra core intensity for fresh sparks (the "POP")
+        float sparkPop = (1.0 - smoothstep(0.0, 0.2, age)) * core * 0.8;
+        alpha += sparkPop;
+      }
+      
+      alpha = clamp(alpha, 0.0, 1.0);
+      if (alpha < 0.005) discard;
+      
+      gl_FragColor = vec4(color, alpha);
     }
   `;
+
+  // Age attribute for all particles
+  const ageData = useMemo(() => new Float32Array(TOTAL), []);
 
   return (
     <points ref={pointsRef}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
         <bufferAttribute attach="attributes-aSize" args={[sizes, 1]} />
+        <bufferAttribute attach="attributes-aPhase" args={[phases, 1]} />
+        <bufferAttribute attach="attributes-aAge" args={[ageData, 1]} />
       </bufferGeometry>
       <shaderMaterial
         ref={materialRef}
@@ -2146,43 +2581,46 @@ const gridFragmentShader = `
     vec2 worldXZ = vWorldPosition.xz;
     float dist = length(worldXZ);
     
-    float cellSize = 2.0 + dist * 0.06;
+    // Crisp grid cells, size = 2.0 units
+    float cellSize = 2.0;
     vec2 gridCoord = worldXZ / cellSize;
     vec2 gridFract = fract(gridCoord);
     vec2 lineDist = abs(gridFract - 0.5) * 2.0;
     
-    float perspectiveFade = 1.0 - smoothstep(5.0, 30.0, dist);
-    float nearFade = smoothstep(0.0, 4.0, dist);
+    float perspectiveFade = 1.0 - smoothstep(12.0, 50.0, dist);
     
-    float lineWidth = 0.002 + 0.003 * perspectiveFade;
-    float majorLineWidth = 0.006 + 0.008 * perspectiveFade;
+    // Visible but refined grid lines
+    float lineWidth = 0.014 * perspectiveFade;
+    float majorLineWidth = 0.028 * perspectiveFade;
     
-    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.x);
-    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.006, lineDist.y);
+    float lineX = 1.0 - smoothstep(lineWidth, lineWidth + 0.004, lineDist.x);
+    float lineZ = 1.0 - smoothstep(lineWidth, lineWidth + 0.004, lineDist.y);
     float regularLine = max(lineX, lineZ);
     
+    // Major lines every 5 cells
     float majorCellSize = cellSize * 5.0;
     vec2 majorCoord = worldXZ / majorCellSize;
     vec2 majorFract = fract(majorCoord);
     vec2 majorDist = abs(majorFract - 0.5) * 2.0;
-    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.015, majorDist.x);
-    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.015, majorDist.y);
+    float majorX = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.008, majorDist.x);
+    float majorZ = 1.0 - smoothstep(majorLineWidth, majorLineWidth + 0.008, majorDist.y);
     float majorLine = max(majorX, majorZ);
     
-    float pulseSpeed = 1.8;
+    // Pulse animation lines
+    float pulseSpeed = 1.5;
     float pulseX = sin(gridCoord.x * 6.283 + uTime * pulseSpeed) * 0.5 + 0.5;
-    float pulseZ = sin(gridCoord.y * 6.283 + uTime * pulseSpeed * 0.7 + 1.5) * 0.5 + 0.5;
-    float dataPulse = max(pulseX * lineX, pulseZ * lineZ) * 0.35;
+    float pulseZ = sin(gridCoord.y * 6.283 + uTime * pulseSpeed * 0.7 + 1.0) * 0.5 + 0.5;
+    float dataPulse = max(pulseX * lineX, pulseZ * lineZ) * 0.22;
     
-    float gridPattern = max(regularLine * 0.10, majorLine * 0.22) * perspectiveFade;
+    float gridPattern = max(regularLine * 0.25, majorLine * 0.50) * perspectiveFade;
     gridPattern += dataPulse * perspectiveFade;
     
-    float nodeGlow = exp(-length(lineDist) * 8.0) * 0.12 * perspectiveFade;
+    float nodeGlow = exp(-length(lineDist) * 9.0) * 0.06 * perspectiveFade;
     
-    float horizonFade = 1.0 - smoothstep(4.0, 35.0, dist);
-    float heightFade = smoothstep(-0.5, 0.0, vWorldPosition.y + 2.0);
+    float horizonFade = 1.0 - smoothstep(5.0, 40.0, dist);
+    float heightFade = smoothstep(-0.5, 0.0, vWorldPosition.y + 2.2);
     
-    float centerGlow = exp(-dist * dist * 0.12) * 0.05;
+    float centerGlow = exp(-dist * dist * 0.08) * 0.04;
     
     vec3 baseColor = vec3(0.35, 0.03, 0.08);
     vec3 pulseColor = vec3(0.80, 0.06, 0.15);
@@ -2190,24 +2628,40 @@ const gridFragmentShader = `
     vec3 nodeColor = vec3(0.90, 0.08, 0.18);
     
     vec3 color = mix(baseColor, majorColor, majorLine) * gridPattern;
-    color += pulseColor * dataPulse * 0.6;
+    color += pulseColor * dataPulse * 0.5;
     color += nodeColor * nodeGlow;
     color += vec3(0.60, 0.03, 0.08) * centerGlow;
-    color += vec3(0.08, 0.005, 0.015) * horizonFade * 0.4;
+    color += vec3(0.08, 0.005, 0.015) * horizonFade * 0.3;
     
-    float alpha = (gridPattern + nodeGlow * 0.3 + centerGlow) * horizonFade * heightFade * nearFade;
-    alpha = clamp(alpha, 0.0, 0.22);
+    // Add mouse glow highlight to grid lines
+    float distToMouseFloor = length(vWorldPosition - uMouseFloor);
+    float mouseFloorGlow = exp(-distToMouseFloor * distToMouseFloor * 0.18) * 0.45;
+    color += vec3(1.0, 0.18, 0.28) * mouseFloorGlow * (regularLine + majorLine * 1.5) * perspectiveFade;
+    
+    float alpha = (gridPattern + nodeGlow * 0.35 + centerGlow) * horizonFade * heightFade;
+    alpha += mouseFloorGlow * 0.40 * perspectiveFade;
+    alpha = clamp(alpha, 0.0, 0.65);
     
     gl_FragColor = vec4(color, alpha);
   }
 `;
 
+import { useMousePosition } from "@/hooks/useMousePosition";
+import { MeshReflectorMaterial } from "@react-three/drei";
+
 export default function NeonGrid() {
   const gridMaterialRef = useRef<THREE.ShaderMaterial>(null);
+  const mouse = useMousePosition(0.08);
+
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 2.14), []);
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const mouseVec = useMemo(() => new THREE.Vector2(), []);
+  const intersection = useMemo(() => new THREE.Vector3(), []);
 
   const gridUniforms = useMemo(
     () => ({
       uTime: { value: 0.0 },
+      uMouseFloor: { value: new THREE.Vector3(0, 0, 0) },
     }),
     []
   );
@@ -2215,11 +2669,19 @@ export default function NeonGrid() {
   useFrame((state) => {
     if (gridMaterialRef.current) {
       gridMaterialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
+
+      // Raycast cursor onto floor plane to get world intersection coordinate
+      mouseVec.set(mouse.x, mouse.y);
+      raycaster.setFromCamera(mouseVec, state.camera);
+      if (raycaster.ray.intersectPlane(plane, intersection)) {
+        gridMaterialRef.current.uniforms.uMouseFloor.value.copy(intersection);
+      }
     }
   });
 
   return (
-    <group position={[0, -2.15, 0]}>
+    <group position={[0, -2.14, 0]}>
+      {/* Primary Grid Mesh */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[200, 200, 1, 1]} />
         <shaderMaterial
@@ -2234,23 +2696,33 @@ export default function NeonGrid() {
         />
       </mesh>
       
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]}>
-        <planeGeometry args={[50, 50]} />
-        <meshBasicMaterial
-          color="#0a0002"
+      {/* Real-time Glossy Floor Reflector base plane */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+        <planeGeometry args={[100, 100]} />
+        <MeshReflectorMaterial
+          mirror={1.0}
+          blur={[300, 100]}
+          resolution={1024}
+          mixBlur={1.0}
+          mixStrength={35}
+          roughness={1}
+          depthScale={1.2}
+          minDepthThreshold={0.4}
+          maxDepthThreshold={1.4}
+          color="#060102"
+          metalness={0.5}
           transparent
-          opacity={0.25}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
+          opacity={0.7}
         />
       </mesh>
       
-      <mesh position={[0, -2.14, -25]} rotation={[0, 0, 0]}>
-        <planeGeometry args={[100, 0.3]} />
+      {/* Horizon Accent line */}
+      <mesh position={[0, 0.01, -30]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[120, 0.2]} />
         <meshBasicMaterial
           color="#ff1744"
           transparent
-          opacity={0.04}
+          opacity={0.03}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -2270,8 +2742,67 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import * as THREE from "three";
+
+const CRTShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uTime: { value: 0.0 },
+    uResolution: { value: new THREE.Vector2() },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform vec2 uResolution;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 uv = vUv;
+      
+      // CRT screen warp (fisheye distortion)
+      vec2 dc = uv - vec2(0.5);
+      float distSq = dot(dc, dc);
+      uv = vec2(0.5) + dc * (1.0 + 0.025 * distSq);
+      
+      // Render black borders outside CRT bounds
+      if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+      }
+      
+      vec4 color = texture2D(tDiffuse, uv);
+      
+      // Horizontal Scanlines
+      float scanline = sin(uv.y * uResolution.y * 1.6) * 0.025;
+      
+      // Vertical color grill structure
+      float grill = sin(uv.x * uResolution.x * 2.0) * 0.012;
+      
+      color.rgb -= scanline;
+      color.rgb -= grill;
+      
+      // Micro CRT noise flicker
+      float noise = sin(uTime * 45.0) * 0.003;
+      color.rgb += noise;
+      
+      // CRT vignette
+      float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
+      vignette = clamp(pow(16.0 * vignette, 0.22), 0.0, 1.0);
+      color.rgb *= vignette;
+      
+      gl_FragColor = color;
+    }
+  `
+};
 
 export default function PostProcessing() {
   const { gl, scene, camera, size } = useThree();
@@ -2287,10 +2818,14 @@ export default function PostProcessing() {
       0.40
     );
 
+    const crtPass = new ShaderPass(CRTShader);
+    crtPass.uniforms.uResolution.value.set(size.width, size.height);
+
     const outputPass = new OutputPass();
 
     instance.addPass(renderPass);
     instance.addPass(bloomPass);
+    instance.addPass(crtPass);
     instance.addPass(outputPass);
 
     return instance;
@@ -2302,7 +2837,12 @@ export default function PostProcessing() {
     return () => composer.dispose();
   }, [composer, size.width, size.height]);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
+    composer.passes.forEach((pass) => {
+      if (pass instanceof ShaderPass && pass.uniforms.uTime) {
+        pass.uniforms.uTime.value = state.clock.getElapsedTime();
+      }
+    });
     composer.render(delta);
   }, 1);
 
@@ -2321,16 +2861,19 @@ import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
 import { useDeviceSize } from "@/hooks/useDeviceSize";
 import NebulaBackground from "./NebulaBackground";
+import AuroraRibbons from "./AuroraRibbons";
 import StarField from "./StarField";
-import NeonGrid from "./NeonGrid";
-import FloatingLaptop from "./FloatingLaptop";
-import TechCubes from "./TechCubes";
+import ShootingStars from "./ShootingStars";
 import DeepSpaceGlobe from "./DeepSpaceGlobe";
-import MagneticParticles from "./MagneticParticles";
 import VolumetricRays from "./VolumetricRays";
+import MagneticParticles from "./MagneticParticles";
 import FloatingHexParticles from "./FloatingHexParticles";
-import PostProcessing from "./PostProcessing";
+import FloatingDebris from "./FloatingDebris";
+import TechCubes from "./TechCubes";
+import FloatingLaptop from "./FloatingLaptop";
+import NeonGrid from "./NeonGrid";
 import FloorRings from "./FloorRings";
+import PostProcessing from "./PostProcessing";
 
 interface SceneProps {
   scrollProgress: number;
@@ -2382,11 +2925,14 @@ export default function Scene({ scrollProgress }: SceneProps) {
 
         <Suspense fallback={null}>
           <NebulaBackground />
+          <AuroraRibbons />
           <StarField />
+          <ShootingStars />
           <DeepSpaceGlobe />
           <VolumetricRays />
           <MagneticParticles />
           <FloatingHexParticles />
+          <FloatingDebris />
           <TechCubes />
           <FloatingLaptop />
           <NeonGrid />
@@ -2396,6 +2942,133 @@ export default function Scene({ scrollProgress }: SceneProps) {
         </Suspense>
       </Canvas>
     </div>
+  );
+}
+```
+
+## File: `src/components/canvas/ShootingStars.tsx`
+
+```typescript
+"use client";
+
+import React, { useRef, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+
+interface StarData {
+  pos: THREE.Vector3;
+  dir: THREE.Vector3;
+  speed: number;
+  length: number;
+  progress: number;
+  delay: number;
+  width: number;
+}
+
+export default function ShootingStars() {
+  const lineRef = useRef<THREE.LineSegments>(null);
+  const count = 3;
+
+  // Pool of shooting star parameters
+  const stars = useMemo(() => {
+    const data: StarData[] = [];
+    for (let i = 0; i < count; i++) {
+      data.push({
+        pos: new THREE.Vector3(),
+        dir: new THREE.Vector3(-1.0, -0.4, 0).normalize(), // diagonal trajectory
+        speed: 12.0 + Math.random() * 8.0,
+        length: 2.0 + Math.random() * 3.0,
+        progress: 0,
+        delay: Math.random() * 8.0,
+        width: 0.8 + Math.random() * 1.5
+      });
+    }
+    return data;
+  }, []);
+
+  // Geometry attributes buffers
+  const [positions, colors] = useMemo(() => {
+    const pos = new Float32Array(count * 2 * 3); // 2 vertices per star, 3 coords
+    const col = new Float32Array(count * 2 * 3); // RGB per vertex
+    return [pos, col];
+  }, []);
+
+  const resetStar = (star: StarData) => {
+    star.pos.set(
+      15.0 + Math.random() * 20.0, // start top-right
+      6.0 + Math.random() * 8.0,
+      -20.0 - Math.random() * 15.0 // far background depth
+    );
+    star.progress = 0;
+    star.delay = 4.0 + Math.random() * 12.0; // random wait time before next streak
+    star.speed = 15.0 + Math.random() * 10.0;
+    star.length = 3.0 + Math.random() * 4.0;
+  };
+
+  useFrame((_, delta) => {
+    if (!lineRef.current) return;
+    const geo = lineRef.current.geometry;
+    const posAttr = geo.attributes.position;
+    const colAttr = geo.attributes.color;
+    const posArray = posAttr.array as Float32Array;
+    const colArray = colAttr.array as Float32Array;
+
+    stars.forEach((star, i) => {
+      const idx = i * 6; // 6 values per line (2 vertices * 3 coords)
+
+      if (star.delay > 0) {
+        star.delay -= delta;
+        // Keep star hidden offscreen when inactive
+        posArray[idx] = 0; posArray[idx + 1] = -999; posArray[idx + 2] = 0;
+        posArray[idx + 3] = 0; posArray[idx + 4] = -999; posArray[idx + 2] = 0;
+        return;
+      }
+
+      // Animate streak progress
+      star.progress += delta * star.speed;
+      const head = star.pos.clone().addScaledVector(star.dir, star.progress);
+      const tail = star.pos.clone().addScaledVector(star.dir, Math.max(0, star.progress - star.length));
+
+      // Set line segment vertices
+      posArray[idx]     = head.x;
+      posArray[idx + 1] = head.y;
+      posArray[idx + 2] = head.z;
+      
+      posArray[idx + 3] = tail.x;
+      posArray[idx + 4] = tail.y;
+      posArray[idx + 5] = tail.z;
+
+      // Color gradient fade (head is bright white, tail is red-crimson)
+      const opacity = Math.sin(Math.min(1.0, star.progress / 5.0) * Math.PI); // fade in/out curve
+      
+      // Head vertex: white-hot
+      colArray[idx]     = 1.0 * opacity;
+      colArray[idx + 1] = 0.95 * opacity;
+      colArray[idx + 2] = 0.9 * opacity;
+
+      // Tail vertex: fading red-pink
+      colArray[idx + 3] = 0.9 * opacity;
+      colArray[idx + 4] = 0.05 * opacity;
+      colArray[idx + 5] = 0.12 * opacity;
+
+      // Reset when completed
+      if (star.progress > 30.0) {
+        resetStar(star);
+      }
+    });
+
+    posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
+  });
+
+  return (
+    <lineSegments ref={lineRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[colors, 3]} />
+      </bufferGeometry>
+      <lineBasicMaterial vertexColors transparent opacity={0.65} blending={THREE.AdditiveBlending} depthWrite={false} linewidth={1.5} />
+    </lineSegments>
   );
 }
 ```
@@ -2730,7 +3403,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
           <meshBasicMaterial color={color} transparent opacity={0.1} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
         <MeshTransmissionMaterial
-          color={new THREE.Color(color).lerp(new THREE.Color("#f7fbff"), 0.72)}
+          color={new THREE.Color(color).lerp(new THREE.Color("#fff0f0"), 0.72)}
           transmission={1}
           thickness={0.08}
           roughness={0.012}
@@ -2741,7 +3414,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
           distortion={0}
           distortionScale={0}
           temporalDistortion={0}
-          attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#f0fbff"), 0.35)}
+          attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#fff0f0"), 0.35)}
           attenuationDistance={0.95}
           emissive={glow}
           emissiveIntensity={hovered ? 0.35 : 0.18}
@@ -2766,12 +3439,12 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
       </mesh>
 
       <mesh position={[0, 0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.48, 0.515, 4]} />
+        <ringGeometry args={[0.48, 0.515, 32]} />
         <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.12 : 0.05} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, -0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.48, 0.515, 4]} />
+        <ringGeometry args={[0.48, 0.515, 32]} />
         <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.08 : 0.03} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 

@@ -7,15 +7,16 @@ import { CinematicCamera } from "@/animations/scrollCamera";
 import { useDeviceSize } from "@/hooks/useDeviceSize";
 import NebulaBackground from "./NebulaBackground";
 import StarField from "./StarField";
-import NeonGrid from "./NeonGrid";
-import FloatingLaptop from "./FloatingLaptop";
-import TechCubes from "./TechCubes";
+import ShootingStars from "./ShootingStars";
 import DeepSpaceGlobe from "./DeepSpaceGlobe";
-import MagneticParticles from "./MagneticParticles";
 import VolumetricRays from "./VolumetricRays";
+import MagneticParticles from "./MagneticParticles";
 import FloatingHexParticles from "./FloatingHexParticles";
-import PostProcessing from "./PostProcessing";
+import TechCubes from "./TechCubes";
+import FloatingLaptop from "./FloatingLaptop";
+import NeonGrid from "./NeonGrid";
 import FloorRings from "./FloorRings";
+import PostProcessing from "./PostProcessing";
 
 interface SceneProps {
   scrollProgress: number;
@@ -68,6 +69,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
         <Suspense fallback={null}>
           <NebulaBackground />
           <StarField />
+          <ShootingStars />
           <DeepSpaceGlobe />
           <VolumetricRays />
           <MagneticParticles />
