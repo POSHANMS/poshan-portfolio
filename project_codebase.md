@@ -40,36 +40,29 @@ import * as THREE from "three";
 
 const sceneCoordinates = [
   {
-    camera: new THREE.Vector3(0.2, 2.2, 7.85),
-    lookAt: new THREE.Vector3(0.15, 1.62, 0),
-    fov: 43,
-  },
-  {
-    camera: new THREE.Vector3(2.5, 0.45, 2.6),
-    lookAt: new THREE.Vector3(2.45, 0.35, -0.2),
+    // Station 1 — Close/Low: intimate view near the laptop, slightly looking up at globe behind
+    camera: new THREE.Vector3(0.5, 0.5, 8.0),
+    lookAt: new THREE.Vector3(0.8, 0.0, -1.0),
     fov: 45,
   },
   {
-    camera: new THREE.Vector3(-2.0, 1.2, 9),
-    lookAt: new THREE.Vector3(0, 0.5, 0),
-    fov: 55,
+    // Station 2 — Mid Swing: dynamic lateral swing to the left, mathematically positioned for full globe ring headroom
+    camera: new THREE.Vector3(-3.5, 2.8, 9.0),
+    lookAt: new THREE.Vector3(1.2, 1.3, -1.5),
+    fov: 58,
   },
   {
-    camera: new THREE.Vector3(3.5, 2.0, 8),
-    lookAt: new THREE.Vector3(0, 0.5, 0),
+    // Station 3 — Wide Establishing: centered high angle, pulled in slightly closer to keep group unified
+    camera: new THREE.Vector3(0.0, 3.8, 12.5),
+    lookAt: new THREE.Vector3(0.5, 0.2, -2.5),
     fov: 52,
-  },
-  {
-    camera: new THREE.Vector3(0, 2.0, 14),
-    lookAt: new THREE.Vector3(0, 0, 0),
-    fov: 65,
   },
 ];
 
 export function CinematicCamera({ scrollProgress }: { scrollProgress: number }) {
-  const currentPos = useRef(new THREE.Vector3(0.2, 2.2, 7.85));
-  const currentLookAt = useRef(new THREE.Vector3(0.15, 1.62, 0));
-  const currentFov = useRef(43);
+  const currentPos = useRef(new THREE.Vector3(0.5, 0.5, 8));
+  const currentLookAt = useRef(new THREE.Vector3(0.8, 0, -1));
+  const currentFov = useRef(45);
 
   useFrame((state) => {
     const segmentCount = sceneCoordinates.length - 1;
@@ -1023,6 +1016,104 @@ body {
 .dashboard-stage {
   top: calc(50% + 6px);
 }
+
+
+
+/* ═══════ LOADER KEYFRAMES ═══════ */
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes logo-pulse {
+  0%, 100% { 
+    filter: drop-shadow(0 0 15px rgba(255, 0, 51, 0.4));
+    opacity: 0.9;
+  }
+  50% { 
+    filter: drop-shadow(0 0 25px rgba(255, 0, 51, 0.7));
+    opacity: 1;
+  }
+}
+
+@keyframes scanline-flicker {
+  0%, 100% { opacity: 0.02; }
+  50% { opacity: 0.04; }
+}
+
+@keyframes glitch-shift {
+  0%, 90%, 100% { transform: translate(0); }
+  92% { transform: translate(-2px, 1px); }
+  94% { transform: translate(2px, -1px); }
+  96% { transform: translate(-1px, 2px); }
+}
+
+/* ═══════ LOADER UTILITY CLASSES ═══════ */
+
+.loader-scanlines {
+  position: relative;
+}
+
+.loader-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 0, 51, 0.015) 2px,
+    rgba(255, 0, 51, 0.015) 4px
+  );
+  pointer-events: none;
+  animation: scanline-flicker 4s ease-in-out infinite;
+}
+
+/* ═══════ DASHBOARD HERO FIXES ═══════ */
+
+/* Ensure dashboard stage doesn't show during loading */
+.dashboard-stage {
+  opacity: 0;
+  animation: stage-reveal 1.5s ease-out 0.3s forwards;
+}
+
+@keyframes stage-reveal {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(var(--stage-scale, 1)); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(var(--stage-scale, 1)); }
+}
+
+/* ═══════ SMOOTH SCROLL CAMERA ═══════ */
+
+/* Prevent content jump during scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Ensure canvas doesn't flicker */
+canvas {
+  display: block;
+}
+
+/* ═══════ REDUCED MOTION ═══════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-stage {
+    animation: none;
+    opacity: 1;
+  }
+
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 ```
 
 ## File: `src/app/layout.tsx`
@@ -1031,7 +1122,6 @@ body {
 import type { Metadata } from "next";
 import "./globals.css";
 import Cursor from "@/components/ui/Cursor";
-import Loader from "@/components/ui/Loader";
 import Navbar from "@/components/ui/Navbar";
 
 export const metadata: Metadata = {
@@ -1057,7 +1147,6 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className="font-sans bg-[#050508] text-[#f0f0f0] antialiased min-h-screen selection:bg-[var(--electric-blue)]/30 selection:text-white" suppressHydrationWarning>
         <Cursor />
-        <Loader />
         <Navbar />
         {children}
       </body>
@@ -1076,6 +1165,7 @@ import dynamic from "next/dynamic";
 import { initScrollCamera } from "@/animations/scrollCamera";
 import DashboardHero from "@/components/ui/DashboardHero";
 import SocialSidebar from "@/components/ui/SocialSidebar";
+import Loader from "@/components/ui/Loader";
 import About from "@/components/sections/About";
 import Skills from "@/components/sections/Skills";
 import Projects from "@/components/sections/Projects";
@@ -1086,6 +1176,8 @@ const Scene = dynamic(() => import("@/components/canvas/Scene"), {
   ssr: false,
   loading: () => null,
 });
+
+const SHOW_DEV_RULER = false;
 
 function useStageScale() {
   const [scale, setScale] = useState(1);
@@ -1107,132 +1199,119 @@ function useStageScale() {
 
 export default function Home() {
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [loaderComplete, setLoaderComplete] = useState(false);
+  const [sceneReady, setSceneReady] = useState(false);
   const stageScale = useStageScale();
 
+  // Initialize scroll camera
   useEffect(() => {
     const scrollControl = initScrollCamera((progress) => {
       setScrollProgress(progress);
     });
+
     return () => {
       if (scrollControl) scrollControl.destroy();
     };
   }, []);
 
+  // Set scene ready state when loader finishes
+  useEffect(() => {
+    if (loaderComplete) {
+      setSceneReady(true);
+    }
+  }, [loaderComplete]);
+
   return (
-    <main className="relative min-h-[500vh] bg-[#0a0002]">
-      <Scene scrollProgress={scrollProgress} />
-      <SocialSidebar />
-      <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
-      <div className="relative z-10 -mt-px bg-[linear-gradient(180deg,rgba(10,0,2,0.38)_0%,rgba(10,0,2,0.82)_18%,rgba(10,0,2,0.94)_100%)]">
+    <main className="relative min-h-[500vh] bg-[#030001]">
+      {/* Preload Sequence Loader (z-index 99999) */}
+      {!loaderComplete && (
+        <Loader onComplete={() => setLoaderComplete(true)} />
+      )}
+
+      {/* 3D WebGL Scene — mounted continuously behind loader for zero pop-in */}
+      <div
+        className="fixed inset-0 z-0 h-full w-full"
+        style={{
+          opacity: sceneReady ? 1 : 0.9,
+          transition: "opacity 1s ease-out",
+        }}
+      >
+        <Scene scrollProgress={scrollProgress} />
+      </div>
+
+      {/* Social sidebar — appears after loader completes */}
+      <div
+        style={{
+          opacity: loaderComplete ? 1 : 0,
+          pointerEvents: loaderComplete ? "auto" : "none",
+          transition: "opacity 1s ease-out 0.3s",
+        }}
+      >
+        <SocialSidebar />
+      </div>
+
+      {/* Dashboard Hero — Station 1 UI overlay */}
+      <div
+        style={{
+          opacity: loaderComplete ? 1 : 0,
+          pointerEvents: loaderComplete ? "auto" : "none",
+          transition: "opacity 1.2s ease-out 0.4s",
+        }}
+      >
+        <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
+      </div>
+
+      {/* Content sections — fade in as user scrolls down */}
+      <div
+        className="relative z-10 -mt-px"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(3,0,1,0.4) 0%, rgba(10,0,2,0.82) 18%, rgba(10,0,2,0.94) 100%)",
+          opacity: loaderComplete ? 1 : 0,
+          pointerEvents: loaderComplete ? "auto" : "none",
+          transition: "opacity 1.5s ease-out",
+        }}
+      >
         <About />
         <Skills />
         <Projects />
         <Experience />
         <Contact />
       </div>
+
+      {/* Dev ruler — hidden by default */}
+      {SHOW_DEV_RULER && loaderComplete && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-black/85 border border-red-900/60 text-red-500 px-4 py-2.5 rounded-md font-mono shadow-2xl flex flex-col items-center gap-1.5 min-w-[280px]"
+          style={{ backdropFilter: "blur(4px)" }}
+        >
+          <div className="flex items-center gap-2 text-xs font-semibold tracking-wider">
+            <span>SCROLL PROGRESS:</span>
+            <span className="text-white text-sm font-bold bg-red-950/60 px-1.5 py-0.5 rounded border border-red-800/40">
+              {scrollProgress.toFixed(3)}
+            </span>
+          </div>
+          <div className="relative w-full h-5 border-b border-red-950 flex justify-between mt-1">
+            <div className="absolute left-0 bottom-0 w-px h-2.5 bg-red-800" />
+            <div className="absolute left-1/4 bottom-0 w-px h-1.5 bg-red-950" />
+            <div className="absolute left-1/2 bottom-0 w-px h-3.5 bg-red-500 -translate-x-1/2 animate-pulse" />
+            <div className="absolute left-3/4 bottom-0 w-px h-1.5 bg-red-950" />
+            <div className="absolute right-0 bottom-0 w-px h-2.5 bg-red-800" />
+            <div
+              className="absolute bottom-0 w-1.5 h-4 bg-red-500 -translate-x-1/2 shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+              style={{ left: `${scrollProgress * 100}%` }}
+            />
+          </div>
+          <div className="flex justify-between w-full text-[9px] text-red-800/80 font-bold px-0.5 mt-0.5">
+            <span>0.00</span>
+            <span>0.25</span>
+            <span>0.50</span>
+            <span>0.75</span>
+            <span>1.00</span>
+          </div>
+        </div>
+      )}
     </main>
-  );
-}
-```
-
-## File: `src/components/canvas/AuroraRibbons.tsx`
-
-```typescript
-"use client";
-
-import React, { useRef, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
-import * as THREE from "three";
-
-const auroraVertexShader = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const auroraFragmentShader = `
-  uniform float uTime;
-  varying vec2 vUv;
-
-  // Sinuous sine-wave noise for aurora ribbons
-  float ribbonNoise(vec2 p, float time) {
-    float v = 0.0;
-    v += sin(p.x * 2.5 + time * 1.2) * 0.45;
-    v += sin(p.x * 5.0 - time * 0.8) * 0.22;
-    v += sin(p.x * 9.5 + time * 1.5) * 0.12;
-    return v;
-  }
-
-  void main() {
-    vec2 uv = vUv;
-    float t = uTime * 0.4;
-    
-    // Wave 1
-    float wave1 = ribbonNoise(uv, t);
-    float dist1 = abs(uv.y - 0.5 - wave1 * 0.22);
-    float ribbon1 = smoothstep(0.18, 0.0, dist1);
-    
-    // Wave 2 (offset for multi-ribbon layer)
-    float wave2 = ribbonNoise(uv + vec2(1.8, 0.3), t * 0.7);
-    float dist2 = abs(uv.y - 0.42 - wave2 * 0.18);
-    float ribbon2 = smoothstep(0.15, 0.0, dist2);
-    
-    // Combine ribbons
-    float intensity = ribbon1 * 0.65 + ribbon2 * 0.45;
-    
-    // Smooth fade borders so it blends into space
-    float edgeFade = smoothstep(0.0, 0.2, uv.x) * smoothstep(1.0, 0.8, uv.x) *
-                     smoothstep(0.0, 0.25, uv.y) * smoothstep(1.0, 0.75, uv.y);
-                     
-    intensity *= edgeFade;
-    
-    // Neon Red/Violet glowing aurora colors
-    vec3 color1 = vec3(0.95, 0.02, 0.08); // pure crimson
-    vec3 color2 = vec3(0.55, 0.01, 0.28); // deep violet-red
-    vec3 color = mix(color1, color2, wave1 * 0.5 + 0.5) * intensity;
-    
-    // Bright neon-pink peaks
-    color += vec3(1.0, 0.3, 0.4) * pow(intensity, 2.5) * 0.4;
-
-    if (intensity < 0.005) discard;
-
-    gl_FragColor = vec4(color, intensity * 0.15); // soft opacity
-  }
-`;
-
-export default function AuroraRibbons() {
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
-
-  const uniforms = useMemo(
-    () => ({
-      uTime: { value: 0.0 },
-    }),
-    []
-  );
-
-  useFrame((state) => {
-    if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
-    }
-  });
-
-  return (
-    <mesh position={[0, 9, -38]} renderOrder={-96}>
-      <planeGeometry args={[95, 30]} />
-      <shaderMaterial
-        ref={materialRef}
-        vertexShader={auroraVertexShader}
-        fragmentShader={auroraFragmentShader}
-        uniforms={uniforms}
-        transparent
-        depthWrite={false}
-        depthTest={false}
-        blending={THREE.AdditiveBlending}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
   );
 }
 ```
@@ -1242,43 +1321,133 @@ export default function AuroraRibbons() {
 ```typescript
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-export default function DeepSpaceGlobe() {
+const globeVertexShader = `
+  varying vec2 vUv;
+  varying vec3 vNormal;
+  void main() {
+    vUv = uv;
+    vNormal = normalize(normalMatrix * normal);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const globeFragmentShader = `
+  uniform float uTime;
+  uniform float uSpeed;
+  uniform vec3 uColor;
+  uniform float uOpacity;
+  varying vec2 vUv;
+  varying vec3 vNormal;
+
+  void main() {
+    // Hologram grid lines
+    vec2 gridDensity = vec2(48.0, 24.0);
+    vec2 gridUv = fract(vUv * gridDensity);
+    vec2 gridLines = smoothstep(0.06, 0.0, abs(gridUv - 0.5));
+    float gridPattern = max(gridLines.x, gridLines.y);
+
+    // Sliding scanlines
+    float scanline = sin(vUv.y * 110.0 - uTime * uSpeed * 6.0) * 0.5 + 0.5;
+
+    // Fresnel rim glow
+    float fresnel = pow(1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.5);
+
+    vec3 col = uColor;
+    if (gridPattern > 0.01) {
+      col = mix(col, vec3(1.0, 0.5, 0.6), gridPattern * 0.5);
+    }
+
+    float alpha = uOpacity * (gridPattern * 0.6 + 0.15) * (0.7 + 0.3 * scanline);
+    alpha += fresnel * 0.35 * (0.8 + 0.2 * scanline);
+
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+interface DeepSpaceGlobeProps {
+  scrollProgress: number;
+}
+
+export default function DeepSpaceGlobe({ scrollProgress }: DeepSpaceGlobeProps) {
   const globeRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Group>(null);
 
+  const mainShaderRef = useRef<THREE.ShaderMaterial>(null);
+  const secondShaderRef = useRef<THREE.ShaderMaterial>(null);
+
+  const mainUniforms = useMemo(
+    () => ({
+      uTime: { value: 0.0 },
+      uSpeed: { value: 0.8 },
+      uColor: { value: new THREE.Color("#ff1744") },
+      uOpacity: { value: 0.45 },
+    }),
+    []
+  );
+
+  const secondUniforms = useMemo(
+    () => ({
+      uTime: { value: 0.0 },
+      uSpeed: { value: 1.4 },
+      uColor: { value: new THREE.Color("#ff4444") },
+      uOpacity: { value: 0.28 },
+    }),
+    []
+  );
+
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
+
+    if (mainShaderRef.current) mainShaderRef.current.uniforms.uTime.value = t;
+    if (secondShaderRef.current) secondShaderRef.current.uniforms.uTime.value = t;
+
+    // Spin speeds up dynamically when scrolling
     if (globeRef.current) {
-      globeRef.current.rotation.y = t * 0.06;
+      globeRef.current.rotation.y = t * 0.08 + scrollProgress * 0.95;
       globeRef.current.rotation.x = Math.sin(t * 0.15) * 0.06;
     }
     if (ringRef.current) {
-      ringRef.current.rotation.z = t * 0.035;
+      ringRef.current.rotation.z = t * 0.035 + scrollProgress * 0.45;
       ringRef.current.rotation.y = Math.sin(t * 0.1) * 0.1;
     }
   });
 
-  // Positioned upper right like reference image - closer and more visible
   return (
-    <group position={[10, 6, -20]} scale={1.8} renderOrder={-8}>
+    <group position={[4.5, 2.5, -8]} scale={2.2} renderOrder={-8}>
       <pointLight position={[0, 0, 2.2]} color="#ff1744" intensity={2.0} distance={15} decay={2} />
       <pointLight position={[-2.2, 1.8, 0.5]} color="#ff8a80" intensity={0.5} distance={10} decay={2} />
 
       <group ref={globeRef}>
-        {/* Main wireframe sphere */}
+        {/* Main wireframe hologram sphere */}
         <mesh>
           <sphereGeometry args={[1.1, 64, 36]} />
-          <meshBasicMaterial color="#ff1744" wireframe transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <shaderMaterial
+            ref={mainShaderRef}
+            vertexShader={globeVertexShader}
+            fragmentShader={globeFragmentShader}
+            uniforms={mainUniforms}
+            transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
         </mesh>
 
-        {/* Secondary wireframe */}
+        {/* Secondary inner hologram sphere */}
         <mesh scale={[1.015, 1.015, 1.015]}>
           <sphereGeometry args={[1.1, 32, 18]} />
-          <meshBasicMaterial color="#ff4444" wireframe transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <shaderMaterial
+            ref={secondShaderRef}
+            vertexShader={globeVertexShader}
+            fragmentShader={globeFragmentShader}
+            uniforms={secondUniforms}
+            transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
         </mesh>
 
         {/* Equator ring */}
@@ -1316,100 +1485,6 @@ export default function DeepSpaceGlobe() {
         <meshBasicMaterial color="#ff1744" transparent opacity={0.03} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
     </group>
-  );
-}
-```
-
-## File: `src/components/canvas/FloatingDebris.tsx`
-
-```typescript
-"use client";
-
-import React, { useRef, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
-import * as THREE from "three";
-
-export default function FloatingDebris() {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const count = 32;
-
-  // Generate random trajectories for each debris chunk
-  const debrisData = useMemo(() => {
-    const data = [];
-    for (let i = 0; i < count; i++) {
-      data.push({
-        position: new THREE.Vector3(
-          (Math.random() - 0.5) * 32,
-          (Math.random() - 0.5) * 16,
-          -10 - Math.random() * 20
-        ),
-        rotation: new THREE.Euler(
-          Math.random() * Math.PI,
-          Math.random() * Math.PI,
-          0
-        ),
-        rotSpeed: new THREE.Vector3(
-          (Math.random() - 0.5) * 0.4,
-          (Math.random() - 0.5) * 0.4,
-          (Math.random() - 0.5) * 0.4
-        ),
-        drift: new THREE.Vector3(
-          (Math.random() - 0.5) * 0.02,
-          (Math.random() - 0.5) * 0.02,
-          (Math.random() - 0.5) * 0.01
-        ),
-        scale: 0.15 + Math.random() * 0.35,
-      });
-    }
-    return data;
-  }, []);
-
-  const dummy = useMemo(() => new THREE.Object3D(), []);
-
-  useFrame((state) => {
-    if (!meshRef.current) return;
-    const t = state.clock.getElapsedTime();
-
-    debrisData.forEach((data, i) => {
-      // Slowly drift positions
-      data.position.x += data.drift.x;
-      data.position.y += data.drift.y;
-      data.position.z += data.drift.z;
-
-      // Wrap boundaries to keep inside scene
-      if (Math.abs(data.position.x) > 20) data.position.x = -data.position.x;
-      if (Math.abs(data.position.y) > 12) data.position.y = -data.position.y;
-      if (data.position.z > -8) data.position.z = -30;
-      if (data.position.z < -30) data.position.z = -8;
-
-      // Rotate over time
-      data.rotation.x += data.rotSpeed.x * 0.02;
-      data.rotation.y += data.rotSpeed.y * 0.02;
-      data.rotation.z += data.rotSpeed.z * 0.02;
-
-      // Apply transformations to dummy object
-      dummy.position.copy(data.position);
-      dummy.rotation.copy(data.rotation);
-      dummy.scale.setScalar(data.scale * (1.0 + Math.sin(t * 0.4 + i) * 0.08));
-      dummy.updateMatrix();
-      
-      meshRef.current!.setMatrixAt(i, dummy.matrix);
-    });
-
-    meshRef.current.instanceMatrix.needsUpdate = true;
-  });
-
-  return (
-    <instancedMesh ref={meshRef} args={[null as any, null as any, count]} castShadow receiveShadow>
-      <dodecahedronGeometry args={[0.6, 0]} />
-      <meshStandardMaterial
-        color="#08080c"
-        roughness={0.8}
-        metalness={0.9}
-        emissive="#ff1744"
-        emissiveIntensity={0.15}
-      />
-    </instancedMesh>
   );
 }
 ```
@@ -1518,6 +1593,7 @@ import React, { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { useMousePosition } from "@/hooks/useMousePosition";
 
 const SCREEN_MATERIAL_NAME = "Material.004";
 
@@ -1526,6 +1602,8 @@ export default function FloatingLaptop() {
 
   const groupRef = useRef<THREE.Group>(null);
   const bobRef   = useRef<THREE.Group>(null);
+  const kbLightRef = useRef<THREE.PointLight>(null);
+  const mouse = useMousePosition(0.08);
 
   useMemo(() => {
     const darkBody = new THREE.MeshStandardMaterial({
@@ -1574,6 +1652,16 @@ export default function FloatingLaptop() {
         0.09 - state.pointer.y * 0.035,
         0.045,
       );
+    }
+
+    if (kbLightRef.current) {
+      const dx = mouse.x - 0.25;
+      const dy = mouse.y + 0.15;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const proximity = Math.exp(-dist * dist * 4.0); // 1.0 close, 0.0 far
+      
+      kbLightRef.current.intensity = 1.5 + proximity * 5.0; // Glows up to 6.5!
+      kbLightRef.current.distance = 2.5 + proximity * 3.5;
     }
   });
 
@@ -1652,7 +1740,7 @@ export default function FloatingLaptop() {
         {/* General body illumination */}
         <pointLight position={[0, -0.5, 0]} intensity={4.0} distance={10} color="#ff1744" decay={2} />
         {/* Keyboard backlight — low, close to keyboard deck surface, subtle warm glow */}
-        <pointLight position={[0.3, -0.15, 0.35]} intensity={3.5} distance={4} color="#ff6680" decay={2} />
+        <pointLight ref={kbLightRef} position={[0.3, -0.15, 0.35]} intensity={3.5} distance={4} color="#ff6680" decay={2} />
         {/* Right-side rim light — catches the right edge of laptop body */}
         <pointLight position={[2.0, 0.3, 0.2]} intensity={2.8} distance={8} color="#ff3355" decay={2} />
       </group>
@@ -1671,12 +1759,15 @@ useGLTF.preload("/models/laptop-baked.glb");
 import React, { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { useMousePosition } from "@/hooks/useMousePosition";
 
 export default function FloorRings() {
   const ringsRef = useRef<THREE.Group>(null);
   const energyRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Group>(null);
   const secondaryRingsRef = useRef<THREE.Group>(null);
+  const timeRef = useRef(0);
+  const mouse = useMousePosition(0.08);
 
   const ringGeometries = useMemo(() => {
     const rings: THREE.BufferGeometry[] = [];
@@ -1757,7 +1848,18 @@ export default function FloorRings() {
   const laptopX = Math.max(0.8, viewport.width * 0.08);
 
   useFrame((state) => {
-    const t = state.clock.getElapsedTime();
+    const dt = state.clock.getDelta();
+    
+    // Proximity to laptop base on floor
+    const dx = mouse.x - 0.25;
+    const dy = mouse.y + 0.15;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const proximity = Math.exp(-dist * dist * 4.0); // 1.0 close, 0.0 far
+    
+    // Rings pulse up to 2.2x faster near mouse
+    const speedFactor = 1.0 + proximity * 1.2;
+    timeRef.current += dt * speedFactor;
+    const t = timeRef.current;
     
     if (ringsRef.current) {
       ringsRef.current.children.forEach((child, i) => {
@@ -2160,11 +2262,11 @@ export default function ParticleNetwork() {
     []
   );
 
-  // Spawn trail particles at cursor position
+  // Spawn trail particles at cursor position (rocket boost explosion effect)
   const spawnTrail = useCallback(
     (wx: number, wy: number, vx: number, vy: number, speed: number) => {
-      // Denser trail: spawn 2-12 particles per frame depending on speed
-      const count = Math.min(12, Math.max(2, Math.floor(speed * 18)));
+      // Denser trail: spawn 3-18 particles per frame depending on speed
+      const count = Math.min(18, Math.max(3, Math.floor(speed * 25)));
 
       for (let s = 0; s < count; s++) {
         const i = AMBIENT_COUNT + trailIndexRef.current;
@@ -2173,24 +2275,26 @@ export default function ParticleNetwork() {
         const idx = i * 3;
         const tIdx = (i - AMBIENT_COUNT) * 3;
 
-        // Extremely close scatter to look like a tight, crisp tail
-        const scatter = 0.04 + speed * 0.12;
+        // Expanded start scatter for a cloud-like explosion shape
+        const scatter = 0.12 + speed * 0.35;
         positions[idx]     = wx + (Math.random() - 0.5) * scatter;
         positions[idx + 1] = wy + (Math.random() - 0.5) * scatter;
-        positions[idx + 2] = (Math.random() - 0.5) * 0.8;
+        positions[idx + 2] = (Math.random() - 0.5) * 1.0;
 
-        // Eject opposite to mouse velocity + random turbulence
-        const ejectSpeed = 0.01 + speed * 0.03;
-        const angle = Math.atan2(-vy, -vx) + (Math.random() - 0.5) * 0.9;
-        trailVelocities[tIdx]     = Math.cos(angle) * ejectSpeed + (Math.random() - 0.5) * 0.008;
-        trailVelocities[tIdx + 1] = Math.sin(angle) * ejectSpeed + (Math.random() - 0.5) * 0.008;
-        trailVelocities[tIdx + 2] = (Math.random() - 0.5) * 0.004;
+        // Eject in a massive 220-degree cone opposite to cursor velocity
+        const angle = Math.atan2(-vy, -vx) + (Math.random() - 0.5) * 2.0;
+        
+        // High-velocity thrust ejection
+        const ejectSpeed = (0.04 + speed * 0.14) * (0.6 + Math.random() * 1.2);
+        trailVelocities[tIdx]     = Math.cos(angle) * ejectSpeed + (Math.random() - 0.5) * 0.02;
+        trailVelocities[tIdx + 1] = Math.sin(angle) * ejectSpeed + (Math.random() - 0.5) * 0.02;
+        trailVelocities[tIdx + 2] = (Math.random() - 0.5) * 0.01;
 
-        // Smaller, delicate sparks
-        sizes[i] = 0.4 + speed * 1.5 + Math.random() * 0.6;
+        // Varied small spark sizes
+        sizes[i] = 0.3 + Math.random() * 0.9 + speed * 1.0;
 
-        // Shorter lifetime for a snappy tail: 0.8-2 seconds
-        const baseLife = 0.8 + Math.random() * 1.2;
+        // Snappy spark lifetime: 0.6 to 1.5 seconds
+        const baseLife = 0.6 + Math.random() * 0.9;
         maxLifetimes[i] = baseLife;
         lifetimes[i] = baseLife;
       }
@@ -2272,15 +2376,15 @@ export default function ParticleNetwork() {
       // Gravity: old particles drift down slowly
       posArray[idx + 1] -= age * age * 0.008;
 
-      // Turbulence: subtle random jitter that increases with age
-      const turb = age * 0.012;
+      // Turbulence: random jitter that increases with age for exhaust scattering
+      const turb = age * 0.035;
       posArray[idx]     += (Math.random() - 0.5) * turb;
       posArray[idx + 1] += (Math.random() - 0.5) * turb;
 
       // Velocity drag (slow down over time)
-      trailVelocities[tIdx]     *= 0.985;
-      trailVelocities[tIdx + 1] *= 0.985;
-      trailVelocities[tIdx + 2] *= 0.98;
+      trailVelocities[tIdx]     *= 0.97;
+      trailVelocities[tIdx + 1] *= 0.97;
+      trailVelocities[tIdx + 2] *= 0.97;
 
       // Size: large spark → shrinking ember
       const sizeCurve = 1.0 - age * age; // quadratic decay
@@ -2564,6 +2668,16 @@ const gridVertexShader = `
 
   void main() {
     vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    
+    // Gravitational warp towards the laptop base position
+    vec2 center = vec2(0.8, -1.24);
+    vec2 toCenter = worldPosition.xz - center;
+    float distToCenter = length(toCenter);
+    
+    // Smooth grid deformation
+    float warp = exp(-distToCenter * distToCenter * 0.08) * 0.65;
+    worldPosition.xz -= normalize(toCenter) * warp * min(distToCenter, 4.0);
+    
     vWorldPosition = worldPosition.xyz;
     vUv = uv;
     vDist = length(worldPosition.xz);
@@ -2573,6 +2687,7 @@ const gridVertexShader = `
 
 const gridFragmentShader = `
   uniform float uTime;
+  uniform vec3 uMouseFloor;
   varying vec3 vWorldPosition;
   varying vec2 vUv;
   varying float vDist;
@@ -2647,7 +2762,6 @@ const gridFragmentShader = `
 `;
 
 import { useMousePosition } from "@/hooks/useMousePosition";
-import { MeshReflectorMaterial } from "@react-three/drei";
 
 export default function NeonGrid() {
   const gridMaterialRef = useRef<THREE.ShaderMaterial>(null);
@@ -2696,23 +2810,14 @@ export default function NeonGrid() {
         />
       </mesh>
       
-      {/* Real-time Glossy Floor Reflector base plane */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+      {/* Dark background base floor plane to prevent lookthrough */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
         <planeGeometry args={[100, 100]} />
-        <MeshReflectorMaterial
-          mirror={1.0}
-          blur={[300, 100]}
-          resolution={1024}
-          mixBlur={1.0}
-          mixStrength={35}
-          roughness={1}
-          depthScale={1.2}
-          minDepthThreshold={0.4}
-          maxDepthThreshold={1.4}
-          color="#060102"
-          metalness={0.5}
+        <meshBasicMaterial
+          color="#020001"
           transparent
-          opacity={0.7}
+          opacity={0.35}
+          depthWrite={false}
         />
       </mesh>
       
@@ -2742,67 +2847,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import * as THREE from "three";
-
-const CRTShader = {
-  uniforms: {
-    tDiffuse: { value: null },
-    uTime: { value: 0.0 },
-    uResolution: { value: new THREE.Vector2() },
-  },
-  vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float uTime;
-    uniform vec2 uResolution;
-    varying vec2 vUv;
-
-    void main() {
-      vec2 uv = vUv;
-      
-      // CRT screen warp (fisheye distortion)
-      vec2 dc = uv - vec2(0.5);
-      float distSq = dot(dc, dc);
-      uv = vec2(0.5) + dc * (1.0 + 0.025 * distSq);
-      
-      // Render black borders outside CRT bounds
-      if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
-      }
-      
-      vec4 color = texture2D(tDiffuse, uv);
-      
-      // Horizontal Scanlines
-      float scanline = sin(uv.y * uResolution.y * 1.6) * 0.025;
-      
-      // Vertical color grill structure
-      float grill = sin(uv.x * uResolution.x * 2.0) * 0.012;
-      
-      color.rgb -= scanline;
-      color.rgb -= grill;
-      
-      // Micro CRT noise flicker
-      float noise = sin(uTime * 45.0) * 0.003;
-      color.rgb += noise;
-      
-      // CRT vignette
-      float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
-      vignette = clamp(pow(16.0 * vignette, 0.22), 0.0, 1.0);
-      color.rgb *= vignette;
-      
-      gl_FragColor = color;
-    }
-  `
-};
 
 export default function PostProcessing() {
   const { gl, scene, camera, size } = useThree();
@@ -2818,14 +2864,10 @@ export default function PostProcessing() {
       0.40
     );
 
-    const crtPass = new ShaderPass(CRTShader);
-    crtPass.uniforms.uResolution.value.set(size.width, size.height);
-
     const outputPass = new OutputPass();
 
     instance.addPass(renderPass);
     instance.addPass(bloomPass);
-    instance.addPass(crtPass);
     instance.addPass(outputPass);
 
     return instance;
@@ -2837,12 +2879,7 @@ export default function PostProcessing() {
     return () => composer.dispose();
   }, [composer, size.width, size.height]);
 
-  useFrame((state, delta) => {
-    composer.passes.forEach((pass) => {
-      if (pass instanceof ShaderPass && pass.uniforms.uTime) {
-        pass.uniforms.uTime.value = state.clock.getElapsedTime();
-      }
-    });
+  useFrame((_, delta) => {
     composer.render(delta);
   }, 1);
 
@@ -2861,14 +2898,12 @@ import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
 import { useDeviceSize } from "@/hooks/useDeviceSize";
 import NebulaBackground from "./NebulaBackground";
-import AuroraRibbons from "./AuroraRibbons";
 import StarField from "./StarField";
 import ShootingStars from "./ShootingStars";
 import DeepSpaceGlobe from "./DeepSpaceGlobe";
 import VolumetricRays from "./VolumetricRays";
 import MagneticParticles from "./MagneticParticles";
 import FloatingHexParticles from "./FloatingHexParticles";
-import FloatingDebris from "./FloatingDebris";
 import TechCubes from "./TechCubes";
 import FloatingLaptop from "./FloatingLaptop";
 import NeonGrid from "./NeonGrid";
@@ -2895,8 +2930,8 @@ export default function Scene({ scrollProgress }: SceneProps) {
           toneMappingExposure: 1.0,
         }}
         camera={{
-          position: [0, 2.0, 9.5],
-          fov: 50,
+          position: [0.5, 0.5, 8],
+          fov: 45,
           near: 0.1,
           far: 300,
         }}
@@ -2925,14 +2960,12 @@ export default function Scene({ scrollProgress }: SceneProps) {
 
         <Suspense fallback={null}>
           <NebulaBackground />
-          <AuroraRibbons />
           <StarField />
           <ShootingStars />
-          <DeepSpaceGlobe />
+          <DeepSpaceGlobe scrollProgress={scrollProgress} />
           <VolumetricRays />
           <MagneticParticles />
           <FloatingHexParticles />
-          <FloatingDebris />
           <TechCubes />
           <FloatingLaptop />
           <NeonGrid />
@@ -3474,7 +3507,7 @@ export default function TechCubes() {
     () => [
       {
         id: "react",
-        position: [1.45, 2.85, -0.15] as [number, number, number],
+        position: [-2.5, 1.2, -2.0] as [number, number, number],
         scale: 0.78,
         color: "#ffb0b0",
         glowColor: "#ff1744",
@@ -3482,7 +3515,7 @@ export default function TechCubes() {
       },
       {
         id: "node",
-        position: [3.85, 1.05, 0.1] as [number, number, number],
+        position: [3.2, 0.8, -3.0] as [number, number, number],
         scale: 0.72,
         color: "#ffaaaa",
         glowColor: "#cc1133",
@@ -3490,7 +3523,7 @@ export default function TechCubes() {
       },
       {
         id: "typescript",
-        position: [2.95, -1.25, 0.75] as [number, number, number],
+        position: [-1.5, -0.8, 1.5] as [number, number, number],
         scale: 0.52,
         color: "#e8a0a0",
         glowColor: "#800010",
@@ -3498,7 +3531,7 @@ export default function TechCubes() {
       },
       {
         id: "next",
-        position: [-0.75, 0.85, 0.65] as [number, number, number],
+        position: [2.8, 2.0, -1.5] as [number, number, number],
         scale: 0.42,
         color: "#f0d0d0",
         glowColor: "#660008",
@@ -3922,10 +3955,15 @@ import React, { useEffect, useRef } from "react";
 
 export default function Cursor() {
   const dotRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
+  const ring1Ref = useRef<HTMLDivElement>(null);
+  const ring2Ref = useRef<HTMLDivElement>(null);
+  const ring3Ref = useRef<HTMLDivElement>(null);
+  const coordsRef = useRef<HTMLDivElement>(null);
   
   const mouseRef = useRef({ x: 0, y: 0 });
-  const ringPosRef = useRef({ x: 0, y: 0 });
+  const pos1 = useRef({ x: 0, y: 0 });
+  const pos2 = useRef({ x: 0, y: 0 });
+  const pos3 = useRef({ x: 0, y: 0 });
   const isHoveredRef = useRef(false);
 
   useEffect(() => {
@@ -3934,55 +3972,69 @@ export default function Cursor() {
     if (!isFinePointer) return;
 
     const dot = dotRef.current;
-    const ring = ringRef.current;
-    if (!dot || !ring) return;
+    const c1 = ring1Ref.current;
+    const c2 = ring2Ref.current;
+    const c3 = ring3Ref.current;
+    const coords = coordsRef.current;
+    if (!dot || !c1 || !c2 || !c3 || !coords) return;
 
-    // Initially hide cursor elements until first mouse move to prevent flash
-    dot.style.opacity = "0";
-    ring.style.opacity = "0";
+    [dot, c1, c2, c3, coords].forEach((el) => {
+      el.style.opacity = "0";
+    });
 
     const handleMouseMove = (e: MouseEvent) => {
       mouseRef.current.x = e.clientX;
       mouseRef.current.y = e.clientY;
-
-      dot.style.opacity = "1";
-      ring.style.opacity = "1";
-
-      // Directly update dot position for zero-latency feel
-      dot.style.transform = `translate3d(${e.clientX - 4}px, ${e.clientY - 4}px, 0)`;
+      [dot, c1, c2, c3, coords].forEach((el) => {
+        el.style.opacity = "1";
+      });
+      
+      // Dot and HUD coordinates follow instantly for zero latency feel
+      dot.style.transform = `translate3d(${e.clientX - 2}px, ${e.clientY - 2}px, 0)`;
+      coords.style.transform = `translate3d(${e.clientX + 16}px, ${e.clientY + 8}px, 0)`;
+      coords.innerText = `[${String(e.clientX).padStart(3, "0")}, ${String(e.clientY).padStart(3, "0")}]`;
     };
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target) return;
 
-      // Detect interactive elements
       const isInteractive = 
         target.tagName === "A" || 
         target.tagName === "BUTTON" || 
-        target.closest("a") || 
-        target.closest("button") || 
-        target.closest('[role="button"]') ||
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        !!target.closest("a") || 
+        !!target.closest("button") || 
+        !!target.closest('[role="button"]') ||
         target.classList.contains("hover-target") ||
         target.getAttribute("data-magnetic") !== null;
 
+      isHoveredRef.current = isInteractive;
+
       if (isInteractive) {
-        isHoveredRef.current = true;
-        ring.classList.add("cursor-morph");
-        dot.classList.add("dot-morph");
+        c1.classList.add("cursor-expand");
+        c2.classList.add("cursor-expand");
+        c3.classList.add("cursor-expand");
+        dot.classList.add("dot-expand");
+        coords.classList.add("coords-hover");
       } else {
-        isHoveredRef.current = false;
-        ring.classList.remove("cursor-morph");
-        dot.classList.remove("dot-morph");
+        c1.classList.remove("cursor-expand");
+        c2.classList.remove("cursor-expand");
+        c3.classList.remove("cursor-expand");
+        dot.classList.remove("dot-expand");
+        coords.classList.remove("coords-hover");
       }
     };
 
     const handleMouseDown = () => {
-      ring.classList.add("cursor-click");
+      [c1, c2, c3].forEach((c) => c.classList.add("cursor-click"));
+      coords.classList.add("coords-click");
     };
 
     const handleMouseUp = () => {
-      ring.classList.remove("cursor-click");
+      [c1, c2, c3].forEach((c) => c.classList.remove("cursor-click"));
+      coords.classList.remove("coords-click");
     };
 
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
@@ -3990,76 +4042,109 @@ export default function Cursor() {
     window.addEventListener("mousedown", handleMouseDown);
     window.addEventListener("mouseup", handleMouseUp);
 
-    // Smooth LERP (Linear Interpolation) loop for the outer ring lag effect
-    let animationFrameId: number;
+    let rafId: number;
     const lerp = (start: number, end: number, amt: number) => (1 - amt) * start + amt * end;
 
     const render = () => {
-      // Lerp ring coordinates toward target mouse coordinates
-      // 0.15 is the speed of follow (lower = slower lag)
-      const targetX = mouseRef.current.x;
-      const targetY = mouseRef.current.y;
+      const tx = mouseRef.current.x;
+      const ty = mouseRef.current.y;
 
-      ringPosRef.current.x = lerp(ringPosRef.current.x, targetX, 0.15);
-      ringPosRef.current.y = lerp(ringPosRef.current.y, targetY, 0.15);
+      // Parallax lag for rings using separate LERP factors
+      pos1.current.x = lerp(pos1.current.x, tx, 0.18);
+      pos1.current.y = lerp(pos1.current.y, ty, 0.18);
+      c1.style.transform = `translate3d(${pos1.current.x - 8}px, ${pos1.current.y - 8}px, 0)`;
 
-      // Apply coordinates offset by half of ring's normal size (24px / 2 = 12px)
-      ring.style.transform = `translate3d(${ringPosRef.current.x - 12}px, ${ringPosRef.current.y - 12}px, 0)`;
+      pos2.current.x = lerp(pos2.current.x, tx, 0.11);
+      pos2.current.y = lerp(pos2.current.y, ty, 0.11);
+      c2.style.transform = `translate3d(${pos2.current.x - 16}px, ${pos2.current.y - 16}px, 0)`;
 
-      animationFrameId = requestAnimationFrame(render);
+      pos3.current.x = lerp(pos3.current.x, tx, 0.06);
+      pos3.current.y = lerp(pos3.current.y, ty, 0.06);
+      c3.style.transform = `translate3d(${pos3.current.x - 24}px, ${pos3.current.y - 24}px, 0)`;
+
+      rafId = requestAnimationFrame(render);
     };
 
-    animationFrameId = requestAnimationFrame(render);
+    rafId = requestAnimationFrame(render);
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseover", handleMouseOver);
       window.removeEventListener("mousedown", handleMouseDown);
       window.removeEventListener("mouseup", handleMouseUp);
-      cancelAnimationFrame(animationFrameId);
+      cancelAnimationFrame(rafId);
     };
   }, []);
 
   return (
     <>
-      {/* Central glowing white orb */}
-      <div
-        ref={dotRef}
-        className="pointer-events-none fixed top-0 left-0 z-[9999] h-2 w-2 rounded-full bg-white shadow-[0_0_10px_#fff,_0_0_20px_var(--electric-blue)] transition-transform duration-[0.05s] ease-out will-change-transform hidden md:block"
-        style={{ transform: "translate3d(-100px, -100px, 0)" }}
-      />
-      {/* Outer LERP ring (Light trail & hover morph) */}
-      <div
-        ref={ringRef}
-        className="pointer-events-none fixed top-0 left-0 z-[9998] h-6 w-6 rounded-full border border-white/40 bg-transparent transition-all duration-300 ease-out will-change-transform hidden md:block"
-        style={{
-          transform: "translate3d(-100px, -100px, 0)",
-          boxShadow: "0 0 8px rgba(255, 255, 255, 0.1)",
-        }}
-      />
+      {/* Central Solid Crimson Dot */}
+      <div ref={dotRef} className="pointer-events-none fixed top-0 left-0 z-[9999] hidden md:block will-change-transform">
+        <div className="h-1 w-1 rounded-full bg-[#ff1744] shadow-[0_0_6px_#ff1744] transition-all duration-150 dot-core" />
+      </div>
       
-      {/* Morph styling rules locally managed */}
-      <style jsx global>{`
-        .cursor-morph {
-          width: 48px !important;
-          height: 48px !important;
-          border-color: var(--electric-blue) !important;
-          box-shadow: 0 0 15px var(--electric-blue), inset 0 0 10px rgba(255, 23, 68, 0.3) !important;
-          margin-top: -12px;
-          margin-left: -12px;
-          background-color: rgba(255, 23, 68, 0.05) !important;
+      {/* Middle Ring - Clockwise Rotation + Concentric Crosshairs */}
+      <div ref={ring1Ref} className="pointer-events-none fixed top-0 left-0 z-[9998] hidden md:block will-change-transform">
+        <div className="h-4 w-4 rounded-full border border-[#ff1744]/65 animate-[spin_5s_linear_infinite] cursor-ring relative">
+          {/* HUD Crosshair ticks */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-0.5 bg-[#ff1744]/65" />
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-0.5 bg-[#ff1744]/65" />
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-0.5 bg-[#ff1744]/65" />
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 h-0.5 bg-[#ff1744]/65" />
+        </div>
+      </div>
+      
+      {/* Outer Ring - Dashed, Counter-Clockwise Rotation + Heartbeat breathing */}
+      <div ref={ring2Ref} className="pointer-events-none fixed top-0 left-0 z-[9998] hidden md:block will-change-transform animate-[pulse_2.2s_ease-in-out_infinite]">
+        <div className="h-8 w-8 rounded-full border border-dashed border-[#ff1744]/40 animate-[spin-reverse_9s_linear_infinite] cursor-ring" />
+      </div>
+      
+      {/* Outermost Ring */}
+      <div ref={ring3Ref} className="pointer-events-none fixed top-0 left-0 z-[9997] hidden md:block will-change-transform">
+        <div className="h-12 w-12 rounded-full border border-[#ff1744]/22 transition-all duration-300 cursor-ring" />
+      </div>
+
+      {/* Cyberpunk HUD Coordinates */}
+      <div
+        ref={coordsRef}
+        className="pointer-events-none fixed top-0 left-0 z-[10000] hidden md:block text-[7px] text-[#ff1744]/60 font-mono tracking-wider select-none transition-colors duration-200"
+        style={{ textShadow: "0 0 4px rgba(255, 23, 68, 0.4)" }}
+      >
+        [000, 000]
+      </div>
+      
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes spin { 
+          from { transform: rotate(0deg); } 
+          to { transform: rotate(360deg); } 
         }
-        .dot-morph {
-          transform: scale(0.5) !important;
-          background-color: var(--hot-pink) !important;
-          shadow-[0_0_10px_#cc1133] !important;
+        @keyframes spin-reverse { 
+          from { transform: rotate(360deg); } 
+          to { transform: rotate(0deg); } 
         }
-        .cursor-click {
-          transform: scale(0.7) !important;
-          border-color: var(--hot-pink) !important;
-          background-color: rgba(255, 23, 68, 0.2) !important;
+        .cursor-expand .cursor-ring {
+          border-color: #00d4ff !important;
+          box-shadow: 0 0 12px #00d4ff !important;
         }
-      `}</style>
+        .dot-expand .dot-core {
+          background-color: #ff2d78 !important;
+          box-shadow: 0 0 10px #ff2d78 !important;
+          transform: scale(1.6);
+        }
+        .coords-hover {
+          color: #00d4ff !important;
+          text-shadow: 0 0 6px rgba(0, 212, 255, 0.6) !important;
+        }
+        .cursor-click .cursor-ring {
+          border-color: #ff2d78 !important;
+          box-shadow: 0 0 16px #ff2d78 !important;
+          transform: scale(0.85);
+        }
+        .coords-click {
+          color: #ff2d78 !important;
+          text-shadow: 0 0 8px rgba(255, 45, 120, 0.8) !important;
+        }
+      ` }} />
     </>
   );
 }
@@ -4462,176 +4547,817 @@ export default function HolographicTerminal({ scrollProgress = 0 }: { scrollProg
 ```typescript
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useProgress } from "@react-three/drei";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
 
-// Simulated log lines based on loading percentage
-const logLines = [
-  { threshold: 5, text: ">> INITIALIZING SECURE CYBERNETIC CONNECTION..." },
-  { threshold: 20, text: ">> RETRIEVING NEURAL SHADER MODULES..." },
-  { threshold: 45, text: ">> LOADING 3D METALLIC CHASSIS MODEL (laptop.glb)..." },
-  { threshold: 65, text: ">> INJECTING REFRACTION TECHNOLOGY (TechCubes)..." },
-  { threshold: 85, text: ">> ESTABLISHING QUANTUM STARFIELD NETWORK..." },
-  { threshold: 98, text: ">> PORTFOLIO ONLINE. DEPLOYING MATRIX..." },
+// ═══════════════════════════════════════════════════════════════════════
+// OVERKILL CONFIGURATION — Tuned for 60fps on all devices
+// ═══════════════════════════════════════════════════════════════════════
+const CONFIG = {
+  // Timing
+  LOAD_DURATION: 10000,        // 10s load time
+  CONVERGE_DURATION: 1500,      // 1.5s convergence
+
+  // Rain — matches working prototype EXACTLY
+  DROP_COUNTS: { back: 300, mid: 150, front: 50 },
+  MOUSE_RADIUS: 220,
+  MOUSE_INNER_RADIUS: 110,
+
+  // Physics (units per frame at 60fps, scaled by dt)
+  SPEEDS: { back: 0.4, mid: 0.9, front: 1.6 },
+
+  // Visual
+  CORE_RED: "#ff0033",
+  VOID_BLACK: "#030001",
+  CLEAR_ALPHA: 0.25,
+};
+
+const CHAR_POOL = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF░▒▓█◢◣◤◥▪▫◊○●◐◑∴∵∷∞∝∫∮∯∰∱∲∳";
+
+const LOG_LINES = [
+  { threshold: 5, text: ">> NEURAL LINK ESTABLISHED" },
+  { threshold: 18, text: ">> QUANTUM ENTANGLEMENT DETECTED" },
+  { threshold: 32, text: ">> DIMENSIONAL BARRIER: UNSTABLE" },
+  { threshold: 48, text: ">> SPACETIME FABRIC: TEARING" },
+  { threshold: 65, text: ">> BREACH IMMINENT — SEEK SHELTER" },
+  { threshold: 82, text: ">> REALITY ANCHOR: LOST" },
+  { threshold: 95, text: ">> ENTERING THE VOID..." },
 ];
 
-export default function Loader() {
-  const { progress } = useProgress();
-  const [displayProgress, setDisplayProgress] = useState(0);
-  const [isDone, setIsDone] = useState(false);
-  const [bootLogs, setBootLogs] = useState<string[]>([]);
+// ═══════════════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════════════
+interface DropChar { char: string; switchTimer: number; }
+interface MicroDrop {
+  x: number; y: number; fontSize: number; baseSpeed: number;
+  baseOpacity: number; chars: DropChar[];
+  phase: number; layer: number;
+}
+interface DebrisParticle {
+  x: number; y: number; vx: number; vy: number;
+  life: number; maxLife: number; size: number;
+  angle: number; spin: number;
+}
+interface LightningBranch {
+  x: number; y: number;
+  segments: { x: number; y: number }[];
+  life: number; maxLife: number;
+}
+interface CrackPoint { x: number; y: number; angle: number; baseRadius: number; noise: number; }
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    // Smooth progress count-up
-    const targetProgress = Math.max(progress, displayProgress);
-    
-    if (displayProgress < 100) {
-      interval = setInterval(() => {
-        setDisplayProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          // Increment faster if actual loading progress is ahead
-          const increment = targetProgress > prev ? Math.max(2, Math.ceil((targetProgress - prev) * 0.2)) : 1;
-          const next = prev + increment;
-          return next > 100 ? 100 : next;
-        });
-      }, 30);
-    } else {
-      // Delay transition for half a second to let user see "100%"
-      const timeout = setTimeout(() => {
-        setIsDone(true);
-      }, 800);
-      return () => clearTimeout(timeout);
+// ═══════════════════════════════════════════════════════════════════════
+// TEAR ENGINE — Self-contained, no React dependencies
+// ═══════════════════════════════════════════════════════════════════════
+class TearEngine {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  active = false;
+  phase: "forming" | "widening" | "collapsing" | "done" = "forming";
+  time = 0;
+  centerX = 0;
+  centerY = 0;
+  crackPoints: CrackPoint[] = [];
+  debris: DebrisParticle[] = [];
+  lightning: LightningBranch[] = [];
+  onComplete?: () => void;
+  W = 0; H = 0;
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to get 2d context");
+    this.ctx = ctx;
+  }
+
+  resize(w: number, h: number) {
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    this.canvas.width = w * dpr;
+    this.canvas.height = h * dpr;
+    this.canvas.style.width = w + "px";
+    this.canvas.style.height = h + "px";
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.W = w; this.H = h;
+    this.centerX = w / 2;
+    this.centerY = h / 2;
+  }
+
+  generateCrack() {
+    this.crackPoints = [];
+    const segments = 80;
+    const baseAngle = -Math.PI / 2;
+
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const angle = baseAngle + t * Math.PI * 2;
+      const r1 = Math.sin(t * 13) * 15;
+      const r2 = Math.sin(t * 7 + 1) * 10;
+      const r3 = Math.sin(t * 23 + 2) * 5;
+      const baseR = 2 + t * 3;
+      const radius = baseR + r1 + r2 + r3;
+      this.crackPoints.push({
+        x: this.centerX + Math.cos(angle) * radius,
+        y: this.centerY + Math.sin(angle) * radius,
+        angle,
+        baseRadius: radius,
+        noise: Math.random(),
+      });
     }
 
-    return () => clearInterval(interval);
-  }, [progress, displayProgress]);
+    this.debris = [];
+    for (let i = 0; i < 200; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const dist = Math.random() * 100;
+      const speed = 2 + Math.random() * 4;
+      this.debris.push({
+        x: this.centerX + Math.cos(a) * dist,
+        y: this.centerY + Math.sin(a) * dist,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed,
+        size: 1 + Math.random() * 3,
+        life: 1,
+        maxLife: 0.8 + Math.random() * 1.2,
+        angle: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 0.2,
+      });
+    }
+  }
 
-  // Update terminal logs based on progress
+  start() {
+    this.active = true;
+    this.phase = "forming";
+    this.time = 0;
+    this.generateCrack();
+  }
+
+  update(dt: number) {
+    if (!this.active) return;
+    this.time += dt;
+
+    if (this.phase === "forming" && this.time > 0.3) this.phase = "widening";
+    if (this.phase === "widening" && this.time > 1.2) this.phase = "collapsing";
+    if (this.phase === "collapsing" && this.time > 2.0) {
+      this.phase = "done";
+      this.active = false;
+      this.onComplete?.();
+      return;
+    }
+
+    for (const d of this.debris) {
+      d.x += d.vx * dt * 60;
+      d.y += d.vy * dt * 60;
+      d.vx *= 0.98;
+      d.vy *= 0.98;
+      d.life -= dt / d.maxLife;
+      d.angle += d.spin * dt * 60;
+    }
+    this.debris = this.debris.filter((d) => d.life > 0);
+
+    if (this.phase === "forming" && Math.random() < 0.3) {
+      const idx = Math.floor(Math.random() * this.crackPoints.length);
+      const p = this.crackPoints[idx];
+      const lAngle = p.angle + (Math.random() - 0.5) * 1;
+      const segs: { x: number; y: number }[] = [];
+      let lx = p.x;
+      let ly = p.y;
+      for (let s = 0; s < 5; s++) {
+        lx += Math.cos(lAngle + (Math.random() - 0.5)) * (10 + Math.random() * 20);
+        ly += Math.sin(lAngle + (Math.random() - 0.5)) * (10 + Math.random() * 20);
+        segs.push({ x: lx, y: ly });
+      }
+      this.lightning.push({ x: lx, y: ly, segments: segs, life: 0.3, maxLife: 0.3 });
+    }
+
+    for (let i = this.lightning.length - 1; i >= 0; i--) {
+      this.lightning[i].life -= dt;
+      if (this.lightning[i].life <= 0) this.lightning.splice(i, 1);
+    }
+  }
+
+  draw() {
+    if (!this.active) return;
+    const { ctx, centerX, centerY, time, W, H } = this;
+    const t = time;
+
+    let expansion = 0;
+    if (this.phase === "forming") expansion = (t / 0.3) * 5;
+    else if (this.phase === "widening") expansion = 5 + ((t - 0.3) / 0.9) * 400;
+    else if (this.phase === "collapsing") expansion = 405 + ((t - 1.2) / 0.8) * 600;
+
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+
+    // Void gradient
+    const voidGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, expansion * 1.5);
+    voidGrad.addColorStop(0, CONFIG.VOID_BLACK);
+    voidGrad.addColorStop(0.3, CONFIG.VOID_BLACK);
+    voidGrad.addColorStop(0.5, "rgba(255,0,51,0.1)");
+    voidGrad.addColorStop(0.7, "rgba(255,0,51,0.3)");
+    voidGrad.addColorStop(0.85, "rgba(255,50,80,0.15)");
+    voidGrad.addColorStop(1, "transparent");
+    ctx.fillStyle = voidGrad;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, expansion * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Crack edges
+    if (this.crackPoints.length > 1) {
+      ctx.shadowColor = CONFIG.CORE_RED;
+      ctx.shadowBlur = 20;
+      ctx.strokeStyle = "rgba(255, 0, 51, 0.8)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i < this.crackPoints.length; i++) {
+        const p = this.crackPoints[i];
+        const r = p.baseRadius + expansion + Math.sin(t * 10 + i) * 3;
+        const x = centerX + Math.cos(p.angle) * r;
+        const y = centerY + Math.sin(p.angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.shadowColor = "#ffffff";
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = "rgba(255, 200, 200, 0.9)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < this.crackPoints.length; i++) {
+        const p = this.crackPoints[i];
+        const r = p.baseRadius + expansion * 0.95 + Math.sin(t * 15 + i) * 2;
+        const x = centerX + Math.cos(p.angle) * r;
+        const y = centerY + Math.sin(p.angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    // Lightning
+    ctx.shadowBlur = 15;
+    for (const l of this.lightning) {
+      const alpha = l.life / l.maxLife;
+      ctx.strokeStyle = `rgba(255, 200, 255, ${alpha})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(l.x, l.y);
+      for (const s of l.segments) ctx.lineTo(s.x, s.y);
+      ctx.stroke();
+    }
+
+    // Debris
+    ctx.shadowBlur = 5;
+    for (const d of this.debris) {
+      const alpha = Math.max(0, d.life);
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.angle);
+      const r = 255;
+      const g = 50 + d.life * 100;
+      const b = 80 + d.life * 50;
+      ctx.fillStyle = `rgba(${r}, ${g | 0}, ${b | 0}, ${alpha})`;
+      ctx.fillRect(-d.size / 2, -d.size / 2, d.size, d.size);
+      ctx.restore();
+    }
+
+    // Vignette during collapse
+    if (this.phase === "collapsing") {
+      const collapseT = (t - 1.2) / 0.8;
+      const vigAlpha = collapseT * 0.95;
+      const vig = ctx.createRadialGradient(
+        centerX, centerY, expansion * 0.5,
+        centerX, centerY, Math.max(W, H)
+      );
+      vig.addColorStop(0, "transparent");
+      vig.addColorStop(0.4, `rgba(3, 0, 1, ${vigAlpha * 0.3})`);
+      vig.addColorStop(1, `rgba(3, 0, 1, ${vigAlpha})`);
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    ctx.restore();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT — COMPLETELY ISOLATED FROM REACT RENDER CYCLE
+// ═══════════════════════════════════════════════════════════════════════
+interface LoaderProps {
+  onComplete?: () => void;
+}
+
+export default function Loader({ onComplete }: LoaderProps) {
+  // React state — ONLY used for mount/unmount, NEVER inside RAF
+  const [isComplete, setIsComplete] = useState(false);
+
+  // DOM Refs — for direct manipulation, zero React involvement
+  const containerRef = useRef<HTMLDivElement>(null);
+  const matrixCanvasRef = useRef<HTMLCanvasElement>(null);
+  const tearCanvasRef = useRef<HTMLCanvasElement>(null);
+  const progressFillRef = useRef<HTMLDivElement>(null);
+  const percentTextRef = useRef<HTMLSpanElement>(null);
+  const statusTextRef = useRef<HTMLSpanElement>(null);
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const counterC1Ref = useRef<HTMLSpanElement>(null);
+  const counterC2Ref = useRef<HTMLSpanElement>(null);
+  const counterC3Ref = useRef<HTMLSpanElement>(null);
+  const uiLayerRef = useRef<HTMLDivElement>(null);
+  const bigCounterRef = useRef<HTMLDivElement>(null);
+  const flashRef = useRef<HTMLDivElement>(null);
+
+  // Animation state — ALL in refs, NEVER triggers re-render
+  const dropsRef = useRef<MicroDrop[]>([]);
+  const mouseRef = useRef({ x: -1000, y: -1000, active: false });
+  const mouseSmoothRef = useRef({ x: -1000, y: -1000 });
+  const tearEngineRef = useRef<TearEngine | null>(null);
+  const rafRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(Date.now());
+  const phaseTimerRef = useRef(0);
+  const hasCompletedRef = useRef(false);
+  const progressRef = useRef(0);
+  const phaseRef = useRef<"loading" | "converging" | "tearing" | "done">("loading");
+  const shownLogsRef = useRef<Set<number>>(new Set());
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+
+  // Initialize drops — called ONCE, never again
+  const initDrops = (w: number, h: number) => {
+    const drops: MicroDrop[] = [];
+    const configs = [
+      { count: CONFIG.DROP_COUNTS.back, font: 7, speed: CONFIG.SPEEDS.back, opacity: 0.06, chars: 4 },
+      { count: CONFIG.DROP_COUNTS.mid, font: 10, speed: CONFIG.SPEEDS.mid, opacity: 0.12, chars: 7 },
+      { count: CONFIG.DROP_COUNTS.front, font: 13, speed: CONFIG.SPEEDS.front, opacity: 0.28, chars: 10 },
+    ];
+
+    for (let layer = 0; layer < 3; layer++) {
+      const cfg = configs[layer];
+      for (let i = 0; i < cfg.count; i++) {
+        const chars: DropChar[] = [];
+        for (let c = 0; c < cfg.chars; c++) {
+          chars.push({
+            char: CHAR_POOL[Math.floor(Math.random() * CHAR_POOL.length)],
+            switchTimer: Math.random() * 30,
+          });
+        }
+        drops.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          fontSize: cfg.font + Math.random() * 3,
+          baseSpeed: cfg.speed * (0.7 + Math.random() * 0.6),
+          baseOpacity: cfg.opacity,
+          chars,
+          phase: Math.random() * Math.PI * 2,
+          layer,
+        });
+      }
+    }
+    dropsRef.current = drops;
+  };
+
+  // Main effect — runs ONCE, sets up everything, never re-runs
   useEffect(() => {
-    const activeLogs = logLines
-      .filter((line) => displayProgress >= line.threshold)
-      .map((line) => line.text);
-    setBootLogs(activeLogs);
-  }, [displayProgress]);
+    const matrixCanvas = matrixCanvasRef.current;
+    const tearCanvas = tearCanvasRef.current;
+    if (!matrixCanvas || !tearCanvas) return;
 
+    // Setup matrix canvas context ONCE
+    const ctx = matrixCanvas.getContext("2d");
+    if (!ctx) return;
+    ctxRef.current = ctx;
+
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    matrixCanvas.width = W * dpr;
+    matrixCanvas.height = H * dpr;
+    matrixCanvas.style.width = W + "px";
+    matrixCanvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Setup tear engine
+    tearEngineRef.current = new TearEngine(tearCanvas);
+    tearEngineRef.current.resize(W, H);
+    tearEngineRef.current.onComplete = () => {
+      if (hasCompletedRef.current) return;
+      hasCompletedRef.current = true;
+      phaseRef.current = "done";
+
+      // White flash
+      if (flashRef.current) {
+        flashRef.current.style.transition = "opacity 0.1s";
+        flashRef.current.style.opacity = "1";
+        setTimeout(() => {
+          if (flashRef.current) {
+            flashRef.current.style.transition = "opacity 1.5s ease-out";
+            flashRef.current.style.opacity = "0";
+          }
+        }, 100);
+      }
+
+      // Hide UI
+      if (uiLayerRef.current) {
+        uiLayerRef.current.style.transition = "opacity 0.5s";
+        uiLayerRef.current.style.opacity = "0";
+      }
+      if (bigCounterRef.current) {
+        bigCounterRef.current.style.transition = "opacity 0.5s";
+        bigCounterRef.current.style.opacity = "0";
+      }
+
+      // Notify completion after flash fades
+      setTimeout(() => {
+        setIsComplete(true);
+        onComplete?.();
+      }, 1600);
+    };
+
+    initDrops(W, H);
+
+    // Mouse tracking
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseRef.current = { x: e.clientX, y: e.clientY, active: true };
+    };
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+
+    // Resize handler
+    const handleResize = () => {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      matrixCanvas.width = W * dpr;
+      matrixCanvas.height = H * dpr;
+      matrixCanvas.style.width = W + "px";
+      matrixCanvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      tearEngineRef.current?.resize(W, H);
+      initDrops(W, H);
+    };
+    window.addEventListener("resize", handleResize);
+
+    // ═══════════════════════════════════════════════════════════════
+    // THE ANIMATION LOOP — ZERO React state updates, pure DOM refs
+    // ═══════════════════════════════════════════════════════════════
+    let lastTime = performance.now();
+
+    const loop = (now: number) => {
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      const time = now / 1000;
+
+      // Smooth mouse
+      mouseSmoothRef.current.x += (mouseRef.current.x - mouseSmoothRef.current.x) * 0.1;
+      mouseSmoothRef.current.y += (mouseRef.current.y - mouseSmoothRef.current.y) * 0.1;
+      const mx = mouseSmoothRef.current.x;
+      const my = mouseSmoothRef.current.y;
+
+      // ── PROGRESS LOGIC ──
+      if (phaseRef.current === "loading") {
+        const elapsed = Date.now() - startTimeRef.current;
+        progressRef.current = Math.min(elapsed / CONFIG.LOAD_DURATION, 1) * 100;
+
+        if (progressRef.current >= 100) {
+          progressRef.current = 100;
+          phaseRef.current = "converging";
+          phaseTimerRef.current = 0;
+          if (statusTextRef.current) {
+            statusTextRef.current.textContent = "DIMENSIONAL BREACH IMMINENT";
+          }
+        }
+      } else if (phaseRef.current === "converging") {
+        phaseTimerRef.current += dt;
+        // Rain converges to center
+        for (const d of dropsRef.current) {
+          const dx = W / 2 - d.x;
+          const dy = H / 2 - d.y;
+          d.x += dx * 0.02 * dt * 60;
+          d.y += dy * 0.02 * dt * 60;
+          d.baseSpeed *= 1.01;
+        }
+        if (phaseTimerRef.current > CONFIG.CONVERGE_DURATION / 1000) {
+          phaseRef.current = "tearing";
+          tearEngineRef.current?.start();
+        }
+      }
+
+      // ── UPDATE UI VIA DOM MANIPULATION (NOT setState) ──
+      const currentProgress = progressRef.current;
+      const displayProgress = Math.floor(currentProgress);
+
+      // Progress bar width
+      if (progressFillRef.current) {
+        progressFillRef.current.style.width = displayProgress + "%";
+      }
+      // Percent text
+      if (percentTextRef.current) {
+        percentTextRef.current.textContent = displayProgress + "%";
+      }
+      // Counter digits
+      const s = displayProgress.toString().padStart(3, "0");
+      if (counterC1Ref.current) counterC1Ref.current.textContent = s[0];
+      if (counterC2Ref.current) counterC2Ref.current.textContent = s[1];
+      if (counterC3Ref.current) counterC3Ref.current.textContent = s[2];
+
+      // Terminal logs — add via DOM, NOT state
+      for (const log of LOG_LINES) {
+        if (currentProgress >= log.threshold && !shownLogsRef.current.has(log.threshold)) {
+          shownLogsRef.current.add(log.threshold);
+          if (terminalRef.current) {
+            const div = document.createElement("div");
+            div.textContent = log.text;
+            div.style.opacity = "0";
+            div.style.transition = "opacity 0.3s";
+            terminalRef.current.appendChild(div);
+            requestAnimationFrame(() => { div.style.opacity = "1"; });
+            if (terminalRef.current.children.length > 4) {
+              terminalRef.current.removeChild(terminalRef.current.firstChild!);
+            }
+          }
+        }
+      }
+
+      // Shake UI during convergence
+      if (phaseRef.current === "converging" && uiLayerRef.current) {
+        const shake = (1 - phaseTimerRef.current / (CONFIG.CONVERGE_DURATION / 1000)) * 3;
+        uiLayerRef.current.style.transform =
+          `translate(${(Math.random() - 0.5) * shake}px, ${(Math.random() - 0.5) * shake}px)`;
+      }
+
+      // ── CLEAR CANVAS ──
+      ctx.fillStyle = `rgba(3, 0, 1, ${CONFIG.CLEAR_ALPHA})`;
+      ctx.fillRect(0, 0, W, H);
+
+      // ── DRAW DROPS ── (matches working prototype exactly)
+      const drops = dropsRef.current;
+      for (let i = 0; i < drops.length; i++) {
+        const d = drops[i];
+        const dx = d.x - mx;
+        const dy = d.y - my;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const mouseRadius = CONFIG.MOUSE_RADIUS;
+
+        let speed = d.baseSpeed;
+        let opacity = d.baseOpacity;
+
+        if (dist < mouseRadius && mouseRef.current.active) {
+          const influence = 1 - dist / mouseRadius;
+          speed *= (1 - influence * 0.7);
+          opacity = Math.min(1, opacity + influence * 0.6);
+          d.x -= (dx / Math.max(dist, 1)) * influence * 0.3;
+        }
+
+        // Breathing
+        const breathe = Math.sin(time * 2 + d.phase) * 0.3 + 0.7;
+        opacity *= breathe;
+
+        // Move
+        d.y += speed * (dt * 60);
+
+        // Character switching
+        for (let c = 0; c < d.chars.length; c++) {
+          const ch = d.chars[c];
+          ch.switchTimer -= dt * 60;
+          if (ch.switchTimer <= 0) {
+            ch.char = CHAR_POOL[Math.floor(Math.random() * CHAR_POOL.length)];
+            ch.switchTimer = 5 + Math.random() * 25;
+          }
+        }
+
+        // Reset if off screen
+        if (d.y > H + 20) {
+          d.y = -20;
+          d.x = Math.random() * W;
+        }
+
+        // Draw
+        for (let c = 0; c < d.chars.length; c++) {
+          const cy = d.y - c * d.fontSize * 1.1;
+          if (cy < -10 || cy > H + 10) continue;
+
+          const charOpacity = c === 0 ? opacity : opacity * (1 - c / d.chars.length) * 0.7;
+          if (charOpacity < 0.005) continue;
+
+          // Color by layer (matches prototype)
+          let r: number, g: number, b: number;
+          if (d.layer === 2 && c === 0) {
+            r = 255; g = 200 + Math.sin(time * 3) * 55; b = 200 + Math.sin(time * 3) * 55;
+          } else if (d.layer === 2) {
+            r = 255; g = 30; b = 50;
+          } else if (d.layer === 1) {
+            r = 180; g = 10; b = 25;
+          } else {
+            r = 80; g = 0; b = 8;
+          }
+
+          // Mouse glow
+          if (dist < mouseRadius * 0.5 && mouseRef.current.active) {
+            const h = 1 - dist / (mouseRadius * 0.5);
+            r = 255;
+            g = Math.min(255, g + h * 200);
+            b = Math.min(255, b + h * 200);
+          }
+
+          ctx.fillStyle = `rgba(${r | 0}, ${g | 0}, ${b | 0}, ${charOpacity})`;
+          ctx.font = `${d.fontSize}px "JetBrains Mono", "Courier New", monospace`;
+          ctx.fillText(d.chars[c].char, d.x, cy);
+        }
+      }
+
+      // ── SCANLINES ──
+      ctx.fillStyle = "rgba(255, 0, 51, 0.02)";
+      for (let y = 0; y < H; y += 4) {
+        ctx.fillRect(0, y, W, 1);
+      }
+
+      // ── TEAR ──
+      tearEngineRef.current?.update(dt);
+      tearEngineRef.current?.draw();
+
+      rafRef.current = requestAnimationFrame(loop);
+    };
+
+    rafRef.current = requestAnimationFrame(loop);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("mousemove", handleMouseMove);
+      cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // EMPTY ARRAY = runs ONCE, never re-runs
+
+  // If loader is complete, render nothing
+  if (isComplete) return null;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RENDER — Static JSX, no state dependencies except isComplete
+  // All animated elements are updated via refs, not React state
+  // ═══════════════════════════════════════════════════════════════════════
   return (
-    <AnimatePresence>
-      {!isDone && (
-        <motion.div
-          key="loader"
-          initial={{ opacity: 1 }}
-          exit={{ 
-            opacity: 0, 
-            y: "-100vh",
-            transition: { duration: 0.8, ease: [0.76, 0, 0.24, 1] } 
-          }}
-          className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#050508] font-mono text-xs select-none"
-        >
-          {/* Subtle grid background */}
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%] pointer-events-none opacity-40" />
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-[99999] overflow-hidden"
+      style={{ background: CONFIG.VOID_BLACK, cursor: "none" }}
+    >
+      {/* Matrix rain canvas */}
+      <canvas
+        ref={matrixCanvasRef}
+        className="absolute inset-0 w-full h-full"
+        style={{ imageRendering: "auto" }}
+      />
 
-          {/* Core Loader Box */}
-          <div className="relative flex flex-col items-center max-w-md w-full px-8">
-            
-            {/* 3D Spinning Logo Intro */}
-            <div className="relative w-24 h-24 mb-8 flex items-center justify-center">
-              {/* Outer rotating neon glow ring */}
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 6, ease: "linear" }}
-                className="absolute inset-0 border border-t-[var(--electric-blue)] border-r-[var(--hot-pink)] border-b-transparent border-l-transparent rounded-full shadow-[0_0_15px_rgba(255,23,68,0.4)]"
-              />
-              
-              {/* Secondary reverse rotating ring */}
-              <motion.div
-                animate={{ rotate: -360 }}
-                transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-                className="absolute inset-2 border border-b-[var(--deep-violet)] border-l-[var(--node-green)] border-t-transparent border-r-transparent rounded-full opacity-60"
-              />
+      {/* Tear overlay canvas */}
+      <canvas
+        ref={tearCanvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        style={{ zIndex: 100 }}
+      />
 
-              {/* Stylized P Logo */}
-              <motion.div 
-                animate={{ 
-                  scale: [1, 1.05, 1],
-                  filter: ["drop-shadow(0 0 5px #ff1744)", "drop-shadow(0 0 12px #800010)", "drop-shadow(0 0 5px #ff1744)"]
-                }}
-                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                className="relative z-10 flex items-center justify-center"
-              >
-                <svg
-                  width="40"
-                  height="45"
-                  viewBox="0 0 40 45"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="filter drop-shadow-[0_0_8px_var(--electric-blue)]"
-                >
-                  <path
-                    d="M5 5H22C28.6274 5 34 10.3726 34 17C34 23.6274 28.6274 29 22 29H13V40"
-                    stroke="#ff1744"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M13 17H22C23.6569 17 25 15.6569 25 14C25 12.3431 23.6569 11 22 11H13V17Z"
-                    fill="#800010"
-                  />
-                </svg>
-              </motion.div>
-            </div>
+      {/* White flash on breach */}
+      <div
+        ref={flashRef}
+        className="absolute inset-0 pointer-events-none bg-white"
+        style={{ zIndex: 200, opacity: 0 }}
+      />
 
-            {/* Terminal Feed Details */}
-            <div className="w-full bg-[rgba(5,5,8,0.92)] border border-[rgba(255,23,68,0.22)] p-4 rounded mb-6 text-[10px] text-[var(--terminal-green)] leading-5 h-36 overflow-hidden flex flex-col justify-end">
-              <div className="space-y-1">
-                {bootLogs.map((log, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="truncate text-[var(--terminal-green)] text-glow-green"
-                  >
-                    {log}
-                  </motion.div>
-                ))}
-                {displayProgress < 100 && (
-                  <span className="inline-block w-2 h-4 bg-[var(--terminal-green)] animate-[pulse_1s_infinite] ml-1 align-middle" />
-                )}
-              </div>
-            </div>
+      {/* UI Layer — updated via DOM refs, not React state */}
+      <div
+        ref={uiLayerRef}
+        className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+        style={{ zIndex: 10 }}
+      >
+        {/* Logo */}
+        <div className="relative w-[140px] h-[140px] mb-16">
+          <div
+            className="absolute inset-[-20px] rounded-full border border-[#ff0033]/20 border-t-[#ff0033]/80"
+            style={{ animation: "spin 4s linear infinite" }}
+          />
+          <div
+            className="absolute inset-[-35px] rounded-full border-[0.5px] border-b-[#ff0033]/40 border-t-transparent"
+            style={{ animation: "spin-reverse 6s linear infinite" }}
+          />
+          <div
+            className="absolute inset-[-50px] rounded-full border-[0.3px] border-l-[#ff0033]/30 border-r-transparent"
+            style={{ animation: "spin 8s linear infinite" }}
+          />
+          <svg viewBox="0 0 100 100" className="w-full h-full" style={{ filter: "drop-shadow(0 0 20px rgba(255,0,51,0.6))" }}>
+            <defs>
+              <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#ff0033" />
+                <stop offset="50%" stopColor="#ff3366" />
+                <stop offset="100%" stopColor="#660011" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                <feMerge>
+                  <feMergeNode in="coloredBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <path
+              d="M28 18 h28 c16 0 24 10 24 22 c0 14 -10 22 -26 22 h-18 v30 h-16 v-74 h8"
+              stroke="url(#logoGrad)"
+              strokeWidth="3.5"
+              fill="none"
+              filter="url(#glow)"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M28 34 h20 c8 0 12 4 12 10 c0 7 -5 10 -14 10 h-18 v-20"
+              stroke="url(#logoGrad)"
+              strokeWidth="3"
+              fill="none"
+              opacity="0.6"
+            />
+            <circle cx="42" cy="40" r="3" fill="#ff0033" opacity="0.8">
+              <animate attributeName="opacity" values="0.4;0.9;0.4" dur="2s" repeatCount="indefinite" />
+            </circle>
+          </svg>
+        </div>
 
-            {/* Loader percentage and progress bar */}
-            <div className="w-full flex items-center justify-between text-xs font-semibold mb-2">
-              <span className="text-[var(--electric-blue)] uppercase tracking-widest text-glow-blue">
-                Initializing System
-              </span>
-              <span className="text-[var(--hot-pink)] text-glow-pink">
-                {displayProgress}%
-              </span>
-            </div>
-
-            <div className="w-full h-1.5 bg-[#0a0a0c] rounded-full overflow-hidden border border-white/5 relative">
-              <motion.div
-                className="h-full bg-gradient-to-r from-[var(--electric-blue)] via-[var(--deep-violet)] to-[var(--hot-pink)] shadow-[0_0_10px_var(--electric-blue)]"
-                style={{ width: `${displayProgress}%` }}
-                layout
-              />
-            </div>
-            
-            <div className="mt-8 text-[9px] text-[#555577] text-center select-none">
-              POSHAN MS PORTFOLIO v1.0.0 · NODE_ENV = PRODUCTION
-            </div>
-
+        {/* Progress bar */}
+        <div className="w-[320px] relative">
+          <div className="flex justify-between mb-2">
+            <span
+              ref={statusTextRef}
+              className="text-[9px] tracking-[0.3em] text-[#ff0033]/70 uppercase font-mono"
+            >
+              ESTABLISHING UPLINK
+            </span>
+            <span
+              ref={percentTextRef}
+              className="text-[9px] tracking-[0.2em] text-[#ff0033]/70 font-mono"
+            >
+              0%
+            </span>
           </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          <div className="h-[1px] bg-[#ff0033]/10 relative overflow-hidden">
+            <div
+              ref={progressFillRef}
+              className="h-full absolute left-0 top-0"
+              style={{
+                width: "0%",
+                background: "linear-gradient(90deg, #ff0033, #ff3366)",
+                boxShadow: "0 0 10px rgba(255,0,51,0.8), 0 0 30px rgba(255,0,51,0.3)",
+                transition: "width 0.1s linear",
+              }}
+            >
+              <div className="absolute right-0 top-[-2px] w-1 h-[5px] bg-white shadow-[0_0_10px_#fff,0_0_20px_#ff0033]" />
+            </div>
+          </div>
+        </div>
+
+        {/* Terminal logs */}
+        <div
+          ref={terminalRef}
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 text-center min-h-[80px]"
+        />
+      </div>
+
+      {/* Big counter */}
+      <div
+        ref={bigCounterRef}
+        className="fixed bottom-10 left-10 font-mono pointer-events-none"
+        style={{ zIndex: 10 }}
+      >
+        <div className="flex items-baseline">
+          <span
+            ref={counterC1Ref}
+            className="text-[80px] font-black leading-none tracking-tighter"
+            style={{
+              color: "rgba(255, 0, 51, 0.15)",
+              fontFamily: "var(--font-jetbrains-mono), monospace",
+            }}
+          >
+            0
+          </span>
+          <span
+            ref={counterC2Ref}
+            className="text-[80px] font-black leading-none tracking-tighter"
+            style={{
+              color: "rgba(255, 0, 51, 0.15)",
+              fontFamily: "var(--font-jetbrains-mono), monospace",
+            }}
+          >
+            0
+          </span>
+          <span
+            ref={counterC3Ref}
+            className="text-[80px] font-black leading-none tracking-tighter"
+            style={{
+              color: "rgba(255, 0, 51, 0.15)",
+              fontFamily: "var(--font-jetbrains-mono), monospace",
+            }}
+          >
+            0
+          </span>
+        </div>
+        <p className="text-[9px] tracking-[0.32em] text-white/25 uppercase mt-1">
+          System Integrity Matrix
+        </p>
+      </div>
+    </div>
   );
 }
 ```
@@ -5169,7 +5895,7 @@ export function useMousePosition(lerpSpeed = 0.08) {
       // Update state to trigger re-renders only when coordinates change significantly
       const diffX = Math.abs(currentRef.current.x - coords.x);
       const diffY = Math.abs(currentRef.current.y - coords.y);
-      
+
       if (diffX > 0.001 || diffY > 0.001) {
         setCoords({
           x: currentRef.current.x,
@@ -5261,6 +5987,154 @@ export function useScrollProgress() {
   }, []);
 
   return { progress: scrollProgress, activeScene };
+}
+```
+
+## File: `src/hooks/useSuspenseAudio.ts`
+
+```typescript
+"use client";
+
+import { useEffect, useRef, useCallback } from "react";
+
+export function useSuspenseAudio() {
+  const startedRef = useRef(false);
+  const synthRef = useRef<any>(null);
+  const noiseRef = useRef<any>(null);
+  const filterRef = useRef<any>(null);
+  const lfoRef = useRef<any>(null);
+
+  const start = useCallback(async () => {
+    if (startedRef.current) return;
+    try {
+      const tone = await import("tone");
+      
+      // Start Tone audio context
+      await tone.start();
+
+      // Low Drone Filter
+      const filter = new tone.Filter(200, "lowpass").toDestination();
+      filterRef.current = filter;
+      
+      // Suspenseful low synth drone
+      const synth = new tone.PolySynth(tone.Synth, {
+        oscillator: { type: "fatsawtooth" },
+        envelope: { attack: 3, decay: 1, sustain: 1, release: 4 },
+      }).connect(filter);
+      synth.volume.value = -20;
+      synthRef.current = synth;
+      
+      // LFO to modulate filter frequency for suspense wobble
+      const lfo = new tone.LFO(0.12, 80, 320).connect(filter.frequency);
+      lfoRef.current = lfo;
+      
+      // Pink noise for cosmic atmospheric wind
+      const noise = new tone.Noise("pink").connect(filter);
+      noise.volume.value = -32;
+      noiseRef.current = noise;
+
+      // Play notes
+      synth.triggerAttack(["C2", "G1", "D2"]);
+      lfo.start();
+      noise.start();
+      startedRef.current = true;
+    } catch (err) {
+      console.warn("Suspense audio failed to initialize:", err);
+    }
+  }, []);
+
+  const setProgress = useCallback((progress: number) => {
+    if (!startedRef.current) return;
+    try {
+      const norm = progress / 100;
+      
+      // Accelerate LFO wobble as load progress completes (from 0.12Hz up to 2.2Hz)
+      if (lfoRef.current) {
+        lfoRef.current.frequency.rampTo(0.12 + norm * 2.05, 0.15);
+      }
+      
+      // Open filter cutoff to make the sound brighter and more intense (from 200Hz up to 650Hz)
+      if (filterRef.current) {
+        filterRef.current.frequency.rampTo(200 + norm * 450, 0.15);
+      }
+      
+      // Slowly swell the volume of the drone and noise to build climax
+      if (synthRef.current) {
+        synthRef.current.volume.rampTo(-20 + norm * 6, 0.15);
+      }
+      if (noiseRef.current) {
+        noiseRef.current.volume.rampTo(-32 + norm * 7, 0.15);
+      }
+    } catch (err) {}
+  }, []);
+
+  const triggerTear = useCallback(async () => {
+    try {
+      const tone = await import("tone");
+      
+      // Sub-bass drop (portal tearing sound)
+      const drop = new tone.MembraneSynth().toDestination();
+      drop.volume.value = 2;
+      drop.triggerAttackRelease("C1", "1n");
+      
+      // White noise burst for the crack explosion
+      const burst = new tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.005, decay: 0.5, sustain: 0 },
+      }).toDestination();
+      burst.volume.value = -4;
+      burst.triggerAttackRelease("1n");
+
+      // Stop the suspense background drone
+      if (synthRef.current) {
+        synthRef.current.releaseAll();
+      }
+      if (noiseRef.current) {
+        noiseRef.current.stop();
+      }
+      if (lfoRef.current) {
+        lfoRef.current.stop();
+      }
+    } catch (err) {
+      console.warn("Tear SFX failed to play:", err);
+    }
+  }, []);
+
+  const stop = useCallback(() => {
+    if (synthRef.current) {
+      try { synthRef.current.releaseAll(); } catch {}
+    }
+    if (noiseRef.current) {
+      try { noiseRef.current.stop(); } catch {}
+    }
+    if (lfoRef.current) {
+      try { lfoRef.current.stop(); } catch {}
+    }
+    startedRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    // Attempt automatic start, and hook to interaction to bypass browser audio policies
+    const handleInteraction = () => {
+      start();
+      window.removeEventListener("click", handleInteraction);
+      window.removeEventListener("mousemove", handleInteraction);
+      window.removeEventListener("keydown", handleInteraction);
+    };
+
+    window.addEventListener("click", handleInteraction);
+    window.addEventListener("mousemove", handleInteraction);
+    window.addEventListener("keydown", handleInteraction);
+
+    return () => {
+      window.removeEventListener("click", handleInteraction);
+      window.removeEventListener("mousemove", handleInteraction);
+      window.removeEventListener("keydown", handleInteraction);
+      stop();
+    };
+  }, [start, stop]);
+
+  return { start, setProgress, triggerTear, stop };
 }
 ```
 
@@ -5813,6 +6687,25 @@ void main() {
   gl_Position = projectionMatrix * mvPosition;
   
   gl_PointSize = min(uSize * (300.0 / -mvPosition.z), 3.0);
+}
+```
+
+## File: `src/types/css.d.ts`
+
+```typescript
+declare module '*.css' {
+  const content: { [className: string]: string };
+  export default content;
+}
+
+declare module '*.scss' {
+  const content: { [className: string]: string };
+  export default content;
+}
+
+declare module '*.sass' {
+  const content: { [className: string]: string };
+  export default content;
 }
 ```
 
@@ -6762,7 +7655,11 @@ console.log(walk(publicDir).map(p => path.relative(publicDir, p)));
 ```json
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -6780,11 +7677,21 @@ console.log(walk(publicDir).map(p => path.relative(publicDir, p)));
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "src/types/**/*.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
 ```
 

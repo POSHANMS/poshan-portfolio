@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Cursor from "@/components/ui/Cursor";
-import Loader from "@/components/ui/Loader";
 import Navbar from "@/components/ui/Navbar";
 
 export const metadata: Metadata = {
@@ -27,7 +26,6 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className="font-sans bg-[#050508] text-[#f0f0f0] antialiased min-h-screen selection:bg-[var(--electric-blue)]/30 selection:text-white" suppressHydrationWarning>
         <Cursor />
-        <Loader />
         <Navbar />
         {children}
       </body>
