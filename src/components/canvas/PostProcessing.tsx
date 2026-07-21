@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -10,6 +10,7 @@ import * as THREE from "three";
 
 export default function PostProcessing() {
   const { gl, scene, camera, size } = useThree();
+  const hasRenderedRef = useRef(false);
 
   const composer = useMemo(() => {
     const instance = new EffectComposer(gl);
@@ -37,8 +38,9 @@ export default function PostProcessing() {
     return () => composer.dispose();
   }, [composer, size.width, size.height]);
 
-  useFrame((_, delta) => {
-    composer.render(delta);
+  // Use priority 1 to run AFTER R3F's default render, then we replace it
+  useFrame(() => {
+    composer.render();
   }, 1);
 
   return null;

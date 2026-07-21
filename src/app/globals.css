@@ -842,12 +842,13 @@ body {
 /* Ensure dashboard stage doesn't show during loading */
 .dashboard-stage {
   opacity: 0;
-  animation: stage-reveal 1.5s ease-out 0.3s forwards;
+  /* Only animate opacity — transform is controlled by inline React style */
+  animation: stage-reveal-opacity 1.5s ease-out 0.3s forwards;
 }
 
-@keyframes stage-reveal {
-  from { opacity: 0; transform: translate(-50%, -48%) scale(var(--stage-scale, 1)); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(var(--stage-scale, 1)); }
+@keyframes stage-reveal-opacity {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ═══════ SMOOTH SCROLL CAMERA ═══════ */
