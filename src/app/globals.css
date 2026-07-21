@@ -778,3 +778,101 @@ body {
 .dashboard-stage {
   top: calc(50% + 6px);
 }
+
+
+
+/* ═══════ LOADER KEYFRAMES ═══════ */
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes logo-pulse {
+  0%, 100% { 
+    filter: drop-shadow(0 0 15px rgba(255, 0, 51, 0.4));
+    opacity: 0.9;
+  }
+  50% { 
+    filter: drop-shadow(0 0 25px rgba(255, 0, 51, 0.7));
+    opacity: 1;
+  }
+}
+
+@keyframes scanline-flicker {
+  0%, 100% { opacity: 0.02; }
+  50% { opacity: 0.04; }
+}
+
+@keyframes glitch-shift {
+  0%, 90%, 100% { transform: translate(0); }
+  92% { transform: translate(-2px, 1px); }
+  94% { transform: translate(2px, -1px); }
+  96% { transform: translate(-1px, 2px); }
+}
+
+/* ═══════ LOADER UTILITY CLASSES ═══════ */
+
+.loader-scanlines {
+  position: relative;
+}
+
+.loader-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 0, 51, 0.015) 2px,
+    rgba(255, 0, 51, 0.015) 4px
+  );
+  pointer-events: none;
+  animation: scanline-flicker 4s ease-in-out infinite;
+}
+
+/* ═══════ DASHBOARD HERO FIXES ═══════ */
+
+/* Ensure dashboard stage doesn't show during loading */
+.dashboard-stage {
+  opacity: 0;
+  animation: stage-reveal 1.5s ease-out 0.3s forwards;
+}
+
+@keyframes stage-reveal {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(var(--stage-scale, 1)); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(var(--stage-scale, 1)); }
+}
+
+/* ═══════ SMOOTH SCROLL CAMERA ═══════ */
+
+/* Prevent content jump during scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Ensure canvas doesn't flicker */
+canvas {
+  display: block;
+}
+
+/* ═══════ REDUCED MOTION ═══════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-stage {
+    animation: none;
+    opacity: 1;
+  }
+
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
