@@ -30,6 +30,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
     <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#000000" }}>
       <Canvas
         shadows
+        frameloop="always"
         gl={{
           antialias: true,
           alpha: false,

@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { initScrollCamera } from "@/animations/scrollCamera";
+import Loader from "@/components/ui/Loader";
 import DashboardHero from "@/components/ui/DashboardHero";
 import SocialSidebar from "@/components/ui/SocialSidebar";
-import Loader from "@/components/ui/Loader";
 import About from "@/components/sections/About";
 import Skills from "@/components/sections/Skills";
 import Projects from "@/components/sections/Projects";
@@ -42,73 +42,72 @@ export default function Home() {
   const [loaderComplete, setLoaderComplete] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
   const stageScale = useStageScale();
+  const scrollControlRef = useRef<{ destroy: () => void } | null>(null);
 
-  // Initialize scroll camera
+  // Initialize scroll camera after loader completes
   useEffect(() => {
-    const scrollControl = initScrollCamera((progress) => {
-      setScrollProgress(progress);
-    });
+    if (!loaderComplete) return;
+
+    const timer = setTimeout(() => {
+      scrollControlRef.current = initScrollCamera((progress) => {
+        setScrollProgress(progress);
+      });
+      setSceneReady(true);
+    }, 300);
 
     return () => {
-      if (scrollControl) scrollControl.destroy();
+      clearTimeout(timer);
+      scrollControlRef.current?.destroy();
+      scrollControlRef.current = null;
     };
-  }, []);
-
-  // Set scene ready state when loader finishes
-  useEffect(() => {
-    if (loaderComplete) {
-      setSceneReady(true);
-    }
   }, [loaderComplete]);
 
   return (
     <main className="relative min-h-[500vh] bg-[#030001]">
-      {/* Preload Sequence Loader (z-index 99999) */}
+      {/* LOADER — renders first, calls onComplete when finished */}
       {!loaderComplete && (
         <Loader onComplete={() => setLoaderComplete(true)} />
       )}
 
-      {/* 3D WebGL Scene — mounted continuously behind loader for zero pop-in */}
-      <div
-        className="fixed inset-0 z-0 h-full w-full"
-        style={{
-          opacity: sceneReady ? 1 : 0.9,
-          transition: "opacity 1s ease-out",
-        }}
-      >
-        <Scene scrollProgress={scrollProgress} />
-      </div>
+      {/* 3D Scene — only renders after loader completes */}
+      {loaderComplete && (
+        <div
+          className="fixed inset-0 z-0 h-full w-full"
+          style={{
+            opacity: sceneReady ? 1 : 0,
+            transition: "opacity 1.5s ease-out",
+          }}
+        >
+          <Scene scrollProgress={scrollProgress} />
+        </div>
+      )}
 
-      {/* Social sidebar — appears after loader completes */}
-      <div
-        style={{
-          opacity: loaderComplete ? 1 : 0,
-          pointerEvents: loaderComplete ? "auto" : "none",
-          transition: "opacity 1s ease-out 0.3s",
-        }}
-      >
-        <SocialSidebar />
-      </div>
+      {/* Social sidebar — appears after loader */}
+      {loaderComplete && (
+        <div style={{
+          opacity: sceneReady ? 1 : 0,
+          transition: "opacity 1s ease-out 0.5s",
+        }}>
+          <SocialSidebar />
+        </div>
+      )}
 
-      {/* Dashboard Hero — Station 1 UI overlay */}
-      <div
-        style={{
-          opacity: loaderComplete ? 1 : 0,
-          pointerEvents: loaderComplete ? "auto" : "none",
-          transition: "opacity 1.2s ease-out 0.4s",
-        }}
-      >
-        <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
-      </div>
+      {/* Dashboard Hero — the "Station 1" view */}
+      {loaderComplete && (
+        <div style={{
+          opacity: sceneReady ? 1 : 0,
+          transition: "opacity 1.2s ease-out 0.8s",
+        }}>
+          <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
+        </div>
+      )}
 
       {/* Content sections — fade in as user scrolls down */}
       <div
         className="relative z-10 -mt-px"
         style={{
-          background:
-            "linear-gradient(180deg, rgba(3,0,1,0.4) 0%, rgba(10,0,2,0.82) 18%, rgba(10,0,2,0.94) 100%)",
+          background: "linear-gradient(180deg, rgba(3,0,1,0.4) 0%, rgba(10,0,2,0.82) 18%, rgba(10,0,2,0.94) 100%)",
           opacity: loaderComplete ? 1 : 0,
-          pointerEvents: loaderComplete ? "auto" : "none",
           transition: "opacity 1.5s ease-out",
         }}
       >

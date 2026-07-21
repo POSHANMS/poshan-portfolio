@@ -692,39 +692,41 @@ export default function Loader({ onComplete }: LoaderProps) {
             className="absolute inset-[-50px] rounded-full border-[0.3px] border-l-[#ff0033]/30 border-r-transparent"
             style={{ animation: "spin 8s linear infinite" }}
           />
-          <svg viewBox="0 0 100 100" className="w-full h-full" style={{ filter: "drop-shadow(0 0 20px rgba(255,0,51,0.6))" }}>
+          {/* FIXED: Solid crimson stroke with CSS drop-shadow instead of SVG filter */}
+          <svg 
+            viewBox="0 0 100 100" 
+            className="w-full h-full" 
+            style={{ filter: "drop-shadow(0 0 12px rgba(255,0,51,0.8)) drop-shadow(0 0 24px rgba(255,0,51,0.4))" }}
+          >
             <defs>
               <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#ff0033" />
                 <stop offset="50%" stopColor="#ff3366" />
-                <stop offset="100%" stopColor="#660011" />
+                <stop offset="100%" stopColor="#cc0022" />
               </linearGradient>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                <feMerge>
-                  <feMergeNode in="coloredBlur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
             </defs>
+            {/* Main P stroke — solid crimson, no SVG filter */}
             <path
               d="M28 18 h28 c16 0 24 10 24 22 c0 14 -10 22 -26 22 h-18 v30 h-16 v-74 h8"
-              stroke="url(#logoGrad)"
+              stroke="#ff0033"
               strokeWidth="3.5"
               fill="none"
-              filter="url(#glow)"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
+            {/* Inner detail stroke */}
             <path
               d="M28 34 h20 c8 0 12 4 12 10 c0 7 -5 10 -14 10 h-18 v-20"
-              stroke="url(#logoGrad)"
-              strokeWidth="3"
+              stroke="#ff3366"
+              strokeWidth="2.5"
               fill="none"
-              opacity="0.6"
+              opacity="0.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-            <circle cx="42" cy="40" r="3" fill="#ff0033" opacity="0.8">
-              <animate attributeName="opacity" values="0.4;0.9;0.4" dur="2s" repeatCount="indefinite" />
+            {/* Center dot */}
+            <circle cx="42" cy="40" r="3" fill="#ff0033">
+              <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
             </circle>
           </svg>
         </div>
