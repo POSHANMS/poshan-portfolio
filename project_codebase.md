@@ -1115,6 +1115,180 @@ canvas {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CINEMATIC BREACH ENHANCEMENTS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Enhanced spin animations for breach rings */
+@keyframes breach-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes breach-spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes breach-pulse {
+  0%, 100% { 
+    filter: drop-shadow(0 0 15px rgba(255, 0, 51, 0.4));
+    opacity: 0.9;
+  }
+  50% { 
+    filter: drop-shadow(0 0 30px rgba(255, 0, 51, 0.7)) drop-shadow(0 0 60px rgba(255, 0, 51, 0.3));
+    opacity: 1;
+  }
+}
+
+@keyframes singularity-glow {
+  0%, 100% {
+    box-shadow: 0 0 30px rgba(255, 0, 51, 0.5), inset 0 0 30px rgba(255, 0, 51, 0.2);
+  }
+  33% {
+    box-shadow: 0 0 50px rgba(255, 50, 50, 0.6), inset 0 0 40px rgba(255, 50, 50, 0.3);
+  }
+  66% {
+    box-shadow: 0 0 40px rgba(255, 100, 100, 0.5), inset 0 0 35px rgba(255, 100, 100, 0.25);
+  }
+}
+
+/* Logo emergence animation */
+.logo-emerge {
+  animation: logo-emerge 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes logo-emerge {
+  0% {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+    filter: blur(20px) brightness(3);
+  }
+  30% {
+    transform: scale(0.3) rotate(-60deg);
+    opacity: 0.3;
+    filter: blur(10px) brightness(2);
+  }
+  60% {
+    transform: scale(0.8) rotate(-10deg);
+    opacity: 0.8;
+    filter: blur(3px) brightness(1.5);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+    filter: blur(0) brightness(1);
+  }
+}
+
+/* Chromatic aberration text effect */
+.chromatic-text {
+  position: relative;
+}
+.chromatic-text::before,
+.chromatic-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.chromatic-text::before {
+  color: #ff0033;
+  transform: translate(-2px, -1px);
+  opacity: 0.7;
+  filter: blur(0.5px);
+}
+.chromatic-text::after {
+  color: #00f0ff;
+  transform: translate(2px, 1px);
+  opacity: 0.7;
+  filter: blur(0.5px);
+}
+
+/* Spacetime distortion overlay */
+.spacetime-distort {
+  position: relative;
+  overflow: hidden;
+}
+.spacetime-distort::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    rgba(255, 0, 51, 0.03) 30%,
+    transparent 60%
+  );
+  animation: distort-rotate 20s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes distort-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Enhanced scanline flicker */
+@keyframes scanline-flicker-breach {
+  0%, 100% { opacity: 0.015; }
+  50% { opacity: 0.035; }
+}
+
+/* Breach phase indicator */
+.breach-phase {
+  position: relative;
+}
+.breach-phase::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #ff0033, #ff3366, #00f0ff);
+  background-size: 200% 100%;
+  animation: phase-scan 2s linear infinite;
+}
+
+@keyframes phase-scan {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+/* ═══════ BREACH LOGO FIXES ═══════ */
+
+.logo-breach-container {
+  will-change: transform, opacity, filter;
+}
+
+.logo-breach-container svg {
+  animation: logo-breathe 3s ease-in-out infinite;
+}
+
+@keyframes logo-breathe {
+  0%, 100% {
+    filter: drop-shadow(0 0 12px rgba(255, 0, 51, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px rgba(255, 0, 51, 0.9)) drop-shadow(0 0 40px rgba(255, 0, 51, 0.3));
+  }
+}
+
+/* Terminal log styling for breach phase */
+.terminal-breach-log {
+  color: #ff0033 !important;
+  text-shadow: 0 0 8px rgba(255, 0, 51, 0.6) !important;
+  font-family: var(--font-jetbrains-mono), monospace !important;
+  font-size: 11px !important;
+  letter-spacing: 0.15em !important;
+  margin-bottom: 4px !important;
+  text-transform: uppercase !important;
+}
 ```
 
 ## File: `src/app/layout.tsx`
@@ -4802,22 +4976,15 @@ import HUDSystem from "@/components/ui/loader/HUDSystem";
 import HiddenTerminal from "@/components/ui/loader/HiddenTerminal";
 
 // ═══════════════════════════════════════════════════════════════════════
-// OVERKILL CONFIGURATION — Tuned for 60fps on all devices
+// CINEMATIC BREACH CONFIGURATION — Professional spacetime tear
 // ═══════════════════════════════════════════════════════════════════════
 const CONFIG = {
-  // Timing
-  LOAD_DURATION: 10000,        // 10s load time
-  CONVERGE_DURATION: 1500,      // 1.5s convergence
-
-  // Rain — matches working prototype EXACTLY
+  LOAD_DURATION: 10000,
+  CONVERGE_DURATION: 2000,
   DROP_COUNTS: { back: 300, mid: 150, front: 50 },
   MOUSE_RADIUS: 220,
   MOUSE_INNER_RADIUS: 110,
-
-  // Physics (units per frame at 60fps, scaled by dt)
   SPEEDS: { back: 0.4, mid: 0.9, front: 1.6 },
-
-  // Visual
   CORE_RED: "#ff0033",
   VOID_BLACK: "#030001",
   CLEAR_ALPHA: 0.25,
@@ -4844,34 +5011,58 @@ interface MicroDrop {
   baseOpacity: number; chars: DropChar[];
   phase: number; layer: number;
 }
-interface DebrisParticle {
-  x: number; y: number; vx: number; vy: number;
-  life: number; maxLife: number; size: number;
-  angle: number; spin: number; noise: number;
-}
-interface LightningBranch {
+interface Shard {
   x: number; y: number;
-  segments: { x: number; y: number }[];
+  vx: number; vy: number;
   life: number; maxLife: number;
+  size: number;
+  rotation: number;
+  rotSpeed: number;
+  vertices: { x: number; y: number }[];
+  color: { r: number; g: number; b: number };
+  trail: { x: number; y: number }[];
 }
-interface CrackPoint { x: number; y: number; angle: number; baseRadius: number; noise: number; }
+interface EnergyTendril {
+  points: { x: number; y: number }[];
+  life: number; maxLife: number;
+  amplitude: number;
+  frequency: number;
+}
+interface ShockwaveRing {
+  birth: number; maxRadius: number;
+  speed: number; decay: number;
+  intensity: number;
+}
 
 // ═══════════════════════════════════════════════════════════════════════
-// TEAR ENGINE — Self-contained, no React dependencies
+// CINEMATIC BREACH ENGINE — Spacetime Fabric Tear
 // ═══════════════════════════════════════════════════════════════════════
-class TearEngine {
+class BreachEngine {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   active = false;
-  phase: "forming" | "widening" | "collapsing" | "done" = "forming";
+  phase: "forming" | "widening" | "collapse" | "revealing" | "done" = "forming";
   time = 0;
   centerX = 0;
   centerY = 0;
-  crackPoints: CrackPoint[] = [];
-  debris: DebrisParticle[] = [];
-  lightning: LightningBranch[] = [];
   onComplete?: () => void;
   W = 0; H = 0;
+
+  // Breach geometry
+  breachRadius = 0;
+  breachTargetRadius = 0;
+  breachIrregularity: number[] = [];
+
+  // Effects
+  shards: Shard[] = [];
+  tendrils: EnergyTendril[] = [];
+  shockwaves: ShockwaveRing[] = [];
+
+  // Gravitational lensing
+  lensStrength = 0;
+
+  // Accretion particles
+  accretionParticles: { angle: number; dist: number; speed: number; size: number }[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -4892,45 +5083,95 @@ class TearEngine {
     this.centerY = h / 2;
   }
 
-  generateCrack() {
-    this.crackPoints = [];
-    const segments = 120;
-    const baseAngle = -Math.PI / 2;
-
+  generateBreachGeometry() {
+    this.breachIrregularity = [];
+    const segments = 180;
     for (let i = 0; i <= segments; i++) {
       const t = i / segments;
-      const angle = baseAngle + t * Math.PI * 2;
-      const r1 = Math.sin(t * 19) * 22;
-      const r2 = Math.cos(t * 11 + 1) * 16;
-      const r3 = Math.sin(t * 31 + 2) * 8;
-      const baseR = 3 + t * 4;
-      const radius = baseR + r1 + r2 + r3;
-      this.crackPoints.push({
-        x: this.centerX + Math.cos(angle) * radius,
-        y: this.centerY + Math.sin(angle) * radius,
-        angle,
-        baseRadius: radius,
-        noise: Math.random(),
+      const angle = t * Math.PI * 2;
+      // Multiple octaves of noise for organic tear shape
+      const r1 = Math.sin(angle * 3) * 0.3;
+      const r2 = Math.sin(angle * 7 + 1) * 0.15;
+      const r3 = Math.sin(angle * 13 + 2) * 0.08;
+      const r4 = Math.sin(angle * 23 + 3) * 0.04;
+      this.breachIrregularity.push(1 + r1 + r2 + r3 + r4);
+    }
+
+    // Generate crystalline shards
+    this.shards = [];
+    for (let i = 0; i < 200; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * 60;
+      const speed = 2 + Math.random() * 8;
+
+      // Create irregular crystalline shape
+      const vertCount = 3 + Math.floor(Math.random() * 4);
+      const vertices: { x: number; y: number }[] = [];
+      for (let v = 0; v < vertCount; v++) {
+        const va = (v / vertCount) * Math.PI * 2 + Math.random() * 0.5;
+        const vr = 0.3 + Math.random() * 0.7;
+        vertices.push({ x: Math.cos(va) * vr, y: Math.sin(va) * vr });
+      }
+
+      // Color variation: white-hot center, cooling to red, then dark
+      const temp = Math.random();
+      let color: { r: number; g: number; b: number };
+      if (temp > 0.7) {
+        color = { r: 255, g: 240 + Math.random() * 15, b: 230 + Math.random() * 25 };
+      } else if (temp > 0.4) {
+        color = { r: 255, g: 100 + Math.random() * 80, b: 80 + Math.random() * 60 };
+      } else {
+        color = { r: 180 + Math.random() * 75, g: 20 + Math.random() * 40, b: 30 + Math.random() * 50 };
+      }
+
+      this.shards.push({
+        x: this.centerX + Math.cos(angle) * dist,
+        y: this.centerY + Math.sin(angle) * dist,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1,
+        maxLife: 0.8 + Math.random() * 1.2,
+        size: 2 + Math.random() * 5,
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.3,
+        vertices,
+        color,
+        trail: [],
       });
     }
 
-    // High velocity shrapnel + glass debris
-    this.debris = [];
-    for (let i = 0; i < 350; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const dist = Math.random() * 80;
-      const speed = 4 + Math.random() * 9;
-      this.debris.push({
-        x: this.centerX + Math.cos(a) * dist,
-        y: this.centerY + Math.sin(a) * dist,
-        vx: Math.cos(a) * speed,
-        vy: Math.sin(a) * speed,
-        size: 2 + Math.random() * 6,
+    // Generate energy tendrils
+    this.tendrils = [];
+    for (let i = 0; i < 12; i++) {
+      const points: { x: number; y: number }[] = [];
+      const segments = 20;
+      const baseAngle = (i / 12) * Math.PI * 2;
+      for (let s = 0; s <= segments; s++) {
+        const t = s / segments;
+        const r = t * 150;
+        const wave = Math.sin(t * Math.PI * 4) * (1 - t) * 20;
+        points.push({
+          x: this.centerX + Math.cos(baseAngle) * r + Math.cos(baseAngle + Math.PI / 2) * wave,
+          y: this.centerY + Math.sin(baseAngle) * r + Math.sin(baseAngle + Math.PI / 2) * wave,
+        });
+      }
+      this.tendrils.push({
+        points,
         life: 1,
-        maxLife: 0.6 + Math.random() * 1.4,
+        maxLife: 0.6 + Math.random() * 0.4,
+        amplitude: 10 + Math.random() * 20,
+        frequency: 2 + Math.random() * 4,
+      });
+    }
+
+    // Generate accretion disk particles
+    this.accretionParticles = [];
+    for (let i = 0; i < 100; i++) {
+      this.accretionParticles.push({
         angle: Math.random() * Math.PI * 2,
-        spin: (Math.random() - 0.5) * 0.4,
-        noise: Math.random(),
+        dist: 20 + Math.random() * 80,
+        speed: 0.02 + Math.random() * 0.05,
+        size: 0.5 + Math.random() * 1.5,
       });
     }
   }
@@ -4939,207 +5180,296 @@ class TearEngine {
     this.active = true;
     this.phase = "forming";
     this.time = 0;
-    this.generateCrack();
+    this.breachRadius = 0;
+    this.breachTargetRadius = 0;
+    this.lensStrength = 0;
+    this.generateBreachGeometry();
   }
 
   update(dt: number) {
     if (!this.active) return;
     this.time += dt;
 
-    if (this.phase === "forming" && this.time > 0.25) this.phase = "widening";
-    if (this.phase === "widening" && this.time > 1.1) this.phase = "collapsing";
-    if (this.phase === "collapsing" && this.time > 1.8) {
+    const t = this.time;
+
+    // Phase transitions
+    if (this.phase === "forming" && t > 0.3) {
+      this.phase = "widening";
+    } else if (this.phase === "widening" && t > 1.0) {
+      this.phase = "collapse";
+    } else if (this.phase === "collapse" && t > 1.6) {
+      this.phase = "revealing";
+    } else if (this.phase === "revealing" && t > 2.2) {
       this.phase = "done";
       this.active = false;
       this.onComplete?.();
       return;
     }
 
-    for (const d of this.debris) {
-      d.x += d.vx * dt * 60;
-      d.y += d.vy * dt * 60;
-      d.vx *= 0.97;
-      d.vy *= 0.97;
-      d.life -= dt / d.maxLife;
-      d.angle += d.spin * dt * 60;
+    // Breach radius animation
+    if (this.phase === "forming") {
+      this.breachTargetRadius = 15;
+      this.lensStrength = t / 0.3;
+    } else if (this.phase === "widening") {
+      this.breachTargetRadius = 80 + (t - 0.3) / 0.7 * 400;
+      this.lensStrength = 1 + (t - 0.3) / 0.7 * 2;
+    } else if (this.phase === "collapse") {
+      this.breachTargetRadius = 480 + (t - 1.0) / 0.6 * 600;
+      this.lensStrength = 3 - (t - 1.0) / 0.6 * 2;
+    } else if (this.phase === "revealing") {
+      this.breachTargetRadius = 1080 + (t - 1.6) / 0.6 * 400;
+      this.lensStrength = Math.max(0, 1 - (t - 1.6) / 0.6);
     }
-    this.debris = this.debris.filter((d) => d.life > 0);
 
-    // Electric arcs
-    if ((this.phase === "forming" || this.phase === "widening") && Math.random() < 0.6) {
-      const idx = Math.floor(Math.random() * this.crackPoints.length);
-      const p = this.crackPoints[idx];
-      const lAngle = p.angle + (Math.random() - 0.5) * 1.2;
-      const segs: { x: number; y: number }[] = [];
-      let lx = p.x;
-      let ly = p.y;
-      for (let s = 0; s < 7; s++) {
-        lx += Math.cos(lAngle + (Math.random() - 0.5)) * (12 + Math.random() * 25);
-        ly += Math.sin(lAngle + (Math.random() - 0.5)) * (12 + Math.random() * 25);
-        segs.push({ x: lx, y: ly });
+    this.breachRadius += (this.breachTargetRadius - this.breachRadius) * 0.1;
+
+    // Spawn shockwaves
+    if (this.phase === "widening" && this.shockwaves.length === 0) {
+      this.shockwaves.push({
+        birth: performance.now(),
+        maxRadius: Math.max(this.W, this.H) * 0.8,
+        speed: 400,
+        decay: 1.5,
+        intensity: 1,
+      });
+    }
+
+    // Update shards
+    for (const shard of this.shards) {
+      shard.x += shard.vx * dt * 60;
+      shard.y += shard.vy * dt * 60;
+      shard.vx *= 0.97;
+      shard.vy *= 0.97;
+      shard.life -= dt / shard.maxLife;
+      shard.rotation += shard.rotSpeed * dt * 60;
+
+      // Add to trail
+      shard.trail.push({ x: shard.x, y: shard.y });
+      if (shard.trail.length > 8) shard.trail.shift();
+    }
+    this.shards = this.shards.filter(s => s.life > 0);
+
+    // Update tendrils
+    for (const tendril of this.tendrils) {
+      tendril.life -= dt / tendril.maxLife;
+      // Animate points
+      for (let i = 0; i < tendril.points.length; i++) {
+        const p = tendril.points[i];
+        const t2 = i / tendril.points.length;
+        p.x += Math.sin(this.time * tendril.frequency + i * 0.5) * tendril.amplitude * t2 * dt;
+        p.y += Math.cos(this.time * tendril.frequency + i * 0.5) * tendril.amplitude * t2 * dt;
       }
-      this.lightning.push({ x: lx, y: ly, segments: segs, life: 0.25, maxLife: 0.25 });
     }
+    this.tendrils = this.tendrils.filter(t => t.life > 0);
 
-    for (let i = this.lightning.length - 1; i >= 0; i--) {
-      this.lightning[i].life -= dt;
-      if (this.lightning[i].life <= 0) this.lightning.splice(i, 1);
+    // Update shockwaves
+    for (const sw of this.shockwaves) {
+      sw.intensity -= dt / sw.decay;
+    }
+    this.shockwaves = this.shockwaves.filter(sw => sw.intensity > 0);
+
+    // Update accretion particles
+    for (const p of this.accretionParticles) {
+      p.angle += p.speed * (1 + 2 / Math.max(p.dist, 10));
+      p.dist *= 0.995;
     }
   }
 
   draw() {
     if (!this.active) return;
     const { ctx, centerX, centerY, time, W, H } = this;
-    const t = time;
-
-    let expansion = 0;
-    if (this.phase === "forming") expansion = (t / 0.25) * 12;
-    else if (this.phase === "widening") expansion = 12 + ((t - 0.25) / 0.85) * 550;
-    else if (this.phase === "collapsing") expansion = 562 + ((t - 1.1) / 0.7) * 900;
 
     ctx.save();
     ctx.clearRect(0, 0, W, H);
 
-    // 1. Radial Shockwave Rings
-    if (t < 0.8) {
-      const ringR = expansion * 1.4;
-      ctx.save();
-      ctx.strokeStyle = "rgba(255, 0, 51, " + Math.max(0, 0.8 - t) + ")";
-      ctx.lineWidth = 4;
-      ctx.shadowColor = CONFIG.CORE_RED;
-      ctx.shadowBlur = 30;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, ringR, 0, Math.PI * 2);
-      ctx.stroke();
+    // 1. GRAVITATIONAL LENSING BACKGROUND
+    // Draw the background with distortion around the breach
+    if (this.lensStrength > 0) {
+      this.drawGravitationalLensing(ctx, W, H, centerX, centerY, this.breachRadius, this.lensStrength);
+    }
 
-      // Outer Cyan Shockwave Ring
-      ctx.strokeStyle = "rgba(0, 240, 255, " + Math.max(0, 0.6 - t) + ")";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, ringR * 1.15, 0, Math.PI * 2);
-      ctx.stroke();
+    // 2. ACCRETION DISK — Rotating energy ring around breach
+    if (this.breachRadius > 20) {
+      ctx.save();
+      for (const p of this.accretionParticles) {
+        const x = centerX + Math.cos(p.angle + time * 2) * p.dist;
+        const y = centerY + Math.sin(p.angle + time * 2) * p.dist * 0.3;
+        const alpha = (1 - p.dist / 100) * 0.6 * Math.min(1, time * 2);
+
+        ctx.beginPath();
+        ctx.arc(x, y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, ${30 + p.dist}, ${50 + p.dist * 2}, ${alpha})`;
+        ctx.fill();
+      }
       ctx.restore();
     }
 
-    // 2. Void Core Hole Cutout
-    const voidGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, expansion * 1.6);
-    voidGrad.addColorStop(0, CONFIG.VOID_BLACK);
-    voidGrad.addColorStop(0.35, CONFIG.VOID_BLACK);
-    voidGrad.addColorStop(0.6, "rgba(255,0,51,0.2)");
-    voidGrad.addColorStop(0.8, "rgba(0,240,255,0.15)");
+    // 3. VOID CORE — The actual hole in spacetime
+    const voidGrad = ctx.createRadialGradient(
+      centerX, centerY, 0,
+      centerX, centerY, this.breachRadius * 1.2
+    );
+    voidGrad.addColorStop(0, "rgba(3, 0, 1, 1)");
+    voidGrad.addColorStop(0.3, "rgba(8, 0, 2, 0.95)");
+    voidGrad.addColorStop(0.6, "rgba(20, 0, 5, 0.3)");
+    voidGrad.addColorStop(0.85, "rgba(255, 0, 51, 0.15)");
+    voidGrad.addColorStop(0.95, "rgba(0, 240, 255, 0.08)");
     voidGrad.addColorStop(1, "transparent");
+
     ctx.fillStyle = voidGrad;
     ctx.beginPath();
-    ctx.arc(centerX, centerY, expansion * 2.2, 0, Math.PI * 2);
+    this.drawBreachPath(ctx, centerX, centerY, this.breachRadius, this.breachIrregularity);
     ctx.fill();
 
-    // 3. Chromatic Aberration Spider-Verse Crack Edges
-    if (this.crackPoints.length > 1) {
-      // Crimson Shift (Left/Top)
-      ctx.save();
-      ctx.shadowColor = "#ff0033";
-      ctx.shadowBlur = 25;
-      ctx.strokeStyle = "rgba(255, 0, 51, 0.95)";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      for (let i = 0; i < this.crackPoints.length; i++) {
-        const p = this.crackPoints[i];
-        const r = p.baseRadius + expansion + Math.sin(t * 12 + i) * 4;
-        const x = centerX + Math.cos(p.angle) * r - 4;
-        const y = centerY + Math.sin(p.angle) * r - 2;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.stroke();
+    // 4. EVENT HORIZON GLOW — Intense ring at the edge
+    const horizonGlow = ctx.createRadialGradient(
+      centerX, centerY, this.breachRadius * 0.8,
+      centerX, centerY, this.breachRadius * 1.15
+    );
+    horizonGlow.addColorStop(0, "transparent");
+    horizonGlow.addColorStop(0.5, "rgba(255, 0, 51, 0.4)");
+    horizonGlow.addColorStop(0.8, "rgba(255, 100, 50, 0.2)");
+    horizonGlow.addColorStop(1, "transparent");
 
-      // Cyan Shift (Right/Bottom)
-      ctx.shadowColor = "#00f0ff";
-      ctx.shadowBlur = 20;
-      ctx.strokeStyle = "rgba(0, 240, 255, 0.85)";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      for (let i = 0; i < this.crackPoints.length; i++) {
-        const p = this.crackPoints[i];
-        const r = p.baseRadius + expansion * 0.97 + Math.sin(t * 16 + i) * 3;
-        const x = centerX + Math.cos(p.angle) * r + 4;
-        const y = centerY + Math.sin(p.angle) * r + 2;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.stroke();
+    ctx.fillStyle = horizonGlow;
+    ctx.beginPath();
+    this.drawBreachPath(ctx, centerX, centerY, this.breachRadius * 1.2, this.breachIrregularity);
+    ctx.fill();
 
-      // Pure White Core Filament
-      ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 12;
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let i = 0; i < this.crackPoints.length; i++) {
-        const p = this.crackPoints[i];
-        const r = p.baseRadius + expansion * 0.99;
-        const x = centerX + Math.cos(p.angle) * r;
-        const y = centerY + Math.sin(p.angle) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.stroke();
-      ctx.restore();
-    }
+    // 5. SPACETIME FABRIC TEAR EDGES — Chromatic aberration
+    this.drawTearEdges(ctx, centerX, centerY, this.breachRadius, this.breachIrregularity, time);
 
-    // 4. Electric Arcs
+    // 6. ENERGY TENDRILS — Organic lightning
     ctx.save();
-    ctx.shadowBlur = 18;
-    for (const l of this.lightning) {
-      const alpha = l.life / l.maxLife;
-      ctx.shadowColor = Math.random() < 0.5 ? "#ff0033" : "#00f0ff";
-      ctx.strokeStyle = Math.random() < 0.5 ? `rgba(255, 220, 240, ${alpha})` : `rgba(200, 245, 255, ${alpha})`;
+    for (const tendril of this.tendrils) {
+      const alpha = tendril.life / tendril.maxLife;
+      ctx.strokeStyle = `rgba(255, ${150 + Math.sin(time * 10) * 100}, 200, ${alpha * 0.8})`;
       ctx.lineWidth = 2;
+      ctx.shadowColor = "#ff0033";
+      ctx.shadowBlur = 15 * alpha;
       ctx.beginPath();
-      ctx.moveTo(l.x, l.y);
-      for (const s of l.segments) ctx.lineTo(s.x, s.y);
+      ctx.moveTo(tendril.points[0].x, tendril.points[0].y);
+      for (let i = 1; i < tendril.points.length; i++) {
+        const cp1x = (tendril.points[i - 1].x + tendril.points[i].x) / 2;
+        const cp1y = (tendril.points[i - 1].y + tendril.points[i].y) / 2;
+        ctx.quadraticCurveTo(tendril.points[i - 1].x, tendril.points[i - 1].y, cp1x, cp1y);
+      }
       ctx.stroke();
     }
     ctx.restore();
 
-    // 5. High-Velocity Polygon Glass Shrapnel
+    // 7. CRYSTALLINE SHARDS — With motion blur trails
     ctx.save();
-    for (const d of this.debris) {
-      const alpha = Math.max(0, d.life);
-      ctx.save();
-      ctx.translate(d.x, d.y);
-      ctx.rotate(d.angle);
-      ctx.shadowColor = d.noise > 0.5 ? "#ff0033" : "#00f0ff";
-      ctx.shadowBlur = 8;
-      
-      const r = d.noise > 0.5 ? 255 : 0;
-      const g = d.noise > 0.5 ? 40 : 240;
-      const b = d.noise > 0.5 ? 80 : 255;
-      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    for (const shard of this.shards) {
+      const alpha = Math.max(0, shard.life);
 
-      // Draw triangular shrapnel shard
+      // Draw motion trail
+      if (shard.trail.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(shard.trail[0].x, shard.trail[0].y);
+        for (let i = 1; i < shard.trail.length; i++) {
+          ctx.lineTo(shard.trail[i].x, shard.trail[i].y);
+        }
+        ctx.strokeStyle = `rgba(${shard.color.r}, ${shard.color.g}, ${shard.color.b}, ${alpha * 0.3})`;
+        ctx.lineWidth = shard.size * 0.5;
+        ctx.stroke();
+      }
+
+      // Draw crystalline shard
+      ctx.save();
+      ctx.translate(shard.x, shard.y);
+      ctx.rotate(shard.rotation);
+      ctx.scale(shard.size, shard.size);
+
       ctx.beginPath();
-      ctx.moveTo(0, -d.size);
-      ctx.lineTo(d.size * 0.8, d.size * 0.8);
-      ctx.lineTo(-d.size * 0.8, d.size * 0.6);
+      ctx.moveTo(shard.vertices[0].x, shard.vertices[0].y);
+      for (let i = 1; i < shard.vertices.length; i++) {
+        ctx.lineTo(shard.vertices[i].x, shard.vertices[i].y);
+      }
       ctx.closePath();
+
+      // Glass-like fill
+      const grad = ctx.createLinearGradient(-1, -1, 1, 1);
+      grad.addColorStop(0, `rgba(${shard.color.r}, ${shard.color.g}, ${shard.color.b}, ${alpha * 0.9})`);
+      grad.addColorStop(0.5, `rgba(${shard.color.r}, ${shard.color.g}, ${shard.color.b}, ${alpha * 0.5})`);
+      grad.addColorStop(1, `rgba(${shard.color.r * 0.5}, ${shard.color.g * 0.5}, ${shard.color.b * 0.5}, ${alpha * 0.3})`);
+      ctx.fillStyle = grad;
       ctx.fill();
+
+      // Edge glow
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.6})`;
+      ctx.lineWidth = 0.1;
+      ctx.stroke();
+
       ctx.restore();
     }
     ctx.restore();
 
-    // 6. Final Dissolve Flash Vignette
-    if (this.phase === "collapsing") {
-      const collapseT = (t - 1.1) / 0.7;
-      const vigAlpha = collapseT * 0.95;
+    // 8. SHOCKWAVE RINGS
+    ctx.save();
+    for (const sw of this.shockwaves) {
+      const age = (performance.now() - sw.birth) / 1000;
+      const radius = age * sw.speed;
+      const alpha = sw.intensity * (1 - age / sw.decay);
+
+      if (alpha > 0 && radius < sw.maxRadius) {
+        // Primary ring
+        ctx.strokeStyle = `rgba(255, 0, 51, ${alpha * 0.5})`;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = "#ff0033";
+        ctx.shadowBlur = 20 * alpha;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Secondary cyan ring (chromatic separation)
+        ctx.strokeStyle = `rgba(0, 240, 255, ${alpha * 0.3})`;
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = "#00f0ff";
+        ctx.shadowBlur = 15 * alpha;
+        ctx.beginPath();
+        ctx.arc(centerX + 3, centerY + 2, radius * 1.02, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Tertiary faint outer ring
+        ctx.strokeStyle = `rgba(255, 100, 100, ${alpha * 0.15})`;
+        ctx.lineWidth = 8;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius * 1.05, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+
+    // 9. CENTER SINGULARITY GLOW
+    if (this.phase !== "done") {
+      const singularityGlow = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, this.breachRadius * 0.5
+      );
+      singularityGlow.addColorStop(0, "rgba(255, 255, 255, 0.8)");
+      singularityGlow.addColorStop(0.2, "rgba(255, 200, 200, 0.4)");
+      singularityGlow.addColorStop(0.5, "rgba(255, 50, 50, 0.2)");
+      singularityGlow.addColorStop(1, "transparent");
+
+      ctx.fillStyle = singularityGlow;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, this.breachRadius * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 10. FINAL DISSOLVE VIGNETTE
+    if (this.phase === "revealing") {
+      const revealT = (time - 1.6) / 0.6;
+      const vigAlpha = revealT * 0.9;
       const vig = ctx.createRadialGradient(
-        centerX, centerY, expansion * 0.4,
+        centerX, centerY, this.breachRadius * 0.3,
         centerX, centerY, Math.max(W, H)
       );
       vig.addColorStop(0, "transparent");
-      vig.addColorStop(0.3, `rgba(3, 0, 1, ${vigAlpha * 0.2})`);
+      vig.addColorStop(0.2, `rgba(3, 0, 1, ${vigAlpha * 0.1})`);
+      vig.addColorStop(0.6, `rgba(3, 0, 1, ${vigAlpha * 0.5})`);
       vig.addColorStop(1, `rgba(3, 0, 1, ${vigAlpha})`);
       ctx.fillStyle = vig;
       ctx.fillRect(0, 0, W, H);
@@ -5147,10 +5477,119 @@ class TearEngine {
 
     ctx.restore();
   }
+
+  private drawBreachPath(
+    ctx: CanvasRenderingContext2D,
+    cx: number, cy: number,
+    radius: number,
+    irregularity: number[]
+  ) {
+    const segments = irregularity.length - 1;
+    ctx.moveTo(
+      cx + Math.cos(0) * radius * irregularity[0],
+      cy + Math.sin(0) * radius * irregularity[0]
+    );
+    for (let i = 1; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const r = radius * irregularity[i];
+      ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+    }
+    ctx.closePath();
+  }
+
+  private drawTearEdges(
+    ctx: CanvasRenderingContext2D,
+    cx: number, cy: number,
+    radius: number,
+    irregularity: number[],
+    time: number
+  ) {
+    const segments = irregularity.length - 1;
+
+    // Red channel offset (left/up)
+    ctx.save();
+    ctx.shadowColor = "#ff0033";
+    ctx.shadowBlur = 20;
+    ctx.strokeStyle = "rgba(255, 0, 51, 0.7)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const r = radius * irregularity[i] + Math.sin(time * 8 + i * 0.5) * 2;
+      const x = cx + Math.cos(angle) * r - 3;
+      const y = cy + Math.sin(angle) * r - 2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+
+    // Cyan channel offset (right/down)
+    ctx.save();
+    ctx.shadowColor = "#00f0ff";
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = "rgba(0, 240, 255, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const r = radius * irregularity[i] + Math.sin(time * 6 + i * 0.3) * 1.5;
+      const x = cx + Math.cos(angle) * r + 3;
+      const y = cy + Math.sin(angle) * r + 2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+
+    // White hot core filament
+    ctx.save();
+    ctx.shadowColor = "#ffffff";
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const r = radius * irregularity[i];
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawGravitationalLensing(
+    ctx: CanvasRenderingContext2D,
+    W: number, H: number,
+    cx: number, cy: number,
+    radius: number,
+    strength: number
+  ) {
+    // Create a subtle distortion effect by drawing radial gradient bands
+    const bands = 8;
+    for (let i = 0; i < bands; i++) {
+      const dist = radius * (0.5 + i * 0.3);
+      const alpha = strength * 0.03 * (1 - i / bands);
+
+      const grad = ctx.createRadialGradient(cx, cy, dist * 0.9, cx, cy, dist * 1.1);
+      grad.addColorStop(0, `rgba(255, 0, 51, 0)`);
+      grad.addColorStop(0.5, `rgba(255, 0, 51, ${alpha})`);
+      grad.addColorStop(1, `rgba(255, 0, 51, 0)`);
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT — COMPLETELY ISOLATED FROM REACT RENDER CYCLE
+// MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════
 interface LoaderProps {
   onComplete?: () => void;
@@ -5158,14 +5597,11 @@ interface LoaderProps {
 
 export default function Loader({ onComplete }: LoaderProps) {
   const { audioEnabled, initAudio, setProgress: setAudioProgress, triggerTear: triggerAudioTear } = useSuspenseAudio();
-
-  // React state — ONLY used for mount/unmount, NEVER inside RAF
   const [isComplete, setIsComplete] = useState(false);
 
-  // DOM Refs — for direct manipulation, zero React involvement
   const containerRef = useRef<HTMLDivElement>(null);
   const matrixCanvasRef = useRef<HTMLCanvasElement>(null);
-  const tearCanvasRef = useRef<HTMLCanvasElement>(null);
+  const breachCanvasRef = useRef<HTMLCanvasElement>(null);
   const progressFillRef = useRef<HTMLDivElement>(null);
   const percentTextRef = useRef<HTMLSpanElement>(null);
   const statusTextRef = useRef<HTMLSpanElement>(null);
@@ -5176,18 +5612,18 @@ export default function Loader({ onComplete }: LoaderProps) {
   const uiLayerRef = useRef<HTMLDivElement>(null);
   const bigCounterRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
+  const logoRef = useRef<HTMLDivElement>(null);
 
-  // Animation state — ALL in refs, NEVER triggers re-render
   const dropsRef = useRef<MicroDrop[]>([]);
   const mouseRef = useRef({ x: -1000, y: -1000, active: false });
   const mouseSmoothRef = useRef({ x: -1000, y: -1000 });
-  const tearEngineRef = useRef<TearEngine | null>(null);
+  const breachEngineRef = useRef<BreachEngine | null>(null);
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(Date.now());
   const phaseTimerRef = useRef(0);
   const hasCompletedRef = useRef(false);
   const progressRef = useRef(0);
-  const phaseRef = useRef<"void" | "loading" | "converging" | "tearing" | "done">("void");
+  const phaseRef = useRef<"void" | "loading" | "converging" | "breaching" | "done">("void");
   const shownLogsRef = useRef<Set<number>>(new Set());
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const voidStartRef = useRef<number>(0);
@@ -5195,8 +5631,9 @@ export default function Loader({ onComplete }: LoaderProps) {
   const hbRingsRef = useRef<{ birth: number }[]>([]);
   const lastHbRef = useRef(0);
   const themeColorRef = useRef("#ff0033");
+  const logoScaleRef = useRef(0);
+  const logoOpacityRef = useRef(0);
 
-  // Initialize drops — called ONCE, never again
   const initDrops = (w: number, h: number) => {
     const drops: MicroDrop[] = [];
     const configs = [
@@ -5230,13 +5667,11 @@ export default function Loader({ onComplete }: LoaderProps) {
     dropsRef.current = drops;
   };
 
-  // Main effect — runs ONCE, sets up everything, never re-runs
   useEffect(() => {
     const matrixCanvas = matrixCanvasRef.current;
-    const tearCanvas = tearCanvasRef.current;
-    if (!matrixCanvas || !tearCanvas) return;
+    const breachCanvas = breachCanvasRef.current;
+    if (!matrixCanvas || !breachCanvas) return;
 
-    // Setup matrix canvas context ONCE
     const ctx = matrixCanvas.getContext("2d");
     if (!ctx) return;
     ctxRef.current = ctx;
@@ -5251,60 +5686,53 @@ export default function Loader({ onComplete }: LoaderProps) {
     matrixCanvas.style.height = H + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Setup tear engine
-    tearEngineRef.current = new TearEngine(tearCanvas);
-    tearEngineRef.current.resize(W, H);
-    tearEngineRef.current.onComplete = () => {
+    breachEngineRef.current = new BreachEngine(breachCanvas);
+    breachEngineRef.current.resize(W, H);
+    breachEngineRef.current.onComplete = () => {
       if (hasCompletedRef.current) return;
       hasCompletedRef.current = true;
       phaseRef.current = "done";
 
-      // White flash
       if (flashRef.current) {
-        flashRef.current.style.transition = "opacity 0.1s";
+        flashRef.current.style.transition = "opacity 0.15s";
         flashRef.current.style.opacity = "1";
         setTimeout(() => {
           if (flashRef.current) {
-            flashRef.current.style.transition = "opacity 1.5s ease-out";
+            flashRef.current.style.transition = "opacity 2s ease-out";
             flashRef.current.style.opacity = "0";
           }
-        }, 100);
+        }, 150);
       }
 
-      // Hide UI
       if (uiLayerRef.current) {
-        uiLayerRef.current.style.transition = "opacity 0.5s";
+        uiLayerRef.current.style.transition = "opacity 0.8s";
         uiLayerRef.current.style.opacity = "0";
       }
       if (bigCounterRef.current) {
-        bigCounterRef.current.style.transition = "opacity 0.5s";
+        bigCounterRef.current.style.transition = "opacity 0.8s";
         bigCounterRef.current.style.opacity = "0";
       }
 
-      // Notify completion after flash fades
       setTimeout(() => {
         setIsComplete(true);
         onComplete?.();
-      }, 1600);
+      }, 2000);
     };
 
     initDrops(W, H);
     voidStartRef.current = performance.now();
 
-    // Mouse tracking
     const handleMouseMove = (e: MouseEvent) => {
       mouseRef.current = { x: e.clientX, y: e.clientY, active: true };
     };
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
 
-    // Touch tracking for mobile cursor interaction
     const handleTouchMove = (e: TouchEvent) => {
       const touch = e.touches[0];
       if (touch) mouseRef.current = { x: touch.clientX, y: touch.clientY, active: true };
     };
     window.addEventListener("touchmove", handleTouchMove, { passive: true });
 
-    // Resize handler
     const handleResize = () => {
       W = window.innerWidth;
       H = window.innerHeight;
@@ -5313,14 +5741,11 @@ export default function Loader({ onComplete }: LoaderProps) {
       matrixCanvas.style.width = W + "px";
       matrixCanvas.style.height = H + "px";
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      tearEngineRef.current?.resize(W, H);
+      breachEngineRef.current?.resize(W, H);
       initDrops(W, H);
     };
     window.addEventListener("resize", handleResize);
 
-    // ═══════════════════════════════════════════════════════════════
-    // THE ANIMATION LOOP — ZERO React state updates, pure DOM refs
-    // ═══════════════════════════════════════════════════════════════
     let lastTime = performance.now();
 
     const loop = (now: number) => {
@@ -5328,21 +5753,18 @@ export default function Loader({ onComplete }: LoaderProps) {
       lastTime = now;
       const time = now / 1000;
 
-      // Smooth mouse
       mouseSmoothRef.current.x += (mouseRef.current.x - mouseSmoothRef.current.x) * 0.1;
       mouseSmoothRef.current.y += (mouseRef.current.y - mouseSmoothRef.current.y) * 0.1;
       const mx = mouseSmoothRef.current.x;
       const my = mouseSmoothRef.current.y;
 
-      // ── VOID PHASE — The Dramatic Entrance ──
+      // ── VOID PHASE ──
       if (phaseRef.current === "void") {
         const voidElapsed = (now - voidStartRef.current) / 1000;
-
         ctx.fillStyle = CONFIG.VOID_BLACK;
         ctx.fillRect(0, 0, W, H);
 
         if (voidElapsed >= 0.5 && voidElapsed < 0.7) {
-          // Single red pixel → exponentially expanding horizontal scanline
           const t = (voidElapsed - 0.5) / 0.2;
           const halfWidth = Math.min(Math.pow(2, t * 10), W / 2);
           ctx.save();
@@ -5352,19 +5774,14 @@ export default function Loader({ onComplete }: LoaderProps) {
           ctx.fillRect(W / 2 - halfWidth, H / 2 - 1, halfWidth * 2, 2);
           ctx.restore();
         } else if (voidElapsed >= 0.7 && voidElapsed < 1.2) {
-          // CRT scanline sweep top → bottom
           const sweepT = (voidElapsed - 0.7) / 0.5;
           const sweepY = sweepT * H;
-
-          // Faint static noise behind sweep line
           for (let sy = 0; sy < sweepY; sy += 4) {
             if (Math.random() < 0.35) {
               ctx.fillStyle = `rgba(255, 0, 51, ${0.01 + Math.random() * 0.03})`;
               ctx.fillRect(0, sy, W, 1);
             }
           }
-
-          // Bright sweeping head with imperfect flicker
           ctx.save();
           ctx.shadowColor = "#ff0033";
           ctx.shadowBlur = 25;
@@ -5374,7 +5791,6 @@ export default function Loader({ onComplete }: LoaderProps) {
           ctx.fillRect(0, sweepY + 3, W, 1);
           ctx.restore();
         } else if (voidElapsed >= 1.2) {
-          // Transition to loading — rain will fade in gradually
           phaseRef.current = "loading";
           startTimeRef.current = Date.now();
           rainFadeRef.current = 0;
@@ -5386,7 +5802,6 @@ export default function Loader({ onComplete }: LoaderProps) {
 
       // ── PROGRESS LOGIC ──
       if (phaseRef.current === "loading") {
-        // Gradually fade rain in from void
         if (rainFadeRef.current < 1) {
           rainFadeRef.current = Math.min(1, rainFadeRef.current + dt * 1.25);
         }
@@ -5403,41 +5818,48 @@ export default function Loader({ onComplete }: LoaderProps) {
         }
       } else if (phaseRef.current === "converging") {
         phaseTimerRef.current += dt;
-        // Rain converges to center
         for (const d of dropsRef.current) {
           const dx = W / 2 - d.x;
           const dy = H / 2 - d.y;
-          d.x += dx * 0.02 * dt * 60;
-          d.y += dy * 0.02 * dt * 60;
-          d.baseSpeed *= 1.01;
+          d.x += dx * 0.025 * dt * 60;
+          d.y += dy * 0.025 * dt * 60;
+          d.baseSpeed *= 1.008;
         }
         if (phaseTimerRef.current > CONFIG.CONVERGE_DURATION / 1000) {
-          phaseRef.current = "tearing";
-          tearEngineRef.current?.start();
+          phaseRef.current = "breaching";
+          breachEngineRef.current?.start();
           triggerAudioTear();
+
+          // Start logo reveal animation
+          if (logoRef.current) {
+            logoRef.current.style.transition = "transform 1.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 1.2s ease-out, filter 2s ease-out";
+            logoRef.current.style.transform = "scale(1)";
+            logoRef.current.style.opacity = "1";
+            logoRef.current.style.filter = "drop-shadow(0 0 30px rgba(255,0,51,0.9)) drop-shadow(0 0 60px rgba(255,0,51,0.4))";
+          }
         }
+      } else if (phaseRef.current === "breaching") {
+        // Logo emerges from singularity
+        logoScaleRef.current = Math.min(1, logoScaleRef.current + dt * 0.8);
+        logoOpacityRef.current = Math.min(1, logoOpacityRef.current + dt * 1.2);
       }
 
-      // ── UPDATE UI VIA DOM MANIPULATION (NOT setState) ──
+      // ── UPDATE UI ──
       const currentProgress = progressRef.current;
       setAudioProgress(currentProgress);
       const displayProgress = Math.floor(currentProgress);
 
-      // Progress bar width
       if (progressFillRef.current) {
         progressFillRef.current.style.width = displayProgress + "%";
       }
-      // Percent text
       if (percentTextRef.current) {
         percentTextRef.current.textContent = displayProgress + "%";
       }
-      // Counter digits
       const s = displayProgress.toString().padStart(3, "0");
       if (counterC1Ref.current) counterC1Ref.current.textContent = s[0];
       if (counterC2Ref.current) counterC2Ref.current.textContent = s[1];
       if (counterC3Ref.current) counterC3Ref.current.textContent = s[2];
 
-      // Terminal logs — add via DOM, NOT state
       for (const log of LOG_LINES) {
         if (currentProgress >= log.threshold && !shownLogsRef.current.has(log.threshold)) {
           shownLogsRef.current.add(log.threshold);
@@ -5446,6 +5868,12 @@ export default function Loader({ onComplete }: LoaderProps) {
             div.textContent = log.text;
             div.style.opacity = "0";
             div.style.transition = "opacity 0.3s";
+            div.style.color = "#ff0033";
+            div.style.textShadow = "0 0 8px rgba(255, 0, 51, 0.6)";
+            div.style.fontFamily = "var(--font-jetbrains-mono), monospace";
+            div.style.fontSize = "11px";
+            div.style.letterSpacing = "0.15em";
+            div.style.marginBottom = "4px";
             terminalRef.current.appendChild(div);
             requestAnimationFrame(() => { div.style.opacity = "1"; });
             if (terminalRef.current.children.length > 4) {
@@ -5455,7 +5883,6 @@ export default function Loader({ onComplete }: LoaderProps) {
         }
       }
 
-      // Shake UI during convergence
       if (phaseRef.current === "converging" && uiLayerRef.current) {
         const shake = (1 - phaseTimerRef.current / (CONFIG.CONVERGE_DURATION / 1000)) * 3;
         uiLayerRef.current.style.transform =
@@ -5466,8 +5893,7 @@ export default function Loader({ onComplete }: LoaderProps) {
       ctx.fillStyle = `rgba(3, 0, 1, ${CONFIG.CLEAR_ALPHA})`;
       ctx.fillRect(0, 0, W, H);
 
-      // ── DRAW DROPS ── (matches working prototype exactly)
-      // Parse theme color once per frame for rain coloring
+      // ── DRAW DROPS ──
       const _tcHex = parseInt(themeColorRef.current.slice(1), 16);
       const tcR = (_tcHex >> 16) & 255, tcG = (_tcHex >> 8) & 255, tcB = _tcHex & 255;
       const drops = dropsRef.current;
@@ -5488,14 +5914,10 @@ export default function Loader({ onComplete }: LoaderProps) {
           d.x -= (dx / Math.max(dist, 1)) * influence * 0.3;
         }
 
-        // Breathing
         const breathe = Math.sin(time * 2 + d.phase) * 0.3 + 0.7;
         opacity *= breathe;
-
-        // Move
         d.y += speed * (dt * 60);
 
-        // Character switching
         for (let c = 0; c < d.chars.length; c++) {
           const ch = d.chars[c];
           ch.switchTimer -= dt * 60;
@@ -5505,13 +5927,11 @@ export default function Loader({ onComplete }: LoaderProps) {
           }
         }
 
-        // Reset if off screen
         if (d.y > H + 20) {
           d.y = -20;
           d.x = Math.random() * W;
         }
 
-        // Draw
         for (let c = 0; c < d.chars.length; c++) {
           const cy = d.y - c * d.fontSize * 1.1;
           if (cy < -10 || cy > H + 10) continue;
@@ -5519,10 +5939,8 @@ export default function Loader({ onComplete }: LoaderProps) {
           const charOpacity = (c === 0 ? opacity : opacity * (1 - c / d.chars.length) * 0.7) * rainFadeRef.current;
           if (charOpacity < 0.005) continue;
 
-          // Color by layer — responds to theme from terminal 'matrix' command
           let r: number, g: number, b: number;
           if (d.layer === 2 && c === 0) {
-            // Head character — white-hot with theme tint
             r = Math.min(255, 200 + tcR * 0.2 + Math.sin(time * 3) * 55);
             g = Math.min(255, 200 + tcG * 0.2 + Math.sin(time * 3) * 55);
             b = Math.min(255, 200 + tcB * 0.2 + Math.sin(time * 3) * 55);
@@ -5533,7 +5951,6 @@ export default function Loader({ onComplete }: LoaderProps) {
             b = tcB * intensity;
           }
 
-          // Mouse glow
           if (dist < mouseRadius * 0.5 && mouseRef.current.active) {
             const h = 1 - dist / (mouseRadius * 0.5);
             r = 255;
@@ -5553,9 +5970,8 @@ export default function Loader({ onComplete }: LoaderProps) {
         ctx.fillRect(0, y, W, 1);
       }
 
-      // ── HEARTBEAT RING — Visual pulse synced to 46 BPM ──
+      // ── HEARTBEAT RING ──
       if (phaseRef.current === "loading" || phaseRef.current === "converging") {
-        // Spawn new ring every 1.3s (matches audio heartbeat interval)
         if (now - lastHbRef.current > 1300) {
           lastHbRef.current = now;
           hbRingsRef.current.push({ birth: now });
@@ -5583,32 +5999,25 @@ export default function Loader({ onComplete }: LoaderProps) {
         ctx.restore();
       }
 
-      // ── TEAR ──
-      tearEngineRef.current?.update(dt);
-      tearEngineRef.current?.draw();
+      // ── BREACH ──
+      breachEngineRef.current?.update(dt);
+      breachEngineRef.current?.draw();
 
       rafRef.current = requestAnimationFrame(loop);
     };
 
     rafRef.current = requestAnimationFrame(loop);
 
-    // Cleanup
     return () => {
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("touchmove", handleTouchMove);
       cancelAnimationFrame(rafRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // EMPTY ARRAY = runs ONCE, never re-runs
+  }, []);
 
-  // If loader is complete, render nothing
   if (isComplete) return null;
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // RENDER — Static JSX, no state dependencies except isComplete
-  // All animated elements are updated via refs, not React state
-  // ═══════════════════════════════════════════════════════════════════════
   return (
     <div
       ref={containerRef}
@@ -5637,9 +6046,9 @@ export default function Loader({ onComplete }: LoaderProps) {
         style={{ imageRendering: "auto" }}
       />
 
-      {/* Tear overlay canvas */}
+      {/* Breach overlay canvas */}
       <canvas
-        ref={tearCanvasRef}
+        ref={breachCanvasRef}
         className="absolute inset-0 w-full h-full pointer-events-none"
         style={{ zIndex: 100 }}
       />
@@ -5651,14 +6060,22 @@ export default function Loader({ onComplete }: LoaderProps) {
         style={{ zIndex: 200, opacity: 0 }}
       />
 
-      {/* UI Layer — updated via DOM refs, not React state */}
+      {/* UI Layer */}
       <div
         ref={uiLayerRef}
         className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
         style={{ zIndex: 10 }}
       >
-        {/* Logo */}
-        <div className="relative w-[140px] h-[140px] mb-16">
+        {/* Logo — starts tiny, emerges from singularity */}
+        <div
+          ref={logoRef}
+          className="relative w-[140px] h-[140px] mb-16 logo-breach-container"
+          style={{ 
+            transform: "scale(0)", 
+            opacity: 0,
+            filter: "drop-shadow(0 0 20px rgba(255,0,51,0.6))"
+          }}
+        >
           <div
             className="absolute inset-[-20px] rounded-full border border-[#ff0033]/20 border-t-[#ff0033]/80"
             style={{ animation: "spin 4s linear infinite" }}
@@ -5671,7 +6088,6 @@ export default function Loader({ onComplete }: LoaderProps) {
             className="absolute inset-[-50px] rounded-full border-[0.3px] border-l-[#ff0033]/30 border-r-transparent"
             style={{ animation: "spin 8s linear infinite" }}
           />
-          {/* FIXED: Solid crimson stroke with CSS drop-shadow instead of SVG filter */}
           <svg 
             viewBox="0 0 100 100" 
             className="w-full h-full" 
@@ -5684,7 +6100,6 @@ export default function Loader({ onComplete }: LoaderProps) {
                 <stop offset="100%" stopColor="#cc0022" />
               </linearGradient>
             </defs>
-            {/* Main P stroke — solid crimson, no SVG filter */}
             <path
               d="M28 18 h28 c16 0 24 10 24 22 c0 14 -10 22 -26 22 h-18 v30 h-16 v-74 h8"
               stroke="#ff0033"
@@ -5693,7 +6108,6 @@ export default function Loader({ onComplete }: LoaderProps) {
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            {/* Inner detail stroke */}
             <path
               d="M28 34 h20 c8 0 12 4 12 10 c0 7 -5 10 -14 10 h-18 v-20"
               stroke="#ff3366"
@@ -5703,7 +6117,6 @@ export default function Loader({ onComplete }: LoaderProps) {
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            {/* Center dot */}
             <circle cx="42" cy="40" r="3" fill="#ff0033">
               <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
             </circle>
@@ -5798,8 +6211,8 @@ export default function Loader({ onComplete }: LoaderProps) {
       {/* Interactive Hidden Cyber Terminal CLI */}
       <HiddenTerminal
         onOverride={() => {
-          phaseRef.current = "tearing";
-          tearEngineRef.current?.start();
+          phaseRef.current = "breaching";
+          breachEngineRef.current?.start();
         }}
         onThemeChange={(color) => {
           themeColorRef.current = color;
@@ -5808,6 +6221,7 @@ export default function Loader({ onComplete }: LoaderProps) {
     </div>
   );
 }
+
 ```
 
 ## File: `src/components/ui/Navbar.tsx`
@@ -6457,6 +6871,7 @@ export function useSuspenseAudio() {
   const filterRef = useRef<BiquadFilterNode | null>(null);
   const noiseNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const convolverRef = useRef<ConvolverNode | null>(null);
 
   // Initialize Web Audio Context on explicit user interaction
   const initAudio = useCallback(() => {
@@ -6469,9 +6884,23 @@ export function useSuspenseAudio() {
 
       // Master Gain
       const master = ctx.createGain();
-      master.gain.setValueAtTime(0.35, ctx.currentTime); // Crisp, loud volume
+      master.gain.setValueAtTime(0.35, ctx.currentTime);
       master.connect(ctx.destination);
       masterGainRef.current = master;
+
+      // Convolution reverb for space ambience
+      const convolver = ctx.createConvolver();
+      const reverbLength = ctx.sampleRate * 3;
+      const reverbBuffer = ctx.createBuffer(2, reverbLength, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const data = reverbBuffer.getChannelData(ch);
+        for (let i = 0; i < reverbLength; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 3) * 0.3;
+        }
+      }
+      convolver.buffer = reverbBuffer;
+      convolver.connect(master);
+      convolverRef.current = convolver;
 
       // Lowpass Filter for suspense wobble
       const filter = ctx.createBiquadFilter();
@@ -6504,7 +6933,7 @@ export function useSuspenseAudio() {
       const drone2 = ctx.createOscillator();
       drone2.type = "sawtooth";
       drone2.frequency.setValueAtTime(98.0, ctx.currentTime);
-      drone2.detune.setValueAtTime(12, ctx.currentTime); // Rich stereo-like chorusing
+      drone2.detune.setValueAtTime(12, ctx.currentTime);
       drone2.connect(filter);
       drone2.start();
       droneOsc2Ref.current = drone2;
@@ -6523,7 +6952,7 @@ export function useSuspenseAudio() {
         b4 = 0.55000 * b4 + white * 0.5329522;
         b5 = -0.7616 * b5 - white * 0.0168980;
         output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-        output[i] *= 0.11; // scale down
+        output[i] *= 0.11;
         b6 = white * 0.115926;
       }
 
@@ -6539,21 +6968,21 @@ export function useSuspenseAudio() {
 
       setAudioEnabled(true);
 
-      // Start Heartbeat Pulse (Every 1.2s -> 45 BPM)
+      // Start Heartbeat Pulse (Every 1.3s -> 46 BPM)
       const playHeartbeat = () => {
         if (!audioCtxRef.current || audioCtxRef.current.state !== "running") return;
         const now = audioCtxRef.current.currentTime;
-        
+
         // Double heartbeat thump (lub-dub)
         const kick1 = audioCtxRef.current.createOscillator();
         kick1.type = "sine";
         kick1.frequency.setValueAtTime(90, now);
         kick1.frequency.exponentialRampToValueAtTime(30, now + 0.12);
-        
+
         const kickGain = audioCtxRef.current.createGain();
         kickGain.gain.setValueAtTime(0.5, now);
         kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-        
+
         kick1.connect(kickGain);
         kickGain.connect(master);
         kick1.start(now);
@@ -6564,11 +6993,11 @@ export function useSuspenseAudio() {
         kick2.type = "sine";
         kick2.frequency.setValueAtTime(75, now + 0.18);
         kick2.frequency.exponentialRampToValueAtTime(25, now + 0.3);
-        
+
         const kickGain2 = audioCtxRef.current.createGain();
         kickGain2.gain.setValueAtTime(0.35, now + 0.18);
         kickGain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
-        
+
         kick2.connect(kickGain2);
         kickGain2.connect(master);
         kick2.start(now + 0.18);
@@ -6603,14 +7032,14 @@ export function useSuspenseAudio() {
     if (norm > 0.2 && Math.random() < 0.05) {
       const blip = ctx.createOscillator();
       blip.type = "sine";
-      const notes = [261.63, 329.63, 392.00, 523.25, 659.25]; // C E G C E
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25];
       const freq = notes[Math.floor(Math.random() * notes.length)];
       blip.frequency.setValueAtTime(freq, now);
-      
+
       const blipGain = ctx.createGain();
       blipGain.gain.setValueAtTime(0.08 * norm, now);
       blipGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-      
+
       blip.connect(blipGain);
       blipGain.connect(masterGainRef.current || ctx.destination);
       blip.start(now);
@@ -6618,52 +7047,99 @@ export function useSuspenseAudio() {
     }
   }, []);
 
-  // Trigger high-energy dimensional tear blast sound
+  // Trigger cinematic dimensional breach sound
   const triggerTear = useCallback(() => {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
     const now = ctx.currentTime;
 
     try {
-      // 1. Massive Sub-Bass Drop (Boom / Blast impact)
-      const boom = ctx.createOscillator();
-      boom.type = "sine";
-      boom.frequency.setValueAtTime(160, now);
-      boom.frequency.exponentialRampToValueAtTime(20, now + 0.8);
+      // 1. Massive Sub-Bass Drop (Singularity collapse)
+      const singularity = ctx.createOscillator();
+      singularity.type = "sine";
+      singularity.frequency.setValueAtTime(200, now);
+      singularity.frequency.exponentialRampToValueAtTime(15, now + 1.2);
 
-      const boomGain = ctx.createGain();
-      boomGain.gain.setValueAtTime(1.0, now);
-      boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+      const singularityGain = ctx.createGain();
+      singularityGain.gain.setValueAtTime(1.2, now);
+      singularityGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
 
-      boom.connect(boomGain);
-      boomGain.connect(ctx.destination);
-      boom.start(now);
-      boom.stop(now + 1.0);
+      singularity.connect(singularityGain);
+      singularityGain.connect(ctx.destination);
+      singularity.start(now);
+      singularity.stop(now + 1.6);
 
-      // 2. White Noise Shockwave Burst
-      const bufferSize = ctx.sampleRate * 0.6;
+      // 2. White Noise Shockwave (Spacetime fabric tearing)
+      const bufferSize = ctx.sampleRate * 1.0;
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.12));
+        const t = i / bufferSize;
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 3) * (1 + Math.sin(t * 50) * 0.3);
       }
 
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
       const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.6, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      noiseGain.gain.setValueAtTime(0.8, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
 
-      noise.connect(noiseGain);
+      // Bandpass filter for "tear" frequency
+      const tearFilter = ctx.createBiquadFilter();
+      tearFilter.type = "bandpass";
+      tearFilter.frequency.setValueAtTime(3000, now);
+      tearFilter.frequency.exponentialRampToValueAtTime(800, now + 0.8);
+      tearFilter.Q.setValueAtTime(5, now);
+
+      noise.connect(tearFilter);
+      tearFilter.connect(noiseGain);
       noiseGain.connect(ctx.destination);
       noise.start(now);
 
-      // 3. Stop background drone
+      // 3. Crystal shatter high frequencies
+      const shatter = ctx.createOscillator();
+      shatter.type = "sawtooth";
+      shatter.frequency.setValueAtTime(4000, now);
+      shatter.frequency.exponentialRampToValueAtTime(8000, now + 0.3);
+      shatter.frequency.exponentialRampToValueAtTime(2000, now + 0.8);
+
+      const shatterGain = ctx.createGain();
+      shatterGain.gain.setValueAtTime(0.15, now);
+      shatterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+
+      const shatterFilter = ctx.createBiquadFilter();
+      shatterFilter.type = "highpass";
+      shatterFilter.frequency.setValueAtTime(2000, now);
+
+      shatter.connect(shatterFilter);
+      shatterFilter.connect(shatterGain);
+      shatterGain.connect(ctx.destination);
+      shatter.start(now);
+      shatter.stop(now + 1.0);
+
+      // 4. Dimensional "whoosh" as breach opens
+      const whoosh = ctx.createOscillator();
+      whoosh.type = "sine";
+      whoosh.frequency.setValueAtTime(80, now + 0.2);
+      whoosh.frequency.exponentialRampToValueAtTime(600, now + 0.6);
+      whoosh.frequency.exponentialRampToValueAtTime(40, now + 1.5);
+
+      const whooshGain = ctx.createGain();
+      whooshGain.gain.setValueAtTime(0, now + 0.2);
+      whooshGain.gain.linearRampToValueAtTime(0.4, now + 0.5);
+      whooshGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+      whoosh.connect(whooshGain);
+      whooshGain.connect(ctx.destination);
+      whoosh.start(now + 0.2);
+      whoosh.stop(now + 1.6);
+
+      // 5. Stop background drone gradually
       if (masterGainRef.current) {
-        masterGainRef.current.gain.setTargetAtTime(0.001, now, 0.4);
+        masterGainRef.current.gain.setTargetAtTime(0.001, now + 0.5, 0.8);
       }
     } catch (e) {
-      console.warn("Error playing tear sound:", e);
+      console.warn("Error playing breach sound:", e);
     }
   }, []);
 
