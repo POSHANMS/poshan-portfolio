@@ -877,3 +877,204 @@ canvas {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CINEMATIC BREACH ENHANCEMENTS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Enhanced spin animations for breach rings */
+@keyframes breach-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes breach-spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes breach-pulse {
+  0%, 100% { 
+    filter: drop-shadow(0 0 15px rgba(255, 0, 51, 0.4));
+    opacity: 0.9;
+  }
+  50% { 
+    filter: drop-shadow(0 0 30px rgba(255, 0, 51, 0.7)) drop-shadow(0 0 60px rgba(255, 0, 51, 0.3));
+    opacity: 1;
+  }
+}
+
+@keyframes singularity-glow {
+  0%, 100% {
+    box-shadow: 0 0 30px rgba(255, 0, 51, 0.5), inset 0 0 30px rgba(255, 0, 51, 0.2);
+  }
+  33% {
+    box-shadow: 0 0 50px rgba(255, 50, 50, 0.6), inset 0 0 40px rgba(255, 50, 50, 0.3);
+  }
+  66% {
+    box-shadow: 0 0 40px rgba(255, 100, 100, 0.5), inset 0 0 35px rgba(255, 100, 100, 0.25);
+  }
+}
+
+/* Logo emergence animation */
+.logo-emerge {
+  animation: logo-emerge 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes logo-emerge {
+  0% {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+    filter: blur(20px) brightness(3);
+  }
+  30% {
+    transform: scale(0.3) rotate(-60deg);
+    opacity: 0.3;
+    filter: blur(10px) brightness(2);
+  }
+  60% {
+    transform: scale(0.8) rotate(-10deg);
+    opacity: 0.8;
+    filter: blur(3px) brightness(1.5);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+    filter: blur(0) brightness(1);
+  }
+}
+
+/* Chromatic aberration text effect */
+.chromatic-text {
+  position: relative;
+}
+.chromatic-text::before,
+.chromatic-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.chromatic-text::before {
+  color: #ff0033;
+  transform: translate(-2px, -1px);
+  opacity: 0.7;
+  filter: blur(0.5px);
+}
+.chromatic-text::after {
+  color: #00f0ff;
+  transform: translate(2px, 1px);
+  opacity: 0.7;
+  filter: blur(0.5px);
+}
+
+/* Spacetime distortion overlay */
+.spacetime-distort {
+  position: relative;
+  overflow: hidden;
+}
+.spacetime-distort::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    rgba(255, 0, 51, 0.03) 30%,
+    transparent 60%
+  );
+  animation: distort-rotate 20s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes distort-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Enhanced scanline flicker */
+@keyframes scanline-flicker-breach {
+  0%, 100% { opacity: 0.015; }
+  50% { opacity: 0.035; }
+}
+
+/* Breach phase indicator */
+.breach-phase {
+  position: relative;
+}
+.breach-phase::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #ff0033, #ff3366, #00f0ff);
+  background-size: 200% 100%;
+  animation: phase-scan 2s linear infinite;
+}
+
+@keyframes phase-scan {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+/* ═══════ BREACH LOGO FIXES ═══════ */
+
+.logo-breach-container {
+  will-change: transform, opacity, filter;
+}
+
+.logo-breach-container svg {
+  animation: logo-breathe 3s ease-in-out infinite;
+}
+
+@keyframes logo-breathe {
+  0%, 100% {
+    filter: drop-shadow(0 0 12px rgba(255, 0, 51, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px rgba(255, 0, 51, 0.9)) drop-shadow(0 0 40px rgba(255, 0, 51, 0.3));
+  }
+}
+
+/* Terminal log styling for breach phase */
+.terminal-breach-log {
+  color: #ff0033 !important;
+  text-shadow: 0 0 8px rgba(255, 0, 51, 0.6) !important;
+  font-family: var(--font-jetbrains-mono), monospace !important;
+  font-size: 11px !important;
+  letter-spacing: 0.15em !important;
+  margin-bottom: 4px !important;
+  text-transform: uppercase !important;
+}
+
+@keyframes p-blink {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  45% { opacity: 1; filter: brightness(1.2); }
+  50% { opacity: 0.3; filter: brightness(2); }
+  55% { opacity: 1; filter: brightness(1); }
+  70% { opacity: 0.85; filter: brightness(1.3); }
+  75% { opacity: 1; filter: brightness(1); }
+}
+
+@keyframes p-flicker {
+  0%, 90%, 100% { opacity: 1; }
+  92% { opacity: 0.7; }
+  94% { opacity: 0.2; }
+  96% { opacity: 0.9; }
+  98% { opacity: 0.4; }
+}
+
+@keyframes glitch-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.02); }
+}
+
+@keyframes spin-reverse {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
