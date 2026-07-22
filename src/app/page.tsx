@@ -64,23 +64,21 @@ export default function Home() {
 
   return (
     <main className="relative min-h-[500vh] bg-[#030001]">
-      {/* LOADER — renders first, calls onComplete when finished */}
+      {/* LOADER — renders in overlay z-[99999], calls onComplete when finished */}
       {!loaderComplete && (
         <Loader onComplete={() => setLoaderComplete(true)} />
       )}
 
-      {/* 3D Scene — only renders after loader completes */}
-      {loaderComplete && (
-        <div
-          className="fixed inset-0 z-0 h-full w-full"
-          style={{
-            opacity: sceneReady ? 1 : 0,
-            transition: "opacity 1.5s ease-out",
-          }}
-        >
-          <Scene scrollProgress={scrollProgress} />
-        </div>
-      )}
+      {/* 3D Scene — continuously mounted at z-0 so WebGL renders live behind the preloader */}
+      <div
+        className="fixed inset-0 z-0 h-full w-full pointer-events-none"
+        style={{
+          opacity: loaderComplete ? (sceneReady ? 1 : 0.9) : 1,
+          transition: "opacity 1.2s ease-out",
+        }}
+      >
+        <Scene scrollProgress={scrollProgress} />
+      </div>
 
       {/* Social sidebar — appears after loader */}
       {loaderComplete && (

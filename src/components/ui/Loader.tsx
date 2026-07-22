@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { useSuspenseAudio } from "@/hooks/useSuspenseAudio";
+import HUDSystem from "@/components/ui/loader/HUDSystem";
+import HiddenTerminal from "@/components/ui/loader/HiddenTerminal";
 
 // ═══════════════════════════════════════════════════════════════════════
 // OVERKILL CONFIGURATION — Tuned for 60fps on all devices
@@ -48,7 +51,7 @@ interface MicroDrop {
 interface DebrisParticle {
   x: number; y: number; vx: number; vy: number;
   life: number; maxLife: number; size: number;
-  angle: number; spin: number;
+  angle: number; spin: number; noise: number;
 }
 interface LightningBranch {
   x: number; y: number;
@@ -95,16 +98,16 @@ class TearEngine {
 
   generateCrack() {
     this.crackPoints = [];
-    const segments = 80;
+    const segments = 120;
     const baseAngle = -Math.PI / 2;
 
     for (let i = 0; i <= segments; i++) {
       const t = i / segments;
       const angle = baseAngle + t * Math.PI * 2;
-      const r1 = Math.sin(t * 13) * 15;
-      const r2 = Math.sin(t * 7 + 1) * 10;
-      const r3 = Math.sin(t * 23 + 2) * 5;
-      const baseR = 2 + t * 3;
+      const r1 = Math.sin(t * 19) * 22;
+      const r2 = Math.cos(t * 11 + 1) * 16;
+      const r3 = Math.sin(t * 31 + 2) * 8;
+      const baseR = 3 + t * 4;
       const radius = baseR + r1 + r2 + r3;
       this.crackPoints.push({
         x: this.centerX + Math.cos(angle) * radius,
@@ -115,21 +118,23 @@ class TearEngine {
       });
     }
 
+    // High velocity shrapnel + glass debris
     this.debris = [];
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 350; i++) {
       const a = Math.random() * Math.PI * 2;
-      const dist = Math.random() * 100;
-      const speed = 2 + Math.random() * 4;
+      const dist = Math.random() * 80;
+      const speed = 4 + Math.random() * 9;
       this.debris.push({
         x: this.centerX + Math.cos(a) * dist,
         y: this.centerY + Math.sin(a) * dist,
         vx: Math.cos(a) * speed,
         vy: Math.sin(a) * speed,
-        size: 1 + Math.random() * 3,
+        size: 2 + Math.random() * 6,
         life: 1,
-        maxLife: 0.8 + Math.random() * 1.2,
+        maxLife: 0.6 + Math.random() * 1.4,
         angle: Math.random() * Math.PI * 2,
-        spin: (Math.random() - 0.5) * 0.2,
+        spin: (Math.random() - 0.5) * 0.4,
+        noise: Math.random(),
       });
     }
   }
@@ -145,9 +150,9 @@ class TearEngine {
     if (!this.active) return;
     this.time += dt;
 
-    if (this.phase === "forming" && this.time > 0.3) this.phase = "widening";
-    if (this.phase === "widening" && this.time > 1.2) this.phase = "collapsing";
-    if (this.phase === "collapsing" && this.time > 2.0) {
+    if (this.phase === "forming" && this.time > 0.25) this.phase = "widening";
+    if (this.phase === "widening" && this.time > 1.1) this.phase = "collapsing";
+    if (this.phase === "collapsing" && this.time > 1.8) {
       this.phase = "done";
       this.active = false;
       this.onComplete?.();
@@ -157,26 +162,27 @@ class TearEngine {
     for (const d of this.debris) {
       d.x += d.vx * dt * 60;
       d.y += d.vy * dt * 60;
-      d.vx *= 0.98;
-      d.vy *= 0.98;
+      d.vx *= 0.97;
+      d.vy *= 0.97;
       d.life -= dt / d.maxLife;
       d.angle += d.spin * dt * 60;
     }
     this.debris = this.debris.filter((d) => d.life > 0);
 
-    if (this.phase === "forming" && Math.random() < 0.3) {
+    // Electric arcs
+    if ((this.phase === "forming" || this.phase === "widening") && Math.random() < 0.6) {
       const idx = Math.floor(Math.random() * this.crackPoints.length);
       const p = this.crackPoints[idx];
-      const lAngle = p.angle + (Math.random() - 0.5) * 1;
+      const lAngle = p.angle + (Math.random() - 0.5) * 1.2;
       const segs: { x: number; y: number }[] = [];
       let lx = p.x;
       let ly = p.y;
-      for (let s = 0; s < 5; s++) {
-        lx += Math.cos(lAngle + (Math.random() - 0.5)) * (10 + Math.random() * 20);
-        ly += Math.sin(lAngle + (Math.random() - 0.5)) * (10 + Math.random() * 20);
+      for (let s = 0; s < 7; s++) {
+        lx += Math.cos(lAngle + (Math.random() - 0.5)) * (12 + Math.random() * 25);
+        ly += Math.sin(lAngle + (Math.random() - 0.5)) * (12 + Math.random() * 25);
         segs.push({ x: lx, y: ly });
       }
-      this.lightning.push({ x: lx, y: ly, segments: segs, life: 0.3, maxLife: 0.3 });
+      this.lightning.push({ x: lx, y: ly, segments: segs, life: 0.25, maxLife: 0.25 });
     }
 
     for (let i = this.lightning.length - 1; i >= 0; i--) {
@@ -191,52 +197,92 @@ class TearEngine {
     const t = time;
 
     let expansion = 0;
-    if (this.phase === "forming") expansion = (t / 0.3) * 5;
-    else if (this.phase === "widening") expansion = 5 + ((t - 0.3) / 0.9) * 400;
-    else if (this.phase === "collapsing") expansion = 405 + ((t - 1.2) / 0.8) * 600;
+    if (this.phase === "forming") expansion = (t / 0.25) * 12;
+    else if (this.phase === "widening") expansion = 12 + ((t - 0.25) / 0.85) * 550;
+    else if (this.phase === "collapsing") expansion = 562 + ((t - 1.1) / 0.7) * 900;
 
     ctx.save();
     ctx.clearRect(0, 0, W, H);
 
-    // Void gradient
-    const voidGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, expansion * 1.5);
+    // 1. Radial Shockwave Rings
+    if (t < 0.8) {
+      const ringR = expansion * 1.4;
+      ctx.save();
+      ctx.strokeStyle = "rgba(255, 0, 51, " + Math.max(0, 0.8 - t) + ")";
+      ctx.lineWidth = 4;
+      ctx.shadowColor = CONFIG.CORE_RED;
+      ctx.shadowBlur = 30;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Outer Cyan Shockwave Ring
+      ctx.strokeStyle = "rgba(0, 240, 255, " + Math.max(0, 0.6 - t) + ")";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, ringR * 1.15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 2. Void Core Hole Cutout
+    const voidGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, expansion * 1.6);
     voidGrad.addColorStop(0, CONFIG.VOID_BLACK);
-    voidGrad.addColorStop(0.3, CONFIG.VOID_BLACK);
-    voidGrad.addColorStop(0.5, "rgba(255,0,51,0.1)");
-    voidGrad.addColorStop(0.7, "rgba(255,0,51,0.3)");
-    voidGrad.addColorStop(0.85, "rgba(255,50,80,0.15)");
+    voidGrad.addColorStop(0.35, CONFIG.VOID_BLACK);
+    voidGrad.addColorStop(0.6, "rgba(255,0,51,0.2)");
+    voidGrad.addColorStop(0.8, "rgba(0,240,255,0.15)");
     voidGrad.addColorStop(1, "transparent");
     ctx.fillStyle = voidGrad;
     ctx.beginPath();
-    ctx.arc(centerX, centerY, expansion * 2, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, expansion * 2.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // Crack edges
+    // 3. Chromatic Aberration Spider-Verse Crack Edges
     if (this.crackPoints.length > 1) {
-      ctx.shadowColor = CONFIG.CORE_RED;
-      ctx.shadowBlur = 20;
-      ctx.strokeStyle = "rgba(255, 0, 51, 0.8)";
-      ctx.lineWidth = 3;
+      // Crimson Shift (Left/Top)
+      ctx.save();
+      ctx.shadowColor = "#ff0033";
+      ctx.shadowBlur = 25;
+      ctx.strokeStyle = "rgba(255, 0, 51, 0.95)";
+      ctx.lineWidth = 4;
       ctx.beginPath();
       for (let i = 0; i < this.crackPoints.length; i++) {
         const p = this.crackPoints[i];
-        const r = p.baseRadius + expansion + Math.sin(t * 10 + i) * 3;
-        const x = centerX + Math.cos(p.angle) * r;
-        const y = centerY + Math.sin(p.angle) * r;
+        const r = p.baseRadius + expansion + Math.sin(t * 12 + i) * 4;
+        const x = centerX + Math.cos(p.angle) * r - 4;
+        const y = centerY + Math.sin(p.angle) * r - 2;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
       ctx.closePath();
       ctx.stroke();
 
-      ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 10;
-      ctx.strokeStyle = "rgba(255, 200, 200, 0.9)";
-      ctx.lineWidth = 1;
+      // Cyan Shift (Right/Bottom)
+      ctx.shadowColor = "#00f0ff";
+      ctx.shadowBlur = 20;
+      ctx.strokeStyle = "rgba(0, 240, 255, 0.85)";
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       for (let i = 0; i < this.crackPoints.length; i++) {
         const p = this.crackPoints[i];
-        const r = p.baseRadius + expansion * 0.95 + Math.sin(t * 15 + i) * 2;
+        const r = p.baseRadius + expansion * 0.97 + Math.sin(t * 16 + i) * 3;
+        const x = centerX + Math.cos(p.angle) * r + 4;
+        const y = centerY + Math.sin(p.angle) * r + 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // Pure White Core Filament
+      ctx.shadowColor = "#ffffff";
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < this.crackPoints.length; i++) {
+        const p = this.crackPoints[i];
+        const r = p.baseRadius + expansion * 0.99;
         const x = centerX + Math.cos(p.angle) * r;
         const y = centerY + Math.sin(p.angle) * r;
         if (i === 0) ctx.moveTo(x, y);
@@ -244,45 +290,60 @@ class TearEngine {
       }
       ctx.closePath();
       ctx.stroke();
+      ctx.restore();
     }
 
-    // Lightning
-    ctx.shadowBlur = 15;
+    // 4. Electric Arcs
+    ctx.save();
+    ctx.shadowBlur = 18;
     for (const l of this.lightning) {
       const alpha = l.life / l.maxLife;
-      ctx.strokeStyle = `rgba(255, 200, 255, ${alpha})`;
-      ctx.lineWidth = 1.5;
+      ctx.shadowColor = Math.random() < 0.5 ? "#ff0033" : "#00f0ff";
+      ctx.strokeStyle = Math.random() < 0.5 ? `rgba(255, 220, 240, ${alpha})` : `rgba(200, 245, 255, ${alpha})`;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(l.x, l.y);
       for (const s of l.segments) ctx.lineTo(s.x, s.y);
       ctx.stroke();
     }
+    ctx.restore();
 
-    // Debris
-    ctx.shadowBlur = 5;
+    // 5. High-Velocity Polygon Glass Shrapnel
+    ctx.save();
     for (const d of this.debris) {
       const alpha = Math.max(0, d.life);
       ctx.save();
       ctx.translate(d.x, d.y);
       ctx.rotate(d.angle);
-      const r = 255;
-      const g = 50 + d.life * 100;
-      const b = 80 + d.life * 50;
-      ctx.fillStyle = `rgba(${r}, ${g | 0}, ${b | 0}, ${alpha})`;
-      ctx.fillRect(-d.size / 2, -d.size / 2, d.size, d.size);
+      ctx.shadowColor = d.noise > 0.5 ? "#ff0033" : "#00f0ff";
+      ctx.shadowBlur = 8;
+      
+      const r = d.noise > 0.5 ? 255 : 0;
+      const g = d.noise > 0.5 ? 40 : 240;
+      const b = d.noise > 0.5 ? 80 : 255;
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+      // Draw triangular shrapnel shard
+      ctx.beginPath();
+      ctx.moveTo(0, -d.size);
+      ctx.lineTo(d.size * 0.8, d.size * 0.8);
+      ctx.lineTo(-d.size * 0.8, d.size * 0.6);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
     }
+    ctx.restore();
 
-    // Vignette during collapse
+    // 6. Final Dissolve Flash Vignette
     if (this.phase === "collapsing") {
-      const collapseT = (t - 1.2) / 0.8;
+      const collapseT = (t - 1.1) / 0.7;
       const vigAlpha = collapseT * 0.95;
       const vig = ctx.createRadialGradient(
-        centerX, centerY, expansion * 0.5,
+        centerX, centerY, expansion * 0.4,
         centerX, centerY, Math.max(W, H)
       );
       vig.addColorStop(0, "transparent");
-      vig.addColorStop(0.4, `rgba(3, 0, 1, ${vigAlpha * 0.3})`);
+      vig.addColorStop(0.3, `rgba(3, 0, 1, ${vigAlpha * 0.2})`);
       vig.addColorStop(1, `rgba(3, 0, 1, ${vigAlpha})`);
       ctx.fillStyle = vig;
       ctx.fillRect(0, 0, W, H);
@@ -300,6 +361,8 @@ interface LoaderProps {
 }
 
 export default function Loader({ onComplete }: LoaderProps) {
+  const { audioEnabled, initAudio, setProgress: setAudioProgress, triggerTear: triggerAudioTear } = useSuspenseAudio();
+
   // React state — ONLY used for mount/unmount, NEVER inside RAF
   const [isComplete, setIsComplete] = useState(false);
 
@@ -328,9 +391,14 @@ export default function Loader({ onComplete }: LoaderProps) {
   const phaseTimerRef = useRef(0);
   const hasCompletedRef = useRef(false);
   const progressRef = useRef(0);
-  const phaseRef = useRef<"loading" | "converging" | "tearing" | "done">("loading");
+  const phaseRef = useRef<"void" | "loading" | "converging" | "tearing" | "done">("void");
   const shownLogsRef = useRef<Set<number>>(new Set());
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const voidStartRef = useRef<number>(0);
+  const rainFadeRef = useRef(0);
+  const hbRingsRef = useRef<{ birth: number }[]>([]);
+  const lastHbRef = useRef(0);
+  const themeColorRef = useRef("#ff0033");
 
   // Initialize drops — called ONCE, never again
   const initDrops = (w: number, h: number) => {
@@ -425,12 +493,20 @@ export default function Loader({ onComplete }: LoaderProps) {
     };
 
     initDrops(W, H);
+    voidStartRef.current = performance.now();
 
     // Mouse tracking
     const handleMouseMove = (e: MouseEvent) => {
       mouseRef.current = { x: e.clientX, y: e.clientY, active: true };
     };
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
+
+    // Touch tracking for mobile cursor interaction
+    const handleTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (touch) mouseRef.current = { x: touch.clientX, y: touch.clientY, active: true };
+    };
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
 
     // Resize handler
     const handleResize = () => {
@@ -462,8 +538,62 @@ export default function Loader({ onComplete }: LoaderProps) {
       const mx = mouseSmoothRef.current.x;
       const my = mouseSmoothRef.current.y;
 
+      // ── VOID PHASE — The Dramatic Entrance ──
+      if (phaseRef.current === "void") {
+        const voidElapsed = (now - voidStartRef.current) / 1000;
+
+        ctx.fillStyle = CONFIG.VOID_BLACK;
+        ctx.fillRect(0, 0, W, H);
+
+        if (voidElapsed >= 0.5 && voidElapsed < 0.7) {
+          // Single red pixel → exponentially expanding horizontal scanline
+          const t = (voidElapsed - 0.5) / 0.2;
+          const halfWidth = Math.min(Math.pow(2, t * 10), W / 2);
+          ctx.save();
+          ctx.shadowColor = "#ff0033";
+          ctx.shadowBlur = 8 + t * 16;
+          ctx.fillStyle = "#ff0033";
+          ctx.fillRect(W / 2 - halfWidth, H / 2 - 1, halfWidth * 2, 2);
+          ctx.restore();
+        } else if (voidElapsed >= 0.7 && voidElapsed < 1.2) {
+          // CRT scanline sweep top → bottom
+          const sweepT = (voidElapsed - 0.7) / 0.5;
+          const sweepY = sweepT * H;
+
+          // Faint static noise behind sweep line
+          for (let sy = 0; sy < sweepY; sy += 4) {
+            if (Math.random() < 0.35) {
+              ctx.fillStyle = `rgba(255, 0, 51, ${0.01 + Math.random() * 0.03})`;
+              ctx.fillRect(0, sy, W, 1);
+            }
+          }
+
+          // Bright sweeping head with imperfect flicker
+          ctx.save();
+          ctx.shadowColor = "#ff0033";
+          ctx.shadowBlur = 25;
+          ctx.fillStyle = `rgba(255, 0, 51, ${0.7 + Math.random() * 0.3})`;
+          ctx.fillRect(0, sweepY - 2, W, 3);
+          ctx.fillStyle = "rgba(255, 100, 120, 0.3)";
+          ctx.fillRect(0, sweepY + 3, W, 1);
+          ctx.restore();
+        } else if (voidElapsed >= 1.2) {
+          // Transition to loading — rain will fade in gradually
+          phaseRef.current = "loading";
+          startTimeRef.current = Date.now();
+          rainFadeRef.current = 0;
+        }
+
+        rafRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
       // ── PROGRESS LOGIC ──
       if (phaseRef.current === "loading") {
+        // Gradually fade rain in from void
+        if (rainFadeRef.current < 1) {
+          rainFadeRef.current = Math.min(1, rainFadeRef.current + dt * 1.25);
+        }
         const elapsed = Date.now() - startTimeRef.current;
         progressRef.current = Math.min(elapsed / CONFIG.LOAD_DURATION, 1) * 100;
 
@@ -488,11 +618,13 @@ export default function Loader({ onComplete }: LoaderProps) {
         if (phaseTimerRef.current > CONFIG.CONVERGE_DURATION / 1000) {
           phaseRef.current = "tearing";
           tearEngineRef.current?.start();
+          triggerAudioTear();
         }
       }
 
       // ── UPDATE UI VIA DOM MANIPULATION (NOT setState) ──
       const currentProgress = progressRef.current;
+      setAudioProgress(currentProgress);
       const displayProgress = Math.floor(currentProgress);
 
       // Progress bar width
@@ -539,6 +671,9 @@ export default function Loader({ onComplete }: LoaderProps) {
       ctx.fillRect(0, 0, W, H);
 
       // ── DRAW DROPS ── (matches working prototype exactly)
+      // Parse theme color once per frame for rain coloring
+      const _tcHex = parseInt(themeColorRef.current.slice(1), 16);
+      const tcR = (_tcHex >> 16) & 255, tcG = (_tcHex >> 8) & 255, tcB = _tcHex & 255;
       const drops = dropsRef.current;
       for (let i = 0; i < drops.length; i++) {
         const d = drops[i];
@@ -585,19 +720,21 @@ export default function Loader({ onComplete }: LoaderProps) {
           const cy = d.y - c * d.fontSize * 1.1;
           if (cy < -10 || cy > H + 10) continue;
 
-          const charOpacity = c === 0 ? opacity : opacity * (1 - c / d.chars.length) * 0.7;
+          const charOpacity = (c === 0 ? opacity : opacity * (1 - c / d.chars.length) * 0.7) * rainFadeRef.current;
           if (charOpacity < 0.005) continue;
 
-          // Color by layer (matches prototype)
+          // Color by layer — responds to theme from terminal 'matrix' command
           let r: number, g: number, b: number;
           if (d.layer === 2 && c === 0) {
-            r = 255; g = 200 + Math.sin(time * 3) * 55; b = 200 + Math.sin(time * 3) * 55;
-          } else if (d.layer === 2) {
-            r = 255; g = 30; b = 50;
-          } else if (d.layer === 1) {
-            r = 180; g = 10; b = 25;
+            // Head character — white-hot with theme tint
+            r = Math.min(255, 200 + tcR * 0.2 + Math.sin(time * 3) * 55);
+            g = Math.min(255, 200 + tcG * 0.2 + Math.sin(time * 3) * 55);
+            b = Math.min(255, 200 + tcB * 0.2 + Math.sin(time * 3) * 55);
           } else {
-            r = 80; g = 0; b = 8;
+            const intensity = d.layer === 2 ? 1.0 : d.layer === 1 ? 0.7 : 0.31;
+            r = tcR * intensity;
+            g = tcG * intensity;
+            b = tcB * intensity;
           }
 
           // Mouse glow
@@ -620,6 +757,36 @@ export default function Loader({ onComplete }: LoaderProps) {
         ctx.fillRect(0, y, W, 1);
       }
 
+      // ── HEARTBEAT RING — Visual pulse synced to 46 BPM ──
+      if (phaseRef.current === "loading" || phaseRef.current === "converging") {
+        // Spawn new ring every 1.3s (matches audio heartbeat interval)
+        if (now - lastHbRef.current > 1300) {
+          lastHbRef.current = now;
+          hbRingsRef.current.push({ birth: now });
+        }
+
+        ctx.save();
+        for (let ri = hbRingsRef.current.length - 1; ri >= 0; ri--) {
+          const ring = hbRingsRef.current[ri];
+          const age = (now - ring.birth) / 1000;
+          if (age > 1.5) {
+            hbRingsRef.current.splice(ri, 1);
+            continue;
+          }
+          const radius = 50 + age * 100;
+          const alpha = Math.max(0, 0.5 * (1 - age / 1.5));
+          const lineW = Math.max(0.3, 2 - age * 1.3);
+          ctx.strokeStyle = `rgba(255, 0, 51, ${alpha})`;
+          ctx.lineWidth = lineW;
+          ctx.shadowColor = "#ff0033";
+          ctx.shadowBlur = 12 * (1 - age / 1.5);
+          ctx.beginPath();
+          ctx.arc(W / 2, H / 2 - 50, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       // ── TEAR ──
       tearEngineRef.current?.update(dt);
       tearEngineRef.current?.draw();
@@ -633,6 +800,7 @@ export default function Loader({ onComplete }: LoaderProps) {
     return () => {
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("touchmove", handleTouchMove);
       cancelAnimationFrame(rafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -648,9 +816,24 @@ export default function Loader({ onComplete }: LoaderProps) {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[99999] overflow-hidden"
-      style={{ background: CONFIG.VOID_BLACK, cursor: "none" }}
+      onClick={() => initAudio()}
+      className="fixed inset-0 z-[99999] overflow-hidden cursor-pointer"
+      style={{ background: CONFIG.VOID_BLACK }}
     >
+      {/* Audio Initializer Badge */}
+      {!audioEnabled && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            initAudio();
+          }}
+          className="absolute top-8 left-1/2 -translate-x-1/2 z-[300] pointer-events-auto px-5 py-2.5 bg-red-950/60 border border-[#ff0033]/80 rounded-full text-[11px] tracking-[0.25em] font-mono text-[#ff0033] shadow-[0_0_20px_rgba(255,0,51,0.5)] animate-pulse hover:bg-[#ff0033]/20 transition-all cursor-pointer flex items-center gap-2"
+        >
+          <span className="w-2.5 h-2.5 rounded-full bg-[#ff0033] animate-ping" />
+          🔊 CLICK TO INITIALIZE AUDIO ENGINE
+        </button>
+      )}
+
       {/* Matrix rain canvas */}
       <canvas
         ref={matrixCanvasRef}
@@ -773,7 +956,7 @@ export default function Loader({ onComplete }: LoaderProps) {
       {/* Big counter */}
       <div
         ref={bigCounterRef}
-        className="fixed bottom-10 left-10 font-mono pointer-events-none"
+        className="fixed bottom-14 left-6 font-mono pointer-events-none"
         style={{ zIndex: 10 }}
       >
         <div className="flex items-baseline">
@@ -812,6 +995,20 @@ export default function Loader({ onComplete }: LoaderProps) {
           System Integrity Matrix
         </p>
       </div>
+
+      {/* Cyber HUD Telemetry System */}
+      <HUDSystem />
+
+      {/* Interactive Hidden Cyber Terminal CLI */}
+      <HiddenTerminal
+        onOverride={() => {
+          phaseRef.current = "tearing";
+          tearEngineRef.current?.start();
+        }}
+        onThemeChange={(color) => {
+          themeColorRef.current = color;
+        }}
+      />
     </div>
   );
 }
