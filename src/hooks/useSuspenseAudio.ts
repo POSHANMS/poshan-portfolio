@@ -1,143 +1,256 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 
 export function useSuspenseAudio() {
-  const startedRef = useRef(false);
-  const synthRef = useRef<any>(null);
-  const noiseRef = useRef<any>(null);
-  const filterRef = useRef<any>(null);
-  const lfoRef = useRef<any>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
-  const start = useCallback(async () => {
-    if (startedRef.current) return;
+  // Audio Nodes
+  const masterGainRef = useRef<GainNode | null>(null);
+  const subOscRef = useRef<OscillatorNode | null>(null);
+  const droneOscRef = useRef<OscillatorNode | null>(null);
+  const droneOsc2Ref = useRef<OscillatorNode | null>(null);
+  const filterRef = useRef<BiquadFilterNode | null>(null);
+  const noiseNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize Web Audio Context on explicit user interaction
+  const initAudio = useCallback(() => {
+    if (audioCtxRef.current && audioCtxRef.current.state === "running") return;
+
     try {
-      const tone = await import("tone");
-      
-      // Start Tone audio context
-      await tone.start();
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      audioCtxRef.current = ctx;
 
-      // Low Drone Filter
-      const filter = new tone.Filter(200, "lowpass").toDestination();
+      // Master Gain
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.35, ctx.currentTime); // Crisp, loud volume
+      master.connect(ctx.destination);
+      masterGainRef.current = master;
+
+      // Lowpass Filter for suspense wobble
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(180, ctx.currentTime);
+      filter.Q.setValueAtTime(4, ctx.currentTime);
+      filter.connect(master);
       filterRef.current = filter;
-      
-      // Suspenseful low synth drone
-      const synth = new tone.PolySynth(tone.Synth, {
-        oscillator: { type: "fatsawtooth" },
-        envelope: { attack: 3, decay: 1, sustain: 1, release: 4 },
-      }).connect(filter);
-      synth.volume.value = -20;
-      synthRef.current = synth;
-      
-      // LFO to modulate filter frequency for suspense wobble
-      const lfo = new tone.LFO(0.12, 80, 320).connect(filter.frequency);
-      lfoRef.current = lfo;
-      
-      // Pink noise for cosmic atmospheric wind
-      const noise = new tone.Noise("pink").connect(filter);
-      noise.volume.value = -32;
-      noiseRef.current = noise;
 
-      // Play notes
-      synth.triggerAttack(["C2", "G1", "D2"]);
-      lfo.start();
+      // Sub-Bass 30Hz Oscillator (Chest Rumble)
+      const sub = ctx.createOscillator();
+      sub.type = "sine";
+      sub.frequency.setValueAtTime(32, ctx.currentTime);
+      const subGain = ctx.createGain();
+      subGain.gain.setValueAtTime(0.4, ctx.currentTime);
+      sub.connect(subGain);
+      subGain.connect(master);
+      sub.start();
+      subOscRef.current = sub;
+
+      // Sawtooth Cyberpunk Drone 1 (C2 - 65.4Hz)
+      const drone = ctx.createOscillator();
+      drone.type = "sawtooth";
+      drone.frequency.setValueAtTime(65.4, ctx.currentTime);
+      drone.connect(filter);
+      drone.start();
+      droneOscRef.current = drone;
+
+      // Detuned Sawtooth Cyberpunk Drone 2 (G2 - 98Hz)
+      const drone2 = ctx.createOscillator();
+      drone2.type = "sawtooth";
+      drone2.frequency.setValueAtTime(98.0, ctx.currentTime);
+      drone2.detune.setValueAtTime(12, ctx.currentTime); // Rich stereo-like chorusing
+      drone2.connect(filter);
+      drone2.start();
+      droneOsc2Ref.current = drone2;
+
+      // Procedural Noise Generator (Cosmic Atmospheric Wind)
+      const bufferSize = ctx.sampleRate * 2;
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+        output[i] *= 0.11; // scale down
+        b6 = white * 0.115926;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      noise.loop = true;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.18, ctx.currentTime);
+      noise.connect(noiseGain);
+      noiseGain.connect(filter);
       noise.start();
-      startedRef.current = true;
+      noiseNodeRef.current = noise;
+
+      setAudioEnabled(true);
+
+      // Start Heartbeat Pulse (Every 1.2s -> 45 BPM)
+      const playHeartbeat = () => {
+        if (!audioCtxRef.current || audioCtxRef.current.state !== "running") return;
+        const now = audioCtxRef.current.currentTime;
+        
+        // Double heartbeat thump (lub-dub)
+        const kick1 = audioCtxRef.current.createOscillator();
+        kick1.type = "sine";
+        kick1.frequency.setValueAtTime(90, now);
+        kick1.frequency.exponentialRampToValueAtTime(30, now + 0.12);
+        
+        const kickGain = audioCtxRef.current.createGain();
+        kickGain.gain.setValueAtTime(0.5, now);
+        kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        
+        kick1.connect(kickGain);
+        kickGain.connect(master);
+        kick1.start(now);
+        kick1.stop(now + 0.16);
+
+        // Second pulse 0.18s later
+        const kick2 = audioCtxRef.current.createOscillator();
+        kick2.type = "sine";
+        kick2.frequency.setValueAtTime(75, now + 0.18);
+        kick2.frequency.exponentialRampToValueAtTime(25, now + 0.3);
+        
+        const kickGain2 = audioCtxRef.current.createGain();
+        kickGain2.gain.setValueAtTime(0.35, now + 0.18);
+        kickGain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+        
+        kick2.connect(kickGain2);
+        kickGain2.connect(master);
+        kick2.start(now + 0.18);
+        kick2.stop(now + 0.33);
+      };
+
+      heartbeatTimerRef.current = setInterval(playHeartbeat, 1300);
+
     } catch (err) {
-      console.warn("Suspense audio failed to initialize:", err);
+      console.warn("Web Audio initialization error:", err);
     }
   }, []);
 
+  // Update audio parameters in real time as progress increases (0 -> 100)
   const setProgress = useCallback((progress: number) => {
-    if (!startedRef.current) return;
-    try {
-      const norm = progress / 100;
+    if (!audioCtxRef.current || audioCtxRef.current.state !== "running") return;
+    const ctx = audioCtxRef.current;
+    const norm = Math.min(Math.max(progress / 100, 0), 1);
+    const now = ctx.currentTime;
+
+    // Filter frequency opens up from 180Hz to 1200Hz for intense rise
+    if (filterRef.current) {
+      filterRef.current.frequency.setTargetAtTime(180 + norm * 1020, now, 0.1);
+    }
+
+    // Sub-bass pitch increases slightly
+    if (subOscRef.current) {
+      subOscRef.current.frequency.setTargetAtTime(32 + norm * 20, now, 0.1);
+    }
+
+    // Play cyber blip note on milestones
+    if (norm > 0.2 && Math.random() < 0.05) {
+      const blip = ctx.createOscillator();
+      blip.type = "sine";
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25]; // C E G C E
+      const freq = notes[Math.floor(Math.random() * notes.length)];
+      blip.frequency.setValueAtTime(freq, now);
       
-      // Accelerate LFO wobble as load progress completes (from 0.12Hz up to 2.2Hz)
-      if (lfoRef.current) {
-        lfoRef.current.frequency.rampTo(0.12 + norm * 2.05, 0.15);
-      }
+      const blipGain = ctx.createGain();
+      blipGain.gain.setValueAtTime(0.08 * norm, now);
+      blipGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
       
-      // Open filter cutoff to make the sound brighter and more intense (from 200Hz up to 650Hz)
-      if (filterRef.current) {
-        filterRef.current.frequency.rampTo(200 + norm * 450, 0.15);
-      }
-      
-      // Slowly swell the volume of the drone and noise to build climax
-      if (synthRef.current) {
-        synthRef.current.volume.rampTo(-20 + norm * 6, 0.15);
-      }
-      if (noiseRef.current) {
-        noiseRef.current.volume.rampTo(-32 + norm * 7, 0.15);
-      }
-    } catch (err) {}
+      blip.connect(blipGain);
+      blipGain.connect(masterGainRef.current || ctx.destination);
+      blip.start(now);
+      blip.stop(now + 0.11);
+    }
   }, []);
 
-  const triggerTear = useCallback(async () => {
-    try {
-      const tone = await import("tone");
-      
-      // Sub-bass drop (portal tearing sound)
-      const drop = new tone.MembraneSynth().toDestination();
-      drop.volume.value = 2;
-      drop.triggerAttackRelease("C1", "1n");
-      
-      // White noise burst for the crack explosion
-      const burst = new tone.NoiseSynth({
-        noise: { type: "white" },
-        envelope: { attack: 0.005, decay: 0.5, sustain: 0 },
-      }).toDestination();
-      burst.volume.value = -4;
-      burst.triggerAttackRelease("1n");
+  // Trigger high-energy dimensional tear blast sound
+  const triggerTear = useCallback(() => {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    const now = ctx.currentTime;
 
-      // Stop the suspense background drone
-      if (synthRef.current) {
-        synthRef.current.releaseAll();
+    try {
+      // 1. Massive Sub-Bass Drop (Boom / Blast impact)
+      const boom = ctx.createOscillator();
+      boom.type = "sine";
+      boom.frequency.setValueAtTime(160, now);
+      boom.frequency.exponentialRampToValueAtTime(20, now + 0.8);
+
+      const boomGain = ctx.createGain();
+      boomGain.gain.setValueAtTime(1.0, now);
+      boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+
+      boom.connect(boomGain);
+      boomGain.connect(ctx.destination);
+      boom.start(now);
+      boom.stop(now + 1.0);
+
+      // 2. White Noise Shockwave Burst
+      const bufferSize = ctx.sampleRate * 0.6;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.12));
       }
-      if (noiseRef.current) {
-        noiseRef.current.stop();
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.6, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+      noise.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noise.start(now);
+
+      // 3. Stop background drone
+      if (masterGainRef.current) {
+        masterGainRef.current.gain.setTargetAtTime(0.001, now, 0.4);
       }
-      if (lfoRef.current) {
-        lfoRef.current.stop();
-      }
-    } catch (err) {
-      console.warn("Tear SFX failed to play:", err);
+    } catch (e) {
+      console.warn("Error playing tear sound:", e);
     }
   }, []);
 
   const stop = useCallback(() => {
-    if (synthRef.current) {
-      try { synthRef.current.releaseAll(); } catch {}
+    if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+    if (audioCtxRef.current) {
+      try { audioCtxRef.current.close(); } catch {}
     }
-    if (noiseRef.current) {
-      try { noiseRef.current.stop(); } catch {}
-    }
-    if (lfoRef.current) {
-      try { lfoRef.current.stop(); } catch {}
-    }
-    startedRef.current = false;
+    setAudioEnabled(false);
   }, []);
 
   useEffect(() => {
-    // Attempt automatic start, and hook to interaction to bypass browser audio policies
-    const handleInteraction = () => {
-      start();
-      window.removeEventListener("click", handleInteraction);
-      window.removeEventListener("mousemove", handleInteraction);
-      window.removeEventListener("keydown", handleInteraction);
+    const handleUserGesture = () => {
+      initAudio();
+      window.removeEventListener("click", handleUserGesture);
+      window.removeEventListener("keydown", handleUserGesture);
+      window.removeEventListener("touchstart", handleUserGesture);
     };
 
-    window.addEventListener("click", handleInteraction);
-    window.addEventListener("mousemove", handleInteraction);
-    window.addEventListener("keydown", handleInteraction);
+    window.addEventListener("click", handleUserGesture);
+    window.addEventListener("keydown", handleUserGesture);
+    window.addEventListener("touchstart", handleUserGesture);
 
     return () => {
-      window.removeEventListener("click", handleInteraction);
-      window.removeEventListener("mousemove", handleInteraction);
-      window.removeEventListener("keydown", handleInteraction);
+      window.removeEventListener("click", handleUserGesture);
+      window.removeEventListener("keydown", handleUserGesture);
+      window.removeEventListener("touchstart", handleUserGesture);
       stop();
     };
-  }, [start, stop]);
+  }, [initAudio, stop]);
 
-  return { start, setProgress, triggerTear, stop };
+  return { audioEnabled, initAudio, setProgress, triggerTear, stop };
 }

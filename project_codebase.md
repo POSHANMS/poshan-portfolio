@@ -1080,12 +1080,13 @@ body {
 /* Ensure dashboard stage doesn't show during loading */
 .dashboard-stage {
   opacity: 0;
-  animation: stage-reveal 1.5s ease-out 0.3s forwards;
+  /* Only animate opacity — transform is controlled by inline React style */
+  animation: stage-reveal-opacity 1.5s ease-out 0.3s forwards;
 }
 
-@keyframes stage-reveal {
-  from { opacity: 0; transform: translate(-50%, -48%) scale(var(--stage-scale, 1)); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(var(--stage-scale, 1)); }
+@keyframes stage-reveal-opacity {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ═══════ SMOOTH SCROLL CAMERA ═══════ */
@@ -1160,12 +1161,12 @@ export default function RootLayout({
 ```typescript
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { initScrollCamera } from "@/animations/scrollCamera";
+import Loader from "@/components/ui/Loader";
 import DashboardHero from "@/components/ui/DashboardHero";
 import SocialSidebar from "@/components/ui/SocialSidebar";
-import Loader from "@/components/ui/Loader";
 import About from "@/components/sections/About";
 import Skills from "@/components/sections/Skills";
 import Projects from "@/components/sections/Projects";
@@ -1202,73 +1203,70 @@ export default function Home() {
   const [loaderComplete, setLoaderComplete] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
   const stageScale = useStageScale();
+  const scrollControlRef = useRef<{ destroy: () => void } | null>(null);
 
-  // Initialize scroll camera
+  // Initialize scroll camera after loader completes
   useEffect(() => {
-    const scrollControl = initScrollCamera((progress) => {
-      setScrollProgress(progress);
-    });
+    if (!loaderComplete) return;
+
+    const timer = setTimeout(() => {
+      scrollControlRef.current = initScrollCamera((progress) => {
+        setScrollProgress(progress);
+      });
+      setSceneReady(true);
+    }, 300);
 
     return () => {
-      if (scrollControl) scrollControl.destroy();
+      clearTimeout(timer);
+      scrollControlRef.current?.destroy();
+      scrollControlRef.current = null;
     };
-  }, []);
-
-  // Set scene ready state when loader finishes
-  useEffect(() => {
-    if (loaderComplete) {
-      setSceneReady(true);
-    }
   }, [loaderComplete]);
 
   return (
     <main className="relative min-h-[500vh] bg-[#030001]">
-      {/* Preload Sequence Loader (z-index 99999) */}
+      {/* LOADER — renders in overlay z-[99999], calls onComplete when finished */}
       {!loaderComplete && (
         <Loader onComplete={() => setLoaderComplete(true)} />
       )}
 
-      {/* 3D WebGL Scene — mounted continuously behind loader for zero pop-in */}
+      {/* 3D Scene — continuously mounted at z-0 so WebGL renders live behind the preloader */}
       <div
-        className="fixed inset-0 z-0 h-full w-full"
+        className="fixed inset-0 z-0 h-full w-full pointer-events-none"
         style={{
-          opacity: sceneReady ? 1 : 0.9,
-          transition: "opacity 1s ease-out",
+          opacity: loaderComplete ? (sceneReady ? 1 : 0.9) : 1,
+          transition: "opacity 1.2s ease-out",
         }}
       >
         <Scene scrollProgress={scrollProgress} />
       </div>
 
-      {/* Social sidebar — appears after loader completes */}
-      <div
-        style={{
-          opacity: loaderComplete ? 1 : 0,
-          pointerEvents: loaderComplete ? "auto" : "none",
-          transition: "opacity 1s ease-out 0.3s",
-        }}
-      >
-        <SocialSidebar />
-      </div>
+      {/* Social sidebar — appears after loader */}
+      {loaderComplete && (
+        <div style={{
+          opacity: sceneReady ? 1 : 0,
+          transition: "opacity 1s ease-out 0.5s",
+        }}>
+          <SocialSidebar />
+        </div>
+      )}
 
-      {/* Dashboard Hero — Station 1 UI overlay */}
-      <div
-        style={{
-          opacity: loaderComplete ? 1 : 0,
-          pointerEvents: loaderComplete ? "auto" : "none",
-          transition: "opacity 1.2s ease-out 0.4s",
-        }}
-      >
-        <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
-      </div>
+      {/* Dashboard Hero — the "Station 1" view */}
+      {loaderComplete && (
+        <div style={{
+          opacity: sceneReady ? 1 : 0,
+          transition: "opacity 1.2s ease-out 0.8s",
+        }}>
+          <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
+        </div>
+      )}
 
       {/* Content sections — fade in as user scrolls down */}
       <div
         className="relative z-10 -mt-px"
         style={{
-          background:
-            "linear-gradient(180deg, rgba(3,0,1,0.4) 0%, rgba(10,0,2,0.82) 18%, rgba(10,0,2,0.94) 100%)",
+          background: "linear-gradient(180deg, rgba(3,0,1,0.4) 0%, rgba(10,0,2,0.82) 18%, rgba(10,0,2,0.94) 100%)",
           opacity: loaderComplete ? 1 : 0,
-          pointerEvents: loaderComplete ? "auto" : "none",
           transition: "opacity 1.5s ease-out",
         }}
       >
@@ -2842,7 +2840,7 @@ export default function NeonGrid() {
 ```typescript
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -2852,6 +2850,7 @@ import * as THREE from "three";
 
 export default function PostProcessing() {
   const { gl, scene, camera, size } = useThree();
+  const hasRenderedRef = useRef(false);
 
   const composer = useMemo(() => {
     const instance = new EffectComposer(gl);
@@ -2879,8 +2878,9 @@ export default function PostProcessing() {
     return () => composer.dispose();
   }, [composer, size.width, size.height]);
 
-  useFrame((_, delta) => {
-    composer.render(delta);
+  // Use priority 1 to run AFTER R3F's default render, then we replace it
+  useFrame(() => {
+    composer.render();
   }, 1);
 
   return null;
@@ -2922,6 +2922,7 @@ export default function Scene({ scrollProgress }: SceneProps) {
     <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#000000" }}>
       <Canvas
         shadows
+        frameloop="always"
         gl={{
           antialias: true,
           alpha: false,
@@ -4542,12 +4543,263 @@ export default function HolographicTerminal({ scrollProgress = 0 }: { scrollProg
 }
 ```
 
+## File: `src/components/ui/loader/HiddenTerminal.tsx`
+
+```typescript
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+
+interface HiddenTerminalProps {
+  onOverride?: () => void;
+  onThemeChange?: (color: string) => void;
+}
+
+export default function HiddenTerminal({ onOverride, onThemeChange }: HiddenTerminalProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+  const [history, setHistory] = useState<string[]>([
+    "NEURAL TERMINAL v2.4.0 — ARCHITECT KERNEL",
+    "Type 'help' to display available operational commands.",
+    "---------------------------------------------------",
+  ]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle terminal on '~' or '`' key, or any letter key if not focused elsewhere
+      if (e.key === "`" || e.key === "~") {
+        e.preventDefault();
+        setIsOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history]);
+
+  const handleCommand = (cmdStr: string) => {
+    const raw = cmdStr.trim();
+    if (!raw) return;
+    const cmd = raw.toLowerCase();
+    const newHistory = [...history, `> ${raw}`];
+
+    switch (cmd) {
+      case "help":
+        newHistory.push(
+          "AVAILABLE COMMANDS:",
+          "  help     - List terminal commands",
+          "  status   - Dump system hardware & memory telemetry",
+          "  matrix   - Switch matrix rain theme (green/red/cyan/gold)",
+          "  poshan   - Developer bio & credentials",
+          "  override - Bypass preloader sequence immediately",
+          "  clear    - Clear terminal output buffer",
+          "  sudo     - Root authorization test"
+        );
+        break;
+      case "status":
+        newHistory.push(
+          "SYSTEM TELEMETRY DUMP:",
+          `  CORES: ${navigator.hardwareConcurrency || 8} logical threads`,
+          `  MEMORY: ${(performance as any).memory ? Math.round((performance as any).memory.usedJSHeapSize / 1048576) + 'MB used' : '64MB heap allocated'}`,
+          `  DISPLAY: ${window.innerWidth}x${window.innerHeight} @ DPR ${window.devicePixelRatio}`,
+          "  UPLINK: STABLE 100Gbps (0.00% packet drop)",
+          "  ENCRYPTION: G-256 QUANTUM LOCK"
+        );
+        break;
+      case "matrix":
+      case "theme":
+        onThemeChange?.("#00ff88");
+        newHistory.push(">> MATRIX RAIN THEME: EMERALD MATRIX ACTIVE [#00ff88]");
+        break;
+      case "poshan":
+        newHistory.push(
+          "=========================================",
+          "  POSHAN MS — FULL STACK ENGINEER",
+          "  Location: Karnataka, India",
+          "  Specialties: React, Next.js, Node, Flask",
+          "  Experience: 2+ Years | 20+ Completed Projects",
+          "========================================="
+        );
+        break;
+      case "override":
+        newHistory.push(">> OVERRIDE COMMAND DETECTED. INITIATING BREACH...");
+        onOverride?.();
+        break;
+      case "clear":
+        setHistory([]);
+        setInputVal("");
+        return;
+      case "sudo":
+        newHistory.push(">> PERMISSION DENIED: Nice try, operative.");
+        break;
+      default:
+        newHistory.push(`Command not recognized: '${raw}'. Type 'help' for options.`);
+        break;
+    }
+
+    setHistory(newHistory);
+    setInputVal("");
+  };
+
+  return (
+    <>
+      {/* Floating Trigger Button */}
+      <button
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="fixed bottom-6 right-6 z-[300] pointer-events-auto px-3.5 py-1.5 bg-black/80 border border-[#ff0033]/60 rounded text-[10px] tracking-[0.2em] font-mono text-[#ff0033] shadow-[0_0_12px_rgba(255,0,51,0.4)] hover:bg-[#ff0033]/20 transition-all cursor-pointer flex items-center gap-2"
+      >
+        <span className="w-2 h-2 rounded-full bg-[#ff0033] animate-pulse" />
+        {isOpen ? "[ CLOSE CLI ]" : "[ ~ ] TERMINAL CLI"}
+      </button>
+
+      {/* Terminal Drawer */}
+      {isOpen && (
+        <div className="fixed bottom-16 right-6 z-[400] w-[380px] max-w-[90vw] h-[260px] bg-black/90 border border-[#ff0033]/80 rounded-lg p-4 font-mono text-xs shadow-[0_0_30px_rgba(255,0,51,0.4)] backdrop-blur-md flex flex-col pointer-events-auto">
+          {/* Header Bar */}
+          <div className="flex justify-between items-center pb-2 mb-2 border-b border-[#ff0033]/40 text-[#ff0033]">
+            <span className="text-[10px] tracking-widest font-bold">// NEURAL_CLI_v2.4</span>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-[#ff0033] hover:text-white text-sm"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* History Scroll Area */}
+          <div className="flex-1 overflow-y-auto space-y-1 text-red-400/90 text-[11px] pr-1 leading-relaxed">
+            {history.map((line, i) => (
+              <div key={i} className={line.startsWith(">") ? "text-white font-bold" : ""}>
+                {line}
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input Form */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCommand(inputVal);
+            }}
+            className="flex items-center gap-2 mt-2 pt-2 border-t border-[#ff0033]/30"
+          >
+            <span className="text-[#ff0033] font-bold">&gt;</span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              placeholder="type 'help' or 'override'..."
+              className="w-full bg-transparent text-white outline-none font-mono text-xs placeholder:text-red-900/60"
+            />
+          </form>
+        </div>
+      )}
+    </>
+  );
+}
+```
+
+## File: `src/components/ui/loader/HUDSystem.tsx`
+
+```typescript
+"use client";
+
+import React, { useEffect, useState } from "react";
+
+export default function HUDSystem() {
+  const [latency, setLatency] = useState(12);
+  const [hexBytes, setHexBytes] = useState("0x8F3A");
+  const [nodeCount, setNodeCount] = useState(847);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLatency(Math.floor(10 + Math.random() * 6));
+      setHexBytes("0x" + Math.floor(Math.random() * 65535).toString(16).toUpperCase());
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      setNodeCount(document.querySelectorAll("*").length || 847);
+    }
+  }, []);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none z-20 font-mono text-[9px] text-[#ff0033]/80 p-6 flex flex-col justify-between select-none">
+      {/* TOP BAR */}
+      <div className="flex justify-between items-start">
+        {/* Top Left Telemetry */}
+        <div className="bg-black/40 backdrop-blur-sm border border-[#ff0033]/30 p-3 rounded space-y-1 shadow-[0_0_15px_rgba(255,0,51,0.15)] animate-fade-in">
+          <div className="flex items-center gap-2 font-bold text-white tracking-widest text-[10px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#ff0033] animate-ping" />
+            SECURE_NET_CONNECTION
+          </div>
+          <div className="text-red-400/90">// PORTAL_GATE: [CHARGING...]</div>
+          <div className="flex gap-4 text-[9px] pt-1 text-red-500/80">
+            <span>UPLINK: STABLE</span>
+            <span>LATENCY: {latency}ms</span>
+            <span>LOSS: 0.00%</span>
+          </div>
+        </div>
+
+        {/* Top Right Security */}
+        <div className="bg-black/40 backdrop-blur-sm border border-[#ff0033]/30 p-3 rounded space-y-1 text-right shadow-[0_0_15px_rgba(255,0,51,0.15)] animate-fade-in">
+          <div className="font-bold text-white tracking-widest text-[10px]">
+            STATUS: ACTIVE // G-256
+          </div>
+          <div className="text-red-400/90">KEY_STREAM: {hexBytes}</div>
+          <div className="flex gap-3 justify-end text-[9px] pt-1 text-red-500/80">
+            <span>THREAT: NULL</span>
+            <span>DIM_LOCK: HOLD</span>
+          </div>
+        </div>
+      </div>
+
+      {/* BOTTOM BAR */}
+      <div className="flex justify-between items-end">
+        {/* Bottom Left Telemetry Pill */}
+        <div className="bg-black/40 backdrop-blur-sm border border-[#ff0033]/30 px-3.5 py-1.5 rounded shadow-[0_0_15px_rgba(255,0,51,0.15)] text-[9px] text-red-400/90 font-mono flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#ff0033] animate-pulse" />
+          <span className="font-bold text-white">NODES:</span> {nodeCount} / {nodeCount}
+          <span className="text-[#ff0033]/40">|</span>
+          <span className="font-bold text-white">CORRUPTION:</span> 0.00%
+        </div>
+
+        {/* Bottom Center Version — Dead Centered */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center bg-black/40 backdrop-blur-sm border border-[#ff0033]/30 px-4 py-2 rounded text-[9px] text-red-400/80 shadow-[0_0_15px_rgba(255,0,51,0.15)]">
+          <span className="font-bold text-white">POSHAN MS PORTFOLIO</span> v1.0.0 · NODE_ENV = PRODUCTION
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
 ## File: `src/components/ui/Loader.tsx`
 
 ```typescript
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { useSuspenseAudio } from "@/hooks/useSuspenseAudio";
+import HUDSystem from "@/components/ui/loader/HUDSystem";
+import HiddenTerminal from "@/components/ui/loader/HiddenTerminal";
 
 // ═══════════════════════════════════════════════════════════════════════
 // OVERKILL CONFIGURATION — Tuned for 60fps on all devices
@@ -4595,7 +4847,7 @@ interface MicroDrop {
 interface DebrisParticle {
   x: number; y: number; vx: number; vy: number;
   life: number; maxLife: number; size: number;
-  angle: number; spin: number;
+  angle: number; spin: number; noise: number;
 }
 interface LightningBranch {
   x: number; y: number;
@@ -4642,16 +4894,16 @@ class TearEngine {
 
   generateCrack() {
     this.crackPoints = [];
-    const segments = 80;
+    const segments = 120;
     const baseAngle = -Math.PI / 2;
 
     for (let i = 0; i <= segments; i++) {
       const t = i / segments;
       const angle = baseAngle + t * Math.PI * 2;
-      const r1 = Math.sin(t * 13) * 15;
-      const r2 = Math.sin(t * 7 + 1) * 10;
-      const r3 = Math.sin(t * 23 + 2) * 5;
-      const baseR = 2 + t * 3;
+      const r1 = Math.sin(t * 19) * 22;
+      const r2 = Math.cos(t * 11 + 1) * 16;
+      const r3 = Math.sin(t * 31 + 2) * 8;
+      const baseR = 3 + t * 4;
       const radius = baseR + r1 + r2 + r3;
       this.crackPoints.push({
         x: this.centerX + Math.cos(angle) * radius,
@@ -4662,21 +4914,23 @@ class TearEngine {
       });
     }
 
+    // High velocity shrapnel + glass debris
     this.debris = [];
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 350; i++) {
       const a = Math.random() * Math.PI * 2;
-      const dist = Math.random() * 100;
-      const speed = 2 + Math.random() * 4;
+      const dist = Math.random() * 80;
+      const speed = 4 + Math.random() * 9;
       this.debris.push({
         x: this.centerX + Math.cos(a) * dist,
         y: this.centerY + Math.sin(a) * dist,
         vx: Math.cos(a) * speed,
         vy: Math.sin(a) * speed,
-        size: 1 + Math.random() * 3,
+        size: 2 + Math.random() * 6,
         life: 1,
-        maxLife: 0.8 + Math.random() * 1.2,
+        maxLife: 0.6 + Math.random() * 1.4,
         angle: Math.random() * Math.PI * 2,
-        spin: (Math.random() - 0.5) * 0.2,
+        spin: (Math.random() - 0.5) * 0.4,
+        noise: Math.random(),
       });
     }
   }
@@ -4692,9 +4946,9 @@ class TearEngine {
     if (!this.active) return;
     this.time += dt;
 
-    if (this.phase === "forming" && this.time > 0.3) this.phase = "widening";
-    if (this.phase === "widening" && this.time > 1.2) this.phase = "collapsing";
-    if (this.phase === "collapsing" && this.time > 2.0) {
+    if (this.phase === "forming" && this.time > 0.25) this.phase = "widening";
+    if (this.phase === "widening" && this.time > 1.1) this.phase = "collapsing";
+    if (this.phase === "collapsing" && this.time > 1.8) {
       this.phase = "done";
       this.active = false;
       this.onComplete?.();
@@ -4704,26 +4958,27 @@ class TearEngine {
     for (const d of this.debris) {
       d.x += d.vx * dt * 60;
       d.y += d.vy * dt * 60;
-      d.vx *= 0.98;
-      d.vy *= 0.98;
+      d.vx *= 0.97;
+      d.vy *= 0.97;
       d.life -= dt / d.maxLife;
       d.angle += d.spin * dt * 60;
     }
     this.debris = this.debris.filter((d) => d.life > 0);
 
-    if (this.phase === "forming" && Math.random() < 0.3) {
+    // Electric arcs
+    if ((this.phase === "forming" || this.phase === "widening") && Math.random() < 0.6) {
       const idx = Math.floor(Math.random() * this.crackPoints.length);
       const p = this.crackPoints[idx];
-      const lAngle = p.angle + (Math.random() - 0.5) * 1;
+      const lAngle = p.angle + (Math.random() - 0.5) * 1.2;
       const segs: { x: number; y: number }[] = [];
       let lx = p.x;
       let ly = p.y;
-      for (let s = 0; s < 5; s++) {
-        lx += Math.cos(lAngle + (Math.random() - 0.5)) * (10 + Math.random() * 20);
-        ly += Math.sin(lAngle + (Math.random() - 0.5)) * (10 + Math.random() * 20);
+      for (let s = 0; s < 7; s++) {
+        lx += Math.cos(lAngle + (Math.random() - 0.5)) * (12 + Math.random() * 25);
+        ly += Math.sin(lAngle + (Math.random() - 0.5)) * (12 + Math.random() * 25);
         segs.push({ x: lx, y: ly });
       }
-      this.lightning.push({ x: lx, y: ly, segments: segs, life: 0.3, maxLife: 0.3 });
+      this.lightning.push({ x: lx, y: ly, segments: segs, life: 0.25, maxLife: 0.25 });
     }
 
     for (let i = this.lightning.length - 1; i >= 0; i--) {
@@ -4738,52 +4993,92 @@ class TearEngine {
     const t = time;
 
     let expansion = 0;
-    if (this.phase === "forming") expansion = (t / 0.3) * 5;
-    else if (this.phase === "widening") expansion = 5 + ((t - 0.3) / 0.9) * 400;
-    else if (this.phase === "collapsing") expansion = 405 + ((t - 1.2) / 0.8) * 600;
+    if (this.phase === "forming") expansion = (t / 0.25) * 12;
+    else if (this.phase === "widening") expansion = 12 + ((t - 0.25) / 0.85) * 550;
+    else if (this.phase === "collapsing") expansion = 562 + ((t - 1.1) / 0.7) * 900;
 
     ctx.save();
     ctx.clearRect(0, 0, W, H);
 
-    // Void gradient
-    const voidGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, expansion * 1.5);
+    // 1. Radial Shockwave Rings
+    if (t < 0.8) {
+      const ringR = expansion * 1.4;
+      ctx.save();
+      ctx.strokeStyle = "rgba(255, 0, 51, " + Math.max(0, 0.8 - t) + ")";
+      ctx.lineWidth = 4;
+      ctx.shadowColor = CONFIG.CORE_RED;
+      ctx.shadowBlur = 30;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Outer Cyan Shockwave Ring
+      ctx.strokeStyle = "rgba(0, 240, 255, " + Math.max(0, 0.6 - t) + ")";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, ringR * 1.15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 2. Void Core Hole Cutout
+    const voidGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, expansion * 1.6);
     voidGrad.addColorStop(0, CONFIG.VOID_BLACK);
-    voidGrad.addColorStop(0.3, CONFIG.VOID_BLACK);
-    voidGrad.addColorStop(0.5, "rgba(255,0,51,0.1)");
-    voidGrad.addColorStop(0.7, "rgba(255,0,51,0.3)");
-    voidGrad.addColorStop(0.85, "rgba(255,50,80,0.15)");
+    voidGrad.addColorStop(0.35, CONFIG.VOID_BLACK);
+    voidGrad.addColorStop(0.6, "rgba(255,0,51,0.2)");
+    voidGrad.addColorStop(0.8, "rgba(0,240,255,0.15)");
     voidGrad.addColorStop(1, "transparent");
     ctx.fillStyle = voidGrad;
     ctx.beginPath();
-    ctx.arc(centerX, centerY, expansion * 2, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, expansion * 2.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // Crack edges
+    // 3. Chromatic Aberration Spider-Verse Crack Edges
     if (this.crackPoints.length > 1) {
-      ctx.shadowColor = CONFIG.CORE_RED;
-      ctx.shadowBlur = 20;
-      ctx.strokeStyle = "rgba(255, 0, 51, 0.8)";
-      ctx.lineWidth = 3;
+      // Crimson Shift (Left/Top)
+      ctx.save();
+      ctx.shadowColor = "#ff0033";
+      ctx.shadowBlur = 25;
+      ctx.strokeStyle = "rgba(255, 0, 51, 0.95)";
+      ctx.lineWidth = 4;
       ctx.beginPath();
       for (let i = 0; i < this.crackPoints.length; i++) {
         const p = this.crackPoints[i];
-        const r = p.baseRadius + expansion + Math.sin(t * 10 + i) * 3;
-        const x = centerX + Math.cos(p.angle) * r;
-        const y = centerY + Math.sin(p.angle) * r;
+        const r = p.baseRadius + expansion + Math.sin(t * 12 + i) * 4;
+        const x = centerX + Math.cos(p.angle) * r - 4;
+        const y = centerY + Math.sin(p.angle) * r - 2;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
       ctx.closePath();
       ctx.stroke();
 
-      ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 10;
-      ctx.strokeStyle = "rgba(255, 200, 200, 0.9)";
-      ctx.lineWidth = 1;
+      // Cyan Shift (Right/Bottom)
+      ctx.shadowColor = "#00f0ff";
+      ctx.shadowBlur = 20;
+      ctx.strokeStyle = "rgba(0, 240, 255, 0.85)";
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       for (let i = 0; i < this.crackPoints.length; i++) {
         const p = this.crackPoints[i];
-        const r = p.baseRadius + expansion * 0.95 + Math.sin(t * 15 + i) * 2;
+        const r = p.baseRadius + expansion * 0.97 + Math.sin(t * 16 + i) * 3;
+        const x = centerX + Math.cos(p.angle) * r + 4;
+        const y = centerY + Math.sin(p.angle) * r + 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // Pure White Core Filament
+      ctx.shadowColor = "#ffffff";
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < this.crackPoints.length; i++) {
+        const p = this.crackPoints[i];
+        const r = p.baseRadius + expansion * 0.99;
         const x = centerX + Math.cos(p.angle) * r;
         const y = centerY + Math.sin(p.angle) * r;
         if (i === 0) ctx.moveTo(x, y);
@@ -4791,45 +5086,60 @@ class TearEngine {
       }
       ctx.closePath();
       ctx.stroke();
+      ctx.restore();
     }
 
-    // Lightning
-    ctx.shadowBlur = 15;
+    // 4. Electric Arcs
+    ctx.save();
+    ctx.shadowBlur = 18;
     for (const l of this.lightning) {
       const alpha = l.life / l.maxLife;
-      ctx.strokeStyle = `rgba(255, 200, 255, ${alpha})`;
-      ctx.lineWidth = 1.5;
+      ctx.shadowColor = Math.random() < 0.5 ? "#ff0033" : "#00f0ff";
+      ctx.strokeStyle = Math.random() < 0.5 ? `rgba(255, 220, 240, ${alpha})` : `rgba(200, 245, 255, ${alpha})`;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(l.x, l.y);
       for (const s of l.segments) ctx.lineTo(s.x, s.y);
       ctx.stroke();
     }
+    ctx.restore();
 
-    // Debris
-    ctx.shadowBlur = 5;
+    // 5. High-Velocity Polygon Glass Shrapnel
+    ctx.save();
     for (const d of this.debris) {
       const alpha = Math.max(0, d.life);
       ctx.save();
       ctx.translate(d.x, d.y);
       ctx.rotate(d.angle);
-      const r = 255;
-      const g = 50 + d.life * 100;
-      const b = 80 + d.life * 50;
-      ctx.fillStyle = `rgba(${r}, ${g | 0}, ${b | 0}, ${alpha})`;
-      ctx.fillRect(-d.size / 2, -d.size / 2, d.size, d.size);
+      ctx.shadowColor = d.noise > 0.5 ? "#ff0033" : "#00f0ff";
+      ctx.shadowBlur = 8;
+      
+      const r = d.noise > 0.5 ? 255 : 0;
+      const g = d.noise > 0.5 ? 40 : 240;
+      const b = d.noise > 0.5 ? 80 : 255;
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+      // Draw triangular shrapnel shard
+      ctx.beginPath();
+      ctx.moveTo(0, -d.size);
+      ctx.lineTo(d.size * 0.8, d.size * 0.8);
+      ctx.lineTo(-d.size * 0.8, d.size * 0.6);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
     }
+    ctx.restore();
 
-    // Vignette during collapse
+    // 6. Final Dissolve Flash Vignette
     if (this.phase === "collapsing") {
-      const collapseT = (t - 1.2) / 0.8;
+      const collapseT = (t - 1.1) / 0.7;
       const vigAlpha = collapseT * 0.95;
       const vig = ctx.createRadialGradient(
-        centerX, centerY, expansion * 0.5,
+        centerX, centerY, expansion * 0.4,
         centerX, centerY, Math.max(W, H)
       );
       vig.addColorStop(0, "transparent");
-      vig.addColorStop(0.4, `rgba(3, 0, 1, ${vigAlpha * 0.3})`);
+      vig.addColorStop(0.3, `rgba(3, 0, 1, ${vigAlpha * 0.2})`);
       vig.addColorStop(1, `rgba(3, 0, 1, ${vigAlpha})`);
       ctx.fillStyle = vig;
       ctx.fillRect(0, 0, W, H);
@@ -4847,6 +5157,8 @@ interface LoaderProps {
 }
 
 export default function Loader({ onComplete }: LoaderProps) {
+  const { audioEnabled, initAudio, setProgress: setAudioProgress, triggerTear: triggerAudioTear } = useSuspenseAudio();
+
   // React state — ONLY used for mount/unmount, NEVER inside RAF
   const [isComplete, setIsComplete] = useState(false);
 
@@ -4875,9 +5187,14 @@ export default function Loader({ onComplete }: LoaderProps) {
   const phaseTimerRef = useRef(0);
   const hasCompletedRef = useRef(false);
   const progressRef = useRef(0);
-  const phaseRef = useRef<"loading" | "converging" | "tearing" | "done">("loading");
+  const phaseRef = useRef<"void" | "loading" | "converging" | "tearing" | "done">("void");
   const shownLogsRef = useRef<Set<number>>(new Set());
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const voidStartRef = useRef<number>(0);
+  const rainFadeRef = useRef(0);
+  const hbRingsRef = useRef<{ birth: number }[]>([]);
+  const lastHbRef = useRef(0);
+  const themeColorRef = useRef("#ff0033");
 
   // Initialize drops — called ONCE, never again
   const initDrops = (w: number, h: number) => {
@@ -4972,12 +5289,20 @@ export default function Loader({ onComplete }: LoaderProps) {
     };
 
     initDrops(W, H);
+    voidStartRef.current = performance.now();
 
     // Mouse tracking
     const handleMouseMove = (e: MouseEvent) => {
       mouseRef.current = { x: e.clientX, y: e.clientY, active: true };
     };
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
+
+    // Touch tracking for mobile cursor interaction
+    const handleTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (touch) mouseRef.current = { x: touch.clientX, y: touch.clientY, active: true };
+    };
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
 
     // Resize handler
     const handleResize = () => {
@@ -5009,8 +5334,62 @@ export default function Loader({ onComplete }: LoaderProps) {
       const mx = mouseSmoothRef.current.x;
       const my = mouseSmoothRef.current.y;
 
+      // ── VOID PHASE — The Dramatic Entrance ──
+      if (phaseRef.current === "void") {
+        const voidElapsed = (now - voidStartRef.current) / 1000;
+
+        ctx.fillStyle = CONFIG.VOID_BLACK;
+        ctx.fillRect(0, 0, W, H);
+
+        if (voidElapsed >= 0.5 && voidElapsed < 0.7) {
+          // Single red pixel → exponentially expanding horizontal scanline
+          const t = (voidElapsed - 0.5) / 0.2;
+          const halfWidth = Math.min(Math.pow(2, t * 10), W / 2);
+          ctx.save();
+          ctx.shadowColor = "#ff0033";
+          ctx.shadowBlur = 8 + t * 16;
+          ctx.fillStyle = "#ff0033";
+          ctx.fillRect(W / 2 - halfWidth, H / 2 - 1, halfWidth * 2, 2);
+          ctx.restore();
+        } else if (voidElapsed >= 0.7 && voidElapsed < 1.2) {
+          // CRT scanline sweep top → bottom
+          const sweepT = (voidElapsed - 0.7) / 0.5;
+          const sweepY = sweepT * H;
+
+          // Faint static noise behind sweep line
+          for (let sy = 0; sy < sweepY; sy += 4) {
+            if (Math.random() < 0.35) {
+              ctx.fillStyle = `rgba(255, 0, 51, ${0.01 + Math.random() * 0.03})`;
+              ctx.fillRect(0, sy, W, 1);
+            }
+          }
+
+          // Bright sweeping head with imperfect flicker
+          ctx.save();
+          ctx.shadowColor = "#ff0033";
+          ctx.shadowBlur = 25;
+          ctx.fillStyle = `rgba(255, 0, 51, ${0.7 + Math.random() * 0.3})`;
+          ctx.fillRect(0, sweepY - 2, W, 3);
+          ctx.fillStyle = "rgba(255, 100, 120, 0.3)";
+          ctx.fillRect(0, sweepY + 3, W, 1);
+          ctx.restore();
+        } else if (voidElapsed >= 1.2) {
+          // Transition to loading — rain will fade in gradually
+          phaseRef.current = "loading";
+          startTimeRef.current = Date.now();
+          rainFadeRef.current = 0;
+        }
+
+        rafRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
       // ── PROGRESS LOGIC ──
       if (phaseRef.current === "loading") {
+        // Gradually fade rain in from void
+        if (rainFadeRef.current < 1) {
+          rainFadeRef.current = Math.min(1, rainFadeRef.current + dt * 1.25);
+        }
         const elapsed = Date.now() - startTimeRef.current;
         progressRef.current = Math.min(elapsed / CONFIG.LOAD_DURATION, 1) * 100;
 
@@ -5035,11 +5414,13 @@ export default function Loader({ onComplete }: LoaderProps) {
         if (phaseTimerRef.current > CONFIG.CONVERGE_DURATION / 1000) {
           phaseRef.current = "tearing";
           tearEngineRef.current?.start();
+          triggerAudioTear();
         }
       }
 
       // ── UPDATE UI VIA DOM MANIPULATION (NOT setState) ──
       const currentProgress = progressRef.current;
+      setAudioProgress(currentProgress);
       const displayProgress = Math.floor(currentProgress);
 
       // Progress bar width
@@ -5086,6 +5467,9 @@ export default function Loader({ onComplete }: LoaderProps) {
       ctx.fillRect(0, 0, W, H);
 
       // ── DRAW DROPS ── (matches working prototype exactly)
+      // Parse theme color once per frame for rain coloring
+      const _tcHex = parseInt(themeColorRef.current.slice(1), 16);
+      const tcR = (_tcHex >> 16) & 255, tcG = (_tcHex >> 8) & 255, tcB = _tcHex & 255;
       const drops = dropsRef.current;
       for (let i = 0; i < drops.length; i++) {
         const d = drops[i];
@@ -5132,19 +5516,21 @@ export default function Loader({ onComplete }: LoaderProps) {
           const cy = d.y - c * d.fontSize * 1.1;
           if (cy < -10 || cy > H + 10) continue;
 
-          const charOpacity = c === 0 ? opacity : opacity * (1 - c / d.chars.length) * 0.7;
+          const charOpacity = (c === 0 ? opacity : opacity * (1 - c / d.chars.length) * 0.7) * rainFadeRef.current;
           if (charOpacity < 0.005) continue;
 
-          // Color by layer (matches prototype)
+          // Color by layer — responds to theme from terminal 'matrix' command
           let r: number, g: number, b: number;
           if (d.layer === 2 && c === 0) {
-            r = 255; g = 200 + Math.sin(time * 3) * 55; b = 200 + Math.sin(time * 3) * 55;
-          } else if (d.layer === 2) {
-            r = 255; g = 30; b = 50;
-          } else if (d.layer === 1) {
-            r = 180; g = 10; b = 25;
+            // Head character — white-hot with theme tint
+            r = Math.min(255, 200 + tcR * 0.2 + Math.sin(time * 3) * 55);
+            g = Math.min(255, 200 + tcG * 0.2 + Math.sin(time * 3) * 55);
+            b = Math.min(255, 200 + tcB * 0.2 + Math.sin(time * 3) * 55);
           } else {
-            r = 80; g = 0; b = 8;
+            const intensity = d.layer === 2 ? 1.0 : d.layer === 1 ? 0.7 : 0.31;
+            r = tcR * intensity;
+            g = tcG * intensity;
+            b = tcB * intensity;
           }
 
           // Mouse glow
@@ -5167,6 +5553,36 @@ export default function Loader({ onComplete }: LoaderProps) {
         ctx.fillRect(0, y, W, 1);
       }
 
+      // ── HEARTBEAT RING — Visual pulse synced to 46 BPM ──
+      if (phaseRef.current === "loading" || phaseRef.current === "converging") {
+        // Spawn new ring every 1.3s (matches audio heartbeat interval)
+        if (now - lastHbRef.current > 1300) {
+          lastHbRef.current = now;
+          hbRingsRef.current.push({ birth: now });
+        }
+
+        ctx.save();
+        for (let ri = hbRingsRef.current.length - 1; ri >= 0; ri--) {
+          const ring = hbRingsRef.current[ri];
+          const age = (now - ring.birth) / 1000;
+          if (age > 1.5) {
+            hbRingsRef.current.splice(ri, 1);
+            continue;
+          }
+          const radius = 50 + age * 100;
+          const alpha = Math.max(0, 0.5 * (1 - age / 1.5));
+          const lineW = Math.max(0.3, 2 - age * 1.3);
+          ctx.strokeStyle = `rgba(255, 0, 51, ${alpha})`;
+          ctx.lineWidth = lineW;
+          ctx.shadowColor = "#ff0033";
+          ctx.shadowBlur = 12 * (1 - age / 1.5);
+          ctx.beginPath();
+          ctx.arc(W / 2, H / 2 - 50, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       // ── TEAR ──
       tearEngineRef.current?.update(dt);
       tearEngineRef.current?.draw();
@@ -5180,6 +5596,7 @@ export default function Loader({ onComplete }: LoaderProps) {
     return () => {
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("touchmove", handleTouchMove);
       cancelAnimationFrame(rafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5195,9 +5612,24 @@ export default function Loader({ onComplete }: LoaderProps) {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[99999] overflow-hidden"
-      style={{ background: CONFIG.VOID_BLACK, cursor: "none" }}
+      onClick={() => initAudio()}
+      className="fixed inset-0 z-[99999] overflow-hidden cursor-pointer"
+      style={{ background: CONFIG.VOID_BLACK }}
     >
+      {/* Audio Initializer Badge */}
+      {!audioEnabled && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            initAudio();
+          }}
+          className="absolute top-8 left-1/2 -translate-x-1/2 z-[300] pointer-events-auto px-5 py-2.5 bg-red-950/60 border border-[#ff0033]/80 rounded-full text-[11px] tracking-[0.25em] font-mono text-[#ff0033] shadow-[0_0_20px_rgba(255,0,51,0.5)] animate-pulse hover:bg-[#ff0033]/20 transition-all cursor-pointer flex items-center gap-2"
+        >
+          <span className="w-2.5 h-2.5 rounded-full bg-[#ff0033] animate-ping" />
+          🔊 CLICK TO INITIALIZE AUDIO ENGINE
+        </button>
+      )}
+
       {/* Matrix rain canvas */}
       <canvas
         ref={matrixCanvasRef}
@@ -5239,39 +5671,41 @@ export default function Loader({ onComplete }: LoaderProps) {
             className="absolute inset-[-50px] rounded-full border-[0.3px] border-l-[#ff0033]/30 border-r-transparent"
             style={{ animation: "spin 8s linear infinite" }}
           />
-          <svg viewBox="0 0 100 100" className="w-full h-full" style={{ filter: "drop-shadow(0 0 20px rgba(255,0,51,0.6))" }}>
+          {/* FIXED: Solid crimson stroke with CSS drop-shadow instead of SVG filter */}
+          <svg 
+            viewBox="0 0 100 100" 
+            className="w-full h-full" 
+            style={{ filter: "drop-shadow(0 0 12px rgba(255,0,51,0.8)) drop-shadow(0 0 24px rgba(255,0,51,0.4))" }}
+          >
             <defs>
               <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#ff0033" />
                 <stop offset="50%" stopColor="#ff3366" />
-                <stop offset="100%" stopColor="#660011" />
+                <stop offset="100%" stopColor="#cc0022" />
               </linearGradient>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                <feMerge>
-                  <feMergeNode in="coloredBlur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
             </defs>
+            {/* Main P stroke — solid crimson, no SVG filter */}
             <path
               d="M28 18 h28 c16 0 24 10 24 22 c0 14 -10 22 -26 22 h-18 v30 h-16 v-74 h8"
-              stroke="url(#logoGrad)"
+              stroke="#ff0033"
               strokeWidth="3.5"
               fill="none"
-              filter="url(#glow)"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
+            {/* Inner detail stroke */}
             <path
               d="M28 34 h20 c8 0 12 4 12 10 c0 7 -5 10 -14 10 h-18 v-20"
-              stroke="url(#logoGrad)"
-              strokeWidth="3"
+              stroke="#ff3366"
+              strokeWidth="2.5"
               fill="none"
-              opacity="0.6"
+              opacity="0.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-            <circle cx="42" cy="40" r="3" fill="#ff0033" opacity="0.8">
-              <animate attributeName="opacity" values="0.4;0.9;0.4" dur="2s" repeatCount="indefinite" />
+            {/* Center dot */}
+            <circle cx="42" cy="40" r="3" fill="#ff0033">
+              <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
             </circle>
           </svg>
         </div>
@@ -5318,7 +5752,7 @@ export default function Loader({ onComplete }: LoaderProps) {
       {/* Big counter */}
       <div
         ref={bigCounterRef}
-        className="fixed bottom-10 left-10 font-mono pointer-events-none"
+        className="fixed bottom-14 left-6 font-mono pointer-events-none"
         style={{ zIndex: 10 }}
       >
         <div className="flex items-baseline">
@@ -5357,6 +5791,20 @@ export default function Loader({ onComplete }: LoaderProps) {
           System Integrity Matrix
         </p>
       </div>
+
+      {/* Cyber HUD Telemetry System */}
+      <HUDSystem />
+
+      {/* Interactive Hidden Cyber Terminal CLI */}
+      <HiddenTerminal
+        onOverride={() => {
+          phaseRef.current = "tearing";
+          tearEngineRef.current?.start();
+        }}
+        onThemeChange={(color) => {
+          themeColorRef.current = color;
+        }}
+      />
     </div>
   );
 }
@@ -5995,146 +6443,259 @@ export function useScrollProgress() {
 ```typescript
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 
 export function useSuspenseAudio() {
-  const startedRef = useRef(false);
-  const synthRef = useRef<any>(null);
-  const noiseRef = useRef<any>(null);
-  const filterRef = useRef<any>(null);
-  const lfoRef = useRef<any>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
-  const start = useCallback(async () => {
-    if (startedRef.current) return;
+  // Audio Nodes
+  const masterGainRef = useRef<GainNode | null>(null);
+  const subOscRef = useRef<OscillatorNode | null>(null);
+  const droneOscRef = useRef<OscillatorNode | null>(null);
+  const droneOsc2Ref = useRef<OscillatorNode | null>(null);
+  const filterRef = useRef<BiquadFilterNode | null>(null);
+  const noiseNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize Web Audio Context on explicit user interaction
+  const initAudio = useCallback(() => {
+    if (audioCtxRef.current && audioCtxRef.current.state === "running") return;
+
     try {
-      const tone = await import("tone");
-      
-      // Start Tone audio context
-      await tone.start();
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      audioCtxRef.current = ctx;
 
-      // Low Drone Filter
-      const filter = new tone.Filter(200, "lowpass").toDestination();
+      // Master Gain
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.35, ctx.currentTime); // Crisp, loud volume
+      master.connect(ctx.destination);
+      masterGainRef.current = master;
+
+      // Lowpass Filter for suspense wobble
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(180, ctx.currentTime);
+      filter.Q.setValueAtTime(4, ctx.currentTime);
+      filter.connect(master);
       filterRef.current = filter;
-      
-      // Suspenseful low synth drone
-      const synth = new tone.PolySynth(tone.Synth, {
-        oscillator: { type: "fatsawtooth" },
-        envelope: { attack: 3, decay: 1, sustain: 1, release: 4 },
-      }).connect(filter);
-      synth.volume.value = -20;
-      synthRef.current = synth;
-      
-      // LFO to modulate filter frequency for suspense wobble
-      const lfo = new tone.LFO(0.12, 80, 320).connect(filter.frequency);
-      lfoRef.current = lfo;
-      
-      // Pink noise for cosmic atmospheric wind
-      const noise = new tone.Noise("pink").connect(filter);
-      noise.volume.value = -32;
-      noiseRef.current = noise;
 
-      // Play notes
-      synth.triggerAttack(["C2", "G1", "D2"]);
-      lfo.start();
+      // Sub-Bass 30Hz Oscillator (Chest Rumble)
+      const sub = ctx.createOscillator();
+      sub.type = "sine";
+      sub.frequency.setValueAtTime(32, ctx.currentTime);
+      const subGain = ctx.createGain();
+      subGain.gain.setValueAtTime(0.4, ctx.currentTime);
+      sub.connect(subGain);
+      subGain.connect(master);
+      sub.start();
+      subOscRef.current = sub;
+
+      // Sawtooth Cyberpunk Drone 1 (C2 - 65.4Hz)
+      const drone = ctx.createOscillator();
+      drone.type = "sawtooth";
+      drone.frequency.setValueAtTime(65.4, ctx.currentTime);
+      drone.connect(filter);
+      drone.start();
+      droneOscRef.current = drone;
+
+      // Detuned Sawtooth Cyberpunk Drone 2 (G2 - 98Hz)
+      const drone2 = ctx.createOscillator();
+      drone2.type = "sawtooth";
+      drone2.frequency.setValueAtTime(98.0, ctx.currentTime);
+      drone2.detune.setValueAtTime(12, ctx.currentTime); // Rich stereo-like chorusing
+      drone2.connect(filter);
+      drone2.start();
+      droneOsc2Ref.current = drone2;
+
+      // Procedural Noise Generator (Cosmic Atmospheric Wind)
+      const bufferSize = ctx.sampleRate * 2;
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+        output[i] *= 0.11; // scale down
+        b6 = white * 0.115926;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      noise.loop = true;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.18, ctx.currentTime);
+      noise.connect(noiseGain);
+      noiseGain.connect(filter);
       noise.start();
-      startedRef.current = true;
+      noiseNodeRef.current = noise;
+
+      setAudioEnabled(true);
+
+      // Start Heartbeat Pulse (Every 1.2s -> 45 BPM)
+      const playHeartbeat = () => {
+        if (!audioCtxRef.current || audioCtxRef.current.state !== "running") return;
+        const now = audioCtxRef.current.currentTime;
+        
+        // Double heartbeat thump (lub-dub)
+        const kick1 = audioCtxRef.current.createOscillator();
+        kick1.type = "sine";
+        kick1.frequency.setValueAtTime(90, now);
+        kick1.frequency.exponentialRampToValueAtTime(30, now + 0.12);
+        
+        const kickGain = audioCtxRef.current.createGain();
+        kickGain.gain.setValueAtTime(0.5, now);
+        kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        
+        kick1.connect(kickGain);
+        kickGain.connect(master);
+        kick1.start(now);
+        kick1.stop(now + 0.16);
+
+        // Second pulse 0.18s later
+        const kick2 = audioCtxRef.current.createOscillator();
+        kick2.type = "sine";
+        kick2.frequency.setValueAtTime(75, now + 0.18);
+        kick2.frequency.exponentialRampToValueAtTime(25, now + 0.3);
+        
+        const kickGain2 = audioCtxRef.current.createGain();
+        kickGain2.gain.setValueAtTime(0.35, now + 0.18);
+        kickGain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+        
+        kick2.connect(kickGain2);
+        kickGain2.connect(master);
+        kick2.start(now + 0.18);
+        kick2.stop(now + 0.33);
+      };
+
+      heartbeatTimerRef.current = setInterval(playHeartbeat, 1300);
+
     } catch (err) {
-      console.warn("Suspense audio failed to initialize:", err);
+      console.warn("Web Audio initialization error:", err);
     }
   }, []);
 
+  // Update audio parameters in real time as progress increases (0 -> 100)
   const setProgress = useCallback((progress: number) => {
-    if (!startedRef.current) return;
-    try {
-      const norm = progress / 100;
+    if (!audioCtxRef.current || audioCtxRef.current.state !== "running") return;
+    const ctx = audioCtxRef.current;
+    const norm = Math.min(Math.max(progress / 100, 0), 1);
+    const now = ctx.currentTime;
+
+    // Filter frequency opens up from 180Hz to 1200Hz for intense rise
+    if (filterRef.current) {
+      filterRef.current.frequency.setTargetAtTime(180 + norm * 1020, now, 0.1);
+    }
+
+    // Sub-bass pitch increases slightly
+    if (subOscRef.current) {
+      subOscRef.current.frequency.setTargetAtTime(32 + norm * 20, now, 0.1);
+    }
+
+    // Play cyber blip note on milestones
+    if (norm > 0.2 && Math.random() < 0.05) {
+      const blip = ctx.createOscillator();
+      blip.type = "sine";
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25]; // C E G C E
+      const freq = notes[Math.floor(Math.random() * notes.length)];
+      blip.frequency.setValueAtTime(freq, now);
       
-      // Accelerate LFO wobble as load progress completes (from 0.12Hz up to 2.2Hz)
-      if (lfoRef.current) {
-        lfoRef.current.frequency.rampTo(0.12 + norm * 2.05, 0.15);
-      }
+      const blipGain = ctx.createGain();
+      blipGain.gain.setValueAtTime(0.08 * norm, now);
+      blipGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
       
-      // Open filter cutoff to make the sound brighter and more intense (from 200Hz up to 650Hz)
-      if (filterRef.current) {
-        filterRef.current.frequency.rampTo(200 + norm * 450, 0.15);
-      }
-      
-      // Slowly swell the volume of the drone and noise to build climax
-      if (synthRef.current) {
-        synthRef.current.volume.rampTo(-20 + norm * 6, 0.15);
-      }
-      if (noiseRef.current) {
-        noiseRef.current.volume.rampTo(-32 + norm * 7, 0.15);
-      }
-    } catch (err) {}
+      blip.connect(blipGain);
+      blipGain.connect(masterGainRef.current || ctx.destination);
+      blip.start(now);
+      blip.stop(now + 0.11);
+    }
   }, []);
 
-  const triggerTear = useCallback(async () => {
-    try {
-      const tone = await import("tone");
-      
-      // Sub-bass drop (portal tearing sound)
-      const drop = new tone.MembraneSynth().toDestination();
-      drop.volume.value = 2;
-      drop.triggerAttackRelease("C1", "1n");
-      
-      // White noise burst for the crack explosion
-      const burst = new tone.NoiseSynth({
-        noise: { type: "white" },
-        envelope: { attack: 0.005, decay: 0.5, sustain: 0 },
-      }).toDestination();
-      burst.volume.value = -4;
-      burst.triggerAttackRelease("1n");
+  // Trigger high-energy dimensional tear blast sound
+  const triggerTear = useCallback(() => {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    const now = ctx.currentTime;
 
-      // Stop the suspense background drone
-      if (synthRef.current) {
-        synthRef.current.releaseAll();
+    try {
+      // 1. Massive Sub-Bass Drop (Boom / Blast impact)
+      const boom = ctx.createOscillator();
+      boom.type = "sine";
+      boom.frequency.setValueAtTime(160, now);
+      boom.frequency.exponentialRampToValueAtTime(20, now + 0.8);
+
+      const boomGain = ctx.createGain();
+      boomGain.gain.setValueAtTime(1.0, now);
+      boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+
+      boom.connect(boomGain);
+      boomGain.connect(ctx.destination);
+      boom.start(now);
+      boom.stop(now + 1.0);
+
+      // 2. White Noise Shockwave Burst
+      const bufferSize = ctx.sampleRate * 0.6;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.12));
       }
-      if (noiseRef.current) {
-        noiseRef.current.stop();
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.6, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+      noise.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noise.start(now);
+
+      // 3. Stop background drone
+      if (masterGainRef.current) {
+        masterGainRef.current.gain.setTargetAtTime(0.001, now, 0.4);
       }
-      if (lfoRef.current) {
-        lfoRef.current.stop();
-      }
-    } catch (err) {
-      console.warn("Tear SFX failed to play:", err);
+    } catch (e) {
+      console.warn("Error playing tear sound:", e);
     }
   }, []);
 
   const stop = useCallback(() => {
-    if (synthRef.current) {
-      try { synthRef.current.releaseAll(); } catch {}
+    if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+    if (audioCtxRef.current) {
+      try { audioCtxRef.current.close(); } catch {}
     }
-    if (noiseRef.current) {
-      try { noiseRef.current.stop(); } catch {}
-    }
-    if (lfoRef.current) {
-      try { lfoRef.current.stop(); } catch {}
-    }
-    startedRef.current = false;
+    setAudioEnabled(false);
   }, []);
 
   useEffect(() => {
-    // Attempt automatic start, and hook to interaction to bypass browser audio policies
-    const handleInteraction = () => {
-      start();
-      window.removeEventListener("click", handleInteraction);
-      window.removeEventListener("mousemove", handleInteraction);
-      window.removeEventListener("keydown", handleInteraction);
+    const handleUserGesture = () => {
+      initAudio();
+      window.removeEventListener("click", handleUserGesture);
+      window.removeEventListener("keydown", handleUserGesture);
+      window.removeEventListener("touchstart", handleUserGesture);
     };
 
-    window.addEventListener("click", handleInteraction);
-    window.addEventListener("mousemove", handleInteraction);
-    window.addEventListener("keydown", handleInteraction);
+    window.addEventListener("click", handleUserGesture);
+    window.addEventListener("keydown", handleUserGesture);
+    window.addEventListener("touchstart", handleUserGesture);
 
     return () => {
-      window.removeEventListener("click", handleInteraction);
-      window.removeEventListener("mousemove", handleInteraction);
-      window.removeEventListener("keydown", handleInteraction);
+      window.removeEventListener("click", handleUserGesture);
+      window.removeEventListener("keydown", handleUserGesture);
+      window.removeEventListener("touchstart", handleUserGesture);
       stop();
     };
-  }, [start, stop]);
+  }, [initAudio, stop]);
 
-  return { start, setProgress, triggerTear, stop };
+  return { audioEnabled, initAudio, setProgress, triggerTear, stop };
 }
 ```
 
