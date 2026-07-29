@@ -3,7 +3,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { initScrollCamera } from "@/animations/scrollCamera";
+import { start3DPowerUpSequence, PowerUpStage, PowerUpStageValues } from "@/animations/powerUpSequence";
 import Loader from "@/components/ui/Loader";
+import WelcomeText from "@/components/ui/WelcomeText";
 import DashboardHero from "@/components/ui/DashboardHero";
 import SocialSidebar from "@/components/ui/SocialSidebar";
 import About from "@/components/sections/About";
@@ -40,61 +42,102 @@ function useStageScale() {
 export default function Home() {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [loaderComplete, setLoaderComplete] = useState(false);
-  const [sceneReady, setSceneReady] = useState(false);
+  const [showWelcomeText, setShowWelcomeText] = useState(false);
+
+  const [powerUpStage, setPowerUpStage] = useState<PowerUpStage>("idle");
+  const [powerUpValues, setPowerUpValues] = useState<PowerUpStageValues>({
+    sceneOpacity: 0,
+    floorOpacity: 0,
+    floorFlicker: 1,
+    laptopOpacity: 0,
+    globeOpacity: 0,
+    starsOpacity: 0,
+    cubesOpacity: 0,
+    uiOpacity: 0,
+  });
+
   const stageScale = useStageScale();
   const scrollControlRef = useRef<{ destroy: () => void } | null>(null);
 
-  // Initialize scroll camera after loader completes
-  useEffect(() => {
-    if (!loaderComplete) return;
+  // Preloader finished -> start welcome text on 100% pitch-black screen
+  const handleLoaderComplete = () => {
+    setLoaderComplete(true);
+    setShowWelcomeText(true);
+    setPowerUpStage("welcome");
+  };
 
-    const timer = setTimeout(() => {
-      scrollControlRef.current = initScrollCamera((progress) => {
-        setScrollProgress(progress);
-      });
-      setSceneReady(true);
-    }, 300);
+  // Welcome text finished & faded out -> start 3D power-up lighting sequence
+  const handleWelcomeComplete = () => {
+    setShowWelcomeText(false);
+
+    start3DPowerUpSequence({
+      onStageChange: (stage) => setPowerUpStage(stage),
+      onValuesUpdate: (vals) => setPowerUpValues(vals),
+      onComplete: () => {
+        // All power-up stages complete
+      },
+    });
+  };
+
+  // Initialize scroll camera ONLY after 3D power-up sequence is fully complete
+  useEffect(() => {
+    if (powerUpStage !== "complete") return;
+
+    scrollControlRef.current = initScrollCamera((progress) => {
+      setScrollProgress(progress);
+    });
 
     return () => {
-      clearTimeout(timer);
       scrollControlRef.current?.destroy();
       scrollControlRef.current = null;
     };
-  }, [loaderComplete]);
+  }, [powerUpStage]);
+
+  const isPowerUpActive = loaderComplete && powerUpStage !== "complete" && powerUpStage !== "idle";
 
   return (
-    <main className="relative min-h-[500vh] bg-[#030001]">
-      {/* LOADER — renders in overlay z-[99999], calls onComplete when finished */}
+    <main className="relative min-h-[500vh] bg-[#000000]">
+      {/* LOADER — renders preloader overlay */}
       {!loaderComplete && (
-        <Loader onComplete={() => setLoaderComplete(true)} />
+        <Loader onComplete={handleLoaderComplete} />
       )}
 
-      {/* 3D Scene — continuously mounted at z-0 so WebGL renders live behind the preloader */}
+      {/* CLEAN WELCOME TEXT — single centered line "Welcome to My Portfolio" on pitch black */}
+      {showWelcomeText && (
+        <WelcomeText onComplete={handleWelcomeComplete} />
+      )}
+
+      {/* 3D Scene — hidden during welcome text, then lights up stage-by-stage driven by GSAP */}
       <div
         className="fixed inset-0 z-0 h-full w-full pointer-events-none"
         style={{
-          opacity: loaderComplete ? (sceneReady ? 1 : 0.9) : 1,
-          transition: "opacity 1.2s ease-out",
+          opacity: showWelcomeText || powerUpStage === "welcome" ? 0 : powerUpValues.sceneOpacity,
         }}
       >
-        <Scene scrollProgress={scrollProgress} />
+        <Scene
+          scrollProgress={scrollProgress}
+          powerUpValues={powerUpValues}
+          isPowerUpActive={isPowerUpActive}
+        />
       </div>
 
-      {/* Social sidebar — appears after loader */}
+      {/* Social sidebar — appears when power-up reaches UI stage */}
       {loaderComplete && (
         <div style={{
-          opacity: sceneReady ? 1 : 0,
-          transition: "opacity 1s ease-out 0.5s",
+          opacity: powerUpStage === "ui" || powerUpStage === "complete" ? 1 : 0,
+          transition: "opacity 1s ease-out",
         }}>
           <SocialSidebar />
         </div>
       )}
 
-      {/* Dashboard Hero — the "Station 1" view */}
+      {/* Dashboard Hero — Station 1 view */}
       {loaderComplete && (
         <div style={{
-          opacity: sceneReady ? 1 : 0,
-          transition: "opacity 1.2s ease-out 0.8s",
+          opacity: powerUpStage === "ui" || powerUpStage === "complete" ? 1 : 0,
+          transform: powerUpStage === "ui" || powerUpStage === "complete" ? "scale(1)" : "scale(0.95)",
+          transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)",
+          willChange: "transform, opacity",
         }}>
           <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
         </div>
@@ -104,8 +147,8 @@ export default function Home() {
       <div
         className="relative z-10 -mt-px"
         style={{
-          background: "linear-gradient(180deg, rgba(3,0,1,0.4) 0%, rgba(10,0,2,0.82) 18%, rgba(10,0,2,0.94) 100%)",
-          opacity: loaderComplete ? 1 : 0,
+          background: "linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(10,0,2,0.82) 18%, rgba(10,0,2,0.94) 100%)",
+          opacity: powerUpStage === "ui" || powerUpStage === "complete" ? 1 : 0,
           transition: "opacity 1.5s ease-out",
         }}
       >

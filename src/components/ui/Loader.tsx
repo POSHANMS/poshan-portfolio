@@ -724,29 +724,23 @@ export default function Loader({ onComplete }: LoaderProps) {
       phaseRef.current = "done";
 
       if (flashRef.current) {
-        flashRef.current.style.transition = "opacity 0.15s";
-        flashRef.current.style.opacity = "1";
-        setTimeout(() => {
-          if (flashRef.current) {
-            flashRef.current.style.transition = "opacity 2s ease-out";
-            flashRef.current.style.opacity = "0";
-          }
-        }, 150);
+        flashRef.current.style.transition = "opacity 0.8s power2.out";
+        flashRef.current.style.opacity = "0";
       }
 
       if (uiLayerRef.current) {
-        uiLayerRef.current.style.transition = "opacity 0.8s";
         uiLayerRef.current.style.opacity = "0";
+        uiLayerRef.current.style.display = "none";
       }
       if (bigCounterRef.current) {
-        bigCounterRef.current.style.transition = "opacity 0.8s";
         bigCounterRef.current.style.opacity = "0";
+        bigCounterRef.current.style.display = "none";
       }
 
       setTimeout(() => {
         setIsComplete(true);
         onComplete?.();
-      }, 2000);
+      }, 1200);
     };
 
     initDrops(W, H);
@@ -843,7 +837,13 @@ export default function Loader({ onComplete }: LoaderProps) {
           phaseRef.current = "converging";
           phaseTimerRef.current = 0;
           if (statusTextRef.current) {
-            statusTextRef.current.textContent = "DIMENSIONAL BREACH IMMINENT";
+            statusTextRef.current.textContent = "CORE IMPLOSION DETECTED";
+          }
+          // STAGE 1: IMPLOSION (0.0s - 0.3s) — Core contracts to scale(0.15) over 0.3s with power4.in
+          if (logoRef.current) {
+            logoRef.current.style.transition = "transform 0.3s cubic-bezier(0.7, 0, 0.84, 0)";
+            logoRef.current.style.transform = "scale(0.15)";
+            logoRef.current.style.filter = "drop-shadow(0 0 100px rgba(255,0,51,1)) drop-shadow(0 0 200px rgba(0,240,255,0.9))";
           }
         }
       } else if (phaseRef.current === "converging") {
@@ -851,33 +851,43 @@ export default function Loader({ onComplete }: LoaderProps) {
         for (const d of dropsRef.current) {
           const dx = W / 2 - d.x;
           const dy = H / 2 - d.y;
-          d.x += dx * 0.025 * dt * 60;
-          d.y += dy * 0.025 * dt * 60;
-          d.baseSpeed *= 1.008;
+          d.x += dx * 0.05 * dt * 60;
+          d.y += dy * 0.05 * dt * 60;
+          d.baseSpeed *= 1.02;
         }
-        if (phaseTimerRef.current > CONFIG.CONVERGE_DURATION / 1000) {
-          phaseRef.current = "breaching";
-          breachEngineRef.current?.start();
-          triggerAudioTear();
 
-          // ═════ LOGO EMERGENCE FROM SINGULARITY ═════
-          if (logoRef.current) {
-            logoRef.current.style.transition = 
-              "transform 2.2s cubic-bezier(0.16, 1, 0.3, 1), " +
-              "opacity 1.6s cubic-bezier(0.4, 0, 0.2, 1), " +
-              "filter 2.5s ease-out";
-            logoRef.current.style.transform = "scale(1)";
-            logoRef.current.style.opacity = "1";
-            logoRef.current.style.filter = 
-              "drop-shadow(0 0 40px rgba(255,0,51,1)) " +
-              "drop-shadow(0 0 80px rgba(255,0,51,0.6)) " +
-              "drop-shadow(0 0 120px rgba(255,0,51,0.3))";
-          }
+        // STAGE 2: VISUAL SHOCKWAVE DETONATION AT 0.3s
+        if (phaseTimerRef.current >= 0.3 && !hasCompletedRef.current) {
+          phaseRef.current = "breaching";
+          phaseTimerRef.current = 0;
+          breachEngineRef.current?.start(); // Canvas renders expanding red organic shockwaves scale(0.15) -> scale(3.0)
+          triggerAudioTear(); // 50ms silence gap -> 42Hz sub detonation impact!
         }
       } else if (phaseRef.current === "breaching") {
-        // Logo emerges from singularity
-        logoScaleRef.current = Math.min(1, logoScaleRef.current + dt * 0.8);
-        logoOpacityRef.current = Math.min(1, logoOpacityRef.current + dt * 1.2);
+        phaseTimerRef.current += dt;
+
+        // STAGE 3: BLEND & CINEMATIC TRANSITION (At 0.4s into breach / 0.7s overall)
+        if (phaseTimerRef.current >= 0.4 && flashRef.current && flashRef.current.style.opacity !== "1") {
+          // Radial lens-bloom flash fades in over 0.2s as shockwaves reach viewport boundaries
+          flashRef.current.style.zIndex = "99999";
+          flashRef.current.style.transition = "transform 0.5s cubic-bezier(0.0, 0, 0.2, 1), opacity 0.2s ease-out";
+          flashRef.current.style.transform = "scale(3)";
+          flashRef.current.style.opacity = "1";
+
+          // HUD UI layers smoothly fade out over 0.3s
+          if (uiLayerRef.current) {
+            uiLayerRef.current.style.transition = "opacity 0.3s ease-out";
+            uiLayerRef.current.style.opacity = "0";
+          }
+          if (bigCounterRef.current) {
+            bigCounterRef.current.style.transition = "opacity 0.3s ease-out";
+            bigCounterRef.current.style.opacity = "0";
+          }
+          if (terminalRef.current) {
+            terminalRef.current.style.transition = "opacity 0.3s ease-out";
+            terminalRef.current.style.opacity = "0";
+          }
+        }
       }
 
       // ── UPDATE UI ──
@@ -887,7 +897,6 @@ export default function Loader({ onComplete }: LoaderProps) {
 
       if (phaseRef.current === "loading" && logoRef.current) {
         logoRef.current.style.opacity = Math.min(1, Math.max(0.3, currentProgress / 5)).toString();
-        logoRef.current.style.transform = "scale(1)";
       }
 
       if (progressFillRef.current) {
@@ -1094,11 +1103,16 @@ export default function Loader({ onComplete }: LoaderProps) {
         style={{ zIndex: 100 }}
       />
 
-      {/* White flash on breach */}
+      {/* STAGE 3: Radial Lens-Bloom Flash Overlay */}
       <div
         ref={flashRef}
-        className="absolute inset-0 pointer-events-none bg-white"
-        style={{ zIndex: 200, opacity: 0 }}
+        className="fixed inset-0 pointer-events-none rounded-full scale-0 opacity-0"
+        style={{
+          zIndex: 99999,
+          background: "radial-gradient(circle at 50% 50%, rgba(255,255,255,1) 0%, rgba(255,0,51,0.6) 45%, rgba(10,0,2,0) 80%)",
+          mixBlendMode: "screen",
+          willChange: "transform, opacity",
+        }}
       />
 
       {/* UI Layer */}
