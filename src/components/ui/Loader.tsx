@@ -888,6 +888,20 @@ export default function Loader({ onComplete }: LoaderProps) {
             terminalRef.current.style.opacity = "0";
           }
         }
+
+        // MODULE 3: Immediate reveal 0.3s–0.4s after explosion peak
+        if (phaseTimerRef.current >= 0.7 && !hasCompletedRef.current) {
+          hasCompletedRef.current = true;
+          phaseRef.current = "done";
+          if (flashRef.current) {
+            flashRef.current.style.transition = "opacity 0.4s ease-out";
+            flashRef.current.style.opacity = "0";
+          }
+          setTimeout(() => {
+            setIsComplete(true);
+            onComplete?.();
+          }, 150); // 150ms buffer as bloom opacity drops to 20%
+        }
       }
 
       // ── UPDATE UI ──

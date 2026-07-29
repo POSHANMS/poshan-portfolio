@@ -1,30 +1,31 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useCallback, useState } from "react";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * CINEMATIC AUDIO ENGINE — Detonation Blast & Sub-Bass Impact
+ * GLOBAL PERSISTENT CINEMATIC AUDIO ENGINE
  *
- * AudioContext is a MODULE-LEVEL SINGLETON so it survives across
- * component mounts/unmounts (Loader → WelcomeText → Hero) without
- * ever requiring a second user gesture.
+ * Web Audio API Context is a module-level singleton that persists across
+ * all route and component changes (Loader → Detonation → Welcome → Hero).
  *
- * Timeline Map:
- *   0:00 - 0:02.5 : Ambient dark sci-fi synth drone & 60Hz hum
- *   0:02.5 - 0:03.0: Anti-gravity suction riser sweep
- *   0:03.0 - 0:03.1: 50ms vacuum silence gap (builds extreme tension)
- *   0:03.1         : DETONATION MOMENT — 42Hz sub-bass drop punch,
- *                    metallic shockwave shatter & Dune horn swell
- *   0:03.1 - 0:06.0: Wide stereo atmospheric reverb tail fading over 3s
+ * Rules:
+ *  1. Loader Phase: Plays CRT boot sound, 30Hz sub rumble, mechanical drones,
+ *     matrix rain static, heartbeat pulses, and suction riser.
+ *  2. Detonation Blast: Triggers sub-bass drop (30Hz–50Hz), metallic shockwave
+ *     shatter, Dune horn stab, and crystal reverb tail.
+ *  3. LOADER AUDIO TERMINATION: All loader drones & background loops STOP
+ *     completely upon detonation.
+ *  4. Welcome Screen: Pitch-black background with ONLY ASMR mechanical keyboard
+ *     keystroke sounds (+/- 4% pitch variance, gain variance, spacebar thock,
+ *     and terminal lock-in thud). NO background drone bleed.
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MODULE-LEVEL SINGLETON — shared across ALL hook instances / component mounts
-// ─────────────────────────────────────────────────────────────────────────────
+// Module-Level Singleton Nodes
 let _ctx: AudioContext | null = null;
 let _masterGain: GainNode | null = null;
+let _ambientGain: GainNode | null = null;
 let _convolver: ConvolverNode | null = null;
 let _filter: BiquadFilterNode | null = null;
 let _subOsc: OscillatorNode | null = null;
@@ -37,7 +38,18 @@ let _heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let _isInitialized = false;
 let _isTearing = false;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// Pre-buffered memory assets for 0ms playback latency
+let _keycapNoiseBuffer: AudioBuffer | null = null;
+
+function createNoiseBuffer(ctx: AudioContext, duration: number): AudioBuffer {
+  const sampleRate = ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, Math.floor(sampleRate * duration), sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sampleRate * 0.004));
+  }
+  return buffer;
+}
 
 export function useSuspenseAudio() {
   const [audioEnabled, setAudioEnabled] = useState(_isInitialized);
@@ -71,21 +83,13 @@ export function useSuspenseAudio() {
 
   // UI cursor plink sound
   const playCursorPlink = useCallback(() => {
-    if (!_ctx) return;
-    if (_ctx.state === "suspended") {
-      _ctx.resume();
-    }
+    if (!_ctx || _ctx.state !== "running") return;
     const ctx = _ctx;
     const now = ctx.currentTime;
 
-    if (_masterGain && _masterGain.gain.value < 0.1) {
-      _masterGain.gain.cancelScheduledValues(now);
-      _masterGain.gain.setValueAtTime(0.4, now);
-    }
-
     const plink = ctx.createOscillator();
     plink.type = "sine";
-    const notes = [1046.50, 1318.51, 1567.98, 2093.00];
+    const notes = [1046.5, 1318.51, 1567.98, 2093.0];
     const freq = notes[Math.floor(Math.random() * notes.length)];
     plink.frequency.setValueAtTime(freq, now);
     plink.frequency.exponentialRampToValueAtTime(freq * 0.5, now + 0.1);
@@ -101,8 +105,10 @@ export function useSuspenseAudio() {
     plink.stop(now + 0.11);
   }, []);
 
-  // ASMR Cyberpunk Keystroke Sound (Lubed mechanical thock + tactile click + binaural pan)
-  const playTypingKeystrokeSound = useCallback(() => {
+  // ═══════════════════════════════════════════════════════════════════════
+  // ORGANIC ASMR TYPING ENGINE (PITCH & GAIN VARIANCE + PRE-BUFFERED)
+  // ═══════════════════════════════════════════════════════════════════════
+  const playTypingKeystrokeSound = useCallback((char?: string, isFinalChar: boolean = false) => {
     if (!_ctx) return;
     if (_ctx.state === "suspended") {
       _ctx.resume();
@@ -110,153 +116,157 @@ export function useSuspenseAudio() {
     const ctx = _ctx;
     const now = ctx.currentTime;
 
-    // Ensure master gain is restored if it was muted during detonation
-    if (_masterGain && _masterGain.gain.value < 0.1) {
+    // Ensure master gain is open for ASMR typing sounds
+    if (_masterGain && _masterGain.gain.value < 0.2) {
       _masterGain.gain.cancelScheduledValues(now);
-      _masterGain.gain.setValueAtTime(0.4, now);
+      _masterGain.gain.setValueAtTime(0.5, now);
     }
 
-    // 1. Deep Mechanical Thock Body (lubed switch sound: 260Hz -> 100Hz)
+    // Organic pitch +/- 4% & volume variance
+    const pitchFactor = 0.96 + Math.random() * 0.08;
+    const gainFactor = 0.85 + Math.random() * 0.15;
+
+    // Special Spacebar Thock (" ")
+    if (char === " ") {
+      const spaceThock = ctx.createOscillator();
+      spaceThock.type = "sine";
+      spaceThock.frequency.setValueAtTime((180 + Math.random() * 20) * pitchFactor, now);
+      spaceThock.frequency.exponentialRampToValueAtTime(50, now + 0.07);
+
+      const spaceGain = ctx.createGain();
+      spaceGain.gain.setValueAtTime(0.55 * gainFactor, now);
+      spaceGain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+
+      const dest = _masterGain || ctx.destination;
+      spaceThock.connect(spaceGain);
+      spaceGain.connect(dest);
+      spaceThock.start(now);
+      spaceThock.stop(now + 0.08);
+      return;
+    }
+
+    // Heavy Terminal Lock-in Sound on final character
+    if (isFinalChar) {
+      const lockThud = ctx.createOscillator();
+      lockThud.type = "sine";
+      lockThud.frequency.setValueAtTime(200, now);
+      lockThud.frequency.exponentialRampToValueAtTime(35, now + 0.2);
+
+      const lockGain = ctx.createGain();
+      lockGain.gain.setValueAtTime(0.75, now);
+      lockGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+      const lockSnap = ctx.createOscillator();
+      lockSnap.type = "sawtooth";
+      lockSnap.frequency.setValueAtTime(3200, now);
+      lockSnap.frequency.exponentialRampToValueAtTime(500, now + 0.04);
+
+      const snapFilter = ctx.createBiquadFilter();
+      snapFilter.type = "lowpass";
+      snapFilter.frequency.setValueAtTime(2000, now);
+
+      const snapGain = ctx.createGain();
+      snapGain.gain.setValueAtTime(0.4, now);
+      snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+      const dest = _masterGain || ctx.destination;
+      lockThud.connect(lockGain);
+      lockSnap.connect(snapFilter);
+      snapFilter.connect(snapGain);
+      lockGain.connect(dest);
+      snapGain.connect(dest);
+
+      lockThud.start(now);
+      lockThud.stop(now + 0.23);
+      lockSnap.start(now);
+      lockSnap.stop(now + 0.055);
+      return;
+    }
+
+    // Standard Organic Keystroke
+    // 1. Deep Mechanical Thock Body
     const thock = ctx.createOscillator();
     thock.type = "sine";
-    const baseFreq = 260 + Math.random() * 60;
+    const baseFreq = (270 + Math.random() * 60) * pitchFactor;
     thock.frequency.setValueAtTime(baseFreq, now);
-    thock.frequency.exponentialRampToValueAtTime(100, now + 0.045);
+    thock.frequency.exponentialRampToValueAtTime(105, now + 0.045);
 
     const thockGain = ctx.createGain();
-    thockGain.gain.setValueAtTime(0.35, now);
+    thockGain.gain.setValueAtTime(0.4 * gainFactor, now);
     thockGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
-    // 2. Tactile Switch Click / Snap (high-frequency tactile bump)
+    // 2. Tactile Switch Snap / Click
     const click = ctx.createOscillator();
     click.type = "triangle";
-    click.frequency.setValueAtTime(4200 + Math.random() * 800, now);
-    click.frequency.exponentialRampToValueAtTime(1200, now + 0.018);
+    click.frequency.setValueAtTime((4400 + Math.random() * 800) * pitchFactor, now);
+    click.frequency.exponentialRampToValueAtTime(1300, now + 0.018);
 
     const clickGain = ctx.createGain();
-    clickGain.gain.setValueAtTime(0.22, now);
+    clickGain.gain.setValueAtTime(0.28 * gainFactor, now);
     clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.022);
 
-    // 3. Keycap Bottom-out Noise Burst (tactile key housing contact)
-    const noiseBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.015), ctx.sampleRate);
-    const noiseData = noiseBuf.getChannelData(0);
-    for (let i = 0; i < noiseData.length; i++) {
-      noiseData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.004));
+    // 3. Pre-buffered Keycap Bottom-out Noise
+    let noiseSrc: AudioBufferSourceNode | null = null;
+    let noiseGain: GainNode | null = null;
+    if (_keycapNoiseBuffer) {
+      noiseSrc = ctx.createBufferSource();
+      noiseSrc.buffer = _keycapNoiseBuffer;
+      noiseSrc.playbackRate.setValueAtTime(pitchFactor, now);
+
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = "bandpass";
+      noiseFilter.frequency.setValueAtTime(3400 + Math.random() * 500, now);
+      noiseFilter.Q.setValueAtTime(2.2, now);
+
+      noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.22 * gainFactor, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.018);
+
+      noiseSrc.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
     }
-    const noiseSrc = ctx.createBufferSource();
-    noiseSrc.buffer = noiseBuf;
 
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = "bandpass";
-    noiseFilter.frequency.setValueAtTime(3200 + Math.random() * 500, now);
-    noiseFilter.Q.setValueAtTime(2.5, now);
-
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.18, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
-
-    noiseSrc.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-
-    // Binaural Panning across stereo field
-    const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     const destNode = _masterGain || ctx.destination;
 
+    // Stereo Panning
+    const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     if (panner) {
-      panner.pan.setValueAtTime((Math.random() - 0.5) * 0.5, now);
+      panner.pan.setValueAtTime((Math.random() - 0.5) * 0.4, now);
       thock.connect(thockGain);
       click.connect(clickGain);
       thockGain.connect(panner);
       clickGain.connect(panner);
-      noiseGain.connect(panner);
+      if (noiseGain) noiseGain.connect(panner);
       panner.connect(destNode);
     } else {
       thock.connect(thockGain);
       click.connect(clickGain);
       thockGain.connect(destNode);
       clickGain.connect(destNode);
-      noiseGain.connect(destNode);
+      if (noiseGain) noiseGain.connect(destNode);
     }
 
     thock.start(now);
     thock.stop(now + 0.052);
     click.start(now);
-    click.stop(now + 0.025);
-    noiseSrc.start(now);
+    click.stop(now + 0.027);
+    if (noiseSrc) noiseSrc.start(now);
   }, []);
 
-  // Enter Lock-in Mechanical Thud (Heavy switch bottom-out + sub thump)
   const playEnterPunchSound = useCallback(() => {
-    if (!_ctx) return;
-    if (_ctx.state === "suspended") {
-      _ctx.resume();
-    }
-    const ctx = _ctx;
-    const now = ctx.currentTime;
+    playTypingKeystrokeSound("O", true);
+  }, [playTypingKeystrokeSound]);
 
-    if (_masterGain && _masterGain.gain.value < 0.1) {
-      _masterGain.gain.cancelScheduledValues(now);
-      _masterGain.gain.setValueAtTime(0.4, now);
-    }
-
-    // Heavy Sub Thump
-    const thud = ctx.createOscillator();
-    thud.type = "sine";
-    thud.frequency.setValueAtTime(160, now);
-    thud.frequency.exponentialRampToValueAtTime(35, now + 0.18);
-
-    const thudGain = ctx.createGain();
-    thudGain.gain.setValueAtTime(0.65, now);
-    thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-    // Metal housing click
-    const snap = ctx.createOscillator();
-    snap.type = "sawtooth";
-    snap.frequency.setValueAtTime(2800, now);
-    snap.frequency.exponentialRampToValueAtTime(400, now + 0.04);
-
-    const snapFilter = ctx.createBiquadFilter();
-    snapFilter.type = "lowpass";
-    snapFilter.frequency.setValueAtTime(1800, now);
-
-    const snapGain = ctx.createGain();
-    snapGain.gain.setValueAtTime(0.35, now);
-    snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-
-    const destNode = _masterGain || ctx.destination;
-    thud.connect(thudGain);
-    snap.connect(snapFilter);
-    snapFilter.connect(snapGain);
-    thudGain.connect(destNode);
-    snapGain.connect(destNode);
-
-    thud.start(now);
-    thud.stop(now + 0.23);
-    snap.start(now);
-    snap.stop(now + 0.055);
-  }, []);
-
-  // INIT Audio Context & Ambient Drones — singleton guard
+  // ═══════════════════════════════════════════════════════════════════════
+  // GLOBAL PERSISTENT AUDIO INITIALIZATION
+  // ═══════════════════════════════════════════════════════════════════════
   const initAudio = useCallback(() => {
-    // Already running — ensure master gain is restored if it was ducked
     if (_ctx && _ctx.state === "running") {
-      if (_masterGain && _masterGain.gain.value < 0.1) {
-        const now = _ctx.currentTime;
-        _masterGain.gain.cancelScheduledValues(now);
-        _masterGain.gain.setValueAtTime(0.4, now);
-      }
       setAudioEnabled(true);
       return;
     }
-    // Suspended (e.g. browser tab switched) — just resume it
     if (_ctx && _ctx.state === "suspended") {
-      _ctx.resume().then(() => {
-        if (_masterGain && _masterGain.gain.value < 0.1) {
-          _masterGain.gain.cancelScheduledValues(_ctx!.currentTime);
-          _masterGain.gain.setValueAtTime(0.4, _ctx!.currentTime);
-        }
-        setAudioEnabled(true);
-      });
+      _ctx.resume().then(() => setAudioEnabled(true));
       return;
     }
 
@@ -265,22 +275,30 @@ export function useSuspenseAudio() {
       const ctx = new AudioContextClass();
       _ctx = ctx;
 
+      // Pre-buffer keystroke noise asset in memory for 0ms latency
+      _keycapNoiseBuffer = createNoiseBuffer(ctx, 0.02);
+
       const master = ctx.createGain();
-      master.gain.setValueAtTime(0.4, ctx.currentTime);
+      master.gain.setValueAtTime(0.5, ctx.currentTime);
       master.connect(ctx.destination);
       _masterGain = master;
 
-      // Stereo Convolver Reverb
+      const ambientBus = ctx.createGain();
+      ambientBus.gain.setValueAtTime(1.0, ctx.currentTime);
+      ambientBus.connect(master);
+      _ambientGain = ambientBus;
+
+      // Convolver Reverb
       const convolver = ctx.createConvolver();
-      const reverbLength = ctx.sampleRate * 3.5;
-      const reverbBuffer = ctx.createBuffer(2, reverbLength, ctx.sampleRate);
+      const reverbLength = ctx.sampleRate * 3.0;
+      const reverbBuf = ctx.createBuffer(2, reverbLength, ctx.sampleRate);
       for (let ch = 0; ch < 2; ch++) {
-        const data = reverbBuffer.getChannelData(ch);
+        const data = reverbBuf.getChannelData(ch);
         for (let i = 0; i < reverbLength; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.2) * 0.35;
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.2) * 0.3;
         }
       }
-      convolver.buffer = reverbBuffer;
+      convolver.buffer = reverbBuf;
       convolver.connect(master);
       _convolver = convolver;
 
@@ -290,7 +308,7 @@ export function useSuspenseAudio() {
       filter.type = "lowpass";
       filter.frequency.setValueAtTime(180, ctx.currentTime);
       filter.Q.setValueAtTime(3.5, ctx.currentTime);
-      filter.connect(master);
+      filter.connect(ambientBus);
       _filter = filter;
 
       // 30Hz Sub-Bass Chest Rumble
@@ -298,9 +316,9 @@ export function useSuspenseAudio() {
       sub.type = "sine";
       sub.frequency.setValueAtTime(30, ctx.currentTime);
       const subGain = ctx.createGain();
-      subGain.gain.setValueAtTime(0.45, ctx.currentTime);
+      subGain.gain.setValueAtTime(0.4, ctx.currentTime);
       sub.connect(subGain);
-      subGain.connect(master);
+      subGain.connect(ambientBus);
       sub.start();
       _subOsc = sub;
 
@@ -324,11 +342,10 @@ export function useSuspenseAudio() {
       const riser = ctx.createOscillator();
       riser.type = "sine";
       riser.frequency.setValueAtTime(100, ctx.currentTime);
-
       const riserGain = ctx.createGain();
       riserGain.gain.setValueAtTime(0.001, ctx.currentTime);
       riser.connect(riserGain);
-      riserGain.connect(master);
+      riserGain.connect(ambientBus);
       riser.start();
       _riserOsc = riser;
       _riserGain = riserGain;
@@ -412,7 +429,6 @@ export function useSuspenseAudio() {
     }
   }, [playCRTBootSound]);
 
-  // Modulate suction riser during progress (0% -> 100%)
   const setProgress = useCallback((progress: number) => {
     if (!_ctx || _ctx.state !== "running") return;
     const ctx = _ctx;
@@ -422,12 +438,9 @@ export function useSuspenseAudio() {
     if (_filter) {
       _filter.frequency.setTargetAtTime(180 + norm * 1400, now, 0.1);
     }
-
     if (_subOsc) {
       _subOsc.frequency.setTargetAtTime(30 + norm * 20, now, 0.1);
     }
-
-    // Vacuum Riser Accelerates exponentially toward 100%
     if (_riserOsc && _riserGain) {
       const riserFreq = 100 + Math.pow(norm, 3.5) * 1200;
       const riserVol = norm > 0.6 ? (norm - 0.6) * 1.8 : 0;
@@ -440,7 +453,9 @@ export function useSuspenseAudio() {
     }
   }, [playCursorPlink]);
 
-  // TRIGGER TEAR — 50ms Silence Gap & Detonation Impact
+  // ═══════════════════════════════════════════════════════════════════════
+  // DETONATION IMPACT & LOADER AUDIO TERMINATION
+  // ═══════════════════════════════════════════════════════════════════════
   const triggerTear = useCallback(() => {
     if (!_ctx || _isTearing) return;
     _isTearing = true;
@@ -449,39 +464,25 @@ export function useSuspenseAudio() {
     const now = ctx.currentTime;
 
     try {
-      // 50ms Ultra-brief Vacuum Silence Gap — master goes near-zero for tension
-      if (_masterGain) {
-        _masterGain.gain.cancelScheduledValues(now);
-        _masterGain.gain.setValueAtTime(0.001, now);
-        _masterGain.gain.linearRampToValueAtTime(0.0001, now + 0.05);
-        // Master gain stays silent through the blast tail — ambient drones die below
-      }
-
+      // 1. CLEANLY STOP ALL LOADER AMBIENT DRONES & HEARTBEATS IMMEDIATELY AT DETONATION
+      // So no background drone/throne voice bleeds into Welcome Screen!
       if (_heartbeatTimer) {
         clearInterval(_heartbeatTimer);
         _heartbeatTimer = null;
       }
+      try { if (_subOsc)   { _subOsc.stop(now);   _subOsc   = null; } } catch {}
+      try { if (_droneOsc) { _droneOsc.stop(now); _droneOsc = null; } } catch {}
+      try { if (_droneOsc2){ _droneOsc2.stop(now); _droneOsc2= null; } } catch {}
+      try { if (_riserOsc) { _riserOsc.stop(now); _riserOsc = null; } } catch {}
+      try { if (_noiseNode){ _noiseNode.stop(now);_noiseNode= null; } } catch {}
 
-      // Kill all looping ambient nodes IMMEDIATELY — they are inaudible (master=0.0001)
-      // so stopping them now vs later makes zero sound difference but prevents them
-      // from being audible if anything re-opens the gain path.
-      try { if (_subOsc)   { _subOsc.stop();   _subOsc   = null; } } catch {}
-      try { if (_droneOsc) { _droneOsc.stop(); _droneOsc = null; } } catch {}
-      try { if (_droneOsc2){ _droneOsc2.stop();_droneOsc2= null; } } catch {}
-      try { if (_riserOsc) { _riserOsc.stop(); _riserOsc = null; } } catch {}
-      try { if (_noiseNode){ _noiseNode.stop();_noiseNode= null; } } catch {}
+      // Ensure master gain is open for detonation SFX & subsequent ASMR typing
+      if (_masterGain) {
+        _masterGain.gain.cancelScheduledValues(now);
+        _masterGain.gain.setValueAtTime(0.5, now);
+      }
 
-      // After the punchy blast finishes (~1.5s), restore master gain for typing ASMR
-      setTimeout(() => {
-        if (_masterGain && _ctx) {
-          const t = _ctx.currentTime;
-          _masterGain.gain.cancelScheduledValues(t);
-          _masterGain.gain.setValueAtTime(0.5, t);
-        }
-      }, 1800);
-
-      // Detonation moment: 50ms after vacuum gap
-      const blastTime = now + 0.05;
+      const blastTime = now + 0.02;
 
       const compressor = ctx.createDynamicsCompressor();
       compressor.threshold.setValueAtTime(-14, blastTime);
@@ -493,80 +494,54 @@ export function useSuspenseAudio() {
 
       const breachMaster = ctx.createGain();
       breachMaster.gain.setValueAtTime(1.0, blastTime);
-      breachMaster.gain.exponentialRampToValueAtTime(0.001, blastTime + 1.4); // short punchy fade
+      breachMaster.gain.exponentialRampToValueAtTime(0.001, blastTime + 1.4);
       breachMaster.connect(compressor);
 
-      // Heavy 42Hz Sub-Bass Impact Punch — punchy, done in 0.7s
+      // 2. Heavy 30Hz-50Hz Sub-Bass Impact Punch
       const subDrop = ctx.createOscillator();
       subDrop.type = "sine";
-      subDrop.frequency.setValueAtTime(180, blastTime);
-      subDrop.frequency.exponentialRampToValueAtTime(42, blastTime + 0.06);
-      subDrop.frequency.exponentialRampToValueAtTime(28, blastTime + 0.5); // stops before 22Hz drone
+      subDrop.frequency.setValueAtTime(160, blastTime);
+      subDrop.frequency.exponentialRampToValueAtTime(50, blastTime + 0.05);
+      subDrop.frequency.exponentialRampToValueAtTime(30, blastTime + 0.45);
 
       const subDropGain = ctx.createGain();
       subDropGain.gain.setValueAtTime(1.0, blastTime);
-      subDropGain.gain.exponentialRampToValueAtTime(0.001, blastTime + 0.7); // done at 0.7s
+      subDropGain.gain.exponentialRampToValueAtTime(0.001, blastTime + 0.65);
 
       subDrop.connect(subDropGain);
       subDropGain.connect(breachMaster);
       subDrop.start(blastTime);
-      subDrop.stop(blastTime + 0.75);
+      subDrop.stop(blastTime + 0.7);
 
-      // Metallic Shockwave Shatter
+      // 3. Metallic Shockwave Shatter
       const slash = ctx.createOscillator();
       slash.type = "sawtooth";
       slash.frequency.setValueAtTime(5200, blastTime);
-      slash.frequency.exponentialRampToValueAtTime(9800, blastTime + 0.12);
-      slash.frequency.exponentialRampToValueAtTime(1400, blastTime + 0.6);
+      slash.frequency.exponentialRampToValueAtTime(9800, blastTime + 0.1);
+      slash.frequency.exponentialRampToValueAtTime(1400, blastTime + 0.5);
 
       const slashFilter = ctx.createBiquadFilter();
       slashFilter.type = "highpass";
       slashFilter.frequency.setValueAtTime(2500, blastTime);
 
       const slashGain = ctx.createGain();
-      slashGain.gain.setValueAtTime(0.50, blastTime);
-      slashGain.gain.exponentialRampToValueAtTime(0.001, blastTime + 0.65);
+      slashGain.gain.setValueAtTime(0.5, blastTime);
+      slashGain.gain.exponentialRampToValueAtTime(0.001, blastTime + 0.55);
 
       slash.connect(slashFilter);
       slashFilter.connect(slashGain);
       slashGain.connect(breachMaster);
       slash.start(blastTime);
-      slash.stop(blastTime + 0.68);
+      slash.stop(blastTime + 0.6);
 
-      // Shockwave Noise Burst
-      const shockLen = Math.floor(ctx.sampleRate * 0.5);
-      const shockBuf = ctx.createBuffer(1, shockLen, ctx.sampleRate);
-      const shockData = shockBuf.getChannelData(0);
-      for (let i = 0; i < shockLen; i++) {
-        const t = i / shockLen;
-        shockData[i] = (Math.random() * 2 - 1) * Math.exp(-t * 5);
-      }
-      const shockSrc = ctx.createBufferSource();
-      shockSrc.buffer = shockBuf;
-
-      const shockFilter = ctx.createBiquadFilter();
-      shockFilter.type = "bandpass";
-      shockFilter.frequency.setValueAtTime(3200, blastTime);
-      shockFilter.frequency.exponentialRampToValueAtTime(300, blastTime + 0.4);
-      shockFilter.Q.setValueAtTime(3.0, blastTime);
-
-      const shockGain = ctx.createGain();
-      shockGain.gain.setValueAtTime(0.70, blastTime);
-      shockGain.gain.exponentialRampToValueAtTime(0.001, blastTime + 0.5);
-
-      shockSrc.connect(shockFilter);
-      shockFilter.connect(shockGain);
-      shockGain.connect(breachMaster);
-      shockSrc.start(blastTime);
-
-      // Dune Horn Stab — short cinematic punch, NOT a long swell drone
+      // 4. Dune Horn Stab
       const horn1 = ctx.createOscillator();
       const horn2 = ctx.createOscillator();
       horn1.type = "sawtooth";
       horn2.type = "sawtooth";
 
       horn1.frequency.setValueAtTime(110, blastTime);
-      horn1.frequency.exponentialRampToValueAtTime(80, blastTime + 0.6); // stays high, no drone
+      horn1.frequency.exponentialRampToValueAtTime(80, blastTime + 0.6);
       horn2.frequency.setValueAtTime(110.8, blastTime);
       horn2.frequency.exponentialRampToValueAtTime(80.4, blastTime + 0.6);
 
@@ -580,7 +555,7 @@ export function useSuspenseAudio() {
       const hornGain = ctx.createGain();
       hornGain.gain.setValueAtTime(0.001, blastTime);
       hornGain.gain.linearRampToValueAtTime(0.65, blastTime + 0.03);
-      hornGain.gain.exponentialRampToValueAtTime(0.001, blastTime + 0.8); // done at 0.8s
+      hornGain.gain.exponentialRampToValueAtTime(0.001, blastTime + 0.8);
 
       horn1.connect(hornFilter);
       horn2.connect(hornFilter);
@@ -592,7 +567,7 @@ export function useSuspenseAudio() {
       horn1.stop(blastTime + 0.85);
       horn2.stop(blastTime + 0.85);
 
-      // Short crystal shimmer tail
+      // 5. Crystal Reverb Tail
       const bell1 = ctx.createOscillator();
       const bell2 = ctx.createOscillator();
       bell1.type = "sine";
@@ -604,7 +579,7 @@ export function useSuspenseAudio() {
       const bellGain = ctx.createGain();
       bellGain.gain.setValueAtTime(0, blastTime + 0.1);
       bellGain.gain.linearRampToValueAtTime(0.25, blastTime + 0.22);
-      bellGain.gain.exponentialRampToValueAtTime(0.001, blastTime + 1.1); // done at 1.1s
+      bellGain.gain.exponentialRampToValueAtTime(0.001, blastTime + 1.1);
 
       bell1.connect(bellGain);
       bell2.connect(bellGain);
@@ -618,7 +593,7 @@ export function useSuspenseAudio() {
       setTimeout(() => {
         try { compressor.disconnect(); } catch {}
         try { breachMaster.disconnect(); } catch {}
-      }, 2500);
+      }, 2000);
 
     } catch (e) {
       console.warn("Error playing detonation blast sound:", e);
@@ -634,6 +609,7 @@ export function useSuspenseAudio() {
       try { _ctx.close(); } catch {}
       _ctx = null;
       _masterGain = null;
+      _ambientGain = null;
       _convolver = null;
       _filter = null;
       _subOsc = null;
@@ -649,11 +625,9 @@ export function useSuspenseAudio() {
   }, []);
 
   useEffect(() => {
-    // If audio was already initialized (e.g. by the Loader), reflect that state
     if (_ctx && _ctx.state === "running") {
       setAudioEnabled(true);
     }
-
     const handleUserGesture = () => {
       initAudio();
       window.removeEventListener("click", handleUserGesture);
@@ -661,7 +635,6 @@ export function useSuspenseAudio() {
       window.removeEventListener("touchstart", handleUserGesture);
     };
 
-    // Only attach listeners if context not yet running
     if (!_ctx || _ctx.state !== "running") {
       window.addEventListener("click", handleUserGesture);
       window.addEventListener("keydown", handleUserGesture);

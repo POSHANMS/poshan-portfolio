@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { useSuspenseAudio } from "@/hooks/useSuspenseAudio";
+import { useAudio } from "@/context/AudioContext";
 
 interface WelcomeTextProps {
   onComplete?: () => void;
@@ -43,7 +43,7 @@ function CinematicTextLine({
   flickerOpacity: number;
   phase: Phase;
 }) {
-  const fontSize = "clamp(2.8rem, 9vw, 8.5rem)";
+  const fontSize = "clamp(2.5rem, 8.5vw, 8rem)";
   const letterSpacing = "0.18em";
   const lineHeight = 1.1;
 
@@ -57,7 +57,7 @@ function CinematicTextLine({
 
   return (
     <div
-      className="relative block"
+      className="relative block max-w-[85vw] mx-auto text-center"
       style={{ fontSize, lineHeight, minHeight: "1.15em" }}
     >
       {/* Deep background glow bloom per line */}
@@ -73,7 +73,7 @@ function CinematicTextLine({
       {/* Shadow depth layer */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-0 top-0 select-none whitespace-nowrap font-mono font-black uppercase"
+        className="pointer-events-none absolute left-0 top-0 select-none whitespace-nowrap font-mono font-black uppercase w-full text-center"
         style={{
           fontSize,
           letterSpacing,
@@ -89,7 +89,7 @@ function CinematicTextLine({
       {/* Cyan chromatic aberration layer */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-0 top-0 select-none whitespace-nowrap font-mono font-black uppercase"
+        className="pointer-events-none absolute left-0 top-0 select-none whitespace-nowrap font-mono font-black uppercase w-full text-center"
         style={{
           fontSize,
           letterSpacing,
@@ -106,7 +106,7 @@ function CinematicTextLine({
       {/* Red chromatic aberration layer */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-0 top-0 select-none whitespace-nowrap font-mono font-black uppercase"
+        className="pointer-events-none absolute left-0 top-0 select-none whitespace-nowrap font-mono font-black uppercase w-full text-center"
         style={{
           fontSize,
           letterSpacing,
@@ -122,7 +122,7 @@ function CinematicTextLine({
 
       {/* Main visible text */}
       <h1
-        className="relative select-none whitespace-nowrap font-mono font-black uppercase text-[#ff0033]"
+        className="relative select-none whitespace-nowrap font-mono font-black uppercase text-[#ff0033] w-full text-center"
         style={{
           fontSize,
           letterSpacing,
@@ -149,12 +149,7 @@ function CinematicTextLine({
 }
 
 export default function WelcomeText({ onComplete, layoutMode = "stacked" }: WelcomeTextProps) {
-  const { initAudio, playTypingKeystrokeSound, playEnterPunchSound } = useSuspenseAudio();
-
-  // Ensure audio context is resumed/active on mount without requiring another click
-  useEffect(() => {
-    initAudio();
-  }, [initAudio]);
+  const { initAudio, playTypingKeystrokeSound, playEnterPunchSound } = useAudio();
 
   const [phase, setPhase] = useState<Phase>("boot");
   const [displayText, setDisplayText] = useState("");
@@ -165,18 +160,22 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
   const [showCursor, setShowCursor] = useState(true);
   const [flickerOpacity, setFlickerOpacity] = useState(1);
 
-  // 3D Spatial Camera Warp Push-Through state
+  // Module 5: 3D Spatial Camera Warp Push-Through state
   const [warpScale, setWarpScale] = useState(1.0);
   const [warpOpacity, setWarpOpacity] = useState(1.0);
   const [warpBlur, setWarpBlur] = useState(0);
 
-  // Cinematic pan state for Option B
+  // Cinematic pan state for Option B fallback
   const [panX, setPanX] = useState(0);
   const textWrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const charIndexRef = useRef(0);
   const hasTriggeredCompleteRef = useRef(false);
   const panRafRef = useRef<number>(0);
+
+  useEffect(() => {
+    initAudio();
+  }, [initAudio]);
 
   // ══ PHASE 1: BOOT SEQUENCE ══
   useEffect(() => {
@@ -194,7 +193,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
     return () => clearInterval(interval);
   }, [phase]);
 
-  // ══ PHASE 2: CINEMATIC ASMR TYPING ══
+  // ══ PHASE 2: CINEMATIC ASMR TYPING ENGINE (MODULE 4) ══
   useEffect(() => {
     if (phase !== "typing") return;
 
@@ -207,13 +206,16 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
       }
 
       charIndexRef.current = idx + 1;
+      const currentChar = FULL_TEXT[idx];
+      const isLastChar = idx === FULL_TEXT.length - 1;
       setDisplayText(FULL_TEXT.slice(0, idx + 1));
-      playTypingKeystrokeSound();
 
-      const char = FULL_TEXT[idx];
-      let delay = 70 + Math.random() * 40;
-      if (char === " ") delay = 160;
-      if (idx === 0) delay = 400;
+      // Module 4: Organic ASMR keystroke audio trigger
+      playTypingKeystrokeSound(currentChar, isLastChar);
+
+      let delay = 65 + Math.random() * 45;
+      if (currentChar === " ") delay = 160;
+      if (idx === 0) delay = 350;
 
       if (Math.random() < 0.1) {
         setGlitchOffset({ x: (Math.random() - 0.5) * 14, y: (Math.random() - 0.5) * 6 });
@@ -223,7 +225,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
       setTimeout(typeNext, delay);
     };
 
-    const timer = setTimeout(typeNext, 200);
+    const timer = setTimeout(typeNext, 180);
     return () => clearTimeout(timer);
   }, [phase, playTypingKeystrokeSound, playEnterPunchSound]);
 
@@ -241,7 +243,6 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
       const ratio = Math.min(cursorIdx / FULL_TEXT.length, 1);
       const cursorX = textW * ratio;
 
-      // Keep cursor in the center third of the viewport
       let targetPan = containerW / 2 - cursorX;
       const minPan = containerW - textW - 48;
       const maxPan = 48;
@@ -255,7 +256,6 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
     return () => window.removeEventListener("resize", updatePan);
   }, [layoutMode, phase]);
 
-  // ══ OPTION B: Pull back to reveal full text after typing completes ══
   useEffect(() => {
     if (layoutMode !== "cinematic-pan") return;
     if (phase !== "surge" && phase !== "hold") return;
@@ -295,33 +295,35 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
     return () => clearInterval(surgeInterval);
   }, [phase]);
 
-  // ══ PHASE 4: STAGE 1 LOCK-IN & HOLD (0.4s PAUSE) ══
+  // ══ PHASE 4: STAGE 1 PAUSE (0.4s PAUSE WITH GLOW INTENSITY PULSE) ══
   useEffect(() => {
     if (phase !== "hold") return;
-    const timer = setTimeout(() => setPhase("warp"), 400);
+    const timer = setTimeout(() => setPhase("warp"), 400); // Module 5 Stage 1: 0.4s pause
     return () => clearTimeout(timer);
   }, [phase]);
 
-  // ══ PHASE 5: STAGE 2 SPATIAL CAMERA WARP (FLY FORWARD THROUGH TEXT) ══
+  // ══ PHASE 5: STAGE 2 SPATIAL CAMERA WARP (SCALE 1.0 → 8.0 WITH RADIAL BLUR) ══
   useEffect(() => {
     if (phase !== "warp") return;
 
     let startTime = performance.now();
-    const duration = 600;
+    const duration = 600; // 0.6s total warp duration
 
     const warpLoop = () => {
       const elapsed = performance.now() - startTime;
       const progress = Math.min(1, elapsed / duration);
 
+      // power3.in exponential curve: scale 1.0 -> 8.0
       const cubicIn = Math.pow(progress, 3);
       const currentScale = 1.0 + cubicIn * 7.0;
       const currentOpacity = Math.max(0, 1 - Math.pow(progress, 1.5));
-      const currentBlur = progress * 24;
+      const currentBlur = progress * 20; // radial motion blur 0px -> 20px
 
       setWarpScale(currentScale);
       setWarpOpacity(currentOpacity);
       setWarpBlur(currentBlur);
 
+      // STAGE 3 HERO REVEAL: Overlap Stage 2 by 0.2s (trigger at progress >= 0.65)
       if (progress >= 0.65 && !hasTriggeredCompleteRef.current) {
         hasTriggeredCompleteRef.current = true;
         onComplete?.();
@@ -342,7 +344,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
     return () => clearInterval(interval);
   }, []);
 
-  // Occasional scanline sweep — FIXED: proper cleanup of nested interval
+  // Occasional scanline sweep
   useEffect(() => {
     if (phase === "warp") return;
     let animInterval: ReturnType<typeof setInterval>;
@@ -457,7 +459,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
 
       {/* ═══ MAIN TEXT CONTAINER (3D SPATIAL CAMERA WARP PUSH-THROUGH) ═══ */}
       <div
-        className="relative flex flex-col items-center justify-center px-6"
+        className="relative flex flex-col items-center justify-center px-6 max-w-[85vw] mx-auto text-center"
         style={{
           perspective: "1200px",
           transform:
@@ -474,7 +476,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
         }}
       >
         {layoutMode === "stacked" ? (
-          <div ref={textWrapperRef} className="flex flex-col items-center gap-1 md:gap-2">
+          <div ref={textWrapperRef} className="flex flex-col items-center gap-1 md:gap-2 max-w-[85vw] mx-auto">
             {/* Line 1: WELCOME TO */}
             <CinematicTextLine
               text={line1Text}
@@ -508,7 +510,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
             )}
           </div>
         ) : (
-          <div ref={textWrapperRef} className="inline-block">
+          <div ref={textWrapperRef} className="inline-block max-w-[85vw] mx-auto">
             <CinematicTextLine
               text={displayText}
               isActive={phase === "typing" || phase === "boot"}
@@ -553,11 +555,6 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
         <p className="mt-3 font-mono text-[8px] uppercase tracking-[0.4em] text-[#ff0033]/30">
           {statusLabel}
         </p>
-        {layoutMode === "cinematic-pan" && phase === "hold" && (
-          <p className="mt-1 font-mono text-[7px] uppercase tracking-[0.3em] text-[#ff0033]/20">
-            // Cinematic Pan Active — Pulling Back
-          </p>
-        )}
       </div>
     </div>
   );
