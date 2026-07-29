@@ -149,12 +149,7 @@ function CinematicTextLine({
 }
 
 export default function WelcomeText({ onComplete, layoutMode = "stacked" }: WelcomeTextProps) {
-  const { initAudio, playTypingKeystrokeSound, playEnterPunchSound } = useSuspenseAudio();
-
-  // Ensure audio context is resumed/active on mount without requiring another click
-  useEffect(() => {
-    initAudio();
-  }, [initAudio]);
+  const { playTypingKeystrokeSound, playEnterPunchSound } = useSuspenseAudio();
 
   const [phase, setPhase] = useState<Phase>("boot");
   const [displayText, setDisplayText] = useState("");

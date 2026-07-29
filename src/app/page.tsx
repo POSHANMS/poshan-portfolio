@@ -104,7 +104,7 @@ export default function Home() {
 
       {/* CLEAN WELCOME TEXT — single centered line "Welcome to My Portfolio" on pitch black */}
       {showWelcomeText && (
-        <WelcomeText onComplete={handleWelcomeComplete} />
+        <WelcomeText onComplete={handleWelcomeComplete} layoutMode="stacked" />
       )}
 
       {/* 3D Scene — hidden during welcome text, then lights up stage-by-stage driven by GSAP */}
