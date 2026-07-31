@@ -33,6 +33,7 @@ function SceneLights({ powerUpValues, isPowerUpActive }: { powerUpValues?: Power
   const l = isPowerUpActive && powerUpValues ? powerUpValues.laptopOpacity : 1;
   const st = isPowerUpActive && powerUpValues ? powerUpValues.starsOpacity : 1;
   const c = isPowerUpActive && powerUpValues ? powerUpValues.cubesOpacity : 1;
+  const g = isPowerUpActive && powerUpValues ? powerUpValues.globeOpacity : 1;
 
   return (
     <>
@@ -58,6 +59,10 @@ function SceneLights({ powerUpValues, isPowerUpActive }: { powerUpValues?: Power
       <pointLight position={[0, 8, -30]} intensity={1.0 * st} color="#ff1744" distance={60} decay={2} />
       <pointLight position={[-8, 3, 2]} intensity={0.4 * st} color="#ff3355" distance={30} decay={2} />
 
+      {/* Globe accent light — casts real-time reflections on the floor */}
+      <pointLight position={[4.5, 2.5, -8]} intensity={3.5 * g} color="#ff1744" distance={25} decay={2} />
+      <pointLight position={[4.5, 0.5, -8]} intensity={2.0 * g} color="#800010" distance={20} decay={2} />
+
       {/* Cube accent light */}
       <pointLight position={[-1, 2, -2]} intensity={0.8 * c} color="#ff1744" distance={15} decay={2} />
     </>
@@ -68,11 +73,17 @@ export default function Scene({ scrollProgress, powerUpValues, isPowerUpActive }
   const { deviceTier } = useDeviceSize();
   const isMobile = deviceTier === "mobile";
 
-  const showFloor = !isPowerUpActive || (powerUpValues && powerUpValues.floorOpacity > 0.01);
-  const showLaptop = !isPowerUpActive || (powerUpValues && powerUpValues.laptopOpacity > 0.01);
-  const showGlobe = !isPowerUpActive || (powerUpValues && powerUpValues.globeOpacity > 0.01);
-  const showStars = !isPowerUpActive || (powerUpValues && powerUpValues.starsOpacity > 0.01);
-  const showCubes = !isPowerUpActive || (powerUpValues && powerUpValues.cubesOpacity > 0.01);
+  const showFloor = !isPowerUpActive || (powerUpValues && powerUpValues.floorOpacity > 0.0001);
+  const showLaptop = !isPowerUpActive || (powerUpValues && powerUpValues.laptopOpacity > 0.0001);
+  const showGlobe = !isPowerUpActive || (powerUpValues && powerUpValues.globeOpacity > 0.0001);
+  const showStars = !isPowerUpActive || (powerUpValues && powerUpValues.starsOpacity > 0.0001);
+  const showCubes = !isPowerUpActive || (powerUpValues && powerUpValues.cubesOpacity > 0.0001);
+
+  const floorOpacity = powerUpValues?.floorOpacity ?? 1;
+  const starsOpacity = powerUpValues?.starsOpacity ?? 1;
+  const globeOpacity = powerUpValues?.globeOpacity ?? 1;
+  const laptopOpacity = powerUpValues?.laptopOpacity ?? 1;
+  const cubesOpacity = powerUpValues?.cubesOpacity ?? 1;
 
   return (
     <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#000000" }}>
@@ -102,12 +113,12 @@ export default function Scene({ scrollProgress, powerUpValues, isPowerUpActive }
         <Suspense fallback={null}>
           <group visible={showStars}>
             <NebulaBackground />
-            <StarField />
+            <StarField starsOpacity={starsOpacity} />
             <ShootingStars />
           </group>
 
           <group visible={showGlobe}>
-            <DeepSpaceGlobe scrollProgress={scrollProgress} />
+            <DeepSpaceGlobe scrollProgress={scrollProgress} globeOpacity={globeOpacity} />
           </group>
 
           <VolumetricRays />
@@ -115,15 +126,15 @@ export default function Scene({ scrollProgress, powerUpValues, isPowerUpActive }
           <FloatingHexParticles />
 
           <group visible={showCubes}>
-            <TechCubes />
+            <TechCubes cubesOpacity={cubesOpacity} />
           </group>
 
           <group visible={showLaptop}>
-            <FloatingLaptop />
+            <FloatingLaptop laptopOpacity={laptopOpacity} />
           </group>
 
           <group visible={showFloor}>
-            <NeonGrid />
+            <NeonGrid floorOpacity={floorOpacity} />
             <FloorRings />
           </group>
 

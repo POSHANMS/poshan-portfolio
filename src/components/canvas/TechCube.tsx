@@ -11,9 +11,10 @@ interface TechCubeProps {
   color: string;
   glowColor: string;
   logoPath: string;
+  cubesOpacity?: number;
 }
 
-export default function TechCube({ position, scale = 1, color, glowColor, logoPath }: TechCubeProps) {
+export default function TechCube({ position, scale = 1, color, glowColor, logoPath, cubesOpacity = 1 }: TechCubeProps) {
   const groupRef = useRef<THREE.Group>(null);
   const lightRef = useRef<THREE.PointLight>(null);
   const [hovered, setHovered] = useState(false);
@@ -34,7 +35,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
 
     if (lightRef.current) {
       const pulse = Math.sin(t * 2.2 + position[0]) * 0.5 + 0.5;
-      lightRef.current.intensity = hovered ? 8.0 + pulse * 2.5 : 5.0 + pulse * 1.5;
+      lightRef.current.intensity = (hovered ? 8.0 + pulse * 2.5 : 5.0 + pulse * 1.5) * cubesOpacity;
     }
   });
 
@@ -42,26 +43,26 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
     <group
       ref={groupRef}
       position={position}
-      scale={scale}
+      scale={scale * cubesOpacity}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
     >
-      <pointLight ref={lightRef} color={glowColor} intensity={4.0} distance={5.6} decay={2} />
+      <pointLight ref={lightRef} color={glowColor} intensity={4.0 * cubesOpacity} distance={5.6} decay={2} />
 
       <mesh scale={[1.1, 1.1, 1.1]}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color={glowColor} transparent opacity={hovered ? 0.08 : 0.03} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} transparent opacity={(hovered ? 0.08 : 0.03) * cubesOpacity} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
       <lineSegments scale={[1.08, 1.08, 1.08]}>
         <edgesGeometry args={[edgeGeometry]} />
-        <lineBasicMaterial color={glowColor} transparent opacity={hovered ? 0.35 : 0.18} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <lineBasicMaterial color={glowColor} transparent opacity={(hovered ? 0.35 : 0.18) * cubesOpacity} blending={THREE.AdditiveBlending} depthWrite={false} />
       </lineSegments>
 
       <RoundedBox args={[1, 1, 1]} radius={0.075} smoothness={6} castShadow>
         <mesh>
           <boxGeometry args={[0.94, 0.94, 0.94]} />
-          <meshBasicMaterial color={color} transparent opacity={0.1} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color={color} transparent opacity={0.1 * cubesOpacity} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
         <MeshTransmissionMaterial
           color={new THREE.Color(color).lerp(new THREE.Color("#fff0f0"), 0.72)}
@@ -78,7 +79,7 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
           attenuationColor={new THREE.Color(color).lerp(new THREE.Color("#fff0f0"), 0.35)}
           attenuationDistance={0.95}
           emissive={glow}
-          emissiveIntensity={hovered ? 0.35 : 0.18}
+          emissiveIntensity={(hovered ? 0.35 : 0.18) * cubesOpacity}
           envMapIntensity={2.35}
           side={THREE.FrontSide}
         />
@@ -86,32 +87,32 @@ export default function TechCube({ position, scale = 1, color, glowColor, logoPa
 
       <lineSegments>
         <edgesGeometry args={[edgeGeometry]} />
-        <lineBasicMaterial color="#ffd6dc" transparent opacity={hovered ? 0.4 : 0.2} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <lineBasicMaterial color="#ffd6dc" transparent opacity={(hovered ? 0.4 : 0.2) * cubesOpacity} blending={THREE.AdditiveBlending} depthWrite={false} />
       </lineSegments>
 
       <mesh position={[0, 0, 0.535]}>
         <planeGeometry args={[0.68, 0.68]} />
-        <meshBasicMaterial map={logoTex} transparent opacity={0.32} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial map={logoTex} transparent opacity={0.32 * cubesOpacity} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, 0, -0.535]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[0.68, 0.68]} />
-        <meshBasicMaterial map={logoTex} transparent opacity={0.08} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial map={logoTex} transparent opacity={0.08 * cubesOpacity} toneMapped={false} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, 0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.48, 0.515, 32]} />
-        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.12 : 0.05} side={THREE.DoubleSide} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={(hovered ? 0.12 : 0.05) * cubesOpacity} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, -0.535, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.48, 0.515, 32]} />
-        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.08 : 0.03} side={THREE.DoubleSide} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={(hovered ? 0.08 : 0.03) * cubesOpacity} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
       <mesh position={[0, -0.78, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.28, 1.28, 1]}>
         <circleGeometry args={[0.72, 48]} />
-        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={hovered ? 0.1 : 0.05} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={glowColor} toneMapped={false} transparent opacity={(hovered ? 0.1 : 0.05) * cubesOpacity} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
     </group>
   );

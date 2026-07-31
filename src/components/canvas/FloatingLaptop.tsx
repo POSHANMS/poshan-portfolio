@@ -8,7 +8,7 @@ import { useMousePosition } from "@/hooks/useMousePosition";
 
 const SCREEN_MATERIAL_NAME = "Material.004";
 
-export default function FloatingLaptop() {
+export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: number }) {
   const { scene } = useGLTF("/models/laptop-baked.glb");
 
   const groupRef = useRef<THREE.Group>(null);
@@ -69,9 +69,9 @@ export default function FloatingLaptop() {
       const dx = mouse.x - 0.25;
       const dy = mouse.y + 0.15;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const proximity = Math.exp(-dist * dist * 4.0); // 1.0 close, 0.0 far
+      const proximity = Math.exp(-dist * dist * 4.0);
       
-      kbLightRef.current.intensity = 1.5 + proximity * 5.0; // Glows up to 6.5!
+      kbLightRef.current.intensity = (1.5 + proximity * 5.0) * laptopOpacity;
       kbLightRef.current.distance = 2.5 + proximity * 3.5;
     }
   });
@@ -84,76 +84,25 @@ export default function FloatingLaptop() {
       ref={groupRef}
       position={[laptopX, -0.52, -1.34]}
       rotation={[0.09, -Math.PI / 2 - 0.15, -0.03]}
+      scale={laptopOpacity * 1.15}
     >
       <group ref={bobRef}>
-        <primitive object={scene} scale={1.15} />
-
-        {/* Screen glow plane — commented out, was visually dissecting through the laptop */}
-        {/*
-        <mesh position={[0.2, 0.78, -0.72]} rotation={[0.05, 0, 0]}>
-          <planeGeometry args={[2.2, 1.35]} />
-          <meshBasicMaterial
-            color="#ff1744"
-            transparent
-            opacity={0.07}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-        */}
-
-        {/* Keyboard glow plane — commented out, was dissecting the keyboard visually */}
-        {/*
-        <mesh position={[0.36, -0.28, 0.22]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[2.5, 1.0]} />
-          <meshBasicMaterial
-            color="#ff1744"
-            transparent
-            opacity={0.08}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-        */}
-
-        {/* 
-        <mesh position={[0.32, -0.9, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[2.35, 72]} />
-          <meshBasicMaterial
-            color="#ff1744"
-            transparent
-            opacity={0.04}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-
-        <mesh position={[0.0, -1.02, 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[1.25, 2.75, 96]} />
-          <meshBasicMaterial
-            color="#ff1744"
-            transparent
-            opacity={0.03}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-        */}
+        <primitive object={scene} />
 
         {/* Key light — behind screen, illuminates top edge and screen halo */}
-        <pointLight position={[0, 1.8, -1.2]}   intensity={7.5} distance={14} color="#ff1744" decay={2} />
+        <pointLight position={[0, 1.8, -1.2]} intensity={7.5 * laptopOpacity} distance={14} color="#ff1744" decay={2} />
         {/* Fill light — left side, illuminates hinge and left body */}
-        <pointLight position={[-2.1, 0.65, 0.45]} intensity={4.5} distance={11} color="#ff1744" decay={2} />
+        <pointLight position={[-2.1, 0.65, 0.45]} intensity={4.5 * laptopOpacity} distance={11} color="#ff1744" decay={2} />
         {/* Under-glow — bottom accent, pink tint */}
-        <pointLight position={[0.8, -1.15, 0.95]} intensity={3.5} distance={10} color="#800010" decay={2} />
+        <pointLight position={[0.8, -1.15, 0.95]} intensity={3.5 * laptopOpacity} distance={10} color="#800010" decay={2} />
         {/* Front fill — viewer-facing, softens shadows */}
-        <pointLight position={[0, 0.5, 1.5]}      intensity={3.2} distance={10} color="#ff1744" decay={2} />
+        <pointLight position={[0, 0.5, 1.5]} intensity={3.2 * laptopOpacity} distance={10} color="#ff1744" decay={2} />
         {/* General body illumination */}
-        <pointLight position={[0, -0.5, 0]} intensity={4.0} distance={10} color="#ff1744" decay={2} />
-        {/* Keyboard backlight — low, close to keyboard deck surface, subtle warm glow */}
-        <pointLight ref={kbLightRef} position={[0.3, -0.15, 0.35]} intensity={3.5} distance={4} color="#ff6680" decay={2} />
+        <pointLight position={[0, -0.5, 0]} intensity={4.0 * laptopOpacity} distance={10} color="#ff1744" decay={2} />
+        {/* Keyboard backlight — low, close to keyboard deck surface */}
+        <pointLight ref={kbLightRef} position={[0.3, -0.15, 0.35]} intensity={3.5 * laptopOpacity} distance={4} color="#ff6680" decay={2} />
         {/* Right-side rim light — catches the right edge of laptop body */}
-        <pointLight position={[2.0, 0.3, 0.2]} intensity={2.8} distance={8} color="#ff3355" decay={2} />
+        <pointLight position={[2.0, 0.3, 0.2]} intensity={2.8 * laptopOpacity} distance={8} color="#ff3355" decay={2} />
       </group>
     </group>
   );

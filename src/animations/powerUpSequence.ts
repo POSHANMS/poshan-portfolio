@@ -6,9 +6,9 @@ export type PowerUpStage =
   | "idle"
   | "welcome"
   | "floor"
-  | "laptop"
-  | "globe"
   | "stars"
+  | "globe"
+  | "laptop"
   | "cubes"
   | "ui"
   | "complete";
@@ -54,39 +54,39 @@ export function start3DPowerUpSequence(callbacks: PowerUpCallbacks) {
   });
 
   // ═══════════════════════════════════════════════════════════════
-  // TOTAL DURATION: ~18 seconds of cinematic power-up
-  // Each stage overlaps with the next for organic flow
+  // TOTAL DURATION: ~16.5 seconds of cinematic power-up
+  // Order: Floor → Stars → Globe → Laptop → Cubes → UI
   // ═══════════════════════════════════════════════════════════════
 
-  // ── SCENE FADE-IN (0s → 3s) ──
+  // ── SCENE FADE-IN (0s → 2.5s) ──
   // Very slow fade from black so the eye adjusts
   tl.to(
     values,
     {
       sceneOpacity: 1,
-      duration: 3,
+      duration: 2.5,
       ease: "power2.inOut",
       onUpdate: update,
     },
     0
   );
 
-  // ── STAGE 1: FLOOR GRID IGNITION (1s → 7s) ──
-  // 6 seconds — like a massive server room booting up row by row
-  tl.add(() => callbacks.onStageChange?.("floor"), 1);
+  // ── STAGE 1: FLOOR GRID IGNITION (0.5s → 5s) ──
+  // 4.5 seconds — perspective grid illuminates outward from center
+  tl.add(() => callbacks.onStageChange?.("floor"), 0.5);
 
   tl.to(
     values,
     {
       floorOpacity: 1,
-      duration: 6,
+      duration: 4.5,
       ease: "power2.inOut",
       onUpdate: update,
     },
-    1
+    0.5
   );
 
-  // Electrical flicker: unstable power flow during early boot (2s → 5s)
+  // Electrical flicker: unstable power flow during early boot (2s → 4s)
   tl.to(
     values,
     {
@@ -100,19 +100,19 @@ export function start3DPowerUpSequence(callbacks: PowerUpCallbacks) {
     2
   );
 
-  // Power stabilizes (5s → 6.5s)
+  // Power stabilizes (4s → 5s)
   tl.to(
     values,
     {
       floorFlicker: 1,
-      duration: 1.5,
+      duration: 1,
       ease: "power2.out",
       onUpdate: update,
     },
-    5
+    4
   );
 
-  // Brief power surge at 6s (like a capacitor discharging into the grid)
+  // Brief power surge at 5s (capacitor discharge into the grid)
   tl.to(
     values,
     {
@@ -123,66 +123,41 @@ export function start3DPowerUpSequence(callbacks: PowerUpCallbacks) {
       ease: "power2.inOut",
       onUpdate: update,
     },
-    6
+    5
   );
 
-  // ── STAGE 2: LAPTOP SYSTEM BOOT (5s → 11s) ──
-  // 6 seconds — motherboard POST sequence feel
-  tl.add(() => callbacks.onStageChange?.("laptop"), 5);
+  // ── STAGE 2: DEEP STARFIELD EMERGENCE (2.5s → 6.5s) ──
+  // 4 seconds — deep space slowly revealing itself behind the grid
+  tl.add(() => callbacks.onStageChange?.("stars"), 2.5);
 
   tl.to(
     values,
     {
-      laptopOpacity: 1,
-      duration: 6,
+      starsOpacity: 1,
+      duration: 4,
+      ease: "power2.inOut",
+      onUpdate: update,
+    },
+    2.5
+  );
+
+  // ── STAGE 3: REACTOR GLOBE WARM-UP (5s → 9s) ──
+  // 4 seconds total — dark metal transitions to crimson core over 1.8s
+  // then holds with holographic flicker
+  tl.add(() => callbacks.onStageChange?.("globe"), 5);
+
+  tl.to(
+    values,
+    {
+      globeOpacity: 1,
+      duration: 1.8,
       ease: "power2.inOut",
       onUpdate: update,
     },
     5
   );
 
-  // Laptop has its own micro-flicker during BIOS boot (6s → 8s)
-  tl.to(
-    values,
-    {
-      laptopOpacity: 0.6,
-      duration: 0.06,
-      repeat: 8,
-      yoyo: true,
-      ease: "rough({ strength: 0.8, points: 10, randomize: true })",
-      onUpdate: update,
-    },
-    6.5
-  );
-
-  // Screen brightens to full (9s → 10.5s)
-  tl.to(
-    values,
-    {
-      laptopOpacity: 1,
-      duration: 1.5,
-      ease: "power2.out",
-      onUpdate: update,
-    },
-    9
-  );
-
-  // ── STAGE 3: WIREFRAME GLOBE ACTIVATION (8s → 14s) ──
-  // 6 seconds — holographic projector spinning up
-  tl.add(() => callbacks.onStageChange?.("globe"), 8);
-
-  tl.to(
-    values,
-    {
-      globeOpacity: 1,
-      duration: 6,
-      ease: "power2.inOut",
-      onUpdate: update,
-    },
-    8
-  );
-
-  // Globe has a "hologram flicker" as it materializes (10s → 12s)
+  // Globe has a "hologram flicker" as it fully materializes (7s → 8s)
   tl.to(
     values,
     {
@@ -193,7 +168,7 @@ export function start3DPowerUpSequence(callbacks: PowerUpCallbacks) {
       ease: "rough({ strength: 1, points: 8, randomize: true })",
       onUpdate: update,
     },
-    10
+    7
   );
 
   tl.to(
@@ -204,27 +179,27 @@ export function start3DPowerUpSequence(callbacks: PowerUpCallbacks) {
       ease: "power2.out",
       onUpdate: update,
     },
-    12
+    8
   );
 
-  // ── STAGE 4: STARS & NEBULA EMERGE (11s → 16s) ──
-  // 5 seconds — deep space slowly revealing itself
-  tl.add(() => callbacks.onStageChange?.("stars"), 11);
+  // ── STAGE 4: LAPTOP SMOOTH MATERIALIZATION (8.5s → 10.0s) ──
+  // 1.5 seconds — premium cinematic scale-in, zero flicker
+  tl.add(() => callbacks.onStageChange?.("laptop"), 8.5);
 
   tl.to(
     values,
     {
-      starsOpacity: 1,
-      duration: 5,
-      ease: "power2.inOut",
+      laptopOpacity: 1,
+      duration: 1.5,
+      ease: "back.out(1.1)",
       onUpdate: update,
     },
-    11
+    8.5
   );
 
-  // ── STAGE 5: TECH CUBES MATERIALIZE (13s → 17s) ──
+  // ── STAGE 5: TECH CUBES MATERIALIZE (10.5s → 14.5s) ──
   // 4 seconds — crystalline objects phasing in
-  tl.add(() => callbacks.onStageChange?.("cubes"), 13);
+  tl.add(() => callbacks.onStageChange?.("cubes"), 10.5);
 
   tl.to(
     values,
@@ -234,12 +209,12 @@ export function start3DPowerUpSequence(callbacks: PowerUpCallbacks) {
       ease: "power2.inOut",
       onUpdate: update,
     },
-    13
+    10.5
   );
 
-  // ── STAGE 6: UI OVERLAY & NAVBAR REVEAL (15s → 18s) ──
+  // ── STAGE 6: UI OVERLAY & NAVBAR REVEAL (13.5s → 16.5s) ──
   // 3 seconds — HUD elements fading in last
-  tl.add(() => callbacks.onStageChange?.("ui"), 15);
+  tl.add(() => callbacks.onStageChange?.("ui"), 13.5);
 
   tl.to(
     values,
@@ -249,7 +224,7 @@ export function start3DPowerUpSequence(callbacks: PowerUpCallbacks) {
       ease: "power3.out",
       onUpdate: update,
     },
-    15
+    13.5
   );
 
   return tl;

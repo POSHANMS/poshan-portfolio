@@ -19,6 +19,7 @@ const globeFragmentShader = `
   uniform float uSpeed;
   uniform vec3 uColor;
   uniform float uOpacity;
+  uniform float uIgnition;
   varying vec2 vUv;
   varying vec3 vNormal;
 
@@ -35,13 +36,23 @@ const globeFragmentShader = `
     // Fresnel rim glow
     float fresnel = pow(1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.5);
 
-    vec3 col = uColor;
+    // ═══════════════════════════════════════════════════════════════
+    // WARM-UP IGNITION — dark metal transitions to crimson core
+    // ═══════════════════════════════════════════════════════════════
+    vec3 darkMetal = vec3(0.015, 0.003, 0.005);
+    vec3 crimsonCore = uColor;
+    vec3 col = mix(darkMetal, crimsonCore, uIgnition);
+    
+    // Grid lines brighten with ignition
     if (gridPattern > 0.01) {
-      col = mix(col, vec3(1.0, 0.5, 0.6), gridPattern * 0.5);
+      col = mix(col, vec3(1.0, 0.5, 0.6), gridPattern * 0.5 * uIgnition);
     }
 
-    float alpha = uOpacity * (gridPattern * 0.6 + 0.15) * (0.7 + 0.3 * scanline);
-    alpha += fresnel * 0.35 * (0.8 + 0.2 * scanline);
+    // Smoothstep-like ignition curve for organic warm-up feel
+    float ignitionBoost = uIgnition * uIgnition * (3.0 - 2.0 * uIgnition);
+    
+    float alpha = uOpacity * ignitionBoost * (gridPattern * 0.6 + 0.15) * (0.7 + 0.3 * scanline);
+    alpha += fresnel * 0.35 * (0.8 + 0.2 * scanline) * ignitionBoost;
 
     gl_FragColor = vec4(col, alpha);
   }
@@ -49,9 +60,10 @@ const globeFragmentShader = `
 
 interface DeepSpaceGlobeProps {
   scrollProgress: number;
+  globeOpacity?: number;
 }
 
-export default function DeepSpaceGlobe({ scrollProgress }: DeepSpaceGlobeProps) {
+export default function DeepSpaceGlobe({ scrollProgress, globeOpacity = 1 }: DeepSpaceGlobeProps) {
   const globeRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Group>(null);
 
@@ -64,6 +76,7 @@ export default function DeepSpaceGlobe({ scrollProgress }: DeepSpaceGlobeProps) 
       uSpeed: { value: 0.8 },
       uColor: { value: new THREE.Color("#ff1744") },
       uOpacity: { value: 0.45 },
+      uIgnition: { value: 0.0 },
     }),
     []
   );
@@ -74,6 +87,7 @@ export default function DeepSpaceGlobe({ scrollProgress }: DeepSpaceGlobeProps) 
       uSpeed: { value: 1.4 },
       uColor: { value: new THREE.Color("#ff4444") },
       uOpacity: { value: 0.28 },
+      uIgnition: { value: 0.0 },
     }),
     []
   );
@@ -81,8 +95,14 @@ export default function DeepSpaceGlobe({ scrollProgress }: DeepSpaceGlobeProps) 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
 
-    if (mainShaderRef.current) mainShaderRef.current.uniforms.uTime.value = t;
-    if (secondShaderRef.current) secondShaderRef.current.uniforms.uTime.value = t;
+    if (mainShaderRef.current) {
+      mainShaderRef.current.uniforms.uTime.value = t;
+      mainShaderRef.current.uniforms.uIgnition.value = globeOpacity;
+    }
+    if (secondShaderRef.current) {
+      secondShaderRef.current.uniforms.uTime.value = t;
+      secondShaderRef.current.uniforms.uIgnition.value = globeOpacity;
+    }
 
     // Spin speeds up dynamically when scrolling
     if (globeRef.current) {
@@ -97,8 +117,9 @@ export default function DeepSpaceGlobe({ scrollProgress }: DeepSpaceGlobeProps) 
 
   return (
     <group position={[4.5, 2.5, -8]} scale={2.2} renderOrder={-8}>
-      <pointLight position={[0, 0, 2.2]} color="#ff1744" intensity={2.0} distance={15} decay={2} />
-      <pointLight position={[-2.2, 1.8, 0.5]} color="#ff8a80" intensity={0.5} distance={10} decay={2} />
+      {/* Core point lights — intensity scales with warm-up for real-time floor reflections */}
+      <pointLight position={[0, 0, 2.2]} color="#ff1744" intensity={2.0 * globeOpacity} distance={15} decay={2} />
+      <pointLight position={[-2.2, 1.8, 0.5]} color="#ff8a80" intensity={0.5 * globeOpacity} distance={10} decay={2} />
 
       <group ref={globeRef}>
         {/* Main wireframe hologram sphere */}
@@ -132,13 +153,13 @@ export default function DeepSpaceGlobe({ scrollProgress }: DeepSpaceGlobeProps) 
         {/* Equator ring */}
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <sphereGeometry args={[1.105, 48, 16]} />
-          <meshBasicMaterial color="#ff1744" wireframe transparent opacity={0.12} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color="#ff1744" wireframe transparent opacity={0.12 * globeOpacity} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
 
         {/* Inner glow sphere */}
         <mesh>
           <sphereGeometry args={[1.02, 48, 24]} />
-          <meshBasicMaterial color="#800010" transparent opacity={0.04} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color="#800010" transparent opacity={0.04 * globeOpacity} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
       </group>
 
@@ -150,7 +171,7 @@ export default function DeepSpaceGlobe({ scrollProgress }: DeepSpaceGlobeProps) 
             <meshBasicMaterial
               color={index === 1 ? "#ff1744" : "#ff4444"}
               transparent
-              opacity={index === 1 ? 0.22 : 0.12}
+              opacity={(index === 1 ? 0.22 : 0.12) * globeOpacity}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
             />
@@ -161,7 +182,7 @@ export default function DeepSpaceGlobe({ scrollProgress }: DeepSpaceGlobeProps) 
       {/* Outer atmosphere glow */}
       <mesh scale={[1.75, 1.75, 1.75]}>
         <sphereGeometry args={[1.1, 42, 24]} />
-        <meshBasicMaterial color="#ff1744" transparent opacity={0.03} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color="#ff1744" transparent opacity={0.03 * globeOpacity} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
     </group>
   );

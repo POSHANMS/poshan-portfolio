@@ -3,6 +3,7 @@
 import React, { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { useMousePosition } from "@/hooks/useMousePosition";
 
 const gridVertexShader = `
   varying vec3 vWorldPosition;
@@ -31,6 +32,7 @@ const gridVertexShader = `
 const gridFragmentShader = `
   uniform float uTime;
   uniform vec3 uMouseFloor;
+  uniform float uIgnition;
   varying vec3 vWorldPosition;
   varying vec2 vUv;
   varying float vDist;
@@ -96,6 +98,15 @@ const gridFragmentShader = `
     float mouseFloorGlow = exp(-distToMouseFloor * distToMouseFloor * 0.18) * 0.45;
     color += vec3(1.0, 0.18, 0.28) * mouseFloorGlow * (regularLine + majorLine * 1.5) * perspectiveFade;
     
+    // ═══════════════════════════════════════════════════════════════
+    // RADIAL IGNITION REVEAL — grid illuminates outward from center
+    // ═══════════════════════════════════════════════════════════════
+    float ignitionRadius = uIgnition * 55.0;
+    float ignitionReveal = 1.0 - smoothstep(ignitionRadius * 0.7, ignitionRadius, dist);
+    gridPattern *= ignitionReveal;
+    nodeGlow *= ignitionReveal;
+    centerGlow *= ignitionReveal;
+    
     float alpha = (gridPattern + nodeGlow * 0.35 + centerGlow) * horizonFade * heightFade;
     alpha += mouseFloorGlow * 0.40 * perspectiveFade;
     alpha = clamp(alpha, 0.0, 0.65);
@@ -104,9 +115,7 @@ const gridFragmentShader = `
   }
 `;
 
-import { useMousePosition } from "@/hooks/useMousePosition";
-
-export default function NeonGrid() {
+export default function NeonGrid({ floorOpacity = 1 }: { floorOpacity?: number }) {
   const gridMaterialRef = useRef<THREE.ShaderMaterial>(null);
   const mouse = useMousePosition(0.08);
 
@@ -119,6 +128,7 @@ export default function NeonGrid() {
     () => ({
       uTime: { value: 0.0 },
       uMouseFloor: { value: new THREE.Vector3(0, 0, 0) },
+      uIgnition: { value: 0.0 },
     }),
     []
   );
@@ -126,6 +136,7 @@ export default function NeonGrid() {
   useFrame((state) => {
     if (gridMaterialRef.current) {
       gridMaterialRef.current.uniforms.uTime.value = state.clock.getElapsedTime();
+      gridMaterialRef.current.uniforms.uIgnition.value = floorOpacity;
 
       // Raycast cursor onto floor plane to get world intersection coordinate
       mouseVec.set(mouse.x, mouse.y);

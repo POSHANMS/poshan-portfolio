@@ -31,9 +31,29 @@ export function CinematicCamera({ scrollProgress }: { scrollProgress: number }) 
   const currentLookAt = useRef(new THREE.Vector3(0.8, 0, -1));
   const currentFov = useRef(45);
 
+  // Station 1 is the hard-locked hero position — camera must be frozen here
+  // until the user physically scrolls. Clamp to 0 to prevent any drift.
+  const clampedProgress = Math.max(0, Math.min(1, scrollProgress));
+
   useFrame((state) => {
+    const camera = state.camera as THREE.PerspectiveCamera;
+
+    // HARD LOCK: When at hero station (no scroll), skip lerp entirely —
+    // directly set Station 1 coordinates. Zero drift, zero auto-advance.
+    if (clampedProgress <= 0) {
+      const s1 = sceneCoordinates[0];
+      camera.position.copy(s1.camera);
+      camera.lookAt(s1.lookAt);
+      camera.fov = s1.fov;
+      camera.updateProjectionMatrix();
+      currentPos.current.copy(s1.camera);
+      currentLookAt.current.copy(s1.lookAt);
+      currentFov.current = s1.fov;
+      return;
+    }
+
     const segmentCount = sceneCoordinates.length - 1;
-    const rawSegment = scrollProgress * segmentCount;
+    const rawSegment = clampedProgress * segmentCount;
     const segmentIdx = Math.min(Math.floor(rawSegment), segmentCount - 1);
     const localT = rawSegment - segmentIdx;
     const easedT = localT * localT * (3.0 - 2.0 * localT);
@@ -45,7 +65,6 @@ export function CinematicCamera({ scrollProgress }: { scrollProgress: number }) 
     currentLookAt.current.lerpVectors(from.lookAt, to.lookAt, easedT);
     currentFov.current = THREE.MathUtils.lerp(from.fov, to.fov, easedT);
 
-    const camera = state.camera as THREE.PerspectiveCamera;
     camera.position.copy(currentPos.current);
     camera.lookAt(currentLookAt.current);
     camera.fov = currentFov.current;

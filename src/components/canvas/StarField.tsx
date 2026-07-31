@@ -46,7 +46,7 @@ function seededRandom(seed: number) {
   };
 }
 
-export default function StarField() {
+export default function StarField({ starsOpacity = 1 }: { starsOpacity?: number }) {
   const starsRef = useRef<THREE.Points>(null);
   const heroStarsRef = useRef<THREE.Points>(null);
 
@@ -116,9 +116,6 @@ export default function StarField() {
     return geo;
   }, []);
 
-  // NOTE: heroSizes toned down from the broken attempt (was 24 + rand*16 = up to 40).
-  // Those were meant as gl_PointSize multipliers, not raw pixel sizes, and combined with
-  // an unclamped distance term they were blowing out into giant flares.
   const { heroPositions, heroColors, heroSizes, heroPhases } = useMemo(() => {
     const pos = new Float32Array(allNodes.length * 3);
     const col = new Float32Array(allNodes.length * 3);
@@ -139,10 +136,10 @@ export default function StarField() {
     return { heroPositions: pos, heroColors: col, heroSizes: sz, heroPhases: ph };
   }, []);
 
-  // Main star field shader - circular (unchanged, this one already works correctly)
+  // Main star field shader - circular
   const starMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 } },
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 } },
       vertexShader: `
         attribute float aSize;
         attribute float aPhase;
@@ -157,6 +154,7 @@ export default function StarField() {
         }
       `,
       fragmentShader: `
+        uniform float uOpacity;
         varying float vAlpha;
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
@@ -164,7 +162,7 @@ export default function StarField() {
           float core = smoothstep(0.5, 0.0, d);
           float glow = smoothstep(0.5, 0.2, d) * 0.4;
           if (core + glow < 0.01) discard;
-          gl_FragColor = vec4(1.0, 0.75, 0.78, (core + glow) * vAlpha);
+          gl_FragColor = vec4(1.0, 0.75, 0.78, (core + glow) * vAlpha * uOpacity);
         }
       `,
       transparent: true,
@@ -174,11 +172,9 @@ export default function StarField() {
   }, []);
 
   // Hero star shader - circular with glow, distance scaled and SAFELY CLAMPED
-  // so a star near the camera plane cannot make -mv.z shrink toward zero and
-  // blow gl_PointSize up into a giant flare (that was the "3 bright lights" bug).
   const heroStarMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 } },
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 } },
       vertexShader: `
         attribute float aSize;
         attribute float aPhase;
@@ -194,6 +190,7 @@ export default function StarField() {
         }
       `,
       fragmentShader: `
+        uniform float uOpacity;
         varying float vAlpha;
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
@@ -203,7 +200,7 @@ export default function StarField() {
           float ring = smoothstep(0.55, 0.45, d) * smoothstep(0.35, 0.45, d) * 0.3;
           if (core + glow + ring < 0.01) discard;
           vec3 color = mix(vec3(1.0, 0.9, 0.9), vec3(1.0, 0.5, 0.5), glow);
-          gl_FragColor = vec4(color, (core + glow + ring) * vAlpha * 0.85);
+          gl_FragColor = vec4(color, (core + glow + ring) * vAlpha * 0.85 * uOpacity);
         }
       `,
       transparent: true,
@@ -215,7 +212,9 @@ export default function StarField() {
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     starMaterial.uniforms.uTime.value = t;
+    starMaterial.uniforms.uOpacity.value = starsOpacity;
     heroStarMaterial.uniforms.uTime.value = t;
+    heroStarMaterial.uniforms.uOpacity.value = starsOpacity;
     if (starsRef.current) starsRef.current.rotation.y = t * 0.0005;
     if (heroStarsRef.current) heroStarsRef.current.rotation.y = t * 0.0005;
   });
@@ -236,7 +235,7 @@ export default function StarField() {
         <lineBasicMaterial
           vertexColors
           transparent
-          opacity={0.45}
+          opacity={0.45 * starsOpacity}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
