@@ -75,6 +75,47 @@ export default function Home() {
   const [wormholePhase, setWormholePhase] = useState<WormholePhase>("idle");
   const [wormholeValues, setWormholeValues] = useState<WormholeValues>(DEFAULT_WORMHOLE_VALUES);
 
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  // Wheel & touch scroll listener — camera hard-locks at 0.0 until physical scroll input
+  useEffect(() => {
+    let target = 0;
+    let current = 0;
+    let rafId = 0;
+
+    const onWheel = (e: WheelEvent) => {
+      target = Math.max(0, Math.min(1, target + e.deltaY * 0.0008));
+    };
+
+    let touchStartY = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const deltaY = touchStartY - e.touches[0].clientY;
+      touchStartY = e.touches[0].clientY;
+      target = Math.max(0, Math.min(1, target + deltaY * 0.002));
+    };
+
+    const update = () => {
+      current += (target - current) * 0.08;
+      setScrollProgress(current);
+      rafId = requestAnimationFrame(update);
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    rafId = requestAnimationFrame(update);
+
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   const stageScale = useStageScale();
 
   // Preloader finished -> start welcome text on 100% pitch-black screen
@@ -136,7 +177,7 @@ export default function Home() {
         }}
       >
         <Scene
-          scrollProgress={0}
+          scrollProgress={scrollProgress}
           powerUpValues={powerUpValues}
           isPowerUpActive={isPowerUpActive}
           wormholeValues={wormholeValues}

@@ -20,23 +20,7 @@ const RULER_TICKS = 41; // total tick slots visible
 const CENTER = Math.floor(RULER_TICKS / 2);
 
 function useAnimatedOffset() {
-  const [offset, setOffset] = useState(0);
-  const rafRef = useRef<number>(0);
-  const startRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const animate = (ts: number) => {
-      if (!startRef.current) startRef.current = ts;
-      const elapsed = (ts - startRef.current) / 1000;
-      // Slow, continuous rightward drift — like film rolling
-      setOffset((elapsed * 8) % RULER_TICKS);
-      rafRef.current = requestAnimationFrame(animate);
-    };
-    rafRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
-
-  return offset;
+  return 0;
 }
 
 function useTimecode() {

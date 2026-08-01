@@ -99,7 +99,7 @@ export function useSuspenseAudio() {
     plinkGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
 
     plink.connect(plinkGain);
-    plinkGain.connect(_masterGain || ctx.destination);
+    plink.connect(_masterGain || ctx.destination);
 
     plink.start(now);
     plink.stop(now + 0.11);

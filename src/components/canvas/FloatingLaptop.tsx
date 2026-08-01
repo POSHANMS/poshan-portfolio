@@ -115,13 +115,13 @@ export default function FloatingLaptop({
         const finalY = -0.52;
         const currentY = finalY + v.laptopEmergenceY + v.laptopY;
 
-        groupRef.current.position.set(laptopX, currentY, -1.34);
+        groupRef.current.position.set(laptopX, currentY, -1.14);
         groupRef.current.rotation.set(
           (v.laptopTiltX * Math.PI) / 180,  // tilt forward during emergence
           v.laptopRotationY,                  // rotation locks into hero stance
           -0.03
         );
-        groupRef.current.scale.setScalar(v.laptopScale * 1.15);
+        groupRef.current.scale.setScalar(v.laptopScale * 1.21);
       }
 
       // Suppress bobbing during wormhole
@@ -181,9 +181,9 @@ export default function FloatingLaptop({
   return (
     <group
       ref={groupRef}
-      position={[laptopX, -0.52, -1.34]}
+      position={[laptopX, -0.52, -1.14]}
       rotation={[0.09, -Math.PI / 2 - 0.15, -0.03]}
-      scale={wormholeActive && wormholeValues ? wormholeValues.laptopScale * 1.15 : laptopOpacity * 1.15}
+      scale={wormholeActive && wormholeValues ? wormholeValues.laptopScale * 1.21 : laptopOpacity * 1.21}
     >
       <group ref={bobRef}>
         <primitive object={scene} />
