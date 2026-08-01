@@ -26,7 +26,13 @@ const sceneCoordinates = [
   },
 ];
 
-export function CinematicCamera({ scrollProgress }: { scrollProgress: number }) {
+export function CinematicCamera({
+  scrollProgress,
+  lensDistortion = 0,
+}: {
+  scrollProgress: number;
+  lensDistortion?: number;
+}) {
   const currentPos = useRef(new THREE.Vector3(0.5, 0.5, 8));
   const currentLookAt = useRef(new THREE.Vector3(0.8, 0, -1));
   const currentFov = useRef(45);
@@ -44,7 +50,8 @@ export function CinematicCamera({ scrollProgress }: { scrollProgress: number }) 
       const s1 = sceneCoordinates[0];
       camera.position.copy(s1.camera);
       camera.lookAt(s1.lookAt);
-      camera.fov = s1.fov;
+      // Apply lens distortion FOV pulse during wormhole (camera spatial snap)
+      camera.fov = s1.fov + lensDistortion * 15;
       camera.updateProjectionMatrix();
       currentPos.current.copy(s1.camera);
       currentLookAt.current.copy(s1.lookAt);
@@ -67,7 +74,7 @@ export function CinematicCamera({ scrollProgress }: { scrollProgress: number }) 
 
     camera.position.copy(currentPos.current);
     camera.lookAt(currentLookAt.current);
-    camera.fov = currentFov.current;
+    camera.fov = currentFov.current + lensDistortion * 15;
     camera.updateProjectionMatrix();
   });
 

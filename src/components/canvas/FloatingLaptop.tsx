@@ -5,10 +5,21 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { useMousePosition } from "@/hooks/useMousePosition";
+import { WormholeValues } from "@/animations/wormholeLaptop";
 
 const SCREEN_MATERIAL_NAME = "Material.004";
 
-export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: number }) {
+interface FloatingLaptopProps {
+  laptopOpacity?: number;
+  wormholeValues?: WormholeValues;
+  wormholeActive?: boolean;
+}
+
+export default function FloatingLaptop({
+  laptopOpacity = 1,
+  wormholeValues,
+  wormholeActive = false,
+}: FloatingLaptopProps) {
   const { scene } = useGLTF("/models/laptop-baked.glb");
 
   const groupRef = useRef<THREE.Group>(null);
@@ -72,7 +83,7 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
         name.includes("keyboard") ||
         name.includes("keycap") ||
         name.includes("keys") ||
-        name.includes("key") && !name.includes("iskey") // avoid false positives
+        (name.includes("key") && !name.includes("iskey")) // avoid false positives
       ) {
         mesh.material = keyboardMaterial;
         return;
@@ -92,6 +103,45 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
 
+    // ═══════════════════════════════════════════════════════════════
+    // WORMHOLE OVERRIDE — direct transform control during materialization
+    // Bypasses normal bobbing/mouse animation until sequence completes
+    // ═══════════════════════════════════════════════════════════════
+    if (wormholeActive && wormholeValues && wormholeValues.laptopScale > 0.001) {
+      const v = wormholeValues;
+
+      if (groupRef.current) {
+        // Laptop rises from the rift (below floor) to final floating position
+        const finalY = -0.52;
+        const currentY = finalY + v.laptopEmergenceY + v.laptopY;
+
+        groupRef.current.position.set(laptopX, currentY, -1.34);
+        groupRef.current.rotation.set(
+          (v.laptopTiltX * Math.PI) / 180,  // tilt forward during emergence
+          v.laptopRotationY,                  // rotation locks into hero stance
+          -0.03
+        );
+        groupRef.current.scale.setScalar(v.laptopScale * 1.15);
+      }
+
+      // Suppress bobbing during wormhole
+      if (bobRef.current) {
+        bobRef.current.position.y = 0;
+      }
+
+      // Keyboard light uses wormhole ambient ramp instead of mouse proximity
+      if (kbLightRef.current) {
+        const ambientRamp = Math.max(laptopOpacity, v.ambientTransition);
+        kbLightRef.current.intensity = (0.8 + 1.2 * ambientRamp) * v.laptopScale;
+        kbLightRef.current.distance = 3.5;
+      }
+
+      return; // Skip normal animation frame
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // NORMAL MODE — existing bob + mouse reactivity (unchanged)
+    // ═══════════════════════════════════════════════════════════════
     if (bobRef.current) {
       bobRef.current.position.y = Math.sin(t * 0.85) * 0.15;
     }
@@ -123,12 +173,17 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
   const { width } = useThree((state) => state.viewport);
   const laptopX   = Math.max(0.8, width * 0.08);
 
+  // During wormhole, derive effective opacity from wormholeValues
+  const effectiveOpacity = wormholeActive && wormholeValues
+    ? Math.max(laptopOpacity, wormholeValues.laptopEmergence)
+    : laptopOpacity;
+
   return (
     <group
       ref={groupRef}
       position={[laptopX, -0.52, -1.34]}
       rotation={[0.09, -Math.PI / 2 - 0.15, -0.03]}
-      scale={laptopOpacity * 1.15}
+      scale={wormholeActive && wormholeValues ? wormholeValues.laptopScale * 1.15 : laptopOpacity * 1.15}
     >
       <group ref={bobRef}>
         <primitive object={scene} />
@@ -146,7 +201,7 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
           target-position={[0, 0, 0]}
           angle={0.55}
           penumbra={0.85}
-          intensity={2.2 * laptopOpacity}
+          intensity={2.2 * effectiveOpacity}
           color="#ff8a95"
           distance={14}
           decay={2}
@@ -156,7 +211,7 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
         {/* ② LEFT RIM LIGHT — catches the metallic lid & chassis edge */}
         <pointLight
           position={[-2.4, 0.4, 0.8]}
-          intensity={1.4 * laptopOpacity}
+          intensity={1.4 * effectiveOpacity}
           color="#ff1744"
           distance={9}
           decay={2}
@@ -165,7 +220,7 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
         {/* ③ RIGHT RIM LIGHT — symmetrical silhouette definition */}
         <pointLight
           position={[2.4, 0.4, 0.8]}
-          intensity={1.4 * laptopOpacity}
+          intensity={1.4 * effectiveOpacity}
           color="#ff4466"
           distance={9}
           decay={2}
@@ -174,7 +229,7 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
         {/* ④ SOFT FRONT FILL — reduces harsh contrast on the deck */}
         <pointLight
           position={[0, 0.3, 2.8]}
-          intensity={1.2 * laptopOpacity}
+          intensity={1.2 * effectiveOpacity}
           color="#ffb3c1"
           distance={10}
           decay={2}
@@ -183,7 +238,7 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
         {/* ⑤ UNDER-GLOW — subtle bounce from the floor grid */}
         <pointLight
           position={[0, -1.4, 0.6]}
-          intensity={1.0 * laptopOpacity}
+          intensity={1.0 * effectiveOpacity}
           color="#800010"
           distance={8}
           decay={2}
@@ -193,7 +248,7 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
         <pointLight
           ref={kbLightRef}
           position={[0.3, -0.12, 0.35]}
-          intensity={1.2 * laptopOpacity}
+          intensity={1.2 * effectiveOpacity}
           distance={3.5}
           color="#ff6680"
           decay={2}
@@ -202,7 +257,7 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
         {/* ⑦ SCREEN HALO — very soft, prevents the display from floating in void */}
         <pointLight
           position={[0, 1.6, -0.8]}
-          intensity={1.8 * laptopOpacity}
+          intensity={1.8 * effectiveOpacity}
           color="#ff1744"
           distance={12}
           decay={2}

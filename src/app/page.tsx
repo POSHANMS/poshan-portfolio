@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { start3DPowerUpSequence, PowerUpStage, PowerUpStageValues } from "@/animations/powerUpSequence";
+import { startWormholeSequence, WormholeValues, WormholePhase } from "@/animations/wormholeLaptop";
 import Loader from "@/components/ui/Loader";
 import WelcomeText from "@/components/ui/WelcomeText";
 import DashboardHero from "@/components/ui/DashboardHero";
@@ -32,6 +33,28 @@ function useStageScale() {
   return scale;
 }
 
+// Default wormhole values (all at starting positions — invisible)
+const DEFAULT_WORMHOLE_VALUES: WormholeValues = {
+  gravitationStrength: 0,
+  singularityGlow: 0,
+  floorWarp: 0,
+  riftScale: 0,
+  riftRotation: 0,
+  riftOpacity: 0,
+  laptopEmergence: 0,
+  laptopEmergenceY: -2.0,
+  laptopTiltX: 55,
+  lensDistortion: 0,
+  laptopScale: 0,
+  laptopY: 0,
+  laptopRotationY: -Math.PI / 2 - 0.55,
+  landingImpact: 0,
+  shockwaveRadius: 0,
+  shockwaveOpacity: 0,
+  energyRingOpacity: 0,
+  ambientTransition: 0,
+};
+
 export default function Home() {
   const [loaderComplete, setLoaderComplete] = useState(false);
   const [showWelcomeText, setShowWelcomeText] = useState(false);
@@ -48,6 +71,10 @@ export default function Home() {
     uiOpacity: 0,
   });
 
+  // ── Wormhole state ──────────────────────────────────────────────────
+  const [wormholePhase, setWormholePhase] = useState<WormholePhase>("idle");
+  const [wormholeValues, setWormholeValues] = useState<WormholeValues>(DEFAULT_WORMHOLE_VALUES);
+
   const stageScale = useStageScale();
 
   // Preloader finished -> start welcome text on 100% pitch-black screen
@@ -62,7 +89,20 @@ export default function Home() {
     setShowWelcomeText(false);
 
     start3DPowerUpSequence({
-      onStageChange: (stage) => setPowerUpStage(stage),
+      onStageChange: (stage) => {
+        setPowerUpStage(stage);
+
+        // When power-up reaches laptop stage → fire the wormhole sequence
+        if (stage === "laptop") {
+          startWormholeSequence({
+            onPhaseChange: (phase) => setWormholePhase(phase),
+            onValuesUpdate: (vals) => setWormholeValues(vals),
+            onComplete: () => {
+              // Wormhole done — laptop is now fully materialized
+            },
+          });
+        }
+      },
       onValuesUpdate: (vals) => setPowerUpValues(vals),
       onComplete: () => {
         // All power-up stages complete
@@ -71,6 +111,10 @@ export default function Home() {
   };
 
   const isPowerUpActive = loaderComplete && powerUpStage !== "complete" && powerUpStage !== "idle";
+
+  // Wormhole is active from when gravity phase starts until it completes
+  const wormholeActive =
+    wormholePhase !== "idle" && wormholePhase !== "complete";
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#000000]">
@@ -95,6 +139,9 @@ export default function Home() {
           scrollProgress={0}
           powerUpValues={powerUpValues}
           isPowerUpActive={isPowerUpActive}
+          wormholeValues={wormholeValues}
+          wormholeActive={wormholeActive}
+          lensDistortion={wormholeValues.lensDistortion}
         />
       </div>
 

@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
 import { useDeviceSize } from "@/hooks/useDeviceSize";
 import { PowerUpStageValues } from "@/animations/powerUpSequence";
+import { WormholeValues } from "@/animations/wormholeLaptop";
 import NebulaBackground from "./NebulaBackground";
 import StarField from "./StarField";
 import ShootingStars from "./ShootingStars";
@@ -15,6 +16,7 @@ import MagneticParticles from "./MagneticParticles";
 import FloatingHexParticles from "./FloatingHexParticles";
 import TechCubes from "./TechCubes";
 import FloatingLaptop from "./FloatingLaptop";
+import WormholeLaptopEntry from "./WormholeLaptopEntry";
 import NeonGrid from "./NeonGrid";
 import FloorRings from "./FloorRings";
 import PostProcessing from "./PostProcessing";
@@ -23,6 +25,9 @@ interface SceneProps {
   scrollProgress: number;
   powerUpValues?: PowerUpStageValues;
   isPowerUpActive?: boolean;
+  wormholeValues?: WormholeValues;
+  wormholeActive?: boolean;
+  lensDistortion?: number;
 }
 
 function SceneLights({ powerUpValues, isPowerUpActive }: { powerUpValues?: PowerUpStageValues; isPowerUpActive?: boolean }) {
@@ -69,15 +74,27 @@ function SceneLights({ powerUpValues, isPowerUpActive }: { powerUpValues?: Power
   );
 }
 
-export default function Scene({ scrollProgress, powerUpValues, isPowerUpActive }: SceneProps) {
+export default function Scene({
+  scrollProgress,
+  powerUpValues,
+  isPowerUpActive,
+  wormholeValues,
+  wormholeActive = false,
+  lensDistortion = 0,
+}: SceneProps) {
   const { deviceTier } = useDeviceSize();
   const isMobile = deviceTier === "mobile";
 
   const showFloor = !isPowerUpActive || (powerUpValues && powerUpValues.floorOpacity > 0.0001);
-  const showLaptop = !isPowerUpActive || (powerUpValues && powerUpValues.laptopOpacity > 0.0001);
   const showGlobe = !isPowerUpActive || (powerUpValues && powerUpValues.globeOpacity > 0.0001);
   const showStars = !isPowerUpActive || (powerUpValues && powerUpValues.starsOpacity > 0.0001);
   const showCubes = !isPowerUpActive || (powerUpValues && powerUpValues.cubesOpacity > 0.0001);
+
+  // Laptop is visible when wormhole is active OR when laptopOpacity > 0
+  const showLaptop =
+    wormholeActive ||
+    !isPowerUpActive ||
+    (powerUpValues && powerUpValues.laptopOpacity > 0.0001);
 
   const floorOpacity = powerUpValues?.floorOpacity ?? 1;
   const starsOpacity = powerUpValues?.starsOpacity ?? 1;
@@ -104,7 +121,7 @@ export default function Scene({ scrollProgress, powerUpValues, isPowerUpActive }
           far: 300,
         }}
       >
-        <CinematicCamera scrollProgress={scrollProgress} />
+        <CinematicCamera scrollProgress={scrollProgress} lensDistortion={lensDistortion} />
 
         <color attach="background" args={["#000000"]} />
 
@@ -129,8 +146,20 @@ export default function Scene({ scrollProgress, powerUpValues, isPowerUpActive }
             <TechCubes cubesOpacity={cubesOpacity} />
           </group>
 
-          <group visible={showLaptop}>
-            <FloatingLaptop laptopOpacity={laptopOpacity} />
+          {/* Wormhole entry effects — only renders when active */}
+          {wormholeActive && wormholeValues && (
+            <WormholeLaptopEntry
+              wormholeValues={wormholeValues}
+              isActive={wormholeActive}
+            />
+          )}
+
+          <group visible={!!showLaptop}>
+            <FloatingLaptop
+              laptopOpacity={laptopOpacity}
+              wormholeValues={wormholeValues}
+              wormholeActive={wormholeActive}
+            />
           </group>
 
           <group visible={showFloor}>
