@@ -17,12 +17,35 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
   const mouse = useMousePosition(0.08);
 
   useMemo(() => {
-    const darkBody = new THREE.MeshStandardMaterial({
-      color:             "#09091a",
-      metalness:          0.85,
-      roughness:          0.15,
-      emissive:          "#1a0a2a",
-      emissiveIntensity:  0.25,
+    // ═══════════════════════════════════════════════════════════════════
+    // PBR MATERIAL TUNING — Gunmetal Chassis + Backlit Keyboard
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Dark gunmetal for body, lid, base — catches red rim reflections
+    const chassisMaterial = new THREE.MeshStandardMaterial({
+      color:             "#1a0a10",   // Dark warm gunmetal
+      metalness:          0.80,       // Highly metallic for crisp reflections
+      roughness:          0.35,       // Satin finish — not mirror, not matte
+      emissive:          "#0d0204",   // Barely perceptible warm ambient glow
+      emissiveIntensity:  0.05,
+    });
+
+    // Keyboard keycaps — subtle crimson backlight so keys are readable
+    const keyboardMaterial = new THREE.MeshStandardMaterial({
+      color:             "#0f0508",   // Near-black keycap base
+      metalness:          0.55,
+      roughness:          0.48,
+      emissive:          "#ff1744",   // Crimson backlight
+      emissiveIntensity:  0.18,       // Soft glow — visible but not blown out
+    });
+
+    // Trackpad — slightly smoother than chassis
+    const trackpadMaterial = new THREE.MeshStandardMaterial({
+      color:             "#14080c",
+      metalness:          0.70,
+      roughness:          0.25,
+      emissive:          "#1a0005",
+      emissiveIntensity:  0.04,
     });
 
     scene.updateMatrixWorld(true);
@@ -35,13 +58,34 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
       mesh.receiveShadow = true;
 
       const mat = mesh.material as THREE.MeshStandardMaterial;
+      const name = mesh.name.toLowerCase();
+
+      // Preserve screen emission texture (vscode screenshot)
       if (mat && mat.name === SCREEN_MATERIAL_NAME) {
         mat.toneMapped = false;
         mat.needsUpdate = true;
         return;
       }
 
-      mesh.material = darkBody;
+      // ── Keyboard keycaps get subtle backlight ──
+      if (
+        name.includes("keyboard") ||
+        name.includes("keycap") ||
+        name.includes("keys") ||
+        name.includes("key") && !name.includes("iskey") // avoid false positives
+      ) {
+        mesh.material = keyboardMaterial;
+        return;
+      }
+
+      // ── Trackpad / touchpad ──
+      if (name.includes("trackpad") || name.includes("touchpad")) {
+        mesh.material = trackpadMaterial;
+        return;
+      }
+
+      // ── Everything else: body, lid, base, hinges, ports ──
+      mesh.material = chassisMaterial;
     });
   }, [scene]);
 
@@ -70,9 +114,9 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
       const dy = mouse.y + 0.15;
       const dist = Math.sqrt(dx * dx + dy * dy);
       const proximity = Math.exp(-dist * dist * 4.0);
-      
-      kbLightRef.current.intensity = (1.5 + proximity * 5.0) * laptopOpacity;
-      kbLightRef.current.distance = 2.5 + proximity * 3.5;
+
+      kbLightRef.current.intensity = (0.8 + proximity * 2.5) * laptopOpacity;
+      kbLightRef.current.distance = 2.5 + proximity * 2.0;
     }
   });
 
@@ -89,20 +133,80 @@ export default function FloatingLaptop({ laptopOpacity = 1 }: { laptopOpacity?: 
       <group ref={bobRef}>
         <primitive object={scene} />
 
-        {/* Key light — behind screen, illuminates top edge and screen halo */}
-        <pointLight position={[0, 1.8, -1.2]} intensity={7.5 * laptopOpacity} distance={14} color="#ff1744" decay={2} />
-        {/* Fill light — left side, illuminates hinge and left body */}
-        <pointLight position={[-2.1, 0.65, 0.45]} intensity={4.5 * laptopOpacity} distance={11} color="#ff1744" decay={2} />
-        {/* Under-glow — bottom accent, pink tint */}
-        <pointLight position={[0.8, -1.15, 0.95]} intensity={3.5 * laptopOpacity} distance={10} color="#800010" decay={2} />
-        {/* Front fill — viewer-facing, softens shadows */}
-        <pointLight position={[0, 0.5, 1.5]} intensity={3.2 * laptopOpacity} distance={10} color="#ff1744" decay={2} />
-        {/* General body illumination */}
-        <pointLight position={[0, -0.5, 0]} intensity={4.0 * laptopOpacity} distance={10} color="#ff1744" decay={2} />
-        {/* Keyboard backlight — low, close to keyboard deck surface */}
-        <pointLight ref={kbLightRef} position={[0.3, -0.15, 0.35]} intensity={3.5 * laptopOpacity} distance={4} color="#ff6680" decay={2} />
-        {/* Right-side rim light — catches the right edge of laptop body */}
-        <pointLight position={[2.0, 0.3, 0.2]} intensity={2.8 * laptopOpacity} distance={8} color="#ff3355" decay={2} />
+        {/* ═══════════════════════════════════════════════════════════════
+            LIGHTING RIG — Soft overhead key light + rim lights
+            Harsh hinge glare removed; keyboard deck now readable.
+        ═══════════════════════════════════════════════════════════════ */}
+
+        {/* ① SOFT OVERHEAD KEY LIGHT
+           Positioned front-above the laptop to gently wash the keyboard
+           deck, trackpad, and palm rests without blowing out the screen. */}
+        <spotLight
+          position={[0, 3.0, 2.0]}
+          target-position={[0, 0, 0]}
+          angle={0.55}
+          penumbra={0.85}
+          intensity={2.2 * laptopOpacity}
+          color="#ff8a95"
+          distance={14}
+          decay={2}
+          castShadow={false}
+        />
+
+        {/* ② LEFT RIM LIGHT — catches the metallic lid & chassis edge */}
+        <pointLight
+          position={[-2.4, 0.4, 0.8]}
+          intensity={1.4 * laptopOpacity}
+          color="#ff1744"
+          distance={9}
+          decay={2}
+        />
+
+        {/* ③ RIGHT RIM LIGHT — symmetrical silhouette definition */}
+        <pointLight
+          position={[2.4, 0.4, 0.8]}
+          intensity={1.4 * laptopOpacity}
+          color="#ff4466"
+          distance={9}
+          decay={2}
+        />
+
+        {/* ④ SOFT FRONT FILL — reduces harsh contrast on the deck */}
+        <pointLight
+          position={[0, 0.3, 2.8]}
+          intensity={1.2 * laptopOpacity}
+          color="#ffb3c1"
+          distance={10}
+          decay={2}
+        />
+
+        {/* ⑤ UNDER-GLOW — subtle bounce from the floor grid */}
+        <pointLight
+          position={[0, -1.4, 0.6]}
+          intensity={1.0 * laptopOpacity}
+          color="#800010"
+          distance={8}
+          decay={2}
+        />
+
+        {/* ⑥ KEYBOARD BACKLIGHT — localised, low-intensity, mouse-reactive */}
+        <pointLight
+          ref={kbLightRef}
+          position={[0.3, -0.12, 0.35]}
+          intensity={1.2 * laptopOpacity}
+          distance={3.5}
+          color="#ff6680"
+          decay={2}
+        />
+
+        {/* ⑦ SCREEN HALO — very soft, prevents the display from floating in void */}
+        <pointLight
+          position={[0, 1.6, -0.8]}
+          intensity={1.8 * laptopOpacity}
+          color="#ff1744"
+          distance={12}
+          decay={2}
+        />
       </group>
     </group>
   );
