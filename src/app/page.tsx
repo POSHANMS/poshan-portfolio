@@ -178,6 +178,7 @@ export default function Home() {
       >
         <Scene
           scrollProgress={scrollProgress}
+          powerUpStage={powerUpStage}
           powerUpValues={powerUpValues}
           isPowerUpActive={isPowerUpActive}
           wormholeValues={wormholeValues}
@@ -196,7 +197,7 @@ export default function Home() {
           transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)",
           willChange: "transform, opacity",
         }}>
-          <DashboardHero scrollProgress={0} stageScale={stageScale} />
+          <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
         </div>
       )}
 

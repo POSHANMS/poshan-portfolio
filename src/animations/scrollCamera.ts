@@ -44,13 +44,13 @@ export function CinematicCamera({
   useFrame((state) => {
     const camera = state.camera as THREE.PerspectiveCamera;
 
-    // HARD LOCK: When at hero station (no scroll), skip lerp entirely —
-    // directly set Station 1 coordinates. Zero drift, zero auto-advance.
-    if (clampedProgress <= 0) {
+    // HARD LOCK: When scrollProgress is in Stage 4 Hero HUD phase (0.0 to 1.0),
+    // lock camera position and lookAt 100% CONSTANT at Station 1 wide-shot view.
+    // Zero rotation, zero pitch change, zero camera zoom, zero translation.
+    if (clampedProgress <= 1.0) {
       const s1 = sceneCoordinates[0];
       camera.position.copy(s1.camera);
       camera.lookAt(s1.lookAt);
-      // Apply lens distortion FOV pulse during wormhole (camera spatial snap)
       camera.fov = s1.fov + lensDistortion * 15;
       camera.updateProjectionMatrix();
       currentPos.current.copy(s1.camera);
@@ -59,14 +59,12 @@ export function CinematicCamera({
       return;
     }
 
-    const segmentCount = sceneCoordinates.length - 1;
-    const rawSegment = clampedProgress * segmentCount;
-    const segmentIdx = Math.min(Math.floor(rawSegment), segmentCount - 1);
-    const localT = rawSegment - segmentIdx;
-    const easedT = localT * localT * (3.0 - 2.0 * localT);
+    // Transition from Station 1 to Station 2 when scrollProgress goes from 0.9 to 1.0
+    const t = (clampedProgress - 0.9) / 0.1;
+    const easedT = t * t * (3.0 - 2.0 * t);
 
-    const from = sceneCoordinates[segmentIdx];
-    const to = sceneCoordinates[Math.min(segmentIdx + 1, segmentCount)];
+    const from = sceneCoordinates[0];
+    const to = sceneCoordinates[1];
 
     currentPos.current.lerpVectors(from.camera, to.camera, easedT);
     currentLookAt.current.lerpVectors(from.lookAt, to.lookAt, easedT);

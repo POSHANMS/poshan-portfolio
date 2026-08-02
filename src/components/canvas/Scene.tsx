@@ -23,6 +23,7 @@ import PostProcessing from "./PostProcessing";
 
 interface SceneProps {
   scrollProgress: number;
+  powerUpStage?: string;
   powerUpValues?: PowerUpStageValues;
   isPowerUpActive?: boolean;
   wormholeValues?: WormholeValues;
@@ -76,6 +77,7 @@ function SceneLights({ powerUpValues, isPowerUpActive }: { powerUpValues?: Power
 
 export default function Scene({
   scrollProgress,
+  powerUpStage,
   powerUpValues,
   isPowerUpActive,
   wormholeValues,
@@ -156,6 +158,7 @@ export default function Scene({
 
           <group visible={!!showLaptop}>
             <FloatingLaptop
+              powerUpStage={powerUpStage}
               laptopOpacity={laptopOpacity}
               wormholeValues={wormholeValues}
               wormholeActive={wormholeActive}
