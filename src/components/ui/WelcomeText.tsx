@@ -149,7 +149,7 @@ function CinematicTextLine({
 }
 
 export default function WelcomeText({ onComplete, layoutMode = "stacked" }: WelcomeTextProps) {
-  const { initAudio, playTypingKeystrokeSound, playEnterPunchSound } = useAudio();
+  const { initAudio, stopLoaderDrones, playTypingKeystrokeSound, playEnterPunchSound } = useAudio();
 
   const [phase, setPhase] = useState<Phase>("boot");
   const [displayText, setDisplayText] = useState("");
@@ -175,7 +175,8 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
 
   useEffect(() => {
     initAudio();
-  }, [initAudio]);
+    stopLoaderDrones();
+  }, [initAudio, stopLoaderDrones]);
 
   // ══ PHASE 1: BOOT SEQUENCE ══
   useEffect(() => {

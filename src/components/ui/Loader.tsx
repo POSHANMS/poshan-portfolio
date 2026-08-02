@@ -626,8 +626,14 @@ interface LoaderProps {
 }
 
 export default function Loader({ onComplete }: LoaderProps) {
-  const { audioEnabled, initAudio, setProgress: setAudioProgress, triggerTear: triggerAudioTear } = useSuspenseAudio();
+  const { audioEnabled, initAudio, stopLoaderDrones, setProgress: setAudioProgress, triggerTear: triggerAudioTear } = useSuspenseAudio();
   const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      stopLoaderDrones();
+    };
+  }, [stopLoaderDrones]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const matrixCanvasRef = useRef<HTMLCanvasElement>(null);

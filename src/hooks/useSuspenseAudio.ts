@@ -454,6 +454,23 @@ export function useSuspenseAudio() {
   }, [playCursorPlink]);
 
   // ═══════════════════════════════════════════════════════════════════════
+  // STOP LOADER AMBIENT DRONES & HEARTBEATS
+  // Cleanly stops loader hum so Welcome Screen has ZERO background audio leak
+  // ═══════════════════════════════════════════════════════════════════════
+  const stopLoaderDrones = useCallback(() => {
+    if (_heartbeatTimer) {
+      clearInterval(_heartbeatTimer);
+      _heartbeatTimer = null;
+    }
+    const now = _ctx ? _ctx.currentTime : 0;
+    try { if (_subOsc)   { _subOsc.stop(now);   _subOsc   = null; } } catch {}
+    try { if (_droneOsc) { _droneOsc.stop(now); _droneOsc = null; } } catch {}
+    try { if (_droneOsc2){ _droneOsc2.stop(now); _droneOsc2= null; } } catch {}
+    try { if (_riserOsc) { _riserOsc.stop(now); _riserOsc = null; } } catch {}
+    try { if (_noiseNode){ _noiseNode.stop(now);_noiseNode= null; } } catch {}
+  }, []);
+
+  // ═══════════════════════════════════════════════════════════════════════
   // DETONATION IMPACT & LOADER AUDIO TERMINATION
   // ═══════════════════════════════════════════════════════════════════════
   const triggerTear = useCallback(() => {
@@ -465,16 +482,7 @@ export function useSuspenseAudio() {
 
     try {
       // 1. CLEANLY STOP ALL LOADER AMBIENT DRONES & HEARTBEATS IMMEDIATELY AT DETONATION
-      // So no background drone/throne voice bleeds into Welcome Screen!
-      if (_heartbeatTimer) {
-        clearInterval(_heartbeatTimer);
-        _heartbeatTimer = null;
-      }
-      try { if (_subOsc)   { _subOsc.stop(now);   _subOsc   = null; } } catch {}
-      try { if (_droneOsc) { _droneOsc.stop(now); _droneOsc = null; } } catch {}
-      try { if (_droneOsc2){ _droneOsc2.stop(now); _droneOsc2= null; } } catch {}
-      try { if (_riserOsc) { _riserOsc.stop(now); _riserOsc = null; } } catch {}
-      try { if (_noiseNode){ _noiseNode.stop(now);_noiseNode= null; } } catch {}
+      stopLoaderDrones();
 
       // Ensure master gain is open for detonation SFX & subsequent ASMR typing
       if (_masterGain) {
@@ -648,5 +656,5 @@ export function useSuspenseAudio() {
     };
   }, [initAudio]);
 
-  return { audioEnabled, initAudio, setProgress, triggerTear, stop, playCursorPlink, playTypingKeystrokeSound, playEnterPunchSound };
+  return { audioEnabled, initAudio, stopLoaderDrones, setProgress, triggerTear, stop, playCursorPlink, playTypingKeystrokeSound, playEnterPunchSound };
 }

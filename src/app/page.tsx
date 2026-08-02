@@ -7,7 +7,7 @@ import { startWormholeSequence, WormholeValues, WormholePhase } from "@/animatio
 import Loader from "@/components/ui/Loader";
 import WelcomeText from "@/components/ui/WelcomeText";
 import DashboardHero from "@/components/ui/DashboardHero";
-import SocialSidebar from "@/components/ui/SocialSidebar";
+
 import CinematicHUD from "@/components/ui/CinematicHUD";
 
 const Scene = dynamic(() => import("@/components/canvas/Scene"), {
@@ -186,15 +186,7 @@ export default function Home() {
         />
       </div>
 
-      {/* Social sidebar — appears when power-up reaches UI stage */}
-      {loaderComplete && (
-        <div style={{
-          opacity: powerUpStage === "ui" || powerUpStage === "complete" ? 1 : 0,
-          transition: "opacity 1s ease-out",
-        }}>
-          <SocialSidebar />
-        </div>
-      )}
+
 
       {/* Dashboard Hero — Station 1 atmospheric overlays */}
       {loaderComplete && (
