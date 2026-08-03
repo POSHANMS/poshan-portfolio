@@ -1,177 +1,445 @@
 "use client";
 
-import React from "react";
-import { FileText, ChevronDown } from "lucide-react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
+import { FileText, ChevronDown, Activity, Terminal, Code2, Shield, Globe, Briefcase } from "lucide-react";
 
-export default function DashboardHero({
-  scrollProgress,
-  stageScale,
-}: {
+interface DashboardHeroProps {
   scrollProgress: number;
   stageScale: number;
-}) {
-  // ── 3D Spatial Holographic Projection Calculation ─────────────────
-  // 0% -> 50%: HUD projects OUT OF the laptop screen face toward viewer
-  //            scale: 0.15 -> 1.0, opacity: 0 -> 1, Z-distance expansion
-  // 50% -> 90%: HUD locks in 3D mid-air reading focus
-  // 90% -> 100%: HUD panel fades out & floats upward
-  let projScale = 0.15;
-  let hudOpacity = 0;
-  let ctaOpacity = 0;
-  let lightBeamOpacity = 0;
+}
 
-  if (scrollProgress <= 0.5) {
-    const t = Math.max(0, scrollProgress / 0.5);
-    projScale = 0.15 + 0.85 * t;
-    hudOpacity = t;
-    lightBeamOpacity = Math.sin(t * Math.PI) * 0.7; // Light beam flare cone peaks mid-projection
-    ctaOpacity = t > 0.6 ? (t - 0.6) / 0.4 : 0;
-  } else if (scrollProgress <= 0.9) {
-    projScale = 1.0;
-    hudOpacity = 1;
-    lightBeamOpacity = 0.15; // Soft residual holographic aura
-    ctaOpacity = 1;
-  } else {
-    const t = (scrollProgress - 0.9) / 0.1;
-    projScale = 1.0 + 0.05 * t;
-    hudOpacity = 1 - t;
-    lightBeamOpacity = 0;
-    ctaOpacity = 1 - t;
-  }
+/* ═══════════════════════════════════════════════════════════════════════
+   CINEMATIC HERO — Holographic Projection from Laptop
+   
+   Scroll Phases (0.0 → 1.0):
+   ───────────────────────────
+   0.00 - 0.18  EMERGENCE     : Panel projects out of laptop screen
+   0.15 - 0.38  MATERIALIZE   : Content elements stagger in with blur
+   0.35 - 0.68  STABILIZE     : Floating parallax, ambient glow pulse
+   0.62 - 0.82  ASCENSION     : Panel lifts, tilts back, ready for exit
+   0.78 - 1.00  DISSIPATION   : Fades into void for next section
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
+const easeOutBack = (t: number) => {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+};
+const easeInOutQuart = (t: number) =>
+  t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+
+export default function DashboardHero({ scrollProgress, stageScale }: DashboardHeroProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const timeRef = useRef(0);
+  const rafRef = useRef(0);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const smoothMouse = useRef({ x: 0, y: 0 });
+
+  /* ── Mouse tracking for parallax ── */
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const x = (e.clientX / window.innerWidth - 0.5) * 2;
+      const y = (e.clientY / window.innerHeight - 0.5) * 2;
+      setMousePos({ x, y });
+    };
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
+  /* ── Time loop for floating animations (no Date.now() in render) ── */
+  useEffect(() => {
+    const tick = () => {
+      timeRef.current += 0.016;
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  /* ── Smooth mouse interpolation ── */
+  smoothMouse.current.x += (mousePos.x - smoothMouse.current.x) * 0.08;
+  smoothMouse.current.y += (mousePos.y - smoothMouse.current.y) * 0.08;
+  const mx = smoothMouse.current.x;
+  const my = smoothMouse.current.y;
+
+  /* ── Scroll phase calculations ── */
+  const p = scrollProgress;
+  const phases = useMemo(() => ({
+    emergence: Math.min(1, p / 0.18),           // 0-18%
+    materialize: Math.min(1, Math.max(0, (p - 0.15) / 0.23)), // 15-38%
+    stabilize: Math.min(1, Math.max(0, (p - 0.35) / 0.33)),   // 35-68%
+    ascension: Math.min(1, Math.max(0, (p - 0.62) / 0.20)),   // 62-82%
+    dissipation: Math.min(1, Math.max(0, (p - 0.78) / 0.22)), // 78-100%
+  }), [p]);
+
+  const t = timeRef.current;
+  const emerge = easeOutExpo(phases.emergence);
+  const ascend = easeInOutQuart(phases.ascension);
+  const dissipate = phases.dissipation;
+
+  /* ── Panel 3D projection transforms ── */
+  const panelRotateX = 58 * (1 - emerge) - (18 * ascend);
+  const panelRotateY = mx * 6 * phases.stabilize;
+  const panelScale = (0.32 + 0.68 * easeOutBack(Math.min(1, emerge * 1.15))) * stageScale;
+  const panelY = 220 * (1 - emerge) - (140 * ascend);
+  const panelZ = -500 * (1 - emerge) + (180 * ascend);
+  const panelOpacity = Math.min(1, emerge * 2.5) * (1 - Math.pow(dissipate, 1.8));
+
+  /* ── Volumetric light beam ── */
+  const beamOpacity = emerge * 0.75 * (1 - dissipate * 0.95);
+  const beamScale = 0.25 + 0.75 * emerge;
+  const beamPulse = 1 + Math.sin(t * 3) * 0.08 * phases.stabilize;
+
+  /* ── Content stagger animation ── */
+  const mat = phases.materialize;
+  const contentOpacity = Math.min(1, mat * 2.2);
+  const contentBlur = Math.max(0, 10 * (1 - mat));
+  const contentLift = 30 * (1 - mat);
+
+  /* ── Floating orbs physics ── */
+  const floatActive = phases.stabilize * (1 - phases.ascension);
+  const bob1 = Math.sin(t * 1.2) * 8 * floatActive;
+  const bob2 = Math.cos(t * 0.9) * 10 * floatActive;
+
+  const badges = [
+    { icon: Activity, text: "HEALTHGPT: ML Healthcare System", delay: 0.00, dir: -1 },
+    { icon: Terminal, text: "CAMPUS PORTAL: React 18 + Flask + Redis", delay: 0.07, dir: 1 },
+    { icon: Code2, text: "DSA: 110+ Solved • LeetCode / GFG", delay: 0.14, dir: -1 },
+    { icon: Shield, text: "CYBERSECURITY: TryHackMe Voyager Rank", delay: 0.21, dir: 1 },
+  ];
+
+  const socials = [
+    { icon: Globe, href: "https://github.com/POSHANMS", label: "GitHub" },
+    { icon: Briefcase, href: "https://linkedin.com/in/poshanms/", label: "LinkedIn" },
+    { icon: FileText, href: "mailto:siddeshwaraprasanna5@gmail.com", label: "CV" },
+  ];
 
   return (
-    <section id="home" className="pointer-events-none relative z-10 h-screen w-screen overflow-hidden">
-      {/* Atmospheric overlays */}
-      <div className="dashboard-haze pointer-events-none absolute inset-0" />
-      <div className="dashboard-scanlines pointer-events-none absolute inset-0" />
-      <div className="dashboard-depth-lines pointer-events-none absolute inset-0" />
-      <div className="dashboard-vignette pointer-events-none absolute inset-0" />
-      <div className="dashboard-floor-glow pointer-events-none absolute inset-x-0 bottom-0" />
-      <div className="dashboard-horizon-fade pointer-events-none absolute inset-x-0 bottom-0" />
-
-      {/* ── Holographic Light Beam Flare Cone (Radiating from screen to glass) ──── */}
+    <section
+      ref={containerRef}
+      id="home"
+      className="pointer-events-none relative z-10 h-screen w-screen overflow-hidden"
+      style={{ perspective: "1500px", perspectiveOrigin: "50% 65%" }}
+    >
+      {/* ═══════════════════════════════════════════════════════════════════
+          VOLUMETRIC LIGHT CONE — Projects from laptop screen upward
+          ═══════════════════════════════════════════════════════════════════ */}
       <div
-        className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-200"
-        style={{ opacity: lightBeamOpacity }}
+        className="absolute bottom-0 left-1/2 pointer-events-none"
+        style={{
+          width: "900px",
+          height: "80vh",
+          transform: "translateX(-50%) translateY(15%)",
+          opacity: beamOpacity,
+          transition: "opacity 0.05s linear",
+        }}
       >
+        {/* Primary conic beam */}
         <div
-          className="h-[520px] w-[680px] rounded-full blur-[90px]"
+          className="absolute inset-0"
           style={{
-            background:
-              "radial-gradient(ellipse at center, rgba(255, 45, 75, 0.35) 0%, rgba(255, 23, 68, 0.12) 50%, rgba(0, 0, 0, 0) 80%)",
-            transform: `scale(${projScale})`,
+            background: `conic-gradient(from 180deg at 50% 100%, transparent 0deg, rgba(255,23,68,0.12) 18deg, rgba(255,23,68,0.35) 35deg, rgba(255,80,60,0.28) 55deg, transparent 75deg, transparent 285deg, rgba(255,80,60,0.28) 305deg, rgba(255,23,68,0.35) 325deg, rgba(255,23,68,0.12) 342deg, transparent 360deg)`,
+            filter: "blur(50px)",
+            transform: `scaleY(${beamScale * beamPulse})`,
+            transformOrigin: "bottom center",
           }}
         />
-      </div>
-
-      {/* ── 3D Spatial Holographic Glassmorphism Projection Panel ────────── */}
-      <div className="absolute inset-0 flex items-center justify-center p-4 md:p-6" style={{ perspective: "1200px" }}>
+        {/* Radial core glow */}
         <div
-          className="pointer-events-auto relative w-full max-w-2xl overflow-hidden p-6 md:p-8 transition-all duration-300 ease-out"
+          className="absolute inset-0"
           style={{
-            opacity: hudOpacity,
-            transform: `scale(${projScale * stageScale}) translateZ(${(1 - projScale) * -150}px)`,
-            transformOrigin: "center center",
-            backdropFilter: "blur(28px) saturate(190%)",
-            WebkitBackdropFilter: "blur(28px) saturate(190%)",
-            background: "rgba(12, 12, 18, 0.55)",
-            border: "1px solid rgba(255, 45, 75, 0.35)",
-            boxShadow:
-              "inset 0 1px 1px rgba(255, 255, 255, 0.18), 0 30px 70px rgba(0, 0, 0, 0.85), 0 0 30px rgba(255, 45, 75, 0.2)",
-            borderRadius: "20px",
+            background: "radial-gradient(ellipse 40% 100% at 50% 100%, rgba(255,40,60,0.45) 0%, rgba(255,23,68,0.2) 30%, transparent 70%)",
+            mixBlendMode: "screen",
+            transform: `scaleY(${beamScale})`,
+            transformOrigin: "bottom center",
+          }}
+        />
+        {/* Scanline overlay on beam — parent owns scaleY, child owns animation */}
+        <div
+          className="absolute inset-0"
+          style={{
+            transform: `scaleY(${beamScale})`,
+            transformOrigin: "bottom center",
           }}
         >
-          {/* Top Status Header & Vector Icon Buttons */}
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
-            {/* Hologram Interface Status Indicator */}
-            <div className="flex items-center gap-2.5">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00ff88] opacity-75"></span>
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#00ff88]"></span>
-              </span>
-              <span className="font-mono text-xs font-semibold tracking-wider text-[#00ff88]">
-                ● HOLOGRAM INTERFACE ONLINE
-              </span>
-              <span className="ml-2 hidden font-mono text-xs text-white/40 md:inline">
-                | SPATIAL PROJECTION
-              </span>
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              background: `repeating-linear-gradient(0deg, transparent, transparent 8px, rgba(255,23,68,0.08) 8px, rgba(255,23,68,0.08) 9px)`,
+              animation: "beam-scan 0.8s linear infinite",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          MAIN HOLOGRAPHIC PANEL — Apple Vision Pro grade glassmorphism
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div
+        className="absolute inset-0 flex items-center justify-center px-4 md:px-8"
+        style={{
+          transform: `translate3d(${mx * 10 * phases.stabilize}px, ${panelY + my * 6 * phases.stabilize}px, ${panelZ}px) rotateX(${panelRotateX}deg) rotateY(${panelRotateY}deg) scale(${panelScale})`,
+          opacity: panelOpacity,
+          transformOrigin: "center 80%",
+          transition: "none",
+          willChange: "transform, opacity",
+        }}
+      >
+        <div className="relative w-full max-w-[920px] pointer-events-auto">
+
+          {/* Ambient Halo — pulsating glow behind panel */}
+          <div
+            className="absolute -inset-10 rounded-[40px] pointer-events-none"
+            style={{
+              background: `radial-gradient(circle at 50% 50%, rgba(255,23,68,0.18) 0%, rgba(255,23,68,0.08) 30%, transparent 65%), radial-gradient(circle at 30% 20%, rgba(255,100,80,0.1) 0%, transparent 50%)`,
+              filter: "blur(40px)",
+              opacity: 0.8 + Math.sin(t * 2) * 0.2 * phases.stabilize,
+            }}
+          />
+
+          {/* Main Glass Card */}
+          <div
+            className="relative overflow-hidden rounded-[28px] hero-glass-panel"
+            style={{
+              background: `linear-gradient(145deg, rgba(14, 12, 18, 0.78) 0%, rgba(8, 6, 12, 0.88) 50%, rgba(10, 8, 14, 0.82) 100%)`,
+              backdropFilter: "blur(56px) saturate(180%)",
+              WebkitBackdropFilter: "blur(56px) saturate(180%)",
+              border: "1.5px solid rgba(255, 23, 68, 0.32)",
+              boxShadow: `inset 0 1px 1px rgba(255,255,255,0.14), inset 0 0 50px rgba(255,23,68,0.08), 0 0 60px rgba(255,23,68,0.18), 0 0 120px rgba(255,23,68,0.08), 0 50px 120px rgba(0,0,0,0.85)`,
+              animation: phases.stabilize > 0.1 ? "border-glow-pulse 4s ease-in-out infinite" : "none",
+            }}
+          >
+            {/* Film grain noise overlay */}
+            <div
+              className="absolute inset-0 opacity-[0.035] pointer-events-none mix-blend-overlay"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+                backgroundSize: "180px 180px",
+              }}
+            />
+
+            {/* Specular edge highlight */}
+            <div
+              className="absolute inset-0 rounded-[28px] pointer-events-none"
+              style={{
+                background: `linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 25%, transparent 75%, rgba(255,23,68,0.25) 100%)`,
+                maskImage: `linear-gradient(to bottom, black 0%, transparent 6%, transparent 94%, black 100%), linear-gradient(to right, black 0%, transparent 6%, transparent 94%, black 100%)`,
+                WebkitMaskImage: `linear-gradient(to bottom, black 0%, transparent 6%, transparent 94%, black 100%), linear-gradient(to right, black 0%, transparent 6%, transparent 94%, black 100%)`,
+                mixBlendMode: "overlay",
+              }}
+            />
+
+            {/* Holographic grid overlay */}
+            <div
+              className="absolute inset-0 opacity-[0.04] pointer-events-none"
+              style={{
+                backgroundImage: `linear-gradient(rgba(255,23,68,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,23,68,0.3) 1px, transparent 1px)`,
+                backgroundSize: "40px 40px",
+              }}
+            />
+
+            {/* Glowing corner brackets */}
+            <div className="absolute top-5 left-5 w-8 h-8">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-[#ff1744] to-transparent" style={{ boxShadow: "0 0 8px rgba(255,23,68,0.8)" }} />
+              <div className="absolute top-0 left-0 w-[2px] h-full bg-gradient-to-b from-[#ff1744] to-transparent" style={{ boxShadow: "0 0 8px rgba(255,23,68,0.8)" }} />
+            </div>
+            <div className="absolute top-5 right-5 w-8 h-8">
+              <div className="absolute top-0 right-0 w-full h-[2px] bg-gradient-to-l from-[#ff1744] to-transparent" style={{ boxShadow: "0 0 8px rgba(255,23,68,0.8)" }} />
+              <div className="absolute top-0 right-0 w-[2px] h-full bg-gradient-to-b from-[#ff1744] to-transparent" style={{ boxShadow: "0 0 8px rgba(255,23,68,0.8)" }} />
+            </div>
+            <div className="absolute bottom-5 left-5 w-8 h-8">
+              <div className="absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-[#ff1744] to-transparent" style={{ boxShadow: "0 0 8px rgba(255,23,68,0.8)" }} />
+              <div className="absolute bottom-0 left-0 w-[2px] h-full bg-gradient-to-t from-[#ff1744] to-transparent" style={{ boxShadow: "0 0 8px rgba(255,23,68,0.8)" }} />
+            </div>
+            <div className="absolute bottom-5 right-5 w-8 h-8">
+              <div className="absolute bottom-0 right-0 w-full h-[2px] bg-gradient-to-l from-[#ff1744] to-transparent" style={{ boxShadow: "0 0 8px rgba(255,23,68,0.8)" }} />
+              <div className="absolute bottom-0 right-0 w-[2px] h-full bg-gradient-to-t from-[#ff1744] to-transparent" style={{ boxShadow: "0 0 8px rgba(255,23,68,0.8)" }} />
             </div>
 
-            {/* Outline Icon Buttons for GitHub, LinkedIn, and CV */}
-            <div className="flex items-center gap-3">
-              <a
-                href="https://github.com/POSHANMS"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="GitHub Profile"
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff2d4d]/35 bg-black/50 text-white/80 transition-all hover:scale-110 hover:border-[#ff2d4d] hover:text-[#ff2d4d] hover:shadow-[0_0_15px_rgba(255,45,77,0.4)]"
+            {/* ── CONTENT ── */}
+            <div
+              className="relative z-10 p-8 md:p-12"
+              style={{
+                opacity: contentOpacity,
+                filter: `blur(${contentBlur}px)`,
+                transform: `translateY(${contentLift}px)`,
+              }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-10 border-b border-white/[0.08] pb-5">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" style={{ boxShadow: "0 0 10px rgba(52,211,153,0.9)" }} />
+                  </span>
+                  <span className="font-mono text-[11px] font-bold tracking-[0.25em] text-emerald-400 uppercase">
+                    Hologram Interface Online
+                  </span>
+                  <span className="hidden md:inline font-mono text-[10px] text-white/25 tracking-[0.2em]">
+                    | SPATIAL PROJECTION v2.4
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  {socials.map((social, i) => {
+                    const s = Math.min(1, Math.max(0, (mat - 0.25 - i * 0.06) * 5));
+                    return (
+                      <a
+                        key={social.label}
+                        href={social.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={social.label}
+                        className="group flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff1744]/25 bg-black/30 text-white/60 transition-all duration-300 hover:scale-110 hover:border-[#ff1744]/70 hover:text-[#ff1744] hover:shadow-[0_0_20px_rgba(255,23,68,0.35)] hover:-translate-y-1"
+                        style={{ opacity: s, transform: `translateY(${(1 - s) * 15}px)` }}
+                      >
+                        <social.icon className="h-4 w-4" />
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Name — Massive gradient with bloom */}
+              <div className="mb-3">
+                <h1
+                  className="font-black uppercase"
+                  style={{
+                    fontSize: "clamp(3rem, 7vw, 6rem)",
+                    lineHeight: 1.0,
+                    letterSpacing: "-0.03em",
+                    background: "linear-gradient(180deg, #ffffff 0%, #ffcdd2 25%, #ff1744 55%, #800010 85%, #400008 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    filter: "drop-shadow(0 0 30px rgba(255,23,68,0.45)) drop-shadow(0 0 80px rgba(255,23,68,0.25))",
+                  }}
+                >
+                  POSHAN M S
+                </h1>
+              </div>
+
+              {/* Subtitle */}
+              <div className="mb-8">
+                <h2
+                  className="font-mono text-sm md:text-base font-semibold tracking-[0.18em] uppercase"
+                  style={{
+                    color: "#ff1744",
+                    textShadow: "0 0 20px rgba(255,23,68,0.7), 0 0 40px rgba(255,23,68,0.3)",
+                    opacity: Math.min(1, (mat - 0.3) * 3),
+                    transform: `translateX(${(1 - Math.min(1, (mat - 0.3) * 3)) * -20}px)`,
+                  }}
+                >
+                  Full-Stack & AI Developer | Computer Science Engineer
+                </h2>
+              </div>
+
+              {/* Quote */}
+              <p
+                className="text-sm md:text-[15px] text-white/75 max-w-2xl leading-[1.7] mb-10"
+                style={{
+                  opacity: Math.min(1, (mat - 0.4) * 2.5),
+                  transform: `translateY(${(1 - Math.min(1, (mat - 0.4) * 2.5)) * 15}px)`,
+                }}
               >
-                <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-              </a>
-              <a
-                href="https://linkedin.com/in/poshanms/"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="LinkedIn Profile"
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff2d4d]/35 bg-black/50 text-white/80 transition-all hover:scale-110 hover:border-[#ff2d4d] hover:text-[#ff2d4d] hover:shadow-[0_0_15px_rgba(255,45,77,0.4)]"
-              >
-                <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                  <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
-                </svg>
-              </a>
-              <a
-                href="mailto:siddeshwaraprasanna5@gmail.com"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Download CV"
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff2d4d]/35 bg-black/50 text-white/80 transition-all hover:scale-110 hover:border-[#ff2d4d] hover:text-[#ff2d4d] hover:shadow-[0_0_15px_rgba(255,45,77,0.4)]"
-              >
-                <FileText className="h-5 w-5" />
-              </a>
+                <span className="text-[#ff1744]/60">&ldquo;</span>
+                Architecting scalable web platforms, intelligent ML diagnostics, and secure systems.
+                <span className="text-[#ff1744]/60">&rdquo;</span>
+              </p>
+
+              {/* Project Badges — staggered slide-in */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10">
+                {badges.map((badge, i) => {
+                  const b = Math.min(1, Math.max(0, (mat - 0.45 - badge.delay) * 4));
+                  return (
+                    <div
+                      key={badge.text}
+                      className="group flex items-center gap-3 rounded-xl border border-[#ff1744]/25 bg-[#ff1744]/[0.06] px-4 py-3.5 font-mono text-[11px] font-medium text-[#ff8a95] shadow-[0_0_14px_rgba(255,23,68,0.08)] transition-all duration-300 hover:border-[#ff1744]/55 hover:bg-[#ff1744]/12 hover:shadow-[0_0_28px_rgba(255,23,68,0.18)] hover:-translate-y-0.5 cursor-default"
+                      style={{
+                        opacity: b,
+                        transform: `translateX(${(1 - b) * badge.dir * 40}px)`,
+                      }}
+                    >
+                      <badge.icon className="h-4 w-4 text-[#ff1744] transition-transform duration-300 group-hover:scale-110" />
+                      <span>[ {badge.text} ]</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer Status Bar */}
+              <div className="flex items-center justify-between border-t border-white/[0.08] pt-5">
+                <div className="flex items-center gap-4 font-mono text-[10px] text-white/40 tracking-[0.15em]">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    SYSTEM OPERATIONAL
+                  </span>
+                  <span className="text-white/20">|</span>
+                  <span>CORE: STABLE</span>
+                  <span className="text-white/20">|</span>
+                  <span>LATENCY: 12ms</span>
+                </div>
+                <div className="flex items-center gap-2 font-mono text-[10px] text-[#ff1744]/60 tracking-widest">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#ff1744] animate-ping" />
+                  LIVE
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Main Title, Subtitle, and Tagline */}
-          <div className="mt-5">
-            <h1 className="font-sans text-4xl font-extrabold tracking-wider text-white md:text-5xl">
-              POSHAN M S
-            </h1>
-            <h2 className="mt-1.5 font-sans text-base font-semibold text-[#ff2d4d] md:text-lg">
-              Full-Stack &amp; AI Developer | Computer Science Engineer
-            </h2>
-            <p className="mt-2.5 text-sm leading-relaxed text-white/80">
-              &quot;Architecting scalable web platforms, intelligent ML diagnostics, and secure systems.&quot;
-            </p>
+          {/* Floating Stat Orb — Right (Projects) */}
+          <div
+            className="absolute -right-20 top-1/4 hidden xl:flex flex-col items-center justify-center w-28 h-28 rounded-full border border-[#ff1744]/20 bg-[#ff1744]/[0.06] backdrop-blur-md pointer-events-none"
+            style={{
+              opacity: floatActive * 0.8,
+              transform: `translateY(${bob1}px)`,
+              boxShadow: "0 0 40px rgba(255,23,68,0.12), inset 0 0 20px rgba(255,23,68,0.05)",
+              animation: floatActive > 0.1 ? "hero-float-1 4s ease-in-out infinite" : "none",
+            }}
+          >
+            <div className="text-3xl font-black text-white/90">20+</div>
+            <div className="text-[9px] font-mono text-white/50 tracking-[0.2em] mt-1">PROJECTS</div>
           </div>
 
-          {/* 2x2 Spatial Badges */}
-          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex items-center rounded-xl border border-[#ff2d4d]/40 bg-[#ff2d4d]/10 px-4 py-2.5 font-mono text-xs font-medium text-[#ff5c77] shadow-[0_0_12px_rgba(255,45,77,0.15)]">
-              [ HEALTHGPT: ML Healthcare System ]
-            </div>
-            <div className="flex items-center rounded-xl border border-[#ff2d4d]/40 bg-[#ff2d4d]/10 px-4 py-2.5 font-mono text-xs font-medium text-[#ff5c77] shadow-[0_0_12px_rgba(255,45,77,0.15)]">
-              [ CAMPUS PORTAL: React 18 + Flask + Redis ]
-            </div>
-            <div className="flex items-center rounded-xl border border-[#ff2d4d]/40 bg-[#ff2d4d]/10 px-4 py-2.5 font-mono text-xs font-medium text-[#ff5c77] shadow-[0_0_12px_rgba(255,45,77,0.15)]">
-              [ DSA: 110+ Solved • LeetCode / GFG ]
-            </div>
-            <div className="flex items-center rounded-xl border border-[#ff2d4d]/40 bg-[#ff2d4d]/10 px-4 py-2.5 font-mono text-xs font-medium text-[#ff5c77] shadow-[0_0_12px_rgba(255,45,77,0.15)]">
-              [ CYBERSECURITY: TryHackMe Voyager Rank ]
-            </div>
+          {/* Floating Stat Orb — Left (Years) */}
+          <div
+            className="absolute -left-16 bottom-1/4 hidden xl:flex flex-col items-center justify-center w-24 h-24 rounded-2xl border border-[#ff1744]/20 bg-[#ff1744]/[0.06] backdrop-blur-md rotate-12 pointer-events-none"
+            style={{
+              opacity: floatActive * 0.8,
+              transform: `translateY(${bob2}px) rotate(12deg)`,
+              boxShadow: "0 0 30px rgba(255,23,68,0.1)",
+              animation: floatActive > 0.1 ? "hero-float-2 5s ease-in-out infinite" : "none",
+            }}
+          >
+            <div className="text-2xl font-black text-white/90 -rotate-12">3+</div>
+            <div className="text-[8px] font-mono text-white/50 tracking-[0.2em] mt-0.5 -rotate-12">YEARS EXP</div>
           </div>
         </div>
+      </div>
 
-        {/* Bottom CTA Pulse Indicator */}
-        <div
-          className="pointer-events-none absolute bottom-10 flex flex-col items-center gap-1 transition-opacity duration-300"
-          style={{ opacity: ctaOpacity }}
+      {/* ═══════════════════════════════════════════════════════════════════
+          BOTTOM SCROLL CTA — Fades during ascension
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div
+        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
+        style={{
+          opacity: (1 - phases.ascension) * phases.stabilize,
+          transform: `translateY(${phases.ascension * 50}px)`,
+        }}
+      >
+        <span
+          className="font-mono text-[10px] tracking-[0.4em] uppercase"
+          style={{
+            color: "rgba(255,23,68,0.7)",
+            textShadow: "0 0 12px rgba(255,23,68,0.5)",
+          }}
         >
-          <span className="font-mono text-xs tracking-widest text-[#ff2d4d] drop-shadow-[0_0_8px_rgba(255,45,77,0.8)]">
-            [ SCROLL TO DIVE INTO CORE SYSTEM ]
-          </span>
-          <ChevronDown className="h-4 w-4 animate-bounce text-[#ff2d4d]" />
+          [ Scroll to Dive into Core System ]
+        </span>
+        <div className="flex flex-col items-center -space-y-1 animate-bounce">
+          <ChevronDown className="h-4 w-4 text-[#ff1744]/60" />
+          <ChevronDown className="h-4 w-4 text-[#ff1744]/35" />
         </div>
       </div>
     </section>

@@ -1089,3 +1089,81 @@ canvas {
   from { transform: rotate(0deg); }
   to { transform: rotate(-360deg); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CINEMATIC HERO — ADDITIONAL CSS
+   Append this to src/app/globals.css or keep as hero-additions.css
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Glass panel base class (used in DashboardHero className) */
+.hero-glass-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Scanline animation for volumetric light beam */
+@keyframes beam-scan {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(8px); }
+}
+
+/* Floating stat orb — right side (Projects) */
+@keyframes hero-float-1 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Floating stat orb — left side (Years Exp) */
+@keyframes hero-float-2 {
+  0%, 100% { transform: translateY(0px) rotate(12deg); }
+  50% { transform: translateY(-10px) rotate(12deg); }
+}
+
+/* Ambient border glow pulse during stabilization phase */
+@keyframes border-glow-pulse {
+  0%, 100% {
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.14),
+                inset 0 0 50px rgba(255, 23, 68, 0.08),
+                0 0 60px rgba(255, 23, 68, 0.18),
+                0 0 120px rgba(255, 23, 68, 0.08),
+                0 50px 120px rgba(0, 0, 0, 0.85);
+  }
+  50% {
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.16),
+                inset 0 0 60px rgba(255, 23, 68, 0.12),
+                0 0 80px rgba(255, 23, 68, 0.25),
+                0 0 140px rgba(255, 23, 68, 0.12),
+                0 50px 120px rgba(0, 0, 0, 0.85);
+  }
+}
+@keyframes beam-scan {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(8px); }
+}
+
+@keyframes hero-float-1 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes hero-float-2 {
+  0%, 100% { transform: translateY(0px) rotate(12deg); }
+  50% { transform: translateY(-10px) rotate(12deg); }
+}
+
+@keyframes border-glow-pulse {
+  0%, 100% {
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.14),
+                inset 0 0 50px rgba(255,23,68,0.08),
+                0 0 60px rgba(255,23,68,0.18),
+                0 0 120px rgba(255,23,68,0.08),
+                0 50px 120px rgba(0,0,0,0.85);
+  }
+  50% {
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.16),
+                inset 0 0 60px rgba(255,23,68,0.12),
+                0 0 80px rgba(255,23,68,0.25),
+                0 0 140px rgba(255,23,68,0.12),
+                0 50px 120px rgba(0,0,0,0.85);
+  }
+}
