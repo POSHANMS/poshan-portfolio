@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
@@ -16,6 +16,7 @@ import MagneticParticles from "./MagneticParticles";
 import FloatingHexParticles from "./FloatingHexParticles";
 import TechCubes from "./TechCubes";
 import FloatingLaptop from "./FloatingLaptop";
+import HolographicProjection from "./HolographicProjection";
 import WormholeLaptopEntry from "./WormholeLaptopEntry";
 import NeonGrid from "./NeonGrid";
 import FloorRings from "./FloorRings";
@@ -86,6 +87,7 @@ export default function Scene({
 }: SceneProps) {
   const { deviceTier } = useDeviceSize();
   const isMobile = deviceTier === "mobile";
+  const laptopScreenRef = useRef<THREE.Mesh | null>(null);
 
   const showFloor = !isPowerUpActive || (powerUpValues && powerUpValues.floorOpacity > 0.0001);
   const showGlobe = !isPowerUpActive || (powerUpValues && powerUpValues.globeOpacity > 0.0001);
@@ -103,6 +105,7 @@ export default function Scene({
   const globeOpacity = powerUpValues?.globeOpacity ?? 1;
   const laptopOpacity = powerUpValues?.laptopOpacity ?? 1;
   const cubesOpacity = powerUpValues?.cubesOpacity ?? 1;
+  const hologramVisible = powerUpStage === "ui" || powerUpStage === "complete" || (!isPowerUpActive && !wormholeActive);
 
   return (
     <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#000000" }}>
@@ -162,8 +165,15 @@ export default function Scene({
               laptopOpacity={laptopOpacity}
               wormholeValues={wormholeValues}
               wormholeActive={wormholeActive}
+              laptopScreenRef={laptopScreenRef}
             />
           </group>
+
+          <HolographicProjection
+            scrollProgress={scrollProgress}
+            laptopScreenRef={laptopScreenRef}
+            visible={hologramVisible}
+          />
 
           <group visible={showFloor}>
             <NeonGrid floorOpacity={floorOpacity} />

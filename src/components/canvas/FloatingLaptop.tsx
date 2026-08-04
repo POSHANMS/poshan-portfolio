@@ -14,6 +14,7 @@ interface FloatingLaptopProps {
   laptopOpacity?: number;
   wormholeValues?: WormholeValues;
   wormholeActive?: boolean;
+  laptopScreenRef?: React.MutableRefObject<THREE.Mesh | null>;
 }
 
 const TERMINAL_LINES = [
@@ -28,6 +29,7 @@ export default function FloatingLaptop({
   laptopOpacity = 1,
   wormholeValues,
   wormholeActive = false,
+  laptopScreenRef,
 }: FloatingLaptopProps) {
   const { scene } = useGLTF("/models/laptop-baked.glb");
 
@@ -56,6 +58,7 @@ export default function FloatingLaptop({
     lastTypeTime: 0,
     lastBlinkTime: 0,
     initialized: false,
+    locked: false,
   });
 
   useMemo(() => {
@@ -100,6 +103,7 @@ export default function FloatingLaptop({
 
       if (mat && mat.name === SCREEN_MATERIAL_NAME) {
         screenMeshRef.current = mesh;
+        if (laptopScreenRef) laptopScreenRef.current = mesh;
         mat.color.set("#050508");
         mat.emissive.set("#000000");
         mat.emissiveIntensity = 0; // Screen completely dark/off on load
@@ -127,7 +131,7 @@ export default function FloatingLaptop({
 
       mesh.material = chassisMaterial;
     });
-  }, [scene]);
+  }, [scene, laptopScreenRef]);
 
   // ── Canvas Initialization (runs once on mount) ──────────────────────
   useEffect(() => {
@@ -251,7 +255,7 @@ export default function FloatingLaptop({
     }
 
     // Run typewriter & cursor logic ONLY when booted or booting is complete
-    if (anim.booted) {
+    if (anim.booted && !anim.locked) {
       // Cursor Blink (every 500ms)
       if (t - anim.lastBlinkTime > 0.5) {
         anim.cursorVisible = !anim.cursorVisible;
@@ -275,13 +279,15 @@ export default function FloatingLaptop({
             if (anim.lineIndex >= TERMINAL_LINES.length) {
               anim.phase = "waiting";
               anim.waitCounter = 0;
+              anim.locked = true;
+              anim.cursorVisible = true;
             }
             drawTerminal(true);
           }
-        } else if (anim.phase === "waiting") {
+        } else if (anim.phase === "waiting" && !anim.locked) {
           anim.waitCounter++;
           if (anim.waitCounter > 50) anim.phase = "clearing";
-        } else if (anim.phase === "clearing") {
+        } else if (anim.phase === "clearing" && !anim.locked) {
           if (anim.completedLines.length > 0) {
             anim.completedLines.shift();
             drawTerminal(true);

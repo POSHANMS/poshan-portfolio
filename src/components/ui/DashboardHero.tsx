@@ -6,6 +6,7 @@ import { FileText, ChevronDown, Activity, Terminal, Code2, Shield, Globe, Briefc
 interface DashboardHeroProps {
   scrollProgress: number;
   stageScale: number;
+  spatial?: boolean;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -29,7 +30,7 @@ const easeOutBack = (t: number) => {
 const easeInOutQuart = (t: number) =>
   t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
 
-export default function DashboardHero({ scrollProgress, stageScale }: DashboardHeroProps) {
+export default function DashboardHero({ scrollProgress, stageScale, spatial = false }: DashboardHeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef(0);
   const rafRef = useRef(0);
@@ -114,6 +115,196 @@ export default function DashboardHero({ scrollProgress, stageScale }: DashboardH
     { icon: Briefcase, href: "https://linkedin.com/in/poshanms/", label: "LinkedIn" },
     { icon: FileText, href: "mailto:siddeshwaraprasanna5@gmail.com", label: "CV" },
   ];
+
+  if (spatial) {
+    const spatialLock = Math.min(1, Math.max(0, (p - 0.28) / 0.08));
+    const dissolve = Math.min(1, Math.max(0, (p - 0.8) / 0.2));
+    const stableGlow = 0.7 + Math.sin(t * 2.4) * 0.16 * spatialLock;
+
+    return (
+      <div
+        ref={containerRef}
+        id="home"
+        className="pointer-events-auto relative w-[920px] max-w-[920px] select-none"
+        style={{
+          transformStyle: "preserve-3d",
+          opacity: 1 - dissolve * 0.92,
+        }}
+      >
+        <div
+          className="absolute -inset-16 rounded-[36px] pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 48%, rgba(255,34,68,0.22), rgba(255,34,68,0.08) 32%, transparent 68%), radial-gradient(circle at 22% 16%, rgba(255,180,190,0.12), transparent 42%)",
+            filter: "blur(42px)",
+            opacity: stableGlow,
+          }}
+        />
+
+        <div
+          className="relative overflow-hidden rounded-[28px] hero-glass-panel"
+          style={{
+            background:
+              "linear-gradient(145deg, rgba(14,12,18,0.78), rgba(8,6,12,0.9) 52%, rgba(10,8,14,0.84))",
+            backdropFilter: "blur(56px) saturate(185%)",
+            WebkitBackdropFilter: "blur(56px) saturate(185%)",
+            border: "1.5px solid rgba(255,34,68,0.36)",
+            boxShadow:
+              "inset 0 1px 1px rgba(255,255,255,0.16), inset 0 0 52px rgba(255,34,68,0.1), 0 0 72px rgba(255,34,68,0.24), 0 0 150px rgba(255,34,68,0.1), 0 48px 120px rgba(0,0,0,0.86)",
+          }}
+        >
+          <div
+            className="absolute inset-0 opacity-[0.04] pointer-events-none mix-blend-overlay"
+            style={{
+              backgroundImage:
+                "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+              backgroundSize: "180px 180px",
+            }}
+          />
+          <div
+            className="absolute inset-0 opacity-[0.07] pointer-events-none"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,34,68,0.38) 1px, transparent 1px), linear-gradient(90deg, rgba(255,34,68,0.3) 1px, transparent 1px)",
+              backgroundSize: "38px 38px",
+            }}
+          />
+          <div
+            className="absolute inset-x-0 top-0 h-px pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(255,255,255,0.72), rgba(255,34,68,0.72), transparent)",
+              opacity: 0.78 + Math.sin(t * 3.2) * 0.16,
+            }}
+          />
+
+          <div className="relative z-10 p-8 md:p-12">
+            <div
+              className="mb-10 flex items-center justify-between border-b border-white/[0.08] pb-5"
+              style={{
+                opacity: contentOpacity,
+                filter: `blur(${contentBlur}px)`,
+                transform: `translateY(${contentLift}px)`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  <span
+                    className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400"
+                    style={{ boxShadow: "0 0 10px rgba(52,211,153,0.9)" }}
+                  />
+                </span>
+                <span className="font-mono text-[11px] font-bold tracking-[0.25em] text-emerald-400 uppercase">
+                  Hologram Interface Online
+                </span>
+                <span className="hidden md:inline font-mono text-[10px] text-white/25 tracking-[0.2em]">
+                  | SPATIAL PROJECTION v3.0
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                {socials.map((social, i) => {
+                  const s = Math.min(1, Math.max(0, (mat - 0.2 - i * 0.06) * 5));
+                  return (
+                    <a
+                      key={social.label}
+                      href={social.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={social.label}
+                      className="group flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff2244]/30 bg-black/35 text-white/65 transition-all duration-300 hover:scale-110 hover:border-[#ff2244]/80 hover:text-[#ff2244] hover:shadow-[0_0_22px_rgba(255,34,68,0.42)] hover:-translate-y-1"
+                      style={{ opacity: s, transform: `translateY(${(1 - s) * 15}px)` }}
+                    >
+                      <social.icon className="h-4 w-4" />
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div
+              style={{
+                opacity: Math.min(1, mat * 2.4),
+                filter: `blur(${Math.max(0, 7 * (1 - mat))}px)`,
+                transform: `translateY(${Math.max(0, 24 * (1 - mat))}px)`,
+              }}
+            >
+              <h1
+                className="font-black uppercase"
+                style={{
+                  fontSize: "clamp(3.4rem, 6.8vw, 6.2rem)",
+                  lineHeight: 1,
+                  letterSpacing: "0",
+                  background:
+                    "linear-gradient(180deg, #ffffff 0%, #ffd7dc 24%, #ff2244 55%, #8c0014 84%, #430008 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  filter:
+                    "drop-shadow(0 0 32px rgba(255,34,68,0.48)) drop-shadow(0 0 88px rgba(255,34,68,0.26))",
+                }}
+              >
+                POSHAN M S
+              </h1>
+
+              <h2
+                className="mb-8 mt-3 font-mono text-sm md:text-base font-semibold tracking-[0.18em] uppercase"
+                style={{
+                  color: "#ff2244",
+                  textShadow: "0 0 20px rgba(255,34,68,0.74), 0 0 44px rgba(255,34,68,0.32)",
+                }}
+              >
+                Full-Stack & AI Developer | Computer Science Engineer
+              </h2>
+
+              <p className="mb-10 max-w-2xl text-sm md:text-[15px] leading-[1.7] text-white/76">
+                <span className="text-[#ff2244]/65">&ldquo;</span>
+                Architecting scalable web platforms, intelligent ML diagnostics, and secure systems.
+                <span className="text-[#ff2244]/65">&rdquo;</span>
+              </p>
+            </div>
+
+            <div className="mb-10 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {badges.map((badge) => {
+                const b = Math.min(1, Math.max(0, (mat - 0.42 - badge.delay) * 4));
+                return (
+                  <div
+                    key={badge.text}
+                    className="group flex items-center gap-3 rounded-xl border border-[#ff2244]/28 bg-[#ff2244]/[0.07] px-4 py-3.5 font-mono text-[11px] font-medium text-[#ff9aa6] shadow-[0_0_16px_rgba(255,34,68,0.1)] transition-all duration-300 hover:border-[#ff2244]/60 hover:bg-[#ff2244]/12 hover:shadow-[0_0_30px_rgba(255,34,68,0.2)] hover:-translate-y-0.5"
+                    style={{
+                      opacity: b,
+                      transform: `translateX(${(1 - b) * badge.dir * 40}px) translateZ(18px)`,
+                    }}
+                  >
+                    <badge.icon className="h-4 w-4 text-[#ff2244] transition-transform duration-300 group-hover:scale-110" />
+                    <span>[ {badge.text} ]</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-white/[0.08] pt-5">
+              <div className="flex items-center gap-4 font-mono text-[10px] text-white/42 tracking-[0.15em]">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  SYSTEM OPERATIONAL
+                </span>
+                <span className="text-white/20">|</span>
+                <span>CORE: STABLE</span>
+                <span className="text-white/20">|</span>
+                <span>LATENCY: 12ms</span>
+              </div>
+              <div className="flex items-center gap-2 font-mono text-[10px] text-[#ff2244]/65 tracking-widest">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#ff2244] animate-ping" />
+                LIVE
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <section
@@ -350,7 +541,7 @@ export default function DashboardHero({ scrollProgress, stageScale }: DashboardH
 
               {/* Project Badges — staggered slide-in */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10">
-                {badges.map((badge, i) => {
+                {badges.map((badge) => {
                   const b = Math.min(1, Math.max(0, (mat - 0.45 - badge.delay) * 4));
                   return (
                     <div

@@ -79,9 +79,10 @@ export default function Home() {
     let target = 0;
     let current = 0;
     let rafId = 0;
+    const getPinnedDelta = () => 1 / Math.max(900, window.innerHeight * 1.5);
 
     const onWheel = (e: WheelEvent) => {
-      target = Math.max(0, Math.min(1, target + e.deltaY * 0.0008));
+      target = Math.max(0, Math.min(1, target + e.deltaY * getPinnedDelta()));
     };
 
     let touchStartY = 0;
@@ -91,7 +92,7 @@ export default function Home() {
     const onTouchMove = (e: TouchEvent) => {
       const deltaY = touchStartY - e.touches[0].clientY;
       touchStartY = e.touches[0].clientY;
-      target = Math.max(0, Math.min(1, target + deltaY * 0.002));
+      target = Math.max(0, Math.min(1, target + deltaY * getPinnedDelta() * 1.35));
     };
 
     const update = () => {
@@ -155,7 +156,7 @@ export default function Home() {
 
       {/* 3D SCENE */}
       <div
-        className="fixed inset-0 z-0 h-full w-full pointer-events-none"
+        className="fixed inset-0 z-0 h-full w-full pointer-events-auto"
         style={{
           opacity: showWelcomeText || powerUpStage === "welcome" ? 0 : powerUpValues.sceneOpacity,
         }}
@@ -177,7 +178,7 @@ export default function Home() {
           handles its own 3D projection (rotateX, translateZ, scale)
           internally via scrollProgress & stageScale.
           ═══════════════════════════════════════════════════════════════ */}
-      {loaderComplete && (
+      {false && loaderComplete && (
         <div
           className="absolute inset-0 z-10"
           style={{
