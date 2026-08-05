@@ -173,6 +173,7 @@ export default function Scene({
             scrollProgress={scrollProgress}
             laptopScreenRef={laptopScreenRef}
             visible={hologramVisible}
+            deviceTier={deviceTier}
           />
 
           <group visible={showFloor}>
@@ -180,7 +181,7 @@ export default function Scene({
             <FloorRings />
           </group>
 
-          <PostProcessing />
+          <PostProcessing hologramActive={hologramVisible} />
         </Suspense>
       </Canvas>
     </div>

@@ -35,4 +35,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-project_codebase.md
+# Ignore context markdown files
+Master_prompt.md
+Thinking.md
+Previous.MD
+Project__codebase.md

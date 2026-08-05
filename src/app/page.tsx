@@ -191,6 +191,33 @@ export default function Home() {
         </div>
       )}
 
+      {/* ═══ VIGNETTE + CHROMATIC ABERRATION OVERLAYS (Bug 7 & 11) ═══
+          Active when hologram is visible (powerUpStage ui/complete).
+          Pointer-events: none so interactions pass through to 3D canvas. */}
+      {(powerUpStage === "ui" || powerUpStage === "complete") && (
+        <>
+          {/* Vignette — darkens corners by ~15% */}
+          <div
+            className="fixed inset-0 z-[5] pointer-events-none"
+            style={{
+              background: "radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.15) 100%)",
+            }}
+          />
+          {/* Chromatic aberration — red/cyan split at viewport edges */}
+          <div
+            className="fixed inset-0 z-[6] pointer-events-none mix-blend-screen"
+            style={{
+              background: [
+                "radial-gradient(ellipse at 0% 50%, rgba(255,0,60,0.06) 0%, transparent 40%)",
+                "radial-gradient(ellipse at 100% 50%, rgba(0,220,255,0.05) 0%, transparent 40%)",
+                "radial-gradient(ellipse at 50% 0%, rgba(255,0,60,0.04) 0%, transparent 30%)",
+                "radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.04) 0%, transparent 30%)",
+              ].join(", "),
+            }}
+          />
+        </>
+      )}
+
       {/* CINEMATIC HUD OVERLAY */}
       <CinematicHUD visible={powerUpStage === "ui" || powerUpStage === "complete"} />
     </main>
