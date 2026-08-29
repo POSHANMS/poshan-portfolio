@@ -44,10 +44,8 @@ export function CinematicCamera({
   useFrame((state) => {
     const camera = state.camera as THREE.PerspectiveCamera;
 
-    // HARD LOCK: When scrollProgress is in Stage 4 Hero HUD phase (0.0 to 1.0),
-    // lock camera position and lookAt 100% CONSTANT at Station 1 wide-shot view.
-    // Zero rotation, zero pitch change, zero camera zoom, zero translation.
-    if (clampedProgress <= 1.0) {
+    // Camera locked at Station 1 — landing page phase
+    if (clampedProgress <= 0.75) {
       const s1 = sceneCoordinates[0];
       camera.position.copy(s1.camera);
       camera.lookAt(s1.lookAt);
@@ -59,12 +57,26 @@ export function CinematicCamera({
       return;
     }
 
-    // Transition from Station 1 to Station 2 when scrollProgress goes from 0.9 to 1.0
-    const t = (clampedProgress - 0.9) / 0.1;
-    const easedT = t * t * (3.0 - 2.0 * t);
+    // 0.75 → 1.0: Two-segment transition: S1→S2 (0.75→0.875), S2→S3 (0.875→1.0)
+    let fromIdx = 0;
+    let toIdx = 1;
+    let localT = (clampedProgress - 0.75) / 0.25;
 
-    const from = sceneCoordinates[0];
-    const to = sceneCoordinates[1];
+    if (localT <= 0.5) {
+      // First half: Station 1 → Station 2
+      localT = localT / 0.5;
+      fromIdx = 0;
+      toIdx = 1;
+    } else {
+      // Second half: Station 2 → Station 3
+      localT = (localT - 0.5) / 0.5;
+      fromIdx = 1;
+      toIdx = 2;
+    }
+
+    const easedT = localT * localT * (3.0 - 2.0 * localT);
+    const from = sceneCoordinates[fromIdx];
+    const to = sceneCoordinates[toIdx];
 
     currentPos.current.lerpVectors(from.camera, to.camera, easedT);
     currentLookAt.current.lerpVectors(from.lookAt, to.lookAt, easedT);

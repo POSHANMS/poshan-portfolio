@@ -133,7 +133,7 @@ export default function FloatingLaptop({
     });
   }, [scene, laptopScreenRef]);
 
-  // ── Canvas Initialization (runs once on mount) ──────────────────────
+  // Create canvas + texture once
   useEffect(() => {
     if (!canvasRef.current) {
       const canvas = document.createElement("canvas");
@@ -144,16 +144,27 @@ export default function FloatingLaptop({
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
       textureRef.current = texture;
-
-      if (screenMeshRef.current) {
-        const mat = screenMeshRef.current.material as THREE.MeshStandardMaterial;
-        mat.map          = texture;
-        mat.emissiveMap  = texture;
-        mat.emissive     = new THREE.Color("#ff2244");
-        mat.emissiveIntensity = 0; // Dark until boot trigger
-        mat.needsUpdate  = true;
-      }
     }
+  }, []);
+
+  // Attach texture to screen mesh as soon as it exists
+  useEffect(() => {
+    const id = setInterval(() => {
+      const texture = textureRef.current;
+      const mesh = screenMeshRef.current;
+      if (texture && mesh) {
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        if (!mat.map) {
+          mat.map = texture;
+          mat.emissiveMap = texture;
+          mat.emissive = new THREE.Color("#ff2244");
+          mat.emissiveIntensity = 0;
+          mat.needsUpdate = true;
+          clearInterval(id);
+        }
+      }
+    }, 50);
+    return () => clearInterval(id);
   }, []);
 
   // Helper to draw terminal frame to canvas
@@ -255,48 +266,30 @@ export default function FloatingLaptop({
     }
 
     // Run typewriter & cursor logic ONLY when booted or booting is complete
-    if (anim.booted && !anim.locked) {
-      // Cursor Blink (every 500ms)
+    if (anim.booted) {
+      // Continuous 1Hz cursor blink (every 500ms)
       if (t - anim.lastBlinkTime > 0.5) {
         anim.cursorVisible = !anim.cursorVisible;
         anim.lastBlinkTime = t;
         drawTerminal(true);
       }
 
-      // Typewriter Advance (every 45ms)
-      if (t - anim.lastTypeTime > 0.045) {
+      // Typewriter Advance (every 45ms) until locked
+      if (!anim.locked && t - anim.lastTypeTime > 0.045) {
         anim.lastTypeTime = t;
-
-        if (anim.phase === "typing") {
-          const line = TERMINAL_LINES[anim.lineIndex];
-          if (anim.currentText.length < line.length) {
-            anim.currentText += line[anim.currentText.length];
-            drawTerminal(true);
-          } else {
-            anim.completedLines.push(anim.currentText);
-            anim.currentText = "";
-            anim.lineIndex++;
-            if (anim.lineIndex >= TERMINAL_LINES.length) {
-              anim.phase = "waiting";
-              anim.waitCounter = 0;
-              anim.locked = true;
-              anim.cursorVisible = true;
-            }
-            drawTerminal(true);
+        const line = TERMINAL_LINES[anim.lineIndex];
+        if (anim.currentText.length < line.length) {
+          anim.currentText += line[anim.currentText.length];
+          drawTerminal(true);
+        } else {
+          anim.completedLines.push(anim.currentText);
+          anim.currentText = "";
+          anim.lineIndex++;
+          if (anim.lineIndex >= TERMINAL_LINES.length) {
+            anim.locked = true; // Permanently locked — never reset or clear
+            anim.cursorVisible = true;
           }
-        } else if (anim.phase === "waiting" && !anim.locked) {
-          anim.waitCounter++;
-          if (anim.waitCounter > 50) anim.phase = "clearing";
-        } else if (anim.phase === "clearing" && !anim.locked) {
-          if (anim.completedLines.length > 0) {
-            anim.completedLines.shift();
-            drawTerminal(true);
-          } else {
-            anim.lineIndex   = 0;
-            anim.currentText = "";
-            anim.phase       = "typing";
-            drawTerminal(true);
-          }
+          drawTerminal(true);
         }
       }
     } else if (anim.booting) {

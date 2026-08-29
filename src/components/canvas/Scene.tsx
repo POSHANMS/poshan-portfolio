@@ -16,7 +16,6 @@ import MagneticParticles from "./MagneticParticles";
 import FloatingHexParticles from "./FloatingHexParticles";
 import TechCubes from "./TechCubes";
 import FloatingLaptop from "./FloatingLaptop";
-import HolographicProjection from "./HolographicProjection";
 import WormholeLaptopEntry from "./WormholeLaptopEntry";
 import NeonGrid from "./NeonGrid";
 import FloorRings from "./FloorRings";
@@ -168,13 +167,6 @@ export default function Scene({
               laptopScreenRef={laptopScreenRef}
             />
           </group>
-
-          <HolographicProjection
-            scrollProgress={scrollProgress}
-            laptopScreenRef={laptopScreenRef}
-            visible={hologramVisible}
-            deviceTier={deviceTier}
-          />
 
           <group visible={showFloor}>
             <NeonGrid floorOpacity={floorOpacity} />

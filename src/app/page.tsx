@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { start3DPowerUpSequence, PowerUpStage, PowerUpStageValues } from "@/animations/powerUpSequence";
 import { startWormholeSequence, WormholeValues, WormholePhase } from "@/animations/wormholeLaptop";
 import Loader from "@/components/ui/Loader";
 import WelcomeText from "@/components/ui/WelcomeText";
-import DashboardHero from "@/components/ui/DashboardHero";
 import CinematicHUD from "@/components/ui/CinematicHUD";
 
 const Scene = dynamic(() => import("@/components/canvas/Scene"), {
@@ -74,44 +73,26 @@ export default function Home() {
 
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Wheel & touch scroll listener
+  // Scroll progress — derived from window.scrollY through the 250vh hero track.
+  // CSS sticky (on the inner element) provides the pinned experience.
+  // No GSAP DOM manipulation = no React reconciliation conflict.
+  const heroRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    let target = 0;
-    let current = 0;
-    let rafId = 0;
-    const getPinnedDelta = () => 1 / Math.max(900, window.innerHeight * 1.5);
-
-    const onWheel = (e: WheelEvent) => {
-      target = Math.max(0, Math.min(1, target + e.deltaY * getPinnedDelta()));
+    const handleScroll = () => {
+      const hero = heroRef.current;
+      if (!hero) return;
+      // The outer div is 250vh. The pin region is the extra 150vh beyond the viewport.
+      const scrollTrack = hero.offsetHeight - window.innerHeight;
+      if (scrollTrack <= 0) return;
+      const heroTop = hero.getBoundingClientRect().top + window.scrollY;
+      const scrolled = Math.max(0, window.scrollY - heroTop);
+      setScrollProgress(Math.min(1, scrolled / scrollTrack));
     };
 
-    let touchStartY = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0].clientY;
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      const deltaY = touchStartY - e.touches[0].clientY;
-      touchStartY = e.touches[0].clientY;
-      target = Math.max(0, Math.min(1, target + deltaY * getPinnedDelta() * 1.35));
-    };
-
-    const update = () => {
-      current += (target - current) * 0.08;
-      setScrollProgress(current);
-      rafId = requestAnimationFrame(update);
-    };
-
-    window.addEventListener("wheel", onWheel, { passive: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-    rafId = requestAnimationFrame(update);
-
-    return () => {
-      window.removeEventListener("wheel", onWheel);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      cancelAnimationFrame(rafId);
-    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // seed on mount
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const stageScale = useStageScale();
@@ -145,7 +126,7 @@ export default function Home() {
   const wormholeActive = wormholePhase !== "idle" && wormholePhase !== "complete";
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-[#000000]">
+    <main className="relative w-full bg-[#000000]">
       {/* LOADER */}
       {!loaderComplete && <Loader onComplete={handleLoaderComplete} />}
 
@@ -154,72 +135,49 @@ export default function Home() {
         <WelcomeText onComplete={handleWelcomeComplete} layoutMode="stacked" />
       )}
 
-      {/* 3D SCENE */}
-      <div
-        className="fixed inset-0 z-0 h-full w-full pointer-events-auto"
-        style={{
-          opacity: showWelcomeText || powerUpStage === "welcome" ? 0 : powerUpValues.sceneOpacity,
-        }}
-      >
-        <Scene
-          scrollProgress={scrollProgress}
-          powerUpStage={powerUpStage}
-          powerUpValues={powerUpValues}
-          isPowerUpActive={isPowerUpActive}
-          wormholeValues={wormholeValues}
-          wormholeActive={wormholeActive}
-          lensDistortion={wormholeValues.lensDistortion}
-        />
+      {/* PINNED HERO TRACK — 250vh outer creates the scroll distance.
+          Inner sticky div stays fixed at top while user scrolls through it.
+          CSS sticky = zero DOM mutation = React-safe. */}
+      <div ref={heroRef} className="relative w-full" style={{ height: "250vh" }}>
+        <div className="sticky top-0 h-screen w-full overflow-hidden">
+          {/* 3D SCENE */}
+          <div
+            className="absolute inset-0 z-0 pointer-events-auto"
+            style={{
+              opacity: showWelcomeText || powerUpStage === "welcome" ? 0 : powerUpValues.sceneOpacity,
+            }}
+          >
+            <Scene
+              scrollProgress={scrollProgress}
+              powerUpStage={powerUpStage}
+              powerUpValues={powerUpValues}
+              isPowerUpActive={isPowerUpActive}
+              wormholeValues={wormholeValues}
+              wormholeActive={wormholeActive}
+              lensDistortion={wormholeValues.lensDistortion}
+            />
+          </div>
+
+          {/* ═══ CHROMATIC ABERRATION OVERLAY (CSS) — vignette now handled by WebGL PostProcessing ═══ */}
+          {(powerUpStage === "ui" || powerUpStage === "complete") && (
+            <div
+              className="absolute inset-0 z-[6] pointer-events-none mix-blend-screen"
+              style={{
+                background: [
+                  "radial-gradient(ellipse at 0% 50%, rgba(255,0,60,0.06) 0%, transparent 40%)",
+                  "radial-gradient(ellipse at 100% 50%, rgba(0,220,255,0.05) 0%, transparent 40%)",
+                  "radial-gradient(ellipse at 50% 0%, rgba(255,0,60,0.04) 0%, transparent 30%)",
+                  "radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.04) 0%, transparent 30%)",
+                ].join(", "),
+              }}
+            />
+          )}
+
+          {/* CINEMATIC HUD OVERLAY */}
+          <CinematicHUD visible={powerUpStage === "ui" || powerUpStage === "complete"} />
+        </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          DASHBOARD HERO — Cinematic Holographic Projection
-          Wrapper: opacity-only fade-in. NO transform here — the hero
-          handles its own 3D projection (rotateX, translateZ, scale)
-          internally via scrollProgress & stageScale.
-          ═══════════════════════════════════════════════════════════════ */}
-      {false && loaderComplete && (
-        <div
-          className="absolute inset-0 z-10"
-          style={{
-            opacity: powerUpStage === "ui" || powerUpStage === "complete" ? 1 : 0,
-            transition: "opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
-            willChange: "opacity",
-          }}
-        >
-          <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
-        </div>
-      )}
-
-      {/* ═══ VIGNETTE + CHROMATIC ABERRATION OVERLAYS (Bug 7 & 11) ═══
-          Active when hologram is visible (powerUpStage ui/complete).
-          Pointer-events: none so interactions pass through to 3D canvas. */}
-      {(powerUpStage === "ui" || powerUpStage === "complete") && (
-        <>
-          {/* Vignette — darkens corners by ~15% */}
-          <div
-            className="fixed inset-0 z-[5] pointer-events-none"
-            style={{
-              background: "radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.15) 100%)",
-            }}
-          />
-          {/* Chromatic aberration — red/cyan split at viewport edges */}
-          <div
-            className="fixed inset-0 z-[6] pointer-events-none mix-blend-screen"
-            style={{
-              background: [
-                "radial-gradient(ellipse at 0% 50%, rgba(255,0,60,0.06) 0%, transparent 40%)",
-                "radial-gradient(ellipse at 100% 50%, rgba(0,220,255,0.05) 0%, transparent 40%)",
-                "radial-gradient(ellipse at 50% 0%, rgba(255,0,60,0.04) 0%, transparent 30%)",
-                "radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.04) 0%, transparent 30%)",
-              ].join(", "),
-            }}
-          />
-        </>
-      )}
-
-      {/* CINEMATIC HUD OVERLAY */}
-      <CinematicHUD visible={powerUpStage === "ui" || powerUpStage === "complete"} />
     </main>
   );
 }
