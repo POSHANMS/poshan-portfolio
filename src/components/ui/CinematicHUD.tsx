@@ -19,8 +19,8 @@ import React, { useEffect, useRef, useState } from "react";
 const RULER_TICKS = 41; // total tick slots visible
 const CENTER = Math.floor(RULER_TICKS / 2);
 
-function useAnimatedOffset() {
-  return 0;
+function useAnimatedOffset(scrollProgress: number) {
+  return scrollProgress * 12;
 }
 
 function useTimecode() {
@@ -145,8 +145,17 @@ function CornerBracket({ position }: { position: "tl" | "tr" | "bl" | "br" }) {
   );
 }
 
-export default function CinematicHUD({ visible }: { visible: boolean }) {
-  const offset = useAnimatedOffset();
+const sceneLabels = [
+  { progress: 0, act: "ACT I", label: "HERO" },
+  { progress: 0.22, act: "ACT II", label: "INSIDE THE LAPTOP" },
+  { progress: 0.66, act: "ACT III", label: "SKILL CONSTELLATION" },
+  { progress: 0.86, act: "ACT IV", label: "PROJECTS" },
+  { progress: 0.94, act: "ACT V", label: "EDUCATION PRACTICE" },
+  { progress: 0.985, act: "ACT VI", label: "CONTACT" },
+];
+
+export default function CinematicHUD({ visible, scrollProgress = 0 }: { visible: boolean; scrollProgress?: number }) {
+  const offset = useAnimatedOffset(scrollProgress);
   const timecode = useTimecode();
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [scrollHintOpacity, setScrollHintOpacity] = useState(1);
@@ -179,6 +188,10 @@ export default function CinematicHUD({ visible }: { visible: boolean }) {
     const t = setInterval(() => setRecVisible((v) => !v), 800);
     return () => clearInterval(t);
   }, []);
+
+  const activeScene = sceneLabels.reduce((best, current) =>
+    Math.abs(scrollProgress - current.progress) < Math.abs(scrollProgress - best.progress) ? current : best,
+  );
 
   return (
     <div
@@ -232,7 +245,7 @@ export default function CinematicHUD({ visible }: { visible: boolean }) {
         <div
           className="flex flex-col items-center gap-2 transition-all duration-700"
           style={{
-            opacity: showScrollHint && !hasScrolled ? scrollHintOpacity : 0,
+            opacity: showScrollHint && !hasScrolled && scrollProgress < 0.08 ? scrollHintOpacity : 0,
             transform: showScrollHint ? "translateY(0)" : "translateY(8px)",
           }}
         >
@@ -309,10 +322,10 @@ export default function CinematicHUD({ visible }: { visible: boolean }) {
         style={{ top: 80, opacity: 0.45 }}
       >
         <span className="font-mono text-[8px] uppercase tracking-[0.4em] text-white/35 select-none">
-          ACT I
+          {activeScene.act}
         </span>
         <span className="font-mono text-[7px] text-white/20 select-none">
-          HERO STATION
+          {activeScene.label}
         </span>
       </div>
     </div>

@@ -595,6 +595,217 @@ body {
   }
 }
 
+.inside-laptop-liquid-field {
+  opacity: 0.78;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(ellipse at 22% 34%, rgba(255, 255, 255, 0.08), transparent 22rem),
+    radial-gradient(ellipse at 78% 62%, rgba(255, 23, 68, 0.24), transparent 26rem),
+    repeating-radial-gradient(ellipse at 52% 45%, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 18px),
+    linear-gradient(115deg, transparent 0%, rgba(255, 23, 68, 0.18) 46%, transparent 68%);
+  background-size: 120% 120%, 130% 130%, 100% 100%, 180% 180%;
+  animation: inside-liquid-drift 13s ease-in-out infinite alternate;
+  filter: blur(0.2px);
+}
+
+.inside-laptop-data-rain {
+  opacity: 0.34;
+  mix-blend-mode: screen;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(90deg, rgba(255, 23, 68, 0.12) 0 1px, transparent 1px 88px);
+  background-size: 100% 96px, 120px 100%;
+  mask-image: radial-gradient(circle at 50% 44%, black 0 45%, transparent 78%);
+  animation: inside-data-fall 4.8s linear infinite;
+}
+
+.inside-laptop-circuit-flow {
+  opacity: 0.32;
+  mix-blend-mode: screen;
+  background:
+    linear-gradient(115deg, transparent 0 41%, rgba(255, 255, 255, 0.14) 41.2% 41.6%, transparent 42%),
+    linear-gradient(65deg, transparent 0 57%, rgba(255, 23, 68, 0.22) 57.2% 57.6%, transparent 58%),
+    radial-gradient(circle at 30% 72%, rgba(255, 255, 255, 0.22) 0 2px, transparent 3px),
+    radial-gradient(circle at 68% 25%, rgba(255, 23, 68, 0.34) 0 2px, transparent 3px);
+  background-size: 420px 260px, 360px 240px, 180px 180px, 220px 220px;
+  animation: inside-circuit-drift 9s linear infinite;
+}
+
+.inside-laptop-core-pulse {
+  animation: inside-core-pulse 3.6s ease-in-out infinite;
+}
+
+.skill-engine-field {
+  opacity: 0.5;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 23, 68, 0.18), transparent 18rem),
+    radial-gradient(circle at 22% 72%, rgba(255, 255, 255, 0.055), transparent 20rem),
+    radial-gradient(circle at 78% 22%, rgba(255, 23, 68, 0.14), transparent 22rem);
+  animation: skill-field-breathe 7s ease-in-out infinite alternate;
+}
+
+.skill-engine-grid {
+  opacity: 0.32;
+  mix-blend-mode: screen;
+  background:
+    linear-gradient(90deg, rgba(255, 23, 68, 0.13) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.075) 1px, transparent 1px),
+    repeating-radial-gradient(circle at 50% 50%, rgba(255, 23, 68, 0.18) 0 1px, transparent 1px 34px);
+  background-size: 96px 96px, 96px 96px, 100% 100%;
+  mask-image: radial-gradient(circle at 50% 50%, black 0 44%, transparent 76%);
+  animation: skill-grid-drift 11s linear infinite;
+}
+
+.skill-engine-core {
+  animation: skill-core-float 6s ease-in-out infinite;
+}
+
+.skill-engine-core::before,
+.skill-engine-core::after {
+  content: "";
+  position: absolute;
+  inset: 7%;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 23, 68, 0.28);
+  box-shadow: 0 0 50px rgba(255, 23, 68, 0.16);
+  animation: skill-orbit-spin 16s linear infinite;
+}
+
+.skill-engine-core::after {
+  inset: 19%;
+  border-color: rgba(255, 255, 255, 0.18);
+  animation-duration: 22s;
+  animation-direction: reverse;
+}
+
+.skill-engine-comet {
+  height: 2px;
+  width: 17rem;
+  transform-origin: left center;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(255, 23, 68, 0.55), transparent);
+  filter: drop-shadow(0 0 14px rgba(255, 23, 68, 0.72));
+  animation: skill-comet-pass 4.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.skill-lane {
+  position: relative;
+  overflow: hidden;
+}
+
+.skill-lane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  transform: translateX(-120%);
+  animation: skill-lane-scan 3.8s ease-in-out infinite;
+}
+
+@keyframes skill-field-breathe {
+  from {
+    transform: scale(1);
+    opacity: 0.36;
+  }
+  to {
+    transform: scale(1.025);
+    opacity: 0.58;
+  }
+}
+
+@keyframes skill-grid-drift {
+  from {
+    background-position: 0 0, 0 0, 50% 50%;
+  }
+  to {
+    background-position: 96px 0, 0 96px, 50% 50%;
+  }
+}
+
+@keyframes skill-core-float {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-10px);
+  }
+}
+
+@keyframes skill-orbit-spin {
+  from {
+    transform: rotate(0deg) scale(1);
+  }
+  to {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes skill-comet-pass {
+  0% {
+    opacity: 0;
+    transform: rotate(-20deg) translateX(-26rem);
+  }
+  18% {
+    opacity: 0.75;
+  }
+  62% {
+    opacity: 0.42;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(-20deg) translateX(34rem);
+  }
+}
+
+@keyframes skill-lane-scan {
+  0%, 45% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes inside-liquid-drift {
+  0% {
+    background-position: 0% 0%, 100% 20%, 50% 50%, 0% 40%;
+    transform: scale(1);
+  }
+  100% {
+    background-position: 10% 7%, 86% 32%, 50% 54%, 80% 54%;
+    transform: scale(1.025);
+  }
+}
+
+@keyframes inside-data-fall {
+  from {
+    background-position: 0 0, 0 0;
+  }
+  to {
+    background-position: 0 96px, 120px 0;
+  }
+}
+
+@keyframes inside-circuit-drift {
+  from {
+    background-position: 0 0, 0 0, 0 0, 0 0;
+  }
+  to {
+    background-position: 420px 260px, -360px 240px, 180px -180px, -220px 220px;
+  }
+}
+
+@keyframes inside-core-pulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 0.22;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 0.62;
+  }
+}
+
 /* Disable Theatre.js studio style overrides if we are in production */
 .theatre-studio-hider {
   display: none !important;
@@ -866,7 +1077,7 @@ body {
 
 /* Prevent content jump during scroll */
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 /* Ensure canvas doesn't flicker */

@@ -2,34 +2,18 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Lenis from "lenis";
 import { start3DPowerUpSequence, PowerUpStage, PowerUpStageValues } from "@/animations/powerUpSequence";
 import { startWormholeSequence, WormholeValues, WormholePhase } from "@/animations/wormholeLaptop";
 import Loader from "@/components/ui/Loader";
 import WelcomeText from "@/components/ui/WelcomeText";
 import CinematicHUD from "@/components/ui/CinematicHUD";
+import CinematicJourney from "@/components/ui/CinematicJourney";
 
 const Scene = dynamic(() => import("@/components/canvas/Scene"), {
   ssr: false,
   loading: () => null,
 });
-
-function useStageScale() {
-  const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const update = () => {
-      const widthScale = (window.innerWidth - 28) / 1760;
-      const heightScale = (window.innerHeight - 112) / 920;
-      setScale(Math.min(1, Math.max(0.58, Math.min(widthScale, heightScale))));
-    };
-
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  return scale;
-}
 
 const DEFAULT_WORMHOLE_VALUES: WormholeValues = {
   gravitationStrength: 0,
@@ -73,7 +57,7 @@ export default function Home() {
 
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Scroll progress — derived from window.scrollY through the 250vh hero track.
+  // Scroll progress — derived from window.scrollY through the 680vh hero track.
   // CSS sticky (on the inner element) provides the pinned experience.
   // No GSAP DOM manipulation = no React reconciliation conflict.
   const heroRef = useRef<HTMLDivElement>(null);
@@ -87,7 +71,9 @@ export default function Home() {
       if (scrollTrack <= 0) return;
       const heroTop = hero.getBoundingClientRect().top + window.scrollY;
       const scrolled = Math.max(0, window.scrollY - heroTop);
-      setScrollProgress(Math.min(1, scrolled / scrollTrack));
+      const nextProgress = Math.min(1, scrolled / scrollTrack);
+      document.documentElement.dataset.storyProgress = nextProgress.toFixed(4);
+      setScrollProgress(nextProgress);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -95,7 +81,34 @@ export default function Home() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const stageScale = useStageScale();
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+    window.scrollTo(0, 0);
+
+    const lenis = new Lenis({
+      duration: 1.25,
+      easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+      wheelMultiplier: 0.82,
+      touchMultiplier: 1.08,
+    });
+
+    let rafId = 0;
+    const raf = (time: number) => {
+      lenis.raf(time);
+      rafId = requestAnimationFrame(raf);
+    };
+
+    rafId = requestAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(rafId);
+      lenis.destroy();
+    };
+  }, []);
 
   const handleLoaderComplete = () => {
     setLoaderComplete(true);
@@ -124,6 +137,11 @@ export default function Home() {
 
   const isPowerUpActive = loaderComplete && powerUpStage !== "complete" && powerUpStage !== "idle";
   const wormholeActive = wormholePhase !== "idle" && wormholePhase !== "complete";
+  const storyVisible =
+    powerUpStage === "laptop" ||
+    powerUpStage === "cubes" ||
+    powerUpStage === "ui" ||
+    powerUpStage === "complete";
 
   return (
     <main className="relative w-full bg-[#000000]">
@@ -135,10 +153,10 @@ export default function Home() {
         <WelcomeText onComplete={handleWelcomeComplete} layoutMode="stacked" />
       )}
 
-      {/* PINNED HERO TRACK — 250vh outer creates the scroll distance.
+      {/* PINNED CINEMATIC TRACK — 680vh outer creates a full story arc.
           Inner sticky div stays fixed at top while user scrolls through it.
           CSS sticky = zero DOM mutation = React-safe. */}
-      <div ref={heroRef} className="relative w-full" style={{ height: "250vh" }}>
+      <div ref={heroRef} className="relative w-full" style={{ height: "680vh" }}>
         <div className="sticky top-0 h-screen w-full overflow-hidden">
           {/* 3D SCENE */}
           <div
@@ -159,7 +177,7 @@ export default function Home() {
           </div>
 
           {/* ═══ CHROMATIC ABERRATION OVERLAY (CSS) — vignette now handled by WebGL PostProcessing ═══ */}
-          {(powerUpStage === "ui" || powerUpStage === "complete") && (
+          {storyVisible && (
             <div
               className="absolute inset-0 z-[6] pointer-events-none mix-blend-screen"
               style={{
@@ -174,10 +192,18 @@ export default function Home() {
           )}
 
           {/* CINEMATIC HUD OVERLAY */}
-          <CinematicHUD visible={powerUpStage === "ui" || powerUpStage === "complete"} />
+          <CinematicJourney
+            scrollProgress={scrollProgress}
+            visible={storyVisible}
+          />
+          <CinematicHUD
+            visible={storyVisible}
+            scrollProgress={scrollProgress}
+          />
         </div>
       </div>
 
+      <div className="h-screen bg-black" aria-hidden="true" />
     </main>
   );
 }

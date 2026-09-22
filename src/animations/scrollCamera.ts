@@ -7,22 +7,102 @@ import * as THREE from "three";
 
 const sceneCoordinates = [
   {
-    // Station 1 — Close/Low: intimate view near the laptop, slightly looking up at globe behind
-    camera: new THREE.Vector3(0.5, 0.5, 8.0),
-    lookAt: new THREE.Vector3(0.8, 0.0, -1.0),
+    // Act I — hero establishing shot.
+    camera: new THREE.Vector3(0.15, 0.62, 8.4),
+    lookAt: new THREE.Vector3(0.72, -0.05, -1.18),
+    fov: 44,
+    progress: 0.0,
+  },
+  {
+    // Drift left first so the hero has parallax instead of a straight push.
+    camera: new THREE.Vector3(-0.95, 0.72, 7.0),
+    lookAt: new THREE.Vector3(0.95, -0.08, -1.22),
+    fov: 42,
+    progress: 0.075,
+  },
+  {
+    // The laptop starts taking over the frame as the entry probe launches.
+    camera: new THREE.Vector3(0.7, 0.42, 4.85),
+    lookAt: new THREE.Vector3(1.02, 0.04, -1.42),
+    fov: 37,
+    progress: 0.155,
+  },
+  {
+    // Act II — screen portal lock. The frame should feel like it is holding breath.
+    camera: new THREE.Vector3(1.06, 0.31, 2.45),
+    lookAt: new THREE.Vector3(1.0, 0.22, -1.9),
+    fov: 32,
+    progress: 0.235,
+  },
+  {
+    // Crossing the screen plane into the laptop world.
+    camera: new THREE.Vector3(0.72, 0.48, 1.06),
+    lookAt: new THREE.Vector3(0.42, 0.42, -4.05),
+    fov: 78,
+    progress: 0.34,
+  },
+  {
+    // Act II hold — inside-laptop world, calm enough to read.
+    camera: new THREE.Vector3(0.08, 0.66, 2.82),
+    lookAt: new THREE.Vector3(0.12, 0.2, -4.9),
+    fov: 64,
+    progress: 0.47,
+  },
+  {
+    // Pull back through the screen before skill constellation starts.
+    camera: new THREE.Vector3(1.25, 0.58, 3.85),
+    lookAt: new THREE.Vector3(0.72, 0.08, -1.7),
+    fov: 43,
+    progress: 0.55,
+  },
+  {
+    // Act III — emerge from the corridor into the technical constellation.
+    camera: new THREE.Vector3(-3.55, 2.16, 5.78),
+    lookAt: new THREE.Vector3(0.65, 0.84, -2.25),
+    fov: 49,
+    progress: 0.62,
+  },
+  {
+    // Orbit around cubes so their movement has narrative weight.
+    camera: new THREE.Vector3(2.9, 2.0, 6.7),
+    lookAt: new THREE.Vector3(0.45, 0.5, -2.35),
+    fov: 46,
+    progress: 0.72,
+  },
+  {
+    // Act III hold — let the recruiter read the actual skill map.
+    camera: new THREE.Vector3(-1.15, 1.35, 6.05),
+    lookAt: new THREE.Vector3(0.35, 0.46, -2.4),
     fov: 45,
+    progress: 0.81,
   },
   {
-    // Station 2 — Mid Swing: dynamic lateral swing to the left, mathematically positioned for full globe ring headroom
-    camera: new THREE.Vector3(-3.5, 2.8, 9.0),
-    lookAt: new THREE.Vector3(1.2, 1.3, -1.5),
+    // Act IV — drop to the grid: project beacons rise from the floor.
+    camera: new THREE.Vector3(-2.95, 0.92, 7.45),
+    lookAt: new THREE.Vector3(0.25, -1.5, -4.45),
+    fov: 54,
+    progress: 0.85,
+  },
+  {
+    // Act IV hold — skim across the mission runway.
+    camera: new THREE.Vector3(3.28, 0.86, 6.85),
+    lookAt: new THREE.Vector3(0.65, -1.22, -4.55),
+    fov: 47,
+    progress: 0.92,
+  },
+  {
+    // Act V — education/practice orbit, wider and calmer.
+    camera: new THREE.Vector3(4.75, 2.45, 8.95),
+    lookAt: new THREE.Vector3(1.25, 0.24, -3.72),
+    fov: 50,
+    progress: 0.96,
+  },
+  {
+    // Act VI — final portfolio contact shot, everything visible again.
+    camera: new THREE.Vector3(0.0, 4.95, 14.85),
+    lookAt: new THREE.Vector3(0.8, 0.18, -2.4),
     fov: 58,
-  },
-  {
-    // Station 3 — Wide Establishing: centered high angle, pulled in slightly closer to keep group unified
-    camera: new THREE.Vector3(0.0, 3.8, 12.5),
-    lookAt: new THREE.Vector3(0.5, 0.2, -2.5),
-    fov: 52,
+    progress: 1.0,
   },
 ];
 
@@ -36,53 +116,43 @@ export function CinematicCamera({
   const currentPos = useRef(new THREE.Vector3(0.5, 0.5, 8));
   const currentLookAt = useRef(new THREE.Vector3(0.8, 0, -1));
   const currentFov = useRef(45);
+  const smoothProgress = useRef(0);
 
-  // Station 1 is the hard-locked hero position — camera must be frozen here
-  // until the user physically scrolls. Clamp to 0 to prevent any drift.
   const clampedProgress = Math.max(0, Math.min(1, scrollProgress));
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const camera = state.camera as THREE.PerspectiveCamera;
+    smoothProgress.current = THREE.MathUtils.damp(smoothProgress.current, clampedProgress, 7.2, delta);
+    const p = smoothProgress.current;
 
-    // Camera locked at Station 1 — landing page phase
-    if (clampedProgress <= 0.75) {
-      const s1 = sceneCoordinates[0];
-      camera.position.copy(s1.camera);
-      camera.lookAt(s1.lookAt);
-      camera.fov = s1.fov + lensDistortion * 15;
-      camera.updateProjectionMatrix();
-      currentPos.current.copy(s1.camera);
-      currentLookAt.current.copy(s1.lookAt);
-      currentFov.current = s1.fov;
-      return;
-    }
-
-    // 0.75 → 1.0: Two-segment transition: S1→S2 (0.75→0.875), S2→S3 (0.875→1.0)
     let fromIdx = 0;
     let toIdx = 1;
-    let localT = (clampedProgress - 0.75) / 0.25;
 
-    if (localT <= 0.5) {
-      // First half: Station 1 → Station 2
-      localT = localT / 0.5;
-      fromIdx = 0;
-      toIdx = 1;
-    } else {
-      // Second half: Station 2 → Station 3
-      localT = (localT - 0.5) / 0.5;
-      fromIdx = 1;
-      toIdx = 2;
+    for (let i = 0; i < sceneCoordinates.length - 1; i++) {
+      const from = sceneCoordinates[i];
+      const to = sceneCoordinates[i + 1];
+      if (p >= from.progress && p <= to.progress) {
+        fromIdx = i;
+        toIdx = i + 1;
+        break;
+      }
     }
 
-    const easedT = localT * localT * (3.0 - 2.0 * localT);
     const from = sceneCoordinates[fromIdx];
     const to = sceneCoordinates[toIdx];
+    const segmentLength = Math.max(0.001, to.progress - from.progress);
+    const localT = THREE.MathUtils.clamp((p - from.progress) / segmentLength, 0, 1);
+    const easedT = localT * localT * (3.0 - 2.0 * localT);
 
     currentPos.current.lerpVectors(from.camera, to.camera, easedT);
     currentLookAt.current.lerpVectors(from.lookAt, to.lookAt, easedT);
     currentFov.current = THREE.MathUtils.lerp(from.fov, to.fov, easedT);
 
-    camera.position.copy(currentPos.current);
+    // Subtle handheld-cinema drift while scrolling; very small so the scene stays premium.
+    const time = state.clock.getElapsedTime();
+    const drift = Math.sin(time * 0.45 + p * Math.PI * 2) * 0.01;
+
+    camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0));
     camera.lookAt(currentLookAt.current);
     camera.fov = currentFov.current + lensDistortion * 15;
     camera.updateProjectionMatrix();

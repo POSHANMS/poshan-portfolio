@@ -12,21 +12,34 @@ const SCREEN_MATERIAL_NAME = "Material.004";
 interface FloatingLaptopProps {
   powerUpStage?: string;
   laptopOpacity?: number;
+  scrollProgress?: number;
   wormholeValues?: WormholeValues;
   wormholeActive?: boolean;
   laptopScreenRef?: React.MutableRefObject<THREE.Mesh | null>;
 }
 
 const TERMINAL_LINES = [
-  "[ CORE ARCHITECTURE ONLINE ]",
-  "> USER_IDENTITY: POSHAN_M_S",
-  "> SYSTEM_STATUS: OPERATIONAL",
-  "> SCROLL TO INITIALIZE HOLOGRAM INTERFACE_",
+  "[ POSHAN MS PORTFOLIO ]",
+  "> IDENTITY: POSHAN_MS",
+  "> ROLE: FULL_STACK_DEVELOPER_AI_DEVELOPER",
+  "> EDUCATION: BE_CSE_2026_CGPA_8.16",
+  "> SCROLL THROUGH THE SCREEN_",
 ];
+
+function smoothstep(edge0: number, edge1: number, value: number) {
+  const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+function phase(progress: number, start: number, end: number) {
+  const fade = Math.min(0.08, (end - start) * 0.4);
+  return smoothstep(start, start + fade, progress) * (1 - smoothstep(end - fade, end, progress));
+}
 
 export default function FloatingLaptop({
   powerUpStage = "complete",
   laptopOpacity = 1,
+  scrollProgress = 0,
   wormholeValues,
   wormholeActive = false,
   laptopScreenRef,
@@ -338,20 +351,48 @@ export default function FloatingLaptop({
     // NORMAL MODE — bobbing & mouse reactivity
     // ═══════════════════════════════════════════════════════════════
     if (bobRef.current) {
-      bobRef.current.position.y = Math.sin(t * 0.85) * 0.15;
+      const portal = phase(scrollProgress, 0.09, 0.36);
+      const inside = phase(scrollProgress, 0.22, 0.56);
+      bobRef.current.position.y = Math.sin(t * 0.85) * 0.15 * (1 - portal * 0.55) + inside * 0.08;
     }
 
     if (groupRef.current) {
+      const portal = phase(scrollProgress, 0.09, 0.36);
+      const inside = phase(scrollProgress, 0.22, 0.56);
+      const pullback = smoothstep(0.47, 0.57, scrollProgress) * (1 - smoothstep(0.76, 0.84, scrollProgress));
+      const skills = phase(scrollProgress, 0.55, 0.82);
+      const projects = phase(scrollProgress, 0.84, 0.93);
+      const finalPullback = smoothstep(0.82, 1, scrollProgress);
+
+      const targetX = laptopX - portal * 0.1 - inside * 0.5 + pullback * 0.34 + skills * 2.25 - projects * 0.22 + finalPullback * 0.08;
+      const targetY = -0.52 + portal * 0.2 + inside * 0.22 + pullback * 0.12 + skills * 0.18 + projects * 0.05 - finalPullback * 0.12;
+      const targetZ = -1.14 + portal * 0.58 - inside * 0.82 + pullback * 1.26 - skills * 1.62 - projects * 0.2;
+      const targetScale = laptopOpacity * (1.21 + portal * 0.82 - inside * 0.36 + pullback * 0.44 - skills * 0.62 + projects * 0.14 - finalPullback * 0.1);
+
+      groupRef.current.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.07);
+      groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.07);
+
       groupRef.current.rotation.y = THREE.MathUtils.lerp(
         groupRef.current.rotation.y,
-        -Math.PI / 2 - 0.15 + state.pointer.x * 0.045,
-        0.045,
+        -Math.PI / 2 - 0.15 + state.pointer.x * 0.045 + portal * 0.42 - inside * 0.28 + skills * 0.78 - projects * 0.14,
+        0.07,
       );
       groupRef.current.rotation.x = THREE.MathUtils.lerp(
         groupRef.current.rotation.x,
-        0.09 - state.pointer.y * 0.035,
-        0.045,
+        0.09 - state.pointer.y * 0.035 - portal * 0.16 + inside * 0.18 - pullback * 0.16 + projects * 0.04,
+        0.07,
       );
+      groupRef.current.rotation.z = THREE.MathUtils.lerp(
+        groupRef.current.rotation.z,
+        -0.03 + portal * 0.045 - inside * 0.035 - projects * 0.02,
+        0.07,
+      );
+
+      if (screenMeshRef.current) {
+        const mat = screenMeshRef.current.material as THREE.MeshStandardMaterial;
+        const storyScreenGlow = 0.58 + portal * 1.05 + inside * 0.35 + pullback * 0.24;
+        mat.emissiveIntensity = THREE.MathUtils.lerp(mat.emissiveIntensity, storyScreenGlow, 0.05);
+      }
     }
 
     if (kbLightRef.current) {
@@ -361,6 +402,7 @@ export default function FloatingLaptop({
       const proximity = Math.exp(-dist * dist * 4.0);
 
       kbLightRef.current.intensity = (0.8 + proximity * 2.5) * laptopOpacity;
+      kbLightRef.current.intensity += phase(scrollProgress, 0.09, 0.36) * 2.6;
       kbLightRef.current.distance = 2.5 + proximity * 2.0;
     }
   });
