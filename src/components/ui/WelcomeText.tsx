@@ -8,15 +8,15 @@ interface WelcomeTextProps {
   layoutMode?: "stacked" | "cinematic-pan";
 }
 
-const FULL_TEXT = "WELCOME TO MY PORTFOLIO";
-const LINE_1 = "WELCOME TO";
-const LINE_2 = "MY PORTFOLIO";
+const FULL_TEXT = "POSHAN MS PORTFOLIO";
+const LINE_1 = "POSHAN MS";
+const LINE_2 = "PORTFOLIO";
 const BOOT_LINES = [
-  "// NEURAL LINK ONLINE //",
-  "INITIALIZING INTERFACE...",
-  "CALIBRATING OPTICAL SENSORS...",
-  "ESTABLISHING UPLINK...",
-  "REALITY ANCHOR: LOCKED",
+  "// FULL STACK DEVELOPER //",
+  "BE COMPUTER SCIENCE ENGINEERING",
+  "NAVKIS COLLEGE OF ENGINEERING",
+  "CGPA 8.16 / 2026 GRADUATE",
+  "OPENING PORTFOLIO WORLD",
 ];
 
 type Phase = "boot" | "typing" | "surge" | "hold" | "warp";
@@ -382,14 +382,14 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
 
   const statusLabel =
     phase === "boot"
-      ? `SYSTEM BOOT ${Math.round(((bootIndex + 1) / BOOT_LINES.length) * 100)}%`
+      ? `PORTFOLIO ENTRY ${Math.round(((bootIndex + 1) / BOOT_LINES.length) * 100)}%`
       : phase === "typing"
-      ? `NEURAL UPLINK ${Math.round((displayText.length / FULL_TEXT.length) * 100)}%`
+      ? `POSHAN MS ${Math.round((displayText.length / FULL_TEXT.length) * 100)}%`
       : phase === "surge"
-      ? "POWER SURGE DETECTED"
+      ? "SCREEN PORTAL IGNITED"
       : phase === "hold"
-      ? "INTERFACE STABILIZED"
-      : "WARPING TO CORE...";
+      ? "HERO SCENE READY"
+      : "ENTERING PORTFOLIO...";
 
   return (
     <div
@@ -443,7 +443,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
       {/* ═══ TOP BOOT INFO ═══ */}
       <div className="absolute top-[10vh] left-0 right-0 text-center">
         <p className="font-mono text-[9px] uppercase tracking-[0.5em] text-[#ff0033]/40">
-          // Neural Interface v2.4.0 // Boot Sequence
+          // Poshan MS // Portfolio Entry
         </p>
         {phase === "boot" && (
           <div className="mt-3 flex justify-center">
@@ -536,7 +536,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
             className="font-mono text-[10px] uppercase tracking-[0.6em] text-white/50"
             style={{ textShadow: "0 0 10px rgba(255,0,51,0.35)" }}
           >
-            // Reality Anchor Established
+            // Computer Science Graduate Portfolio
           </p>
         </div>
       </div>
