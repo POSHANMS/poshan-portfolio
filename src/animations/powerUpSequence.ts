@@ -54,65 +54,64 @@ export function start3DPowerUpSequence(callbacks: PowerUpCallbacks) {
   });
 
   // ═══════════════════════════════════════════════════════════════
-  // TOTAL DURATION: ~16.5 seconds of cinematic power-up
-  // Order: Floor → Stars → Globe → Laptop → Cubes → UI
+  // TOTAL DURATION: ~8.8 seconds of cinematic power-up
+  // The portfolio overlay arrives while the world is still forming, so
+  // the first complete scene reads as Poshan's hero instead of a hidden boot.
   // ═══════════════════════════════════════════════════════════════
 
-  // ── SCENE FADE-IN (0s → 2.5s) ──
-  // Very slow fade from black so the eye adjusts
+  // ── SCENE FADE-IN (0s → 1.4s) ──
   tl.to(
     values,
     {
       sceneOpacity: 1,
-      duration: 2.5,
+      duration: 1.4,
       ease: "power2.inOut",
       onUpdate: update,
     },
     0
   );
 
-  // ── STAGE 1: FLOOR GRID IGNITION (0.5s → 5s) ──
-  // 4.5 seconds — perspective grid illuminates outward from center
-  tl.add(() => callbacks.onStageChange?.("floor"), 0.5);
+  // ── STAGE 1: FLOOR GRID IGNITION (0.25s → 2.65s) ──
+  tl.add(() => callbacks.onStageChange?.("floor"), 0.25);
 
   tl.to(
     values,
     {
       floorOpacity: 1,
-      duration: 4.5,
+      duration: 2.4,
       ease: "power2.inOut",
       onUpdate: update,
     },
-    0.5
+    0.25
   );
 
-  // Electrical flicker: unstable power flow during early boot (2s → 4s)
+  // Electrical flicker: unstable power flow during early boot.
   tl.to(
     values,
     {
       floorFlicker: 0.25,
       duration: 0.08,
-      repeat: 12,
+      repeat: 7,
       yoyo: true,
       ease: "rough({ template: none, strength: 1.2, points: 16, taper: 'none', randomize: true, clamp: true })",
       onUpdate: update,
     },
-    2
+    1.05
   );
 
-  // Power stabilizes (4s → 5s)
+  // Power stabilizes.
   tl.to(
     values,
     {
       floorFlicker: 1,
-      duration: 1,
+      duration: 0.55,
       ease: "power2.out",
       onUpdate: update,
     },
-    4
+    2.05
   );
 
-  // Brief power surge at 5s (capacitor discharge into the grid)
+  // Brief power surge through the grid.
   tl.to(
     values,
     {
@@ -123,108 +122,102 @@ export function start3DPowerUpSequence(callbacks: PowerUpCallbacks) {
       ease: "power2.inOut",
       onUpdate: update,
     },
-    5
+    2.6
   );
 
-  // ── STAGE 2: DEEP STARFIELD EMERGENCE (2.5s → 6.5s) ──
-  // 4 seconds — deep space slowly revealing itself behind the grid
-  tl.add(() => callbacks.onStageChange?.("stars"), 2.5);
+  // ── STAGE 2: DEEP STARFIELD EMERGENCE (0.9s → 3.5s) ──
+  tl.add(() => callbacks.onStageChange?.("stars"), 0.9);
 
   tl.to(
     values,
     {
       starsOpacity: 1,
-      duration: 4,
+      duration: 2.6,
       ease: "power2.inOut",
       onUpdate: update,
     },
-    2.5
+    0.9
   );
 
-  // ── STAGE 3: REACTOR GLOBE WARM-UP (5s → 9s) ──
-  // 4 seconds total — dark metal transitions to crimson core over 1.8s
-  // then holds with holographic flicker
-  tl.add(() => callbacks.onStageChange?.("globe"), 5);
+  // ── STAGE 3: REACTOR GLOBE WARM-UP (2.4s → 4.6s) ──
+  tl.add(() => callbacks.onStageChange?.("globe"), 2.4);
 
   tl.to(
     values,
     {
       globeOpacity: 1,
-      duration: 1.8,
+      duration: 1.15,
       ease: "power2.inOut",
       onUpdate: update,
     },
-    5
+    2.4
   );
 
-  // Globe has a "hologram flicker" as it fully materializes (7s → 8s)
+  // Globe has a short hologram flicker as it fully materializes.
   tl.to(
     values,
     {
       globeOpacity: 0.5,
       duration: 0.05,
-      repeat: 10,
+      repeat: 5,
       yoyo: true,
       ease: "rough({ strength: 1, points: 8, randomize: true })",
       onUpdate: update,
     },
-    7
+    3.45
   );
 
   tl.to(
     values,
     {
       globeOpacity: 1,
-      duration: 1,
+      duration: 0.7,
       ease: "power2.out",
       onUpdate: update,
     },
-    8
+    3.95
   );
 
-  // ── STAGE 4: LAPTOP SMOOTH MATERIALIZATION (8.5s → 10.0s) ──
-  // 1.5 seconds — premium cinematic scale-in, zero flicker
-  tl.add(() => callbacks.onStageChange?.("laptop"), 8.5);
+  // ── STAGE 4: LAPTOP SMOOTH MATERIALIZATION (4.35s → 5.75s) ──
+  tl.add(() => callbacks.onStageChange?.("laptop"), 4.35);
 
   tl.to(
     values,
     {
       laptopOpacity: 1,
-      duration: 1.5,
+      duration: 1.4,
       ease: "back.out(1.1)",
       onUpdate: update,
     },
-    8.5
+    4.35
   );
 
-  // ── STAGE 5: TECH CUBES MATERIALIZE (10.5s → 14.5s) ──
-  // 4 seconds — crystalline objects phasing in
-  tl.add(() => callbacks.onStageChange?.("cubes"), 10.5);
+  // ── STAGE 5: TECH CUBES MATERIALIZE (5.35s → 7.95s) ──
+  tl.add(() => callbacks.onStageChange?.("cubes"), 5.35);
 
   tl.to(
     values,
     {
       cubesOpacity: 1,
-      duration: 4,
+      duration: 2.6,
       ease: "power2.inOut",
       onUpdate: update,
     },
-    10.5
+    5.35
   );
 
-  // ── STAGE 6: UI OVERLAY & NAVBAR REVEAL (13.5s → 16.5s) ──
-  // 3 seconds — HUD elements fading in last
-  tl.add(() => callbacks.onStageChange?.("ui"), 13.5);
+  // ── STAGE 6: UI OVERLAY & NAVBAR REVEAL (5.1s → 8.8s) ──
+  tl.add(() => callbacks.onStageChange?.("ui"), 5.1);
 
   tl.to(
     values,
     {
       uiOpacity: 1,
-      duration: 3,
+      duration: 3.7,
       ease: "power3.out",
       onUpdate: update,
     },
-    13.5
+    5.1
   );
 
   return tl;
