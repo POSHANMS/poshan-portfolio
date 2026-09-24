@@ -360,21 +360,23 @@ export default function FloatingLaptop({
       const portal = phase(scrollProgress, 0.09, 0.36);
       const inside = phase(scrollProgress, 0.22, 0.56);
       const pullback = smoothstep(0.47, 0.57, scrollProgress) * (1 - smoothstep(0.76, 0.84, scrollProgress));
-      const skills = phase(scrollProgress, 0.55, 0.82);
+      // The skill vault is a separate room, so the laptop exits rather than
+      // competing with the artifacts that explain the stack.
+      const skills = smoothstep(0.55, 0.62, scrollProgress) * (1 - smoothstep(0.80, 0.85, scrollProgress));
       const projects = phase(scrollProgress, 0.84, 0.93);
       const finalPullback = smoothstep(0.82, 1, scrollProgress);
 
-      const targetX = laptopX - portal * 0.1 - inside * 0.5 + pullback * 0.34 + skills * 2.25 - projects * 0.22 + finalPullback * 0.08;
-      const targetY = -0.52 + portal * 0.2 + inside * 0.22 + pullback * 0.12 + skills * 0.18 + projects * 0.05 - finalPullback * 0.12;
-      const targetZ = -1.14 + portal * 0.58 - inside * 0.82 + pullback * 1.26 - skills * 1.62 - projects * 0.2;
-      const targetScale = laptopOpacity * (1.21 + portal * 0.82 - inside * 0.36 + pullback * 0.44 - skills * 0.62 + projects * 0.14 - finalPullback * 0.1);
+      const targetX = laptopX - portal * 0.1 - inside * 0.5 + pullback * 0.34 + skills * 7.8 - projects * 0.22 + finalPullback * 0.08;
+      const targetY = -0.52 + portal * 0.2 + inside * 0.22 + pullback * 0.12 + skills * 1.75 + projects * 0.05 - finalPullback * 0.12;
+      const targetZ = -1.14 + portal * 0.58 - inside * 0.82 + pullback * 1.26 - skills * 7.2 - projects * 0.2;
+      const targetScale = laptopOpacity * (1.21 + portal * 0.82 - inside * 0.36 + pullback * 0.44 - skills * 1.05 + projects * 0.14 - finalPullback * 0.1);
 
       groupRef.current.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.07);
       groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.07);
 
       groupRef.current.rotation.y = THREE.MathUtils.lerp(
         groupRef.current.rotation.y,
-        -Math.PI / 2 - 0.15 + state.pointer.x * 0.045 + portal * 0.42 - inside * 0.28 + skills * 0.78 - projects * 0.14,
+        -Math.PI / 2 - 0.15 + state.pointer.x * 0.045 + portal * 0.42 - inside * 0.28 + skills * 1.1 - projects * 0.14,
         0.07,
       );
       groupRef.current.rotation.x = THREE.MathUtils.lerp(
