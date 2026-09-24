@@ -1,18 +1,12 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
-  BrainCircuit,
-  Braces,
-  Cpu,
-  Database,
   GraduationCap,
   Mail,
   Network,
   Radio,
-  Server,
-  ShieldCheck,
   TerminalSquare,
 } from "lucide-react";
 import { JOURNEY_MILESTONES, PROFILE, PROJECTS, RESUME_SUMMARY, SKILL_GROUPS, STATS } from "@/utils/constants";
@@ -27,8 +21,6 @@ const chapters: { id: ChapterId; act: string; label: string; range: [number, num
   { id: "journey", act: "ACT V", label: "Education", range: [0.93, 0.97] },
   { id: "contact", act: "ACT VI", label: "Contact", range: [0.975, 1.0] },
 ];
-
-const skillIcons = [Braces, Server, Database, Network, BrainCircuit, ShieldCheck];
 
 function clamp(value: number, min = 0, max = 1) {
   return Math.max(min, Math.min(max, value));
@@ -197,11 +189,152 @@ function ActTwoAboutWorld({ presence, progress }: { presence: number; progress: 
   );
 }
 
-function SkillsChapter({ presence, progress }: { presence: number; progress: number }) {
-  const groups = SKILL_GROUPS.slice(0, 12);
-  const coreGroups = groups.slice(0, 6);
-  const supportGroups = groups.slice(6);
-  const activeIndex = Math.min(groups.length - 1, Math.floor(progress * groups.length));
+type CubeModuleId = "INTERFACE" | "RUNTIME" | "SYSTEMS" | "DATA";
+type CubeHoverTarget = { role: CubeModuleId; x: number; y: number };
+
+const CUBE_SKILL_MODULES: Record<CubeModuleId, {
+  title: string;
+  description: string;
+  groups: { label: string; skills: readonly string[] }[];
+}> = {
+  INTERFACE: {
+    title: "Interface Module",
+    description: "The surfaces people see and use.",
+    groups: [
+      { label: SKILL_GROUPS[1][0], skills: SKILL_GROUPS[1][1] },
+      { label: SKILL_GROUPS[6][0], skills: SKILL_GROUPS[6][1] },
+    ],
+  },
+  RUNTIME: {
+    title: "Runtime Module",
+    description: "The services that make software respond in real time.",
+    groups: [
+      { label: SKILL_GROUPS[2][0], skills: SKILL_GROUPS[2][1] },
+      { label: SKILL_GROUPS[4][0], skills: SKILL_GROUPS[4][1] },
+    ],
+  },
+  SYSTEMS: {
+    title: "Systems Module",
+    description: "The logic, models, and foundations behind the build.",
+    groups: [
+      { label: SKILL_GROUPS[0][0], skills: SKILL_GROUPS[0][1] },
+      { label: SKILL_GROUPS[5][0], skills: SKILL_GROUPS[5][1] },
+      { label: SKILL_GROUPS[10][0], skills: SKILL_GROUPS[10][1] },
+      { label: SKILL_GROUPS[11][0], skills: SKILL_GROUPS[11][1] },
+    ],
+  },
+  DATA: {
+    title: "Data Module",
+    description: "Where information is stored, shipped, protected, and observed.",
+    groups: [
+      { label: SKILL_GROUPS[3][0], skills: SKILL_GROUPS[3][1] },
+      { label: SKILL_GROUPS[7][0], skills: SKILL_GROUPS[7][1] },
+      { label: SKILL_GROUPS[8][0], skills: SKILL_GROUPS[8][1] },
+      { label: SKILL_GROUPS[9][0], skills: SKILL_GROUPS[9][1] },
+    ],
+  },
+};
+
+const SKILL_CONNECTIONS: Partial<Record<string, readonly string[]>> = {
+  "React (18)": ["Next.js", "Framer Motion", "Tailwind CSS", "Leaflet.js"],
+  "Next.js": ["React (18)", "TypeScript", "Vercel", "Tailwind CSS"],
+  Python: ["Flask", "SQLAlchemy", "Scikit-learn", "Google ADK"],
+  JavaScript: ["React (18)", "Node.js", "Express", "Socket.io"],
+  TypeScript: ["Next.js", "React (18)", "Vite", "Framer Motion"],
+  Java: ["Spring Boot", "OOP", "DSA", "REST APIs"],
+  SQL: ["PostgreSQL", "MySQL", "SQLite3", "SQLAlchemy"],
+  Flask: ["Python", "SQLAlchemy", "REST APIs", "Flask-based ML integration (HealthGPT)"],
+  "Node.js": ["JavaScript", "Express", "Socket.io", "JWT"],
+  PostgreSQL: ["SQL", "Redis", "Docker", "Vercel"],
+  MongoDB: ["Express", "Node.js", "Cloudinary", "JWT"],
+  Docker: ["Git", "GitHub", "Vercel", "Railway"],
+  "Google ADK": ["Gemini", "Flask", "Python", "Model training & evaluation"],
+};
+
+function CubeHoverPanel({ module, onPanelHoverChange }: { module: CubeModuleId | null; onPanelHoverChange: (hovered: boolean) => void }) {
+  const details = module ? CUBE_SKILL_MODULES[module] : null;
+  const [focusedSkill, setFocusedSkill] = useState<string | null>(null);
+  const relatedSkills = focusedSkill ? SKILL_CONNECTIONS[focusedSkill] ?? [] : [];
+
+  useEffect(() => {
+    setFocusedSkill(details?.groups[0]?.skills[0] ?? null);
+  }, [details]);
+
+  return (
+    <aside
+      className="absolute right-3 top-[8vh] z-30 w-[min(24rem,calc(100vw-1.5rem))] border border-[#ff6b7f]/65 bg-[#0a0104]/82 p-4 shadow-[0_0_56px_rgba(255,23,68,0.22)] backdrop-blur-xl md:right-8 md:top-[11vh] md:w-[min(28rem,36vw)] md:p-5"
+      style={{
+        opacity: details ? 1 : 0,
+        pointerEvents: details ? "auto" : "none",
+        transform: `translate3d(${details ? 0 : 22}px, ${details ? 0 : -8}px, 0)`,
+        filter: `blur(${details ? 0 : 3}px)`,
+        transition: "opacity 180ms ease, transform 240ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms ease",
+      }}
+      onMouseEnter={() => onPanelHoverChange(true)}
+      onMouseLeave={() => onPanelHoverChange(false)}
+      aria-hidden={!details}
+    >
+      {details && (
+        <>
+          <div className="mb-4 flex items-start justify-between border-b border-[#ff6b7f]/35 pb-3">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.26em] text-[#ff8a98]">Skill artifact open</p>
+              <h3 className="mt-2 text-2xl font-black uppercase leading-none text-white">{details.title}</h3>
+            </div>
+            <span className="mt-1 h-2.5 w-2.5 bg-white shadow-[0_0_18px_rgba(255,255,255,0.86)]" />
+          </div>
+          <p className="mb-4 text-sm leading-6 text-white/76">{details.description}</p>
+          <div className="max-h-[38vh] space-y-3 overflow-y-auto pr-1">
+            {details.groups.map((group) => (
+              <section key={group.label}>
+                <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-[#ff7890]">{group.label}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {group.skills.map((skill) => (
+                    <button
+                      key={skill}
+                      type="button"
+                      onMouseEnter={() => setFocusedSkill(skill)}
+                      onFocus={() => setFocusedSkill(skill)}
+                      className={`border px-2 py-1 font-mono text-[10px] leading-4 transition ${focusedSkill === skill ? "border-[#ff7185] bg-[#ff1744]/22 text-white shadow-[0_0_16px_rgba(255,23,68,0.22)]" : "border-white/18 bg-white/[0.06] text-white/76 hover:border-[#ff7185]/70 hover:text-white"}`}
+                    >
+                      {skill}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+          <div className="mt-4 border-t border-white/12 pt-3">
+            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-[#ff8a98]">{focusedSkill ?? "Skill context"}</p>
+            <div className="mt-2 flex min-h-7 flex-wrap items-center gap-1.5">
+              {relatedSkills.length > 0 ? relatedSkills.map((skill) => (
+                <span key={skill} className="border border-[#ff6b7f]/35 bg-[#ff1744]/10 px-2 py-1 font-mono text-[9px] text-white/86">{skill}</span>
+              )) : <span className="font-mono text-[10px] text-white/46">Part of the {details.title.toLowerCase()}.</span>}
+            </div>
+          </div>
+        </>
+      )}
+    </aside>
+  );
+}
+
+function SkillsChapter({
+  presence,
+  progress,
+  hoveredCube,
+  cubeTargets,
+  onCubeHoverChange,
+  onPanelHoverChange,
+}: {
+  presence: number;
+  progress: number;
+  hoveredCube: CubeModuleId | null;
+  cubeTargets: Partial<Record<CubeModuleId, CubeHoverTarget>>;
+  onCubeHoverChange: (module: CubeModuleId | null) => void;
+  onPanelHoverChange: (hovered: boolean) => void;
+}) {
+  const reveal = smoothstep(0.02, 0.2, progress);
+  const cubeHitAreas: CubeModuleId[] = ["INTERFACE", "RUNTIME", "SYSTEMS", "DATA"];
 
   return (
     <div
@@ -214,107 +347,43 @@ function SkillsChapter({ presence, progress }: { presence: number; progress: num
         transition: "opacity 160ms linear, transform 160ms linear, filter 160ms linear",
       }}
     >
-      <div className="skill-engine-field absolute inset-0" />
-      <div className="skill-engine-grid absolute inset-0" />
-      <div className="skill-engine-comet absolute left-[44%] top-[52%]" />
-      <div className="absolute inset-y-0 left-0 w-[72vw] bg-gradient-to-r from-black/92 via-black/70 to-transparent" />
-      <div className="absolute inset-y-0 right-0 hidden w-[44vw] bg-gradient-to-l from-black/82 via-black/34 to-transparent md:block" />
+      <div className="skill-vault-field absolute inset-0" />
+      <div className="skill-vault-grain absolute inset-0" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_50%,transparent_0%,rgba(2,0,1,0.24)_48%,rgba(0,0,0,0.82)_100%)]" />
 
-      <div className="absolute left-6 top-[8vh] w-[min(37rem,calc(100vw-3rem))] md:left-16">
-        <Kicker act="ACT III" label="Skill Constellation" />
-        <h2 className="max-w-lg text-4xl font-black uppercase leading-[0.9] text-white md:text-6xl">
-          Stack Engine
-        </h2>
-        <p className="mt-5 max-w-lg text-sm leading-7 text-white/64">
-          The laptop pulls back and the floating cubes become a map of the tools Poshan uses to build, ship, secure, and explain software.
-        </p>
-        <div className="mt-5 flex max-w-xl flex-wrap gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/70">
-          {["Python", "React", "Flask", "SQL", "Google ADK", "Docker"].map((item, index) => (
-            <span
-              key={item}
-              className="border border-[#ff1744]/35 bg-[#ff1744]/10 px-3 py-2 text-[#ffd7de]"
-              style={{
-                opacity: smoothstep(index * 0.035, index * 0.035 + 0.16, progress),
-                transform: `translateY(${(1 - smoothstep(index * 0.035, index * 0.035 + 0.16, progress)) * 12}px)`,
-              }}
-            >
-              {item}
-            </span>
-          ))}
-        </div>
+      <div className="absolute left-6 top-[9vh] w-[min(27rem,calc(100vw-3rem))] md:left-16" style={{ opacity: reveal }}>
+        <Kicker act="ACT III" label="Skill Vault" />
+        <h2 className="max-w-md text-4xl font-black uppercase leading-[0.9] text-white md:text-6xl">Skills,<br />assembled.</h2>
+        <p className="mt-4 max-w-xs text-sm leading-7 text-white/62">Four artifacts hold the tools behind the work. Hover one to inspect the stack.</p>
       </div>
 
-      <div className="skill-engine-core absolute left-1/2 top-[50%] hidden h-[23rem] w-[23rem] -translate-x-1/2 -translate-y-1/2 md:block">
-        <div className="absolute inset-0 rounded-full border border-[#ff1744]/28" />
-        <div className="absolute inset-[12%] rounded-full border border-white/16" />
-        <div className="absolute inset-[28%] rounded-full border border-[#ff6b7f]/22" />
-        <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 border border-white/45 bg-[#ff1744]/15 shadow-[0_0_70px_rgba(255,23,68,0.55)]" />
-        {coreGroups.map(([group], index) => {
-          const angle = (Math.PI * 2 * index) / coreGroups.length - Math.PI / 2;
-          const reveal = smoothstep(0.08 + index * 0.045, 0.25 + index * 0.045, progress);
-          const x = Math.cos(angle) * 10.1;
-          const y = Math.sin(angle) * 10.1;
-          const Icon = skillIcons[index] ?? Cpu;
-          return (
-            <div
-              key={group}
-              className="absolute flex h-24 w-32 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center border border-white/14 bg-black/35 text-center shadow-[0_0_34px_rgba(255,23,68,0.12)] backdrop-blur-sm"
-              style={{
-                left: `calc(50% + ${x}rem)`,
-                top: `calc(50% + ${y}rem)`,
-                opacity: reveal,
-                transform: `translate(-50%, -50%) scale(${0.84 + reveal * 0.16})`,
-              }}
-            >
-              <Icon className="mb-2 h-5 w-5 text-[#ff6b7f]" />
-              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white">{group}</span>
-            </div>
-          );
-        })}
+      <div className="absolute bottom-[11vh] left-16 hidden font-mono text-[10px] uppercase tracking-[0.24em] text-[#ffb0ba] lg:block" style={{ opacity: 0.42 + (hoveredCube ? 0.58 : 0) }}>
+        {hoveredCube ? "Artifact expanded" : "Hover an artifact to explore"}
       </div>
 
-      <div className="absolute bottom-[11vh] left-6 right-6 grid max-h-[40vh] gap-3 overflow-hidden md:left-16 md:right-16 md:grid-cols-3">
-        {supportGroups.slice(0, 6).map(([group, skills], index) => {
-          const laneIndex = index + 6;
-          const reveal = smoothstep(0.22 + index * 0.04, 0.42 + index * 0.04, progress);
-          const active = activeIndex === laneIndex || activeIndex === laneIndex - 1;
-          return (
-            <div
-              key={group}
-              className="skill-lane min-h-[5.4rem] border-l border-[#ff1744]/35 bg-black/55 px-4 py-3 backdrop-blur-[2px]"
-              style={{
-                opacity: reveal,
-                transform: `translateY(${(1 - reveal) * 22}px)`,
-                boxShadow: active ? "0 0 32px rgba(255,23,68,0.2)" : "none",
-              }}
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#ff6b7f]">{group}</h3>
-                <span className="font-mono text-[9px] text-white/28">0{laneIndex + 1}</span>
-              </div>
-              <p className="line-clamp-2 text-xs leading-5 text-white/72">{skills.slice(0, 5).join(" / ")}</p>
-            </div>
-          );
-        })}
-      </div>
+      {cubeHitAreas.map((module) => {
+        const target = cubeTargets[module];
+        return (
+          <button
+            key={module}
+            type="button"
+            aria-label={`Inspect ${CUBE_SKILL_MODULES[module].title}`}
+            className="pointer-events-auto absolute z-10 h-[clamp(10rem,15vw,18rem)] w-[clamp(10rem,15vw,18rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent outline-none"
+            style={{
+              left: target ? `${target.x}%` : "-30%",
+              top: target ? `${target.y}%` : "-30%",
+              pointerEvents: target ? "auto" : "none",
+            }}
+            onMouseEnter={() => onCubeHoverChange(module)}
+            onMouseLeave={() => onCubeHoverChange(null)}
+            onFocus={() => onCubeHoverChange(module)}
+            onBlur={() => onCubeHoverChange(null)}
+            onClick={() => onCubeHoverChange(module)}
+          />
+        );
+      })}
 
-      <div className="absolute right-6 top-[10vh] hidden w-[min(32rem,34vw)] bg-black/46 p-5 backdrop-blur-[2px] md:block">
-        <div className="mb-4 flex items-center justify-between border-b border-[#ff1744]/28 pb-3 font-mono text-[10px] uppercase tracking-[0.18em]">
-          <span className="text-[#ff6b7f]">Live Stack Readout</span>
-          <span className="text-white/32">{Math.round(progress * 100).toString().padStart(2, "0")}%</span>
-        </div>
-        <div className="space-y-3">
-          {coreGroups.map(([group, skills], index) => {
-            const reveal = smoothstep(index * 0.055, index * 0.055 + 0.2, progress);
-            return (
-              <div key={group} className="grid grid-cols-[7rem_1fr] gap-4" style={{ opacity: reveal }}>
-                <h3 className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#ff6b7f]">{group}</h3>
-                <p className="text-xs leading-5 text-white/64">{skills.slice(0, 6).join(" / ")}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <CubeHoverPanel module={hoveredCube} onPanelHoverChange={onPanelHoverChange} />
     </div>
   );
 }
@@ -422,6 +491,54 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
 }
 
 export default function CinematicJourney({ scrollProgress, visible }: { scrollProgress: number; visible: boolean }) {
+  const [hoveredCube, setHoveredCube] = useState<CubeModuleId | null>(null);
+  const [cubeTargets, setCubeTargets] = useState<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
+  const cubeTargetsRef = useRef<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
+  const cubeCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHoveringCubePanel = useRef(false);
+
+  const clearCubeCloseTimer = useCallback(() => {
+    if (cubeCloseTimer.current) {
+      clearTimeout(cubeCloseTimer.current);
+      cubeCloseTimer.current = null;
+    }
+  }, []);
+
+  const closeCubePanel = useCallback((delay = 650) => {
+    clearCubeCloseTimer();
+    cubeCloseTimer.current = setTimeout(() => setHoveredCube(null), delay);
+  }, [clearCubeCloseTimer]);
+
+  useEffect(() => {
+    const onCubeRelayHover = (event: Event) => {
+      const detail = (event as CustomEvent<{ role: CubeModuleId | null }>).detail;
+      if (detail?.role) {
+        clearCubeCloseTimer();
+        setHoveredCube(detail.role);
+        return;
+      }
+
+      closeCubePanel();
+    };
+
+    window.addEventListener("cube-relay-hover", onCubeRelayHover);
+    return () => {
+      clearCubeCloseTimer();
+      window.removeEventListener("cube-relay-hover", onCubeRelayHover);
+    };
+  }, [clearCubeCloseTimer, closeCubePanel]);
+
+  useEffect(() => {
+    const onCubeVaultTargets = (event: Event) => {
+      const targets = (event as CustomEvent<{ targets?: CubeHoverTarget[] }>).detail?.targets ?? [];
+      const nextTargets = Object.fromEntries(targets.map((target) => [target.role, target])) as Partial<Record<CubeModuleId, CubeHoverTarget>>;
+      cubeTargetsRef.current = nextTargets;
+      setCubeTargets(nextTargets);
+    };
+
+    window.addEventListener("cube-vault-targets", onCubeVaultTargets);
+    return () => window.removeEventListener("cube-vault-targets", onCubeVaultTargets);
+  }, []);
   const states = useMemo(
     () =>
       Object.fromEntries(
@@ -453,6 +570,53 @@ export default function CinematicJourney({ scrollProgress, visible }: { scrollPr
     [scrollProgress],
   );
 
+  useEffect(() => {
+    if (activeChapter !== "skills") {
+      clearCubeCloseTimer();
+      setHoveredCube(null);
+    }
+  }, [activeChapter, clearCubeCloseTimer]);
+
+  useEffect(() => {
+    if (!visible || activeChapter !== "skills") return;
+
+    const hoverRadius = 16;
+    const cubeRoles: CubeModuleId[] = ["INTERFACE", "RUNTIME", "SYSTEMS", "DATA"];
+
+    const onViewportPointerMove = (event: PointerEvent) => {
+      if (isHoveringCubePanel.current || window.innerWidth === 0 || window.innerHeight === 0) return;
+
+      const pointer = {
+        x: (event.clientX / window.innerWidth) * 100,
+        y: (event.clientY / window.innerHeight) * 100,
+      };
+
+      const closest = cubeRoles.reduce<{ role: CubeModuleId; distance: number } | null>((best, role) => {
+        const target = cubeTargetsRef.current[role];
+        if (!target) return best;
+
+        const distance = Math.hypot(pointer.x - target.x, pointer.y - target.y);
+        return !best || distance < best.distance ? { role, distance } : best;
+      }, null);
+
+      if (closest && closest.distance <= hoverRadius) {
+        clearCubeCloseTimer();
+        setHoveredCube((current) => current === closest.role ? current : closest.role);
+        document.body.style.cursor = "pointer";
+        return;
+      }
+
+      document.body.style.cursor = "";
+      closeCubePanel();
+    };
+
+    window.addEventListener("pointermove", onViewportPointerMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", onViewportPointerMove);
+      document.body.style.cursor = "";
+    };
+  }, [activeChapter, clearCubeCloseTimer, closeCubePanel, visible]);
+
   if (!visible) return null;
 
   return (
@@ -461,7 +625,25 @@ export default function CinematicJourney({ scrollProgress, visible }: { scrollPr
       <HeroChapter presence={states.hero.presence} />
       <EnterLaptopCue scrollProgress={scrollProgress} />
       <ActTwoAboutWorld presence={states.laptop.presence} progress={states.laptop.progress} />
-      <SkillsChapter presence={states.skills.presence} progress={states.skills.progress} />
+      <SkillsChapter
+        presence={states.skills.presence}
+        progress={states.skills.progress}
+        hoveredCube={hoveredCube}
+        cubeTargets={cubeTargets}
+        onCubeHoverChange={(module) => {
+          if (module) {
+            clearCubeCloseTimer();
+            setHoveredCube(module);
+          } else {
+            closeCubePanel();
+          }
+        }}
+        onPanelHoverChange={(isHovered) => {
+          isHoveringCubePanel.current = isHovered;
+          if (isHovered) clearCubeCloseTimer();
+          else closeCubePanel();
+        }}
+      />
       <ProjectsChapter presence={states.projects.presence} progress={states.projects.progress} />
       <JourneyChapter presence={states.journey.presence} progress={states.journey.progress} />
       <ContactChapter presence={states.contact.presence} progress={states.contact.progress} />
