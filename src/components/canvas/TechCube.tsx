@@ -15,6 +15,7 @@ interface TechCubeProps {
   cubesOpacity?: number;
   orbitIndex?: number;
   selfRot?: { x: number; y: number; z: number };
+  onHoverChange?: (hovered: boolean) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -249,6 +250,7 @@ export default function TechCube({
   cubesOpacity = 1,
   orbitIndex = 0,
   selfRot = { x: 0.005, y: 0.008, z: 0.003 },
+  onHoverChange,
 }: TechCubeProps) {
   const groupRef = useRef<THREE.Group>(null);
   const lightRef = useRef<THREE.PointLight>(null);
@@ -355,13 +357,27 @@ export default function TechCube({
   const effectiveScale = scale * cubesOpacity;
 
   return (
-    <group
-      ref={groupRef}
-      position={position}
-      scale={effectiveScale}
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
-    >
+    <group ref={groupRef} position={position} scale={effectiveScale}>
+      {/* A dedicated raycast shell keeps hover reliable even while the visual
+          layers are transparent, animated, or rotating. */}
+      <mesh
+        onPointerOver={(event) => {
+          event.stopPropagation();
+          setHovered(true);
+          onHoverChange?.(true);
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={(event) => {
+          event.stopPropagation();
+          setHovered(false);
+          onHoverChange?.(false);
+          document.body.style.cursor = "";
+        }}
+      >
+        <boxGeometry args={[1.7, 1.7, 1.7]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
       {/* ═══ POINT LIGHT — Pulsating glow source ═══ */}
       <pointLight
         ref={lightRef}
