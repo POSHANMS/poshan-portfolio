@@ -56,24 +56,24 @@ const sceneCoordinates = [
     progress: 0.55,
   },
   {
-    // Act III — emerge from the corridor into the technical constellation.
-    camera: new THREE.Vector3(-3.55, 2.16, 5.78),
-    lookAt: new THREE.Vector3(0.65, 0.84, -2.25),
-    fov: 49,
+    // Act III — a calm, frontal arrival in the skills vault.
+    camera: new THREE.Vector3(-0.45, 0.3, 5.3),
+    lookAt: new THREE.Vector3(0, 0.05, -3.2),
+    fov: 43,
     progress: 0.62,
   },
   {
-    // Orbit around cubes so their movement has narrative weight.
-    camera: new THREE.Vector3(2.9, 2.0, 6.7),
-    lookAt: new THREE.Vector3(0.45, 0.5, -2.35),
-    fov: 46,
+    // A restrained camera drift lets the recruiter inspect the four artifacts.
+    camera: new THREE.Vector3(0.42, 0.18, 4.35),
+    lookAt: new THREE.Vector3(0, 0.04, -3.2),
+    fov: 41,
     progress: 0.72,
   },
   {
     // Act III hold — let the recruiter read the actual skill map.
-    camera: new THREE.Vector3(-1.15, 1.35, 6.05),
-    lookAt: new THREE.Vector3(0.35, 0.46, -2.4),
-    fov: 45,
+    camera: new THREE.Vector3(-0.25, 0.28, 4.6),
+    lookAt: new THREE.Vector3(0, 0.03, -3.2),
+    fov: 42,
     progress: 0.81,
   },
   {
