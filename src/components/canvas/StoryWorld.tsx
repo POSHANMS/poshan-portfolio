@@ -65,7 +65,7 @@ function StarWarpTunnel({ scrollProgress }: { scrollProgress: number }) {
   }, []);
 
   useFrame((state) => {
-    const warp = phase(scrollProgress, 0.08, 0.38) + phase(scrollProgress, 0.49, 0.6) * 0.65;
+    const warp = phase(scrollProgress, 0.08, 0.52);
     if (materialRef.current) {
       materialRef.current.opacity = 0.035 + warp * 0.2;
       materialRef.current.color.set(warp > 0.25 ? "#fff0f2" : "#ff1744");
@@ -387,16 +387,18 @@ function SkillConstellation({ scrollProgress }: { scrollProgress: number }) {
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
-    const visible = phase(scrollProgress, 0.54, 0.82);
+    // This is the faint destination pattern the cubes answer. It clears before
+    // the relay finishes so the real cubes, rather than labels, own Act III.
+    const visible = phase(scrollProgress, 0.53, 0.68);
     if (rootRef.current) {
       rootRef.current.position.x = laptopX;
       rootRef.current.rotation.y = Math.sin(t * 0.24) * 0.12 + smoothstep(0.55, 0.82, scrollProgress) * 0.22;
       rootRef.current.position.y = Math.sin(t * 0.7) * 0.05;
       rootRef.current.scale.setScalar(0.92 + visible * 0.16);
     }
-    if (lineMat.current) lineMat.current.opacity = visible * 0.56;
+    if (lineMat.current) lineMat.current.opacity = visible * 0.22;
     nodeMats.current.forEach((mat, index) => {
-      mat.opacity = visible * (0.55 + Math.sin(t * 1.8 + index) * 0.18);
+      mat.opacity = visible * (0.22 + Math.sin(t * 1.8 + index) * 0.08);
     });
   });
 
@@ -428,7 +430,7 @@ function SkillConstellation({ scrollProgress }: { scrollProgress: number }) {
             anchorY="middle"
             color={node.color}
             material-transparent
-            material-opacity={phase(scrollProgress, 0.56, 0.81)}
+            material-opacity={phase(scrollProgress, 0.55, 0.66) * 0.45}
           >
             {node.label}
           </Text>
@@ -581,7 +583,6 @@ export default function StoryWorld({ scrollProgress }: { scrollProgress: number 
       <EntryProbe scrollProgress={scrollProgress} />
       <LaptopPortal scrollProgress={scrollProgress} />
       <InteriorWorld scrollProgress={scrollProgress} />
-      <SkillConstellation scrollProgress={scrollProgress} />
       <ProjectBeacons scrollProgress={scrollProgress} />
       <TransmissionSignal scrollProgress={scrollProgress} />
     </group>
