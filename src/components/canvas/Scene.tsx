@@ -20,6 +20,12 @@ import WormholeLaptopEntry from "./WormholeLaptopEntry";
 import NeonGrid from "./NeonGrid";
 import FloorRings from "./FloorRings";
 import PostProcessing from "./PostProcessing";
+import StoryWorld from "./StoryWorld";
+
+function smoothstep(edge0: number, edge1: number, value: number) {
+  const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
 
 interface SceneProps {
   scrollProgress: number;
@@ -105,6 +111,8 @@ export default function Scene({
   const laptopOpacity = powerUpValues?.laptopOpacity ?? 1;
   const cubesOpacity = powerUpValues?.cubesOpacity ?? 1;
   const hologramVisible = powerUpStage === "ui" || powerUpStage === "complete" || (!isPowerUpActive && !wormholeActive);
+  const skillVaultStrength = smoothstep(0.55, 0.62, scrollProgress) * (1 - smoothstep(0.80, 0.85, scrollProgress));
+  const exteriorStrength = 1 - skillVaultStrength;
 
   return (
     <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#000000" }}>
@@ -134,12 +142,12 @@ export default function Scene({
         <Suspense fallback={null}>
           <group visible={showStars}>
             <NebulaBackground />
-            <StarField starsOpacity={starsOpacity} />
+            <StarField starsOpacity={starsOpacity * (0.24 + exteriorStrength * 0.76)} />
             <ShootingStars />
           </group>
 
           <group visible={showGlobe}>
-            <DeepSpaceGlobe scrollProgress={scrollProgress} globeOpacity={globeOpacity} />
+            <DeepSpaceGlobe scrollProgress={scrollProgress} globeOpacity={globeOpacity * exteriorStrength} />
           </group>
 
           <VolumetricRays />
@@ -147,7 +155,7 @@ export default function Scene({
           <FloatingHexParticles />
 
           <group visible={showCubes}>
-            <TechCubes cubesOpacity={cubesOpacity} />
+            <TechCubes cubesOpacity={cubesOpacity} scrollProgress={scrollProgress} />
           </group>
 
           {/* Wormhole entry effects — only renders when active */}
@@ -162,6 +170,7 @@ export default function Scene({
             <FloatingLaptop
               powerUpStage={powerUpStage}
               laptopOpacity={laptopOpacity}
+              scrollProgress={scrollProgress}
               wormholeValues={wormholeValues}
               wormholeActive={wormholeActive}
               laptopScreenRef={laptopScreenRef}
@@ -172,6 +181,8 @@ export default function Scene({
             <NeonGrid floorOpacity={floorOpacity} />
             <FloorRings />
           </group>
+
+          <StoryWorld scrollProgress={scrollProgress} />
 
           <PostProcessing hologramActive={hologramVisible} />
         </Suspense>
