@@ -23,13 +23,13 @@ const CONFIG = {
 const CHAR_POOL = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF░▒▓█◢◣◤◥▪▫◊○●◐◑∴∵∷∞∝∫∮∯∰∱∲∳";
 
 const LOG_LINES = [
-  { threshold: 5, text: ">> NEURAL LINK ESTABLISHED" },
-  { threshold: 18, text: ">> QUANTUM ENTANGLEMENT DETECTED" },
-  { threshold: 32, text: ">> DIMENSIONAL BARRIER: UNSTABLE" },
-  { threshold: 48, text: ">> SPACETIME FABRIC: TEARING" },
-  { threshold: 65, text: ">> BREACH IMMINENT — SEEK SHELTER" },
-  { threshold: 82, text: ">> REALITY ANCHOR: LOST" },
-  { threshold: 95, text: ">> ENTERING THE VOID..." },
+  { threshold: 5, text: ">> POSHAN MS PORTFOLIO LOADING" },
+  { threshold: 18, text: ">> FULL STACK DEVELOPER PROFILE READY" },
+  { threshold: 32, text: ">> BE CSE 2026 CONTEXT INDEXED" },
+  { threshold: 48, text: ">> PROJECT BEACONS PRIMED" },
+  { threshold: 65, text: ">> LAPTOP PORTAL WARMING" },
+  { threshold: 82, text: ">> SKILL CONSTELLATION READY" },
+  { threshold: 95, text: ">> OPENING HERO SCENE..." },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1241,7 +1241,7 @@ export default function Loader({ onComplete }: LoaderProps) {
               ref={statusTextRef}
               className="text-[9px] tracking-[0.3em] text-[#ff0033]/70 uppercase font-mono"
             >
-              ESTABLISHING UPLINK
+              PREPARING PORTFOLIO
             </span>
             <span
               ref={percentTextRef}
@@ -1312,7 +1312,7 @@ export default function Loader({ onComplete }: LoaderProps) {
           </span>
         </div>
         <p className="text-[9px] tracking-[0.32em] text-white/25 uppercase mt-1">
-          System Integrity Matrix
+          Portfolio Entry Sequence
         </p>
       </div>
 
