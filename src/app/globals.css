@@ -635,6 +635,28 @@ body {
   animation: inside-core-pulse 3.6s ease-in-out infinite;
 }
 
+.skill-vault-field {
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(142, 0, 25, 0.46), transparent 24rem),
+    radial-gradient(ellipse at 10% 80%, rgba(255, 23, 68, 0.12), transparent 25rem),
+    radial-gradient(ellipse at 90% 12%, rgba(255, 255, 255, 0.055), transparent 24rem),
+    linear-gradient(118deg, rgba(5, 1, 2, 0.62) 0%, rgba(18, 1, 5, 0.72) 46%, rgba(5, 1, 2, 0.62) 100%);
+  opacity: 0.78;
+  animation: skill-vault-drift 12s ease-in-out infinite alternate;
+}
+
+.skill-vault-grain {
+  opacity: 0.26;
+  mix-blend-mode: screen;
+  background:
+    repeating-linear-gradient(104deg, transparent 0 54px, rgba(255, 255, 255, 0.028) 55px 56px, transparent 57px 112px),
+    radial-gradient(circle at 25% 22%, rgba(255, 23, 68, 0.36) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 74% 71%, rgba(255, 255, 255, 0.26) 0 1px, transparent 1.5px);
+  background-size: 340px 240px, 92px 92px, 128px 128px;
+  mask-image: radial-gradient(ellipse at 50% 50%, black 0 58%, transparent 96%);
+  animation: skill-vault-grain-shift 16s linear infinite;
+}
+
 .skill-engine-field {
   opacity: 0.5;
   mix-blend-mode: screen;
@@ -710,6 +732,26 @@ body {
   to {
     transform: scale(1.025);
     opacity: 0.58;
+  }
+}
+
+@keyframes skill-vault-drift {
+  from {
+    background-position: 50% 50%, 10% 80%, 90% 12%, 0 0;
+    transform: scale(1);
+  }
+  to {
+    background-position: 47% 54%, 16% 72%, 84% 18%, 100% 0;
+    transform: scale(1.025);
+  }
+}
+
+@keyframes skill-vault-grain-shift {
+  from {
+    background-position: 0 0, 0 0, 0 0;
+  }
+  to {
+    background-position: 340px 240px, 92px 92px, -128px 128px;
   }
 }
 
