@@ -9,6 +9,7 @@ import Loader from "@/components/ui/Loader";
 import WelcomeText from "@/components/ui/WelcomeText";
 import CinematicHUD from "@/components/ui/CinematicHUD";
 import CinematicJourney from "@/components/ui/CinematicJourney";
+import { useActFourSequence } from "@/hooks/useActFourSequence";
 
 const Scene = dynamic(() => import("@/components/canvas/Scene"), {
   ssr: false,
@@ -56,8 +57,10 @@ export default function Home() {
   const [wormholeValues, setWormholeValues] = useState<WormholeValues>(DEFAULT_WORMHOLE_VALUES);
 
   const [scrollProgress, setScrollProgress] = useState(0);
+  const actFour = useActFourSequence(scrollProgress);
+  const lenisRef = useRef<Lenis | null>(null);
 
-  // Scroll progress — derived from window.scrollY through the 680vh hero track.
+  // Scroll progress — derived from window.scrollY through the cinematic hero track.
   // CSS sticky (on the inner element) provides the pinned experience.
   // No GSAP DOM manipulation = no React reconciliation conflict.
   const heroRef = useRef<HTMLDivElement>(null);
@@ -66,7 +69,7 @@ export default function Home() {
     const handleScroll = () => {
       const hero = heroRef.current;
       if (!hero) return;
-      // The outer div is 250vh. The pin region is the extra 150vh beyond the viewport.
+      // The sticky region maps the long track into one continuous camera path.
       const scrollTrack = hero.offsetHeight - window.innerHeight;
       if (scrollTrack <= 0) return;
       const heroTop = hero.getBoundingClientRect().top + window.scrollY;
@@ -96,6 +99,14 @@ export default function Home() {
       wheelMultiplier: 0.82,
       touchMultiplier: 1.08,
     });
+    lenisRef.current = lenis;
+
+    const onActFourScrollLock = (event: Event) => {
+      const locked = (event as CustomEvent<{ locked?: boolean }>).detail?.locked;
+      if (locked) lenis.stop();
+      else lenis.start();
+    };
+    window.addEventListener("act-four-scroll-lock", onActFourScrollLock);
 
     let rafId = 0;
     const raf = (time: number) => {
@@ -106,7 +117,9 @@ export default function Home() {
     rafId = requestAnimationFrame(raf);
     return () => {
       cancelAnimationFrame(rafId);
+      window.removeEventListener("act-four-scroll-lock", onActFourScrollLock);
       lenis.destroy();
+      lenisRef.current = null;
     };
   }, []);
 
@@ -153,10 +166,10 @@ export default function Home() {
         <WelcomeText onComplete={handleWelcomeComplete} layoutMode="stacked" />
       )}
 
-      {/* PINNED CINEMATIC TRACK — 680vh outer creates a full story arc.
+      {/* PINNED CINEMATIC TRACK — extended so each chapter has room to breathe.
           Inner sticky div stays fixed at top while user scrolls through it.
           CSS sticky = zero DOM mutation = React-safe. */}
-      <div ref={heroRef} className="relative w-full" style={{ height: "680vh" }}>
+      <div ref={heroRef} data-cinematic-track className="relative w-full" style={{ height: "1500vh" }}>
         <div className="sticky top-0 h-screen w-full overflow-hidden">
           {/* 3D SCENE */}
           <div
@@ -173,6 +186,8 @@ export default function Home() {
               wormholeValues={wormholeValues}
               wormholeActive={wormholeActive}
               lensDistortion={wormholeValues.lensDistortion}
+              actFourPhase={actFour.phase}
+              actFourProjectIndex={actFour.projectIndex}
             />
           </div>
 
@@ -195,6 +210,11 @@ export default function Home() {
           <CinematicJourney
             scrollProgress={scrollProgress}
             visible={storyVisible}
+            actFourPhase={actFour.phase}
+            actFourProjectIndex={actFour.projectIndex}
+            actFourExitArmed={actFour.exitArmed}
+            onActFourWarp={actFour.beginWarp}
+            onActFourExit={actFour.exitProjectWorld}
           />
           <CinematicHUD
             visible={storyVisible}

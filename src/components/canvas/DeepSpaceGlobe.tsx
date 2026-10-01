@@ -65,7 +65,6 @@ interface DeepSpaceGlobeProps {
 
 export default function DeepSpaceGlobe({ scrollProgress, globeOpacity = 1 }: DeepSpaceGlobeProps) {
   const globeRef = useRef<THREE.Group>(null);
-  const ringRef = useRef<THREE.Group>(null);
 
   const mainShaderRef = useRef<THREE.ShaderMaterial>(null);
   const secondShaderRef = useRef<THREE.ShaderMaterial>(null);
@@ -108,10 +107,6 @@ export default function DeepSpaceGlobe({ scrollProgress, globeOpacity = 1 }: Dee
     if (globeRef.current) {
       globeRef.current.rotation.y = t * 0.08 + scrollProgress * 0.95;
       globeRef.current.rotation.x = Math.sin(t * 0.15) * 0.06;
-    }
-    if (ringRef.current) {
-      ringRef.current.rotation.z = t * 0.035 + scrollProgress * 0.45;
-      ringRef.current.rotation.y = Math.sin(t * 0.1) * 0.1;
     }
   });
 
@@ -163,27 +158,6 @@ export default function DeepSpaceGlobe({ scrollProgress, globeOpacity = 1 }: Dee
         </mesh>
       </group>
 
-      {/* Orbital rings */}
-      <group ref={ringRef} rotation={[0.95, 0.22, -0.28]}>
-        {[1.32, 1.58, 1.86, 2.2].map((radius, index) => (
-          <mesh key={radius}>
-            <torusGeometry args={[radius, 0.008, 8, 160]} />
-            <meshBasicMaterial
-              color={index === 1 ? "#ff1744" : "#ff4444"}
-              transparent
-              opacity={(index === 1 ? 0.22 : 0.12) * globeOpacity}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-            />
-          </mesh>
-        ))}
-      </group>
-
-      {/* Outer atmosphere glow */}
-      <mesh scale={[1.75, 1.75, 1.75]}>
-        <sphereGeometry args={[1.1, 42, 24]} />
-        <meshBasicMaterial color="#ff1744" transparent opacity={0.03 * globeOpacity} blending={THREE.AdditiveBlending} depthWrite={false} />
-      </mesh>
     </group>
   );
 }

@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import Lenis from "lenis";
 import * as THREE from "three";
+import type { ActFourPhase } from "@/types/actFour";
 
 const sceneCoordinates = [
   {
@@ -77,25 +78,25 @@ const sceneCoordinates = [
     progress: 0.81,
   },
   {
-    // Act IV — drop to the grid: project beacons rise from the floor.
-    camera: new THREE.Vector3(-2.95, 0.92, 7.45),
-    lookAt: new THREE.Vector3(0.25, -1.5, -4.45),
-    fov: 54,
+    // Act IV — the external globe becomes the project-world destination.
+    camera: new THREE.Vector3(0.75, 0.92, 7.45),
+    lookAt: new THREE.Vector3(4.5, 2.5, -8),
+    fov: 50,
     progress: 0.85,
   },
   {
-    // Act IV hold — skim across the mission runway.
-    camera: new THREE.Vector3(3.28, 0.86, 6.85),
-    lookAt: new THREE.Vector3(0.65, -1.22, -4.55),
-    fov: 47,
-    progress: 0.92,
+    // Act IV hold — lock onto the core before the manual warp begins.
+    camera: new THREE.Vector3(2.25, 1.4, 4.25),
+    lookAt: new THREE.Vector3(4.5, 2.5, -8),
+    fov: 45,
+    progress: 0.89,
   },
   {
     // Act V — education/practice orbit, wider and calmer.
     camera: new THREE.Vector3(4.75, 2.45, 8.95),
     lookAt: new THREE.Vector3(1.25, 0.24, -3.72),
     fov: 50,
-    progress: 0.96,
+    progress: 0.935,
   },
   {
     // Act VI — final portfolio contact shot, everything visible again.
@@ -109,14 +110,17 @@ const sceneCoordinates = [
 export function CinematicCamera({
   scrollProgress,
   lensDistortion = 0,
+  actFourPhase = "locked",
 }: {
   scrollProgress: number;
   lensDistortion?: number;
+  actFourPhase?: ActFourPhase;
 }) {
   const currentPos = useRef(new THREE.Vector3(0.5, 0.5, 8));
   const currentLookAt = useRef(new THREE.Vector3(0.8, 0, -1));
   const currentFov = useRef(45);
   const smoothProgress = useRef(0);
+  const warpProgress = useRef(0);
 
   const clampedProgress = Math.max(0, Math.min(1, scrollProgress));
 
@@ -144,9 +148,33 @@ export function CinematicCamera({
     const localT = THREE.MathUtils.clamp((p - from.progress) / segmentLength, 0, 1);
     const easedT = localT * localT * (3.0 - 2.0 * localT);
 
-    currentPos.current.lerpVectors(from.camera, to.camera, easedT);
-    currentLookAt.current.lerpVectors(from.lookAt, to.lookAt, easedT);
-    currentFov.current = THREE.MathUtils.lerp(from.fov, to.fov, easedT);
+    const desiredPosition = new THREE.Vector3().lerpVectors(from.camera, to.camera, easedT);
+    const desiredLookAt = new THREE.Vector3().lerpVectors(from.lookAt, to.lookAt, easedT);
+    let desiredFov = THREE.MathUtils.lerp(from.fov, to.fov, easedT);
+
+    const isWarping = actFourPhase === "warping";
+    warpProgress.current = THREE.MathUtils.damp(warpProgress.current, isWarping ? 1 : 0, isWarping ? 3.2 : 5.6, delta);
+
+    if (isWarping) {
+      const origin = new THREE.Vector3(2.25, 1.4, 4.25);
+      const destination = new THREE.Vector3(4.5, 2.5, -7.25);
+      desiredPosition.lerpVectors(origin, destination, warpProgress.current);
+      desiredLookAt.lerpVectors(new THREE.Vector3(4.5, 2.5, -8), new THREE.Vector3(4.5, 2.5, -12), warpProgress.current);
+      desiredFov = 46 + Math.sin(warpProgress.current * Math.PI) * 38;
+    } else if (actFourPhase === "inside") {
+      desiredPosition.set(4.5, 2.5, -6.85);
+      desiredLookAt.set(4.5, 2.5, -12.4);
+      desiredFov = 48;
+    } else if (actFourPhase === "returning") {
+      desiredPosition.set(2.9, 1.85, 4.7);
+      desiredLookAt.set(0.9, 0.35, -3.4);
+      desiredFov = 51;
+    }
+
+    const cameraDamping = actFourPhase === "locked" || actFourPhase === "ready" ? 8.4 : 4.6;
+    currentPos.current.lerp(desiredPosition, 1 - Math.exp(-cameraDamping * delta));
+    currentLookAt.current.lerp(desiredLookAt, 1 - Math.exp(-cameraDamping * delta));
+    currentFov.current = THREE.MathUtils.damp(currentFov.current, desiredFov, cameraDamping, delta);
 
     // Subtle handheld-cinema drift while scrolling; very small so the scene stays premium.
     const time = state.clock.getElapsedTime();

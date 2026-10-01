@@ -4,6 +4,7 @@ import React, { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import TechCube from "./TechCube";
+import type { ActFourPhase } from "@/types/actFour";
 
 type CubeRole = "INTERFACE" | "RUNTIME" | "SYSTEMS" | "DATA";
 
@@ -64,13 +65,14 @@ function VaultBeacon({ strength }: { strength: number }) {
   );
 }
 
-export default function TechCubes({ cubesOpacity = 1, scrollProgress = 0 }: { cubesOpacity?: number; scrollProgress?: number }) {
+export default function TechCubes({ cubesOpacity = 1, scrollProgress = 0, actFourPhase = "locked" }: { cubesOpacity?: number; scrollProgress?: number; actFourPhase?: ActFourPhase }) {
   const cubeRefs = useRef<THREE.Group[]>([]);
   const hoverFieldFrame = useRef(0);
   const { viewport } = useThree();
   const laptopX = Math.max(0.8, viewport.width * 0.08);
   const vaultStrength = smoothstep(0.55, 0.625, scrollProgress) * (1 - smoothstep(0.805, 0.85, scrollProgress));
   const exitStrength = smoothstep(0.805, 0.87, scrollProgress);
+  const actFourHidden = actFourPhase === "ready" || actFourPhase === "warping" || actFourPhase === "inside";
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
@@ -92,7 +94,7 @@ export default function TechCubes({ cubesOpacity = 1, scrollProgress = 0 }: { cu
 
       cube.position.lerp(target, 0.075);
       cube.rotation.z = THREE.MathUtils.lerp(cube.rotation.z, vaultStrength * (index < 2 ? -0.035 : 0.035), 0.05);
-      cube.scale.setScalar(config.scale * cubesOpacity * (1 + Math.sin(t * 1.9 + index) * vaultStrength * 0.025));
+      cube.scale.setScalar(config.scale * cubesOpacity * (actFourHidden ? 0.001 : 1) * (1 + Math.sin(t * 1.9 + index) * vaultStrength * 0.025));
     });
 
     // Keep the DOM hover fields attached to the rendered cube centers. This

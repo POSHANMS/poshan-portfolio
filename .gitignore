@@ -24,6 +24,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+next-dev*.log
+next-dev.pid
 
 # local env files
 .env*.local
@@ -40,3 +42,4 @@ Master_prompt.md
 Thinking.md
 Previous.MD
 Project__codebase.md
+project_codebase.md

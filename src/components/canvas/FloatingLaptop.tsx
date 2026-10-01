@@ -6,6 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { useMousePosition } from "@/hooks/useMousePosition";
 import { WormholeValues } from "@/animations/wormholeLaptop";
+import type { ActFourPhase } from "@/types/actFour";
 
 const SCREEN_MATERIAL_NAME = "Material.004";
 
@@ -16,6 +17,7 @@ interface FloatingLaptopProps {
   wormholeValues?: WormholeValues;
   wormholeActive?: boolean;
   laptopScreenRef?: React.MutableRefObject<THREE.Mesh | null>;
+  actFourPhase?: ActFourPhase;
 }
 
 const TERMINAL_LINES = [
@@ -43,6 +45,7 @@ export default function FloatingLaptop({
   wormholeValues,
   wormholeActive = false,
   laptopScreenRef,
+  actFourPhase = "locked",
 }: FloatingLaptopProps) {
   const { scene } = useGLTF("/models/laptop-baked.glb");
 
@@ -363,36 +366,41 @@ export default function FloatingLaptop({
       // The skill vault is a separate room, so the laptop exits rather than
       // competing with the artifacts that explain the stack.
       const skills = smoothstep(0.55, 0.62, scrollProgress) * (1 - smoothstep(0.80, 0.85, scrollProgress));
-      const projects = phase(scrollProgress, 0.84, 0.93);
+      // The project entry owns the laptop only while it is in frame. Once the
+      // core returns, the laptop comes back before Act V instead of vanishing.
+      const actFourApproach = smoothstep(0.80, 0.852, scrollProgress) * (1 - smoothstep(0.93, 0.955, scrollProgress));
+      const actFourSeal = actFourPhase === "returning"
+        ? 0
+        : Math.max(actFourApproach, actFourPhase === "warping" || actFourPhase === "inside" ? 1 : 0);
       const finalPullback = smoothstep(0.82, 1, scrollProgress);
 
-      const targetX = laptopX - portal * 0.1 - inside * 0.5 + pullback * 0.34 + skills * 7.8 - projects * 0.22 + finalPullback * 0.08;
-      const targetY = -0.52 + portal * 0.2 + inside * 0.22 + pullback * 0.12 + skills * 1.75 + projects * 0.05 - finalPullback * 0.12;
-      const targetZ = -1.14 + portal * 0.58 - inside * 0.82 + pullback * 1.26 - skills * 7.2 - projects * 0.2;
-      const targetScale = laptopOpacity * (1.21 + portal * 0.82 - inside * 0.36 + pullback * 0.44 - skills * 1.05 + projects * 0.14 - finalPullback * 0.1);
+      const targetX = laptopX - portal * 0.1 - inside * 0.5 + pullback * 0.34 + skills * 7.8 + actFourSeal * 0.5 + finalPullback * 0.08;
+      const targetY = -0.52 + portal * 0.2 + inside * 0.22 + pullback * 0.12 + skills * 1.75 - actFourSeal * 0.72 - finalPullback * 0.12;
+      const targetZ = -1.14 + portal * 0.58 - inside * 0.82 + pullback * 1.26 - skills * 7.2 + actFourSeal * 0.8;
+      const targetScale = laptopOpacity * (1.21 + portal * 0.82 - inside * 0.36 + pullback * 0.44 - skills * 1.05 - finalPullback * 0.1) * (1 - actFourSeal);
 
       groupRef.current.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.07);
       groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.07);
 
       groupRef.current.rotation.y = THREE.MathUtils.lerp(
         groupRef.current.rotation.y,
-        -Math.PI / 2 - 0.15 + state.pointer.x * 0.045 + portal * 0.42 - inside * 0.28 + skills * 1.1 - projects * 0.14,
+        -Math.PI / 2 - 0.15 + state.pointer.x * 0.045 + portal * 0.42 - inside * 0.28 + skills * 1.1,
         0.07,
       );
       groupRef.current.rotation.x = THREE.MathUtils.lerp(
         groupRef.current.rotation.x,
-        0.09 - state.pointer.y * 0.035 - portal * 0.16 + inside * 0.18 - pullback * 0.16 + projects * 0.04,
+        0.09 - state.pointer.y * 0.035 - portal * 0.16 + inside * 0.18 - pullback * 0.16 + actFourSeal * 1.08,
         0.07,
       );
       groupRef.current.rotation.z = THREE.MathUtils.lerp(
         groupRef.current.rotation.z,
-        -0.03 + portal * 0.045 - inside * 0.035 - projects * 0.02,
+        -0.03 + portal * 0.045 - inside * 0.035 + actFourSeal * 0.12,
         0.07,
       );
 
       if (screenMeshRef.current) {
         const mat = screenMeshRef.current.material as THREE.MeshStandardMaterial;
-        const storyScreenGlow = 0.58 + portal * 1.05 + inside * 0.35 + pullback * 0.24;
+        const storyScreenGlow = (0.58 + portal * 1.05 + inside * 0.35 + pullback * 0.24) * (1 - actFourSeal);
         mat.emissiveIntensity = THREE.MathUtils.lerp(mat.emissiveIntensity, storyScreenGlow, 0.05);
       }
     }
@@ -413,7 +421,7 @@ export default function FloatingLaptop({
   const laptopX   = Math.max(0.8, width * 0.08);
 
   const effectiveOpacity = wormholeActive && wormholeValues
-    ? Math.max(laptopOpacity, wormholeValues.laptopEmergence)
+    ? wormholeValues.laptopEmergence
     : laptopOpacity;
 
   return (

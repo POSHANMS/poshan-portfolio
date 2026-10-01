@@ -4,6 +4,7 @@ import React, { useMemo, useRef } from "react";
 import { Text } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import type { ActFourPhase } from "@/types/actFour";
 
 function clamp(value: number, min = 0, max = 1) {
   return Math.max(min, Math.min(max, value));
@@ -576,15 +577,15 @@ function TransmissionSignal({ scrollProgress }: { scrollProgress: number }) {
   );
 }
 
-export default function StoryWorld({ scrollProgress }: { scrollProgress: number }) {
+export default function StoryWorld({ scrollProgress, actFourPhase = "locked" }: { scrollProgress: number; actFourPhase?: ActFourPhase }) {
   return (
     <group>
       <StarWarpTunnel scrollProgress={scrollProgress} />
       <EntryProbe scrollProgress={scrollProgress} />
       <LaptopPortal scrollProgress={scrollProgress} />
       <InteriorWorld scrollProgress={scrollProgress} />
-      <ProjectBeacons scrollProgress={scrollProgress} />
-      <TransmissionSignal scrollProgress={scrollProgress} />
+      {actFourPhase === "locked" && <ProjectBeacons scrollProgress={scrollProgress} />}
+      {actFourPhase === "locked" && <TransmissionSignal scrollProgress={scrollProgress} />}
     </group>
   );
 }
