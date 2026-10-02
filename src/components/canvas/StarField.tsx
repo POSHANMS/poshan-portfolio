@@ -115,7 +115,13 @@ function seededRandom(seed: number) {
   };
 }
 
-export default function StarField({ starsOpacity = 1 }: { starsOpacity?: number }) {
+export default function StarField({
+  starsOpacity = 1,
+  showConstellations = true,
+}: {
+  starsOpacity?: number;
+  showConstellations?: boolean;
+}) {
   const starsRef = useRef<THREE.Points>(null);
   const heroStarsRef = useRef<THREE.Points>(null);
   const linesRef = useRef<THREE.LineSegments>(null);
@@ -346,9 +352,11 @@ export default function StarField({ starsOpacity = 1 }: { starsOpacity?: number 
         <primitive object={starMaterial} attach="material" />
       </points>
 
-      <lineSegments ref={linesRef} geometry={lineGeometry}>
-        <primitive object={lineMaterial} attach="material" />
-      </lineSegments>
+      {showConstellations && (
+        <lineSegments ref={linesRef} geometry={lineGeometry}>
+          <primitive object={lineMaterial} attach="material" />
+        </lineSegments>
+      )}
 
       <points ref={heroStarsRef}>
         <bufferGeometry>

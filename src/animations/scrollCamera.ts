@@ -92,11 +92,18 @@ const sceneCoordinates = [
     progress: 0.89,
   },
   {
-    // Act V — education/practice orbit, wider and calmer.
-    camera: new THREE.Vector3(4.75, 2.45, 8.95),
-    lookAt: new THREE.Vector3(1.25, 0.24, -3.72),
-    fov: 50,
+    // Act V — the camera clears the recall and gives the education orbit its own frame.
+    camera: new THREE.Vector3(-0.72, 1.82, 9.7),
+    lookAt: new THREE.Vector3(1.35, 0.72, -5.15),
+    fov: 47,
     progress: 0.935,
+  },
+  {
+    // Hold Act V until its final checkpoint has been read.
+    camera: new THREE.Vector3(-0.72, 1.82, 9.7),
+    lookAt: new THREE.Vector3(1.35, 0.72, -5.15),
+    fov: 47,
+    progress: 0.997,
   },
   {
     // Act VI — final portfolio contact shot, everything visible again.

@@ -22,6 +22,7 @@ import FloorRings from "./FloorRings";
 import PostProcessing from "./PostProcessing";
 import StoryWorld from "./StoryWorld";
 import ActFourWorld from "./ActFourWorld";
+import ActFiveWorld from "./ActFiveWorld";
 import type { ActFourPhase } from "@/types/actFour";
 
 function smoothstep(edge0: number, edge1: number, value: number) {
@@ -41,7 +42,17 @@ interface SceneProps {
   actFourProjectIndex?: number;
 }
 
-function SceneLights({ powerUpValues, isPowerUpActive, isProjectCore }: { powerUpValues?: PowerUpStageValues; isPowerUpActive?: boolean; isProjectCore: boolean }) {
+function SceneLights({
+  powerUpValues,
+  isPowerUpActive,
+  isProjectCore,
+  isActFive,
+}: {
+  powerUpValues?: PowerUpStageValues;
+  isPowerUpActive?: boolean;
+  isProjectCore: boolean;
+  isActFive: boolean;
+}) {
   // Smooth multipliers — direct JSX calculation, no useFrame mutation hacks
   const s = isPowerUpActive && powerUpValues ? powerUpValues.sceneOpacity : 1;
   const f = isPowerUpActive && powerUpValues ? powerUpValues.floorOpacity : 1;
@@ -50,7 +61,7 @@ function SceneLights({ powerUpValues, isPowerUpActive, isProjectCore }: { powerU
   const st = isPowerUpActive && powerUpValues ? powerUpValues.starsOpacity : 1;
   const c = isPowerUpActive && powerUpValues ? powerUpValues.cubesOpacity : 1;
   const g = isPowerUpActive && powerUpValues ? powerUpValues.globeOpacity : 1;
-  const exteriorLight = isProjectCore ? 0.08 : 1;
+  const exteriorLight = isProjectCore || isActFive ? 0.08 : 1;
 
   return (
     <>
@@ -120,6 +131,9 @@ export default function Scene({
   const hologramVisible = powerUpStage === "ui" || powerUpStage === "complete" || (!isPowerUpActive && !wormholeActive);
   const skillVaultStrength = smoothstep(0.55, 0.62, scrollProgress) * (1 - smoothstep(0.80, 0.85, scrollProgress));
   const exteriorStrength = 1 - skillVaultStrength;
+  // Act V is a true location change: retain the stars, but leave the physical desk-world behind.
+  const actFiveStrength = smoothstep(0.902, 0.922, scrollProgress) * (1 - smoothstep(0.997, 0.999, scrollProgress));
+  const isActFive = actFiveStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
   const isInsideProjectCore = actFourPhase === "inside";
   const isProjectTransit = actFourPhase === "warping" || isInsideProjectCore;
 
@@ -146,25 +160,33 @@ export default function Scene({
 
         <color attach="background" args={["#000000"]} />
 
-        <SceneLights powerUpValues={powerUpValues} isPowerUpActive={isPowerUpActive} isProjectCore={isInsideProjectCore} />
+        <SceneLights
+          powerUpValues={powerUpValues}
+          isPowerUpActive={isPowerUpActive}
+          isProjectCore={isInsideProjectCore}
+          isActFive={isActFive}
+        />
 
         <Suspense fallback={null}>
           {/* Warp owns the starfield during transit so the streaks read as speed, not background noise. */}
           <group visible={showStars && !isProjectTransit}>
-            <NebulaBackground />
-            <StarField starsOpacity={starsOpacity * (0.24 + exteriorStrength * 0.76)} />
-            <ShootingStars />
+            {!isActFive && <NebulaBackground />}
+            <StarField
+              starsOpacity={starsOpacity * (isActFive ? 1 : 0.24 + exteriorStrength * 0.76)}
+              showConstellations={!isActFive}
+            />
+            {!isActFive && <ShootingStars />}
           </group>
 
-          <group visible={showGlobe}>
+          <group visible={showGlobe && !isActFive}>
             <DeepSpaceGlobe scrollProgress={scrollProgress} globeOpacity={globeOpacity * exteriorStrength * (isInsideProjectCore ? 0 : 1)} />
           </group>
 
-          {!isInsideProjectCore && <VolumetricRays />}
-          {!isInsideProjectCore && <MagneticParticles />}
-          {!isInsideProjectCore && <FloatingHexParticles />}
+          {!isInsideProjectCore && !isActFive && <VolumetricRays />}
+          {!isInsideProjectCore && !isActFive && <MagneticParticles />}
+          {!isInsideProjectCore && !isActFive && <FloatingHexParticles />}
 
-          <group visible={showCubes}>
+          <group visible={showCubes && !isActFive}>
             <TechCubes cubesOpacity={cubesOpacity} scrollProgress={scrollProgress} actFourPhase={actFourPhase} />
           </group>
 
@@ -176,7 +198,7 @@ export default function Scene({
             />
           )}
 
-          <group visible={!!showLaptop}>
+          <group visible={!!showLaptop && !isActFive}>
             <FloatingLaptop
               powerUpStage={powerUpStage}
               laptopOpacity={laptopOpacity}
@@ -188,13 +210,14 @@ export default function Scene({
             />
           </group>
 
-          <group visible={showFloor && !isInsideProjectCore}>
+          <group visible={showFloor && !isInsideProjectCore && !isActFive}>
             <NeonGrid floorOpacity={floorOpacity} />
             <FloorRings />
           </group>
 
-          {!isInsideProjectCore && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
+          {!isInsideProjectCore && !isActFive && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
           <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} />
+          <ActFiveWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />
 
           <PostProcessing hologramActive={hologramVisible} />
         </Suspense>

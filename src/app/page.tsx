@@ -169,7 +169,7 @@ export default function Home() {
       {/* PINNED CINEMATIC TRACK — extended so each chapter has room to breathe.
           Inner sticky div stays fixed at top while user scrolls through it.
           CSS sticky = zero DOM mutation = React-safe. */}
-      <div ref={heroRef} data-cinematic-track className="relative w-full" style={{ height: "1500vh" }}>
+        <div ref={heroRef} data-cinematic-track className="relative w-full" style={{ height: "2000vh" }}>
         <div className="sticky top-0 h-screen w-full overflow-hidden">
           {/* 3D SCENE */}
           <div

@@ -9,7 +9,7 @@ const ACT_FOUR_EXIT = 0.905;
 const PROJECT_COUNT = PROJECTS.length;
 const WHEEL_THRESHOLD = 124;
 const PROJECT_ADVANCE_LOCK_MS = 1450;
-const ACT_FOUR_RETURN_TARGET = 0.92;
+const ACT_FOUR_RETURN_TARGET = 0.916;
 
 export function useActFourSequence(scrollProgress: number) {
   const [phase, setPhase] = useState<ActFourPhase>("locked");

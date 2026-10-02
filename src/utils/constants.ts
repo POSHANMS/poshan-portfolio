@@ -98,6 +98,10 @@ export const JOURNEY_MILESTONES = [
     title: "Security + Practice",
     body: "Completed Deloitte Cyber Security virtual internship, TryHackMe practice, log analysis, vulnerability assessment, and 110+ DSA problems across LeetCode and GeeksforGeeks.",
   },
+  {
+    title: "Build + Delivery Practice",
+    body: "Ship and maintain practical projects with Docker, Git, GitHub, Vercel, Railway, Render, and Cloudinary.",
+  },
 ] as const;
 
 export const RESUME_SUMMARY =

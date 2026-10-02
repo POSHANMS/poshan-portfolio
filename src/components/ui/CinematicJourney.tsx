@@ -15,13 +15,13 @@ import type { ActFourPhase } from "@/types/actFour";
 
 type ChapterId = "hero" | "laptop" | "skills" | "projects" | "journey" | "contact";
 
-const chapters: { id: ChapterId; act: string; label: string; range: [number, number] }[] = [
+const chapters: { id: ChapterId; act: string; label: string; range: [number, number]; holdUntilEnd?: boolean }[] = [
   { id: "hero", act: "ACT I", label: "Hero", range: [0.0, 0.17] },
   { id: "laptop", act: "ACT II", label: "About", range: [0.18, 0.54] },
   { id: "skills", act: "ACT III", label: "Skills", range: [0.55, 0.82] },
   { id: "projects", act: "ACT IV", label: "Projects", range: [0.825, 0.9] },
-  { id: "journey", act: "ACT V", label: "Education", range: [0.915, 0.96] },
-  { id: "contact", act: "ACT VI", label: "Contact", range: [0.965, 1.0] },
+  { id: "journey", act: "ACT V", label: "Education", range: [0.91, 0.997], holdUntilEnd: true },
+  { id: "contact", act: "ACT VI", label: "Contact", range: [0.998, 1.0] },
 ];
 
 function clamp(value: number, min = 0, max = 1) {
@@ -33,11 +33,11 @@ function smoothstep(edge0: number, edge1: number, x: number) {
   return t * t * (3 - 2 * t);
 }
 
-function chapterPresence(progress: number, range: [number, number]) {
+function chapterPresence(progress: number, range: [number, number], holdUntilEnd = false) {
   const [start, end] = range;
   const fade = Math.min(0.065, (end - start) * 0.34);
   const enter = start <= 0 ? 1 : smoothstep(start, start + fade, progress);
-  const exit = 1 - smoothstep(end - fade, end, progress);
+  const exit = holdUntilEnd ? (progress < end ? 1 : 0) : 1 - smoothstep(end - fade, end, progress);
   return clamp(enter * exit);
 }
 
@@ -65,8 +65,8 @@ function Panel({
       style={{
         opacity: presence,
         transform: `translate3d(calc(${baseX} + ${(1 - presence) * x * 0.7}px), ${(1 - presence) * 12}px, 0)`,
-        filter: `blur(${(1 - presence) * 3.5}px)`,
-        transition: "opacity 160ms linear, transform 160ms linear, filter 160ms linear",
+        filter: "none",
+        willChange: "opacity, transform, filter",
       }}
     >
       {children}
@@ -529,26 +529,40 @@ function ProjectsChapter({
 }
 
 function JourneyChapter({ presence, progress }: { presence: number; progress: number }) {
+  const intro = smoothstep(0.02, 0.3, progress);
+
   return (
-    <Panel presence={presence} side="left" className="left-6 top-[12vh] w-[min(42rem,calc(100vw-3rem))] md:left-16">
-      <Kicker act="ACT V" label="Education And Practice" />
-      <div className="flex items-center gap-4">
-        <GraduationCap className="h-8 w-8 text-[#ff6b7f]" />
-        <h2 className="text-4xl font-black uppercase leading-none text-white md:text-5xl">How The Work Was Built</h2>
+    <Panel presence={presence} side="left" className="left-6 top-[7vh] w-[min(42rem,calc(100vw-3rem))] md:left-16">
+      <div aria-hidden="true" className="pointer-events-none absolute -inset-x-10 -inset-y-8 -z-10 bg-[radial-gradient(ellipse_at_18%_45%,rgba(0,0,0,0.78),rgba(0,0,0,0.42)_52%,transparent_78%)]" />
+      <div style={{ opacity: intro, transform: `translateY(${(1 - intro) * 12}px)`, willChange: "opacity, transform" }}>
+        <Kicker act="ACT V" label="Education And Practice" />
       </div>
-      <div className="mt-7 space-y-5">
+      <div className="flex items-center gap-4" style={{ opacity: intro, transform: `translateX(${(1 - intro) * -22}px)`, willChange: "opacity, transform" }}>
+        <GraduationCap className="h-8 w-8 text-[#ff6b7f]" />
+        <h2 className="text-3xl font-black uppercase leading-none text-white md:text-4xl">How The Work Was Built</h2>
+      </div>
+      <div className="mt-3 space-y-2">
         {JOURNEY_MILESTONES.map((item, index) => {
-          const reveal = smoothstep(index * 0.14, index * 0.14 + 0.2, progress);
+            const reveal = smoothstep(0.08 + index * 0.14, 0.28 + index * 0.14, progress);
           return (
-            <div key={item.title} className="grid grid-cols-[2rem_1fr] gap-4" style={{ opacity: reveal }}>
+              <div
+                key={item.title}
+                className="grid grid-cols-[1.5rem_1fr] gap-3"
+                style={{
+                  opacity: reveal,
+                  transform: `translate3d(0, ${(1 - reveal) * 26}px, 0)`,
+                  filter: `blur(${(1 - reveal) * 3}px)`,
+                  willChange: "opacity, transform, filter",
+                }}
+              >
               <div className="relative flex justify-center">
                 <div className="mt-1 h-3 w-3 border border-[#ff1744] bg-black shadow-[0_0_18px_rgba(255,23,68,0.8)]" />
-                {index < JOURNEY_MILESTONES.length - 1 && <div className="absolute top-5 h-14 w-px bg-[#ff1744]/24" />}
+                  {index < JOURNEY_MILESTONES.length - 1 && <div className="absolute top-5 h-9 w-px bg-[#ff1744]/24" />}
               </div>
-              <div style={{ transform: `translateX(${(1 - reveal) * 20}px)` }}>
+                <div style={{ transform: `translateX(${(1 - reveal) * 20}px)`, willChange: "transform" }}>
                 <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#ff1744]">checkpoint 0{index + 1}</p>
-                <h3 className="mt-1 text-xl font-bold text-white">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-white/58">{item.body}</p>
+                  <h3 className="mt-0.5 text-base font-bold text-white">{item.title}</h3>
+                  <p className="mt-1 text-xs leading-4 text-white/70">{item.body}</p>
               </div>
             </div>
           );
@@ -662,7 +676,7 @@ export default function CinematicJourney({
         chapters.map((chapter) => [
           chapter.id,
           {
-            presence: visible ? chapterPresence(scrollProgress, chapter.range) : 0,
+            presence: visible ? chapterPresence(scrollProgress, chapter.range, chapter.holdUntilEnd) : 0,
             progress: localProgress(scrollProgress, chapter.range),
           },
         ]),
@@ -672,7 +686,7 @@ export default function CinematicJourney({
   const activeChapter = useMemo(
     () => {
       const bestVisible = chapters.reduce((best, chapter) => {
-        const presence = chapterPresence(scrollProgress, chapter.range);
+        const presence = chapterPresence(scrollProgress, chapter.range, chapter.holdUntilEnd);
         return presence > best.presence ? { id: chapter.id, presence } : best;
       }, { id: "hero" as ChapterId, presence: 0 });
 
@@ -775,7 +789,7 @@ export default function CinematicJourney({
 
       <div className="absolute right-8 top-24 hidden flex-col items-end gap-2 font-mono text-[9px] uppercase tracking-[0.26em] text-white/30 md:flex">
         {chapters.map((chapter) => {
-          const active = chapterPresence(scrollProgress, chapter.range);
+          const active = chapterPresence(scrollProgress, chapter.range, chapter.holdUntilEnd);
           return (
             <div key={chapter.id} className="flex items-center gap-2" style={{ opacity: 0.24 + active * 0.76 }}>
               <span>{chapter.label}</span>
