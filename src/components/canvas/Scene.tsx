@@ -147,6 +147,7 @@ export default function Scene({
       <Canvas
         shadows
         frameloop="always"
+        dpr={isMobile ? [1, 1.25] : deviceTier === "tablet" ? [1, 1.35] : [1, 1.5]}
         gl={{
           antialias: true,
           alpha: false,
@@ -178,7 +179,7 @@ export default function Scene({
           <group visible={showStars && !isProjectTransit}>
             {!isActFive && !isActSix && <NebulaBackground />}
             <StarField
-              starsOpacity={starsOpacity * (isActFive || isActSix ? 1 : 0.24 + exteriorStrength * 0.76)}
+              starsOpacity={starsOpacity * (isActFive ? 0.75 : 0.24 + exteriorStrength * 0.76)}
               showConstellations={!isActFive && !isActSix}
             />
             {!isActFive && !isActSix && <ShootingStars />}
@@ -223,10 +224,10 @@ export default function Scene({
 
           {!isInsideProjectCore && !isActFive && !isActSix && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
           {!isActFive && !isActSix && <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} />}
-          <ActFiveWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />
-          <ActSixWorld scrollProgress={scrollProgress} />
+          {scrollProgress < 0.956 && <ActFiveWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
+          <ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} />
 
-          <PostProcessing hologramActive={hologramVisible} />
+          <PostProcessing hologramActive={hologramVisible} cosmicActive={isActSix} />
         </Suspense>
       </Canvas>
     </div>
