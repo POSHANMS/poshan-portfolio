@@ -313,10 +313,8 @@ export function CinematicCamera({
   useFrame((state) => {
     const camera = state.camera as THREE.PerspectiveCamera;
 
-    // HARD LOCK: When scrollProgress is in Stage 4 Hero HUD phase (0.0 to 1.0),
-    // lock camera position and lookAt 100% CONSTANT at Station 1 wide-shot view.
-    // Zero rotation, zero pitch change, zero camera zoom, zero translation.
-    if (clampedProgress <= 1.0) {
+    // Camera locked at Station 1 — landing page phase
+    if (clampedProgress <= 0.75) {
       const s1 = sceneCoordinates[0];
       camera.position.copy(s1.camera);
       camera.lookAt(s1.lookAt);
@@ -328,12 +326,26 @@ export function CinematicCamera({
       return;
     }
 
-    // Transition from Station 1 to Station 2 when scrollProgress goes from 0.9 to 1.0
-    const t = (clampedProgress - 0.9) / 0.1;
-    const easedT = t * t * (3.0 - 2.0 * t);
+    // 0.75 → 1.0: Two-segment transition: S1→S2 (0.75→0.875), S2→S3 (0.875→1.0)
+    let fromIdx = 0;
+    let toIdx = 1;
+    let localT = (clampedProgress - 0.75) / 0.25;
 
-    const from = sceneCoordinates[0];
-    const to = sceneCoordinates[1];
+    if (localT <= 0.5) {
+      // First half: Station 1 → Station 2
+      localT = localT / 0.5;
+      fromIdx = 0;
+      toIdx = 1;
+    } else {
+      // Second half: Station 2 → Station 3
+      localT = (localT - 0.5) / 0.5;
+      fromIdx = 1;
+      toIdx = 2;
+    }
+
+    const easedT = localT * localT * (3.0 - 2.0 * localT);
+    const from = sceneCoordinates[fromIdx];
+    const to = sceneCoordinates[toIdx];
 
     currentPos.current.lerpVectors(from.camera, to.camera, easedT);
     currentLookAt.current.lerpVectors(from.lookAt, to.lookAt, easedT);
@@ -2065,13 +2077,12 @@ export default function RootLayout({
 ```typescript
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { start3DPowerUpSequence, PowerUpStage, PowerUpStageValues } from "@/animations/powerUpSequence";
 import { startWormholeSequence, WormholeValues, WormholePhase } from "@/animations/wormholeLaptop";
 import Loader from "@/components/ui/Loader";
 import WelcomeText from "@/components/ui/WelcomeText";
-import DashboardHero from "@/components/ui/DashboardHero";
 import CinematicHUD from "@/components/ui/CinematicHUD";
 
 const Scene = dynamic(() => import("@/components/canvas/Scene"), {
@@ -2139,44 +2150,26 @@ export default function Home() {
 
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  // Wheel & touch scroll listener
+  // Scroll progress — derived from window.scrollY through the 250vh hero track.
+  // CSS sticky (on the inner element) provides the pinned experience.
+  // No GSAP DOM manipulation = no React reconciliation conflict.
+  const heroRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    let target = 0;
-    let current = 0;
-    let rafId = 0;
-    const getPinnedDelta = () => 1 / Math.max(900, window.innerHeight * 1.5);
-
-    const onWheel = (e: WheelEvent) => {
-      target = Math.max(0, Math.min(1, target + e.deltaY * getPinnedDelta()));
+    const handleScroll = () => {
+      const hero = heroRef.current;
+      if (!hero) return;
+      // The outer div is 250vh. The pin region is the extra 150vh beyond the viewport.
+      const scrollTrack = hero.offsetHeight - window.innerHeight;
+      if (scrollTrack <= 0) return;
+      const heroTop = hero.getBoundingClientRect().top + window.scrollY;
+      const scrolled = Math.max(0, window.scrollY - heroTop);
+      setScrollProgress(Math.min(1, scrolled / scrollTrack));
     };
 
-    let touchStartY = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0].clientY;
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      const deltaY = touchStartY - e.touches[0].clientY;
-      touchStartY = e.touches[0].clientY;
-      target = Math.max(0, Math.min(1, target + deltaY * getPinnedDelta() * 1.35));
-    };
-
-    const update = () => {
-      current += (target - current) * 0.08;
-      setScrollProgress(current);
-      rafId = requestAnimationFrame(update);
-    };
-
-    window.addEventListener("wheel", onWheel, { passive: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-    rafId = requestAnimationFrame(update);
-
-    return () => {
-      window.removeEventListener("wheel", onWheel);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      cancelAnimationFrame(rafId);
-    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // seed on mount
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const stageScale = useStageScale();
@@ -2210,7 +2203,7 @@ export default function Home() {
   const wormholeActive = wormholePhase !== "idle" && wormholePhase !== "complete";
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-[#000000]">
+    <main className="relative w-full bg-[#000000]">
       {/* LOADER */}
       {!loaderComplete && <Loader onComplete={handleLoaderComplete} />}
 
@@ -2219,72 +2212,49 @@ export default function Home() {
         <WelcomeText onComplete={handleWelcomeComplete} layoutMode="stacked" />
       )}
 
-      {/* 3D SCENE */}
-      <div
-        className="fixed inset-0 z-0 h-full w-full pointer-events-auto"
-        style={{
-          opacity: showWelcomeText || powerUpStage === "welcome" ? 0 : powerUpValues.sceneOpacity,
-        }}
-      >
-        <Scene
-          scrollProgress={scrollProgress}
-          powerUpStage={powerUpStage}
-          powerUpValues={powerUpValues}
-          isPowerUpActive={isPowerUpActive}
-          wormholeValues={wormholeValues}
-          wormholeActive={wormholeActive}
-          lensDistortion={wormholeValues.lensDistortion}
-        />
+      {/* PINNED HERO TRACK — 250vh outer creates the scroll distance.
+          Inner sticky div stays fixed at top while user scrolls through it.
+          CSS sticky = zero DOM mutation = React-safe. */}
+      <div ref={heroRef} className="relative w-full" style={{ height: "250vh" }}>
+        <div className="sticky top-0 h-screen w-full overflow-hidden">
+          {/* 3D SCENE */}
+          <div
+            className="absolute inset-0 z-0 pointer-events-auto"
+            style={{
+              opacity: showWelcomeText || powerUpStage === "welcome" ? 0 : powerUpValues.sceneOpacity,
+            }}
+          >
+            <Scene
+              scrollProgress={scrollProgress}
+              powerUpStage={powerUpStage}
+              powerUpValues={powerUpValues}
+              isPowerUpActive={isPowerUpActive}
+              wormholeValues={wormholeValues}
+              wormholeActive={wormholeActive}
+              lensDistortion={wormholeValues.lensDistortion}
+            />
+          </div>
+
+          {/* ═══ CHROMATIC ABERRATION OVERLAY (CSS) — vignette now handled by WebGL PostProcessing ═══ */}
+          {(powerUpStage === "ui" || powerUpStage === "complete") && (
+            <div
+              className="absolute inset-0 z-[6] pointer-events-none mix-blend-screen"
+              style={{
+                background: [
+                  "radial-gradient(ellipse at 0% 50%, rgba(255,0,60,0.06) 0%, transparent 40%)",
+                  "radial-gradient(ellipse at 100% 50%, rgba(0,220,255,0.05) 0%, transparent 40%)",
+                  "radial-gradient(ellipse at 50% 0%, rgba(255,0,60,0.04) 0%, transparent 30%)",
+                  "radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.04) 0%, transparent 30%)",
+                ].join(", "),
+              }}
+            />
+          )}
+
+          {/* CINEMATIC HUD OVERLAY */}
+          <CinematicHUD visible={powerUpStage === "ui" || powerUpStage === "complete"} />
+        </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          DASHBOARD HERO — Cinematic Holographic Projection
-          Wrapper: opacity-only fade-in. NO transform here — the hero
-          handles its own 3D projection (rotateX, translateZ, scale)
-          internally via scrollProgress & stageScale.
-          ═══════════════════════════════════════════════════════════════ */}
-      {false && loaderComplete && (
-        <div
-          className="absolute inset-0 z-10"
-          style={{
-            opacity: powerUpStage === "ui" || powerUpStage === "complete" ? 1 : 0,
-            transition: "opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
-            willChange: "opacity",
-          }}
-        >
-          <DashboardHero scrollProgress={scrollProgress} stageScale={stageScale} />
-        </div>
-      )}
-
-      {/* ═══ VIGNETTE + CHROMATIC ABERRATION OVERLAYS (Bug 7 & 11) ═══
-          Active when hologram is visible (powerUpStage ui/complete).
-          Pointer-events: none so interactions pass through to 3D canvas. */}
-      {(powerUpStage === "ui" || powerUpStage === "complete") && (
-        <>
-          {/* Vignette — darkens corners by ~15% */}
-          <div
-            className="fixed inset-0 z-[5] pointer-events-none"
-            style={{
-              background: "radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.15) 100%)",
-            }}
-          />
-          {/* Chromatic aberration — red/cyan split at viewport edges */}
-          <div
-            className="fixed inset-0 z-[6] pointer-events-none mix-blend-screen"
-            style={{
-              background: [
-                "radial-gradient(ellipse at 0% 50%, rgba(255,0,60,0.06) 0%, transparent 40%)",
-                "radial-gradient(ellipse at 100% 50%, rgba(0,220,255,0.05) 0%, transparent 40%)",
-                "radial-gradient(ellipse at 50% 0%, rgba(255,0,60,0.04) 0%, transparent 30%)",
-                "radial-gradient(ellipse at 50% 100%, rgba(0,220,255,0.04) 0%, transparent 30%)",
-              ].join(", "),
-            }}
-          />
-        </>
-      )}
-
-      {/* CINEMATIC HUD OVERLAY */}
-      <CinematicHUD visible={powerUpStage === "ui" || powerUpStage === "complete"} />
     </main>
   );
 }
@@ -2490,13 +2460,13 @@ export default function DeepSpaceGlobe({ scrollProgress, globeOpacity = 1 }: Dee
 "use client";
 
 import React, { useRef, useMemo, useEffect } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useMousePosition } from "@/hooks/useMousePosition";
 
-// ═══════════════════════════════════════════════════════════════════════
-// TYPES
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// TYPES — Strict, zero `any`
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface AnimationValues {
   beamOpacity: number;
@@ -2514,6 +2484,11 @@ interface AnimationValues {
   rimPulse: number;
   hasEmerged: boolean;
   sourceGlow: number;
+  brightness: number;
+  emergenceProgress: number;
+  dissipationProgress: number;
+  panelY: number;
+  hoverPhase: number;
 }
 
 interface FloatingDebrisProps {
@@ -2522,239 +2497,22 @@ interface FloatingDebrisProps {
   animRef: React.RefObject<AnimationValues>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// CONSTANTS
-// ═══════════════════════════════════════════════════════════════════════
-
-const SHARD_COUNT_DESKTOP = 26;
-const SHARD_COUNT_MOBILE = 8;
-const CHIP_COUNT_DESKTOP = 10;
-const CHIP_COUNT_MOBILE = 4;
-
-const SHARD_COLORS = [
-  new THREE.Color("#ff1744"),
-  new THREE.Color("#ff3355"),
-  new THREE.Color("#800010"),
-  new THREE.Color("#ffffff"),
-];
-
-const SHARD_COLOR_WEIGHTS = [0.35, 0.35, 0.25, 0.05];
-
-const CHIP_TEXTS = [
-  "01",
-  "AP",
-  "◢",
-  "∴",
-  "REACT",
-  "NODE",
-  "TS",
-  "NEXT",
-  "◤",
-  "PY",
-  "GO",
-  "R3F",
-];
-
-// ═══════════════════════════════════════════════════════════════════════
-// UTILITIES
-// ═══════════════════════════════════════════════════════════════════════
-
-function weightedRandomIndex(weights: number[]): number {
-  const sum = weights.reduce((a, b) => a + b, 0);
-  let r = Math.random() * sum;
-  for (let i = 0; i < weights.length; i++) {
-    r -= weights[i];
-    if (r <= 0) return i;
-  }
-  return weights.length - 1;
-}
-
-function createTextTexture(text: string): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  const size = 256;
-  canvas.width = size;
-  canvas.height = size;
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("FloatingDebris: Failed to acquire canvas 2D context");
-  }
-
-  ctx.clearRect(0, 0, size, size);
-
-  ctx.font =
-    "bold 64px 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  ctx.shadowColor = "#ff0033";
-  ctx.shadowBlur = 28;
-  ctx.fillStyle = "#ff1744";
-  ctx.fillText(text, size / 2, size / 2);
-
-  ctx.shadowColor = "#ff3355";
-  ctx.shadowBlur = 12;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(text, size / 2, size / 2);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  return texture;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// 7.1 ORBITING GLASS SHARDS
-// ═══════════════════════════════════════════════════════════════════════
-
 interface ShardConfig {
   orbitA: number;
   orbitB: number;
   orbitSpeed: number;
   orbitPhase: number;
-  orbitQuat: THREE.Quaternion;
+  inclinationX: number;
+  inclinationY: number;
+  inclinationZ: number;
   spinAxis: THREE.Vector3;
   spinSpeed: number;
-  size: number;
+  baseSize: number;
   color: THREE.Color;
+  emissive: THREE.Color;
+  repulsionStrength: number;
+  formationDelay: number;
 }
-
-function GlassShards({
-  isMobile,
-  animRef,
-  mousePos,
-}: {
-  isMobile: boolean;
-  animRef: React.RefObject<AnimationValues>;
-  mousePos: { x: number; y: number };
-}) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-
-  const dummy = useRef(new THREE.Object3D());
-  const posScratch = useRef(new THREE.Vector3());
-  const pushScratch = useRef(new THREE.Vector3());
-  const repulsor = useRef(new THREE.Vector3());
-
-  const count = isMobile ? SHARD_COUNT_MOBILE : SHARD_COUNT_DESKTOP;
-
-  const shards = useMemo<ShardConfig[]>(() => {
-    return Array.from({ length: count }, () => {
-      const normal = new THREE.Vector3(
-        Math.random() - 0.5,
-        Math.random() - 0.5,
-        Math.random() - 0.5
-      ).normalize();
-      const quat = new THREE.Quaternion().setFromUnitVectors(
-        new THREE.Vector3(0, 0, 1),
-        normal
-      );
-
-      return {
-        orbitA: 3.0 + Math.random() * 5.0,
-        orbitB: 2.0 + Math.random() * 4.0,
-        orbitSpeed: (Math.random() - 0.5) * 0.6 + 0.25,
-        orbitPhase: Math.random() * Math.PI * 2,
-        orbitQuat: quat,
-        spinAxis: new THREE.Vector3(
-          Math.random() - 0.5,
-          Math.random() - 0.5,
-          Math.random() - 0.5
-        ).normalize(),
-        spinSpeed: (Math.random() - 0.5) * 3.0,
-        size: 0.02 + Math.random() * 0.06,
-        color: SHARD_COLORS[weightedRandomIndex(SHARD_COLOR_WEIGHTS)].clone(),
-      };
-    });
-  }, [count]);
-
-  const geometry = useMemo(
-    () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6),
-    []
-  );
-
-  const material = useMemo(
-    () =>
-      new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 1,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      }),
-    []
-  );
-
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    for (let i = 0; i < shards.length; i++) {
-      mesh.setColorAt(i, shards[i].color);
-    }
-    if (mesh.instanceColor) {
-      mesh.instanceColor.needsUpdate = true;
-    }
-  }, [shards]);
-
-  useFrame((state) => {
-    const mesh = meshRef.current;
-    const a = animRef.current;
-    if (!mesh || !a) return;
-
-    if (a.debrisOpacity <= 0.001) {
-      mesh.visible = false;
-      return;
-    }
-    mesh.visible = true;
-
-    const t = state.clock.getElapsedTime();
-    const d = dummy.current;
-    const p = posScratch.current;
-    const push = pushScratch.current;
-    const rep = repulsor.current;
-
-    rep.set(mousePos.x * 8, mousePos.y * 4.5, 0);
-
-    for (let i = 0; i < shards.length; i++) {
-      const s = shards[i];
-      const angle = t * s.orbitSpeed + s.orbitPhase;
-
-      p.set(Math.cos(angle) * s.orbitA, Math.sin(angle) * s.orbitB, 0);
-      p.applyQuaternion(s.orbitQuat);
-
-      push.copy(p).sub(rep);
-      const dist = push.length();
-      const repelRadius = 2.5;
-      if (dist < repelRadius && dist > 0.001) {
-        const force = (1.0 - dist / repelRadius) * 1.5;
-        push.normalize().multiplyScalar(force);
-        p.add(push);
-      }
-
-      d.position.copy(p);
-      d.scale.setScalar(s.size);
-      d.rotation.set(0, 0, 0);
-      d.rotateOnAxis(s.spinAxis, t * s.spinSpeed);
-      d.updateMatrix();
-
-      mesh.setMatrixAt(i, d.matrix);
-    }
-
-    mesh.instanceMatrix.needsUpdate = true;
-    material.opacity = a.debrisOpacity;
-  });
-
-  return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, count]}
-      frustumCulled={false}
-      renderOrder={15}
-    />
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// 7.2 DATA CHIPS
-// ═══════════════════════════════════════════════════════════════════════
 
 interface ChipConfig {
   text: string;
@@ -2762,32 +2520,339 @@ interface ChipConfig {
   phase: number;
   speed: number;
   scale: number;
+  parallaxFactor: number;
+  rotationSpeed: number;
 }
 
-function DataChips({
-  isMobile,
-  animRef,
-  mousePos,
-}: {
-  isMobile: boolean;
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const SHARD_COUNT_DESKTOP = 30;
+const SHARD_COUNT_MOBILE = 8;
+const CHIP_COUNT_DESKTOP = 12;
+const CHIP_COUNT_MOBILE = 4;
+const DUST_COUNT_DESKTOP = 80;
+const DUST_COUNT_MOBILE = 0;
+
+const PALETTE: { color: THREE.Color; emissive: THREE.Color; weight: number }[] = [
+  { color: new THREE.Color("#ff1744"), emissive: new THREE.Color("#ff0033"), weight: 0.35 },
+  { color: new THREE.Color("#ff3355"), emissive: new THREE.Color("#ff6688"), weight: 0.35 },
+  { color: new THREE.Color("#800010"), emissive: new THREE.Color("#400008"), weight: 0.25 },
+  { color: new THREE.Color("#ffffff"), emissive: new THREE.Color("#ffcccc"), weight: 0.05 },
+];
+
+const CHIP_TEXTS = [
+  "01", "AP", "◢", "∴", "REACT", "NODE", "TS", "NEXT", "◤", "PY", "GO", "R3F",
+];
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MATH UTILITIES — GC-free helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function weightedRandomEntry<T>(items: { value: T; weight: number }[]): T {
+  const total = items.reduce((s, i) => s + i.weight, 0);
+  let r = Math.random() * total;
+  for (const item of items) {
+    r -= item.weight;
+    if (r <= 0) return item.value;
+  }
+  return items[items.length - 1].value;
+}
+
+function damp(current: number, target: number, lambda: number, dt: number): number {
+  return THREE.MathUtils.lerp(current, target, 1.0 - Math.exp(-lambda * dt));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CANVAS TEXTURE FACTORY — JetBrains Mono holographic chips
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function createChipTexture(text: string): THREE.CanvasTexture {
+  const size = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("[FloatingDebris] Canvas 2D context acquisition failed");
+
+  // Transparent background
+  ctx.clearRect(0, 0, size, size);
+
+  // Outer glow pass (crimson)
+  ctx.shadowColor = "#ff0033";
+  ctx.shadowBlur = 60;
+  ctx.font = "bold 96px 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#ff1744";
+  ctx.fillText(text, size / 2, size / 2);
+
+  // Inner glow pass (bright core)
+  ctx.shadowColor = "#ff99aa";
+  ctx.shadowBlur = 25;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(text, size / 2, size / 2);
+
+  // Subtle scanline overlay on texture
+  ctx.globalCompositeOperation = "overlay";
+  for (let y = 0; y < size; y += 4) {
+    ctx.fillStyle = `rgba(255, 0, 30, ${0.03 + Math.random() * 0.04})`;
+    ctx.fillRect(0, y, size, 1);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: HEX SHARD SYSTEM
+// 30 instanced hexagonal prisms with elliptical orbits, magnetic repulsion,
+// tumbling spin, and cinematic formation animation.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface HexShardSystemProps {
+  count: number;
   animRef: React.RefObject<AnimationValues>;
   mousePos: { x: number; y: number };
-}) {
+}
+
+const HexShardSystem = React.memo(function HexShardSystem({
+  count,
+  animRef,
+  mousePos,
+}: HexShardSystemProps) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const { camera } = useThree();
+
+  // Scratch objects — persisted across frames to eliminate GC pressure
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const _pos = useMemo(() => new THREE.Vector3(), []);
+  const _push = useMemo(() => new THREE.Vector3(), []);
+  const _euler = useMemo(() => new THREE.Euler(), []);
+  const _color = useMemo(() => new THREE.Color(), []);
+
+  // Smooth formation & opacity
+  const smoothForm = useRef(0);
+  const smoothOpacity = useRef(0);
+
+  // Generate shard configurations
+  const shards = useMemo<ShardConfig[]>(() => {
+    return Array.from({ length: count }, () => {
+      const spinAxis = new THREE.Vector3(
+        Math.random() - 0.5,
+        Math.random() - 0.5,
+        Math.random() - 0.5
+      ).normalize();
+
+      const paletteEntry = weightedRandomEntry(
+        PALETTE.map((p) => ({ value: p, weight: p.weight }))
+      );
+
+      return {
+        orbitA: 2.0 + Math.random() * 2.6,
+        orbitB: 1.3 + Math.random() * 1.7,
+        orbitSpeed: (Math.random() - 0.5) * 0.45 + 0.18,
+        orbitPhase: Math.random() * Math.PI * 2,
+        inclinationX: (Math.random() - 0.5) * 1.4,
+        inclinationY: (Math.random() - 0.5) * 0.8,
+        inclinationZ: (Math.random() - 0.5) * 1.4,
+        spinAxis,
+        spinSpeed: (Math.random() - 0.5) * 3.5,
+        baseSize: 0.02 + Math.random() * 0.06,
+        color: paletteEntry.color.clone(),
+        emissive: paletteEntry.emissive.clone(),
+        repulsionStrength: 0.9 + Math.random() * 1.4,
+        formationDelay: Math.random() * 0.6,
+      };
+    });
+  }, [count]);
+
+  // Hexagonal prism geometry — flattened into chip-like plates
+  const geometry = useMemo(() => {
+    const geo = new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
+    geo.scale(1, 0.22, 1);
+    return geo;
+  }, []);
+
+  // Physical material for glass-like crystalline feel with emissive bloom
+  const material = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0.15,
+        roughness: 0.15,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        emissive: 0xff1744,
+        emissiveIntensity: 0.35,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1,
+      }),
+    []
+  );
+
+  // Initialize instance colors & matrices
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    for (let i = 0; i < shards.length; i++) {
+      mesh.setColorAt(i, shards[i].color);
+      dummy.position.set(0, -999, 0);
+      dummy.scale.setScalar(0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [shards, dummy]);
+
+  useFrame((state, delta) => {
+    const mesh = meshRef.current;
+    const a = animRef.current;
+    if (!mesh || !a) return;
+
+    const dt = Math.min(delta, 0.05);
+    const t = state.clock.getElapsedTime();
+
+    // Gate visibility
+    const targetOpacity = a.debrisOpacity * (a.hasEmerged ? 1 : 0);
+    smoothOpacity.current = damp(smoothOpacity.current, targetOpacity, 10, dt);
+
+    if (smoothOpacity.current <= 0.001) {
+      mesh.visible = false;
+      return;
+    }
+    mesh.visible = true;
+
+    // Formation progress: shards spiral in from expanded orbits
+    const rawForm = Math.max(0, (a.debrisOpacity - 0.1) / 0.9);
+    smoothForm.current = damp(smoothForm.current, rawForm, 4, dt);
+    const form = smoothForm.current;
+
+    // Material pulse synced with hologram rim
+    const pulse = 0.85 + 0.15 * Math.sin(t * 1.8) * a.rimPulse;
+    material.opacity = smoothOpacity.current * pulse;
+    material.emissiveIntensity = (0.25 + 0.2 * a.rimPulse) * smoothOpacity.current;
+
+    // Mouse repulsor in local panel space
+    // Panel faces camera via lookAt, so local XY ≈ screen space
+    const repulsorX = mousePos.x * 5.5;
+    const repulsorY = mousePos.y * 3.8;
+
+    for (let i = 0; i < shards.length; i++) {
+      const s = shards[i];
+      const staggeredForm = Math.max(0, Math.min(1, (form - s.formationDelay) / (1 - s.formationDelay)));
+      if (staggeredForm <= 0.001) {
+        dummy.position.set(0, -999, 0);
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+        continue;
+      }
+
+      // Elliptical orbit
+      const angle = t * s.orbitSpeed + s.orbitPhase;
+      const expand = 1.0 + (1.0 - staggeredForm) * 2.5; // Start far, spiral in
+      _pos.set(
+        Math.cos(angle) * s.orbitA * expand,
+        Math.sin(angle) * s.orbitB * expand,
+        0
+      );
+
+      // Apply 3D inclination to orbit plane
+      _euler.set(s.inclinationX, s.inclinationY, s.inclinationZ);
+      _pos.applyEuler(_euler);
+
+      // Magnetic repulsion from cursor (world-space approx in local XY)
+      _push.copy(_pos);
+      _push.x -= repulsorX;
+      _push.y -= repulsorY;
+      const dist = _push.length();
+      const repelRadius = 3.2;
+      if (dist < repelRadius && dist > 0.001) {
+        const force = Math.pow(1.0 - dist / repelRadius, 1.5) * s.repulsionStrength;
+        _push.normalize().multiplyScalar(force);
+        _pos.add(_push);
+      }
+
+      // Breathing scale
+      const breathe = 1.0 + Math.sin(t * 2.2 + i * 0.7) * 0.06 * a.rimPulse;
+      const scale = s.baseSize * staggeredForm * breathe;
+
+      // Tumble rotation
+      dummy.position.copy(_pos);
+      dummy.scale.setScalar(scale);
+      dummy.rotation.set(0, 0, 0);
+      dummy.rotateOnAxis(s.spinAxis, t * s.spinSpeed + i * 1.3);
+      dummy.updateMatrix();
+
+      mesh.setMatrixAt(i, dummy.matrix);
+
+      // Dynamic emissive color pulse per shard
+      _color.copy(s.color).lerp(s.emissive, 0.3 + 0.2 * Math.sin(t * 3 + i));
+      mesh.setColorAt(i, _color);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[geometry, material, count]}
+      frustumCulled={true}
+      renderOrder={15}
+    />
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: DATA CHIP SYSTEM
+// 12 floating text chips rendered as canvas textures. They float in the
+// foreground (closer to camera than panel) with 1.5x parallax reactivity.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface DataChipSystemProps {
+  count: number;
+  animRef: React.RefObject<AnimationValues>;
+  mousePos: { x: number; y: number };
+}
+
+const DataChipSystem = React.memo(function DataChipSystem({
+  count,
+  animRef,
+  mousePos,
+}: DataChipSystemProps) {
   const groupRef = useRef<THREE.Group>(null);
 
-  const count = isMobile ? CHIP_COUNT_MOBILE : CHIP_COUNT_DESKTOP;
+  // Smooth parallax state
+  const smoothMouse = useRef({ x: 0, y: 0 });
+  const smoothForm = useRef(0);
 
   const chips = useMemo<ChipConfig[]>(() => {
     return Array.from({ length: count }, (_, i) => ({
       text: CHIP_TEXTS[i % CHIP_TEXTS.length],
       basePos: new THREE.Vector3(
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 6,
-        -(0.8 + Math.random() * 1.2)
+        (Math.random() - 0.5) * 5.8,
+        (Math.random() - 0.5) * 3.6,
+        0.25 + Math.random() * 0.75 // Foreground layer
       ),
       phase: Math.random() * Math.PI * 2,
-      speed: 0.2 + Math.random() * 0.4,
-      scale: 0.15 + Math.random() * 0.15,
+      speed: 0.2 + Math.random() * 0.45,
+      scale: 0.09 + Math.random() * 0.13,
+      parallaxFactor: 1.3 + Math.random() * 0.8,
+      rotationSpeed: (Math.random() - 0.5) * 0.3,
     }));
   }, [count]);
 
@@ -2795,39 +2860,44 @@ function DataChips({
 
   const materials = useMemo(() => {
     return chips.map((chip) => {
-      const tex = createTextTexture(chip.text);
+      const tex = createChipTexture(chip.text);
       return new THREE.MeshBasicMaterial({
         map: tex,
         transparent: true,
-        opacity: 1,
+        opacity: 0,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.DoubleSide,
+        toneMapped: false,
       });
     });
   }, [chips]);
 
-  const parallaxLerp = useRef({ x: 0, y: 0 });
-
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const group = groupRef.current;
     const a = animRef.current;
     if (!group || !a) return;
 
-    if (a.debrisOpacity <= 0.001) {
+    const dt = Math.min(delta, 0.05);
+    const t = state.clock.getElapsedTime();
+
+    const targetOpacity = a.debrisOpacity * (a.hasEmerged ? 1 : 0);
+    if (targetOpacity <= 0.001) {
       group.visible = false;
       return;
     }
     group.visible = true;
 
-    const t = state.clock.getElapsedTime();
+    // Smooth formation
+    const rawForm = Math.max(0, (a.debrisOpacity - 0.15) / 0.85);
+    smoothForm.current = damp(smoothForm.current, rawForm, 5, dt);
+    const form = smoothForm.current;
 
-    // Panel parallax rate ≈ 0.3 units max deflection
-    // Chips move opposite at 1.5x → ~0.45 units
-    const targetX = -mousePos.x * 0.45;
-    const targetY = -mousePos.y * 0.35;
-    parallaxLerp.current.x += (targetX - parallaxLerp.current.x) * 0.08;
-    parallaxLerp.current.y += (targetY - parallaxLerp.current.y) * 0.08;
+    // Parallax at 1.5x panel rate (opposite direction for depth)
+    const targetX = -mousePos.x * 0.55;
+    const targetY = -mousePos.y * 0.42;
+    smoothMouse.current.x += (targetX - smoothMouse.current.x) * 0.07;
+    smoothMouse.current.y += (targetY - smoothMouse.current.y) * 0.07;
 
     group.children.forEach((child, i) => {
       if (i >= chips.length) return;
@@ -2835,14 +2905,30 @@ function DataChips({
       const mesh = child as THREE.Mesh;
       const mat = mesh.material as THREE.MeshBasicMaterial;
 
-      const bobY = Math.sin(t * chip.speed + chip.phase) * 0.15;
-      const bobX = Math.cos(t * chip.speed * 0.7 + chip.phase) * 0.08;
+      const staggeredForm = Math.max(0, Math.min(1, (form - i * 0.04) / 0.7));
 
-      mesh.position.x = chip.basePos.x + bobX + parallaxLerp.current.x;
-      mesh.position.y = chip.basePos.y + bobY + parallaxLerp.current.y;
-      mesh.position.z = chip.basePos.z;
+      // Organic bobbing
+      const bobY = Math.sin(t * chip.speed + chip.phase) * 0.14;
+      const bobX = Math.cos(t * chip.speed * 0.65 + chip.phase) * 0.07;
+      const bobZ = Math.sin(t * chip.speed * 0.35 + chip.phase) * 0.05;
 
-      mat.opacity = a.debrisOpacity;
+      // Parallax offset (1.5x rate as specified)
+      const paraX = smoothMouse.current.x * chip.parallaxFactor;
+      const paraY = smoothMouse.current.y * chip.parallaxFactor;
+
+      mesh.position.set(
+        chip.basePos.x + bobX + paraX,
+        chip.basePos.y + bobY + paraY,
+        chip.basePos.z + bobZ
+      );
+
+      // Gentle rotation
+      mesh.rotation.z = Math.sin(t * chip.rotationSpeed + chip.phase) * 0.08;
+
+      // Scale & opacity with formation
+      const s = chip.scale * staggeredForm;
+      mesh.scale.set(s, s, s);
+      mat.opacity = targetOpacity * staggeredForm * (0.85 + 0.15 * Math.sin(t * 2 + i));
     });
   });
 
@@ -2850,20 +2936,140 @@ function DataChips({
     <group ref={groupRef}>
       {chips.map((chip, i) => (
         <mesh
-          key={i}
+          key={`chip-${chip.text}-${i}`}
           geometry={geometry}
           material={materials[i]}
-          scale={chip.scale}
           renderOrder={16}
         />
       ))}
     </group>
   );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: ATMOSPHERIC DUST
+// Ultra-subtle crimson motes that drift around the hologram. Adds volumetric
+// depth and sells the "physical light" illusion. Disabled on mobile.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface AtmosphericDustProps {
+  count: number;
+  animRef: React.RefObject<AnimationValues>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════
+const AtmosphericDust = React.memo(function AtmosphericDust({
+  count,
+  animRef,
+}: AtmosphericDustProps) {
+  const pointsRef = useRef<THREE.Points>(null);
+  const smoothOpacity = useRef(0);
+
+  const { positions, phases, sizes } = useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    const ph = new Float32Array(count);
+    const sz = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+      pos[i3] = (Math.random() - 0.5) * 9;
+      pos[i3 + 1] = (Math.random() - 0.5) * 5.5;
+      pos[i3 + 2] = (Math.random() - 0.5) * 2.5;
+      ph[i] = Math.random() * Math.PI * 2;
+      sz[i] = 0.008 + Math.random() * 0.025;
+    }
+    return { positions: pos, phases: ph, sizes: sz };
+  }, [count]);
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: {
+          uTime: { value: 0 },
+          uOpacity: { value: 0 },
+          uColor: { value: new THREE.Color("#ff1744") },
+        },
+        vertexShader: /* glsl */ `
+          attribute float aPhase;
+          attribute float aSize;
+          varying float vAlpha;
+          uniform float uTime;
+          void main() {
+            vAlpha = 0.3 + 0.25 * sin(uTime * 0.7 + aPhase);
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            gl_Position = projectionMatrix * mv;
+            gl_PointSize = aSize * (45.0 / max(1.0, -mv.z));
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          uniform vec3 uColor;
+          uniform float uOpacity;
+          varying float vAlpha;
+          void main() {
+            vec2 uv = gl_PointCoord - vec2(0.5);
+            float d = length(uv);
+            if (d > 0.5) discard;
+            float core = smoothstep(0.5, 0.0, d);
+            float halo = smoothstep(0.5, 0.2, d) * 0.4;
+            float alpha = (core + halo) * vAlpha * uOpacity;
+            if (alpha < 0.003) discard;
+            gl_FragColor = vec4(uColor * (1.0 + core * 0.5), alpha);
+          }
+        `,
+      }),
+    []
+  );
+
+  useFrame((state, delta) => {
+    const points = pointsRef.current;
+    const a = animRef.current;
+    if (!points || !a || count === 0) return;
+
+    const dt = Math.min(delta, 0.05);
+    const t = state.clock.getElapsedTime();
+
+    const targetOpacity = a.debrisOpacity * 0.3 * (a.hasEmerged ? 1 : 0);
+    smoothOpacity.current = damp(smoothOpacity.current, targetOpacity, 8, dt);
+
+    if (smoothOpacity.current <= 0.001) {
+      points.visible = false;
+      return;
+    }
+    points.visible = true;
+    material.uniforms.uTime.value = t;
+    material.uniforms.uOpacity.value = smoothOpacity.current;
+
+    const posAttr = points.geometry.attributes.position;
+    const posArray = posAttr.array as Float32Array;
+
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+      posArray[i3] += Math.sin(t * 0.25 + phases[i]) * 0.0006;
+      posArray[i3 + 1] += Math.cos(t * 0.18 + phases[i]) * 0.0005;
+      posArray[i3 + 2] += Math.sin(t * 0.12 + phases[i]) * 0.0003;
+    }
+    posAttr.needsUpdate = true;
+  });
+
+  if (count === 0) return null;
+
+  return (
+    <points ref={pointsRef} material={material} renderOrder={13} frustumCulled={false}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-aPhase" args={[phases, 1]} />
+        <bufferAttribute attach="attributes-aSize" args={[sizes, 1]} />
+      </bufferGeometry>
+    </points>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT: FloatingDebris
+// Orchestrates shards, chips, and dust into one cohesive debris field.
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export default function FloatingDebris({
   visible,
@@ -2874,10 +3080,20 @@ export default function FloatingDebris({
 
   if (!visible) return null;
 
+  const shardCount = isMobile ? SHARD_COUNT_MOBILE : SHARD_COUNT_DESKTOP;
+  const chipCount = isMobile ? CHIP_COUNT_MOBILE : CHIP_COUNT_DESKTOP;
+  const dustCount = isMobile ? DUST_COUNT_MOBILE : DUST_COUNT_DESKTOP;
+
   return (
-    <group>
-      <GlassShards isMobile={isMobile} animRef={animRef} mousePos={mousePos} />
-      <DataChips isMobile={isMobile} animRef={animRef} mousePos={mousePos} />
+    <group name="FloatingDebrisRig">
+      {/* Orbiting glass shards — elliptical hex prisms */}
+      <HexShardSystem count={shardCount} animRef={animRef} mousePos={mousePos} />
+
+      {/* Foreground data chips — canvas text textures */}
+      <DataChipSystem count={chipCount} animRef={animRef} mousePos={mousePos} />
+
+      {/* Atmospheric dust motes — volumetric depth */}
+      <AtmosphericDust count={dustCount} animRef={animRef} />
     </group>
   );
 }
@@ -3116,7 +3332,7 @@ export default function FloatingLaptop({
     });
   }, [scene, laptopScreenRef]);
 
-  // ── Canvas Initialization (runs once on mount) ──────────────────────
+  // Create canvas + texture once
   useEffect(() => {
     if (!canvasRef.current) {
       const canvas = document.createElement("canvas");
@@ -3127,16 +3343,27 @@ export default function FloatingLaptop({
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
       textureRef.current = texture;
-
-      if (screenMeshRef.current) {
-        const mat = screenMeshRef.current.material as THREE.MeshStandardMaterial;
-        mat.map          = texture;
-        mat.emissiveMap  = texture;
-        mat.emissive     = new THREE.Color("#ff2244");
-        mat.emissiveIntensity = 0; // Dark until boot trigger
-        mat.needsUpdate  = true;
-      }
     }
+  }, []);
+
+  // Attach texture to screen mesh as soon as it exists
+  useEffect(() => {
+    const id = setInterval(() => {
+      const texture = textureRef.current;
+      const mesh = screenMeshRef.current;
+      if (texture && mesh) {
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        if (!mat.map) {
+          mat.map = texture;
+          mat.emissiveMap = texture;
+          mat.emissive = new THREE.Color("#ff2244");
+          mat.emissiveIntensity = 0;
+          mat.needsUpdate = true;
+          clearInterval(id);
+        }
+      }
+    }, 50);
+    return () => clearInterval(id);
   }, []);
 
   // Helper to draw terminal frame to canvas
@@ -3238,48 +3465,30 @@ export default function FloatingLaptop({
     }
 
     // Run typewriter & cursor logic ONLY when booted or booting is complete
-    if (anim.booted && !anim.locked) {
-      // Cursor Blink (every 500ms)
+    if (anim.booted) {
+      // Continuous 1Hz cursor blink (every 500ms)
       if (t - anim.lastBlinkTime > 0.5) {
         anim.cursorVisible = !anim.cursorVisible;
         anim.lastBlinkTime = t;
         drawTerminal(true);
       }
 
-      // Typewriter Advance (every 45ms)
-      if (t - anim.lastTypeTime > 0.045) {
+      // Typewriter Advance (every 45ms) until locked
+      if (!anim.locked && t - anim.lastTypeTime > 0.045) {
         anim.lastTypeTime = t;
-
-        if (anim.phase === "typing") {
-          const line = TERMINAL_LINES[anim.lineIndex];
-          if (anim.currentText.length < line.length) {
-            anim.currentText += line[anim.currentText.length];
-            drawTerminal(true);
-          } else {
-            anim.completedLines.push(anim.currentText);
-            anim.currentText = "";
-            anim.lineIndex++;
-            if (anim.lineIndex >= TERMINAL_LINES.length) {
-              anim.phase = "waiting";
-              anim.waitCounter = 0;
-              anim.locked = true;
-              anim.cursorVisible = true;
-            }
-            drawTerminal(true);
+        const line = TERMINAL_LINES[anim.lineIndex];
+        if (anim.currentText.length < line.length) {
+          anim.currentText += line[anim.currentText.length];
+          drawTerminal(true);
+        } else {
+          anim.completedLines.push(anim.currentText);
+          anim.currentText = "";
+          anim.lineIndex++;
+          if (anim.lineIndex >= TERMINAL_LINES.length) {
+            anim.locked = true; // Permanently locked — never reset or clear
+            anim.cursorVisible = true;
           }
-        } else if (anim.phase === "waiting" && !anim.locked) {
-          anim.waitCounter++;
-          if (anim.waitCounter > 50) anim.phase = "clearing";
-        } else if (anim.phase === "clearing" && !anim.locked) {
-          if (anim.completedLines.length > 0) {
-            anim.completedLines.shift();
-            drawTerminal(true);
-          } else {
-            anim.lineIndex   = 0;
-            anim.currentText = "";
-            anim.phase       = "typing";
-            drawTerminal(true);
-          }
+          drawTerminal(true);
         }
       }
     } else if (anim.booting) {
@@ -3449,9 +3658,9 @@ import React, { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-// ═══════════════════════════════════════════════════════════════════════
-// TYPES
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// TYPES — Strict zero-`any` interface matching HolographicProjection.tsx
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface AnimationValues {
   beamOpacity: number;
@@ -3469,6 +3678,11 @@ interface AnimationValues {
   rimPulse: number;
   hasEmerged: boolean;
   sourceGlow: number;
+  brightness: number;
+  emergenceProgress: number;
+  dissipationProgress: number;
+  panelY: number;
+  hoverPhase: number;
 }
 
 interface FloorProjectionProps {
@@ -3477,140 +3691,450 @@ interface FloorProjectionProps {
   laptopScreenRef?: React.MutableRefObject<THREE.Mesh | null>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// SHADERS — Core Disc (Main Floor Projection)
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════════
 
-const discVertexShader = `
+const CRIMSON_CORE = new THREE.Color("#ff1744");
+const CRIMSON_DEEP = new THREE.Color("#ff0033");
+const CRIMSON_DARK = new THREE.Color("#800010");
+const CRIMSON_SOFT = new THREE.Color("#ff3355");
+const WHITE_HOT = new THREE.Color("#ffffff");
+
+const DISC_RADIUS = 6.5;
+const DISC_SEGMENTS = 128;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: VOLUMETRIC PROJECTION DISC
+// AAA-grade floor decal with FBM noise, data-radar HUD, rotating sweep,
+// chromatic aberration, multi-ripple emergence, and scanline grid.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const discVertexShader = /* glsl */ `
   varying vec2 vUv;
+  varying vec3 vWorldPos;
   varying float vDist;
-  uniform float uTime;
 
   void main() {
     vUv = uv;
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPos = worldPosition.xyz;
     vDist = length(uv - 0.5) * 2.0;
-    gl_Position = projectionMatrix * viewMatrix * worldPos;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
   }
 `;
 
-const discFragmentShader = `
+const discFragmentShader = /* glsl */ `
   uniform float uTime;
   uniform float uOpacity;
   uniform float uRippleProgress;
   uniform float uPulse;
+  uniform float uChromatic;
+  uniform float uBrightness;
+
   varying vec2 vUv;
+  varying vec3 vWorldPos;
   varying float vDist;
+
+  // Hash & FBM for organic volumetric texture
+  vec3 hash33(vec3 p) {
+    p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
+             dot(p, vec3(269.5, 183.3, 246.1)),
+             dot(p, vec3(113.5, 271.9, 124.6)));
+    return fract(sin(p) * 43758.5453);
+  }
+
+  float hash13(vec3 p) {
+    p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
+             dot(p, vec3(269.5, 183.3, 246.1)),
+             dot(p, vec3(113.5, 271.9, 124.6)));
+    return fract(sin(p.x) * 43758.5453);
+  }
+
+  float noise(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float n = mix(
+      mix(mix(hash13(i), hash13(i + vec3(1,0,0)), f.x),
+          mix(hash13(i + vec3(0,1,0)), hash13(i + vec3(1,1,0)), f.x), f.y),
+      mix(mix(hash13(i + vec3(0,0,1)), hash13(i + vec3(1,0,1)), f.x),
+          mix(hash13(i + vec3(0,1,1)), hash13(i + vec3(1,1,1)), f.x), f.y),
+      f.z
+    );
+    return n;
+  }
+
+  float fbm(vec3 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 5; i++) {
+      v += a * noise(p);
+      p *= 2.1;
+      a *= 0.48;
+    }
+    return v;
+  }
 
   void main() {
     float dist = vDist;
+    float t = uTime;
 
-    // Core radial gradient: crimson center fading to transparent edges
-    float core = 1.0 - smoothstep(0.0, 0.35, dist);
-    float mid = 1.0 - smoothstep(0.0, 0.70, dist);
+    // ═══ RADIAL GRADIENTS ═══
+    float core = 1.0 - smoothstep(0.0, 0.22, dist);
+    float mid = 1.0 - smoothstep(0.0, 0.55, dist);
     float edge = 1.0 - smoothstep(0.0, 1.0, dist);
+    float outerRim = 1.0 - smoothstep(0.72, 1.0, dist);
 
-    // Data radar pattern: slowly rotating concentric rings
+    // ═══ ORGANIC VOLUMETRIC NOISE ═══
+    float volNoise = fbm(vec3(vUv * 3.5, t * 0.15)) * 0.35;
+    float volNoise2 = fbm(vec3(vUv * 6.0, t * 0.22 + 10.0)) * 0.2;
+
+    // ═══ DATA RADAR — slowly rotating concentric rings ═══
+    float radar = sin(dist * 22.0 - t * 0.9) * 0.5 + 0.5;
+    float radarRing = smoothstep(0.47, 0.53, radar) * 0.18;
+    float radar2 = sin(dist * 14.0 + t * 0.6) * 0.5 + 0.5;
+    float radarRing2 = smoothstep(0.48, 0.52, radar2) * 0.1;
+
+    // ═══ ROTATING SWEEP LINE (holographic HUD scanner) ═══
     float angle = atan(vUv.y - 0.5, vUv.x - 0.5);
-    float radar = sin(dist * 18.0 - uTime * 1.2) * 0.5 + 0.5;
-    float radarRing = smoothstep(0.48, 0.52, radar) * 0.12;
+    float sweep = angle + t * 0.45;
+    float sweepLine = smoothstep(0.025, 0.0, abs(fract(sweep / 6.28318530718) - 0.5)) * 0.28;
+    float sweepTrail = smoothstep(0.12, 0.0, abs(fract(sweep / 6.28318530718) - 0.5)) * 0.08;
 
-    // Rotating sweep line (holographic HUD)
-    float sweep = angle + uTime * 0.6;
-    float sweepLine = smoothstep(0.03, 0.0, abs(fract(sweep / 6.28318530718) - 0.5)) * 0.2;
+    // ═══ SCANLINE GRID OVERLAY ═══
+    float scanGrid = sin(vUv.x * 120.0 + t * 0.3) * sin(vUv.y * 120.0 - t * 0.2);
+    scanGrid = smoothstep(0.92, 1.0, abs(scanGrid)) * 0.06;
 
-    // Emergence ripple ring
+    // ═══ EMERGENCE RIPPLE (white-hot expanding ring) ═══
     float ripple = 0.0;
     float rippleBright = 0.0;
+    float rippleGlow = 0.0;
     if (uRippleProgress > 0.0 && uRippleProgress < 1.0) {
       float rp = uRippleProgress;
-      float r1 = smoothstep(0.0, 0.15, dist - rp);
-      float r2 = smoothstep(0.0, 0.15, rp + 0.1 - dist);
+      // Primary ripple
+      float r1 = smoothstep(0.0, 0.08, dist - rp);
+      float r2 = smoothstep(0.0, 0.12, rp + 0.08 - dist);
       ripple = r1 * r2;
-      rippleBright = ripple * 2.5;
+      rippleBright = ripple * 3.0;
+      // Secondary echo ripple
+      float rp2 = rp * 0.85;
+      float r1b = smoothstep(0.0, 0.06, dist - rp2);
+      float r2b = smoothstep(0.0, 0.1, rp2 + 0.06 - dist);
+      rippleGlow = r1b * r2b * 0.6;
     }
 
-    // Color palette
-    vec3 crimson   = vec3(1.0, 0.09, 0.27); // #ff1744
-    vec3 deepRed   = vec3(1.0, 0.0,  0.20); // #ff0033
-    vec3 softRed   = vec3(1.0, 0.20, 0.33); // #ff3355
-    vec3 darkRed   = vec3(0.5, 0.0,  0.06); // #800010
+    // ═══ CHROMATIC ABERRATION (during dissipation) ═══
+    float chroma = uChromatic * smoothstep(0.3, 0.9, dist) * 0.25;
+
+    // ═══ COLOR PALETTE ═══
+    vec3 crimson   = vec3(1.0, 0.09, 0.27);
+    vec3 deepRed   = vec3(1.0, 0.0,  0.20);
+    vec3 softRed   = vec3(1.0, 0.20, 0.33);
+    vec3 darkRed   = vec3(0.5, 0.0,  0.06);
     vec3 white     = vec3(1.0, 1.0,  1.0);
+    vec3 hotCore   = vec3(1.0, 0.92, 0.90);
 
-    // Base color mixing
-    vec3 color = mix(darkRed, crimson, core);
-    color = mix(color, deepRed, mid * 0.4);
-    color = mix(color, softRed, edge * 0.2);
+    // Base color mixing with noise
+    vec3 color = mix(darkRed, crimson, core + volNoise * 0.3);
+    color = mix(color, deepRed, mid * 0.5 + volNoise2 * 0.2);
+    color = mix(color, softRed, edge * 0.25);
+    color = mix(color, hotCore, core * core * 0.6);
 
-    // Add radar HUD pattern
-    color += crimson * radarRing;
-    color += vec3(1.0, 0.4, 0.4) * sweepLine * edge;
+    // Add radar HUD patterns
+    color += crimson * radarRing * (0.9 + uPulse * 0.3);
+    color += softRed * radarRing2 * 0.5;
+    color += vec3(1.0, 0.5, 0.5) * sweepLine * edge;
+    color += vec3(1.0, 0.3, 0.3) * sweepTrail * edge * 0.5;
+    color += crimson * scanGrid * mid;
 
     // Ripple: white-hot leading edge, fading to crimson
-    vec3 rippleColor = mix(crimson, white, ripple * 0.8);
+    vec3 rippleColor = mix(crimson, white, ripple * 0.85);
     color += rippleColor * rippleBright;
+    color += softRed * rippleGlow * 1.2;
 
-    // Alpha composition
-    float alpha = (core * 0.5 + mid * 0.25 + edge * 0.08) * uOpacity;
-    alpha += ripple * 0.6 * uOpacity;
-    alpha += radarRing * 0.25 * uOpacity;
-    alpha += sweepLine * 0.15 * uOpacity;
+    // Chromatic split
+    color.r += chroma * (core + 0.3);
+    color.b -= chroma * 0.15;
+    color.g += chroma * 0.05;
 
-    if (alpha < 0.002) discard;
+    // Outer rim glow pulse
+    float rimPulse = outerRim * (0.08 + 0.06 * sin(t * 1.8) * uPulse);
+    color += crimson * rimPulse;
+
+    // ═══ ALPHA COMPOSITION ═══
+    float alpha = (core * 0.55 + mid * 0.28 + edge * 0.10) * uOpacity;
+    alpha += ripple * 0.75 * uOpacity;
+    alpha += rippleGlow * 0.35 * uOpacity;
+    alpha += radarRing * 0.35 * uOpacity;
+    alpha += sweepLine * 0.22 * uOpacity;
+    alpha += scanGrid * 0.15 * uOpacity;
+    alpha += rimPulse * 2.5 * uOpacity;
+    alpha *= uBrightness;
+
+    if (alpha < 0.003) discard;
 
     gl_FragColor = vec4(color, alpha);
   }
 `;
 
-// ═══════════════════════════════════════════════════════════════════════
-// SHADERS — Grid Warp Decal (Darkens grid beneath hologram)
-// ═══════════════════════════════════════════════════════════════════════
 
-const gridDecalVertexShader = `
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: GRID WARP DECAL
+// Darkens and warps the neon grid beneath the hologram with a "burn" effect
+// and subtle edge-glow where the projection meets the floor.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const gridDecalVertexShader = /* glsl */ `
   varying vec2 vUv;
+  varying vec3 vWorldPos;
   varying float vDist;
 
   void main() {
     vUv = uv;
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPos = worldPosition.xyz;
     vDist = length(uv - 0.5) * 2.0;
-    gl_Position = projectionMatrix * viewMatrix * worldPos;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
   }
 `;
 
-const gridDecalFragmentShader = `
+const gridDecalFragmentShader = /* glsl */ `
   uniform float uOpacity;
+  uniform float uTime;
+  uniform float uPulse;
   varying vec2 vUv;
+  varying vec3 vWorldPos;
   varying float vDist;
 
   void main() {
     float dist = vDist;
     float radial = 1.0 - smoothstep(0.0, 1.0, dist);
-    // Dark crimson "burn" color
-    vec3 color = vec3(0.06, 0.0, 0.01);
-    float alpha = radial * 0.45 * uOpacity;
+
+    // Grid line sampling (simulated)
+    vec2 gridUv = vWorldPos.xz * 0.5;
+    vec2 gridFract = fract(gridUv);
+    vec2 lineDist = abs(gridFract - 0.5) * 2.0;
+    float gridLine = 1.0 - smoothstep(0.0, 0.06, lineDist.x);
+    gridLine = max(gridLine, 1.0 - smoothstep(0.0, 0.06, lineDist.y));
+
+    // Dark crimson "burn" color with grid line illumination
+    vec3 burnColor = vec3(0.08, 0.0, 0.015);
+    vec3 lineColor = vec3(1.0, 0.08, 0.18) * gridLine * 0.25;
+
+    // Edge glow where hologram projection meets floor
+    float edgeGlow = exp(-dist * dist * 8.0) * (0.3 + 0.15 * sin(uTime * 2.5) * uPulse);
+    vec3 edgeColor = vec3(1.0, 0.1, 0.25) * edgeGlow;
+
+    // Warp distortion visual (subtle heat shimmer at edges)
+    float warp = sin(vWorldPos.x * 8.0 + uTime * 1.2) * cos(vWorldPos.z * 6.0 - uTime * 0.9) * 0.03 * radial;
+
+    vec3 color = burnColor + lineColor + edgeColor;
+    float alpha = (radial * 0.55 + edgeGlow * 0.8 + gridLine * 0.15) * uOpacity + warp;
     if (alpha < 0.002) discard;
+
     gl_FragColor = vec4(color, alpha);
   }
 `;
 
-// ═══════════════════════════════════════════════════════════════════════
-// COMPONENT
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: SHOCKWAVE ENERGY RING
+// Expanding multi-harmonic energy ring with chromatic leading edge.
+// ═══════════════════════════════════════════════════════════════════════════════
 
-export default function FloorProjection({ visible, animRef, laptopScreenRef }: FloorProjectionProps) {
-  if (!visible) return null;
+const shockwaveVertexShader = /* glsl */ `
+  varying vec2 vUv;
+  varying float vDist;
+  void main() {
+    vUv = uv;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vDist = length(uv - 0.5) * 2.0;
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
 
-  // ── Refs ─────────────────────────────────────────────────────────────
+const shockwaveFragmentShader = /* glsl */ `
+  uniform float uTime;
+  uniform float uOpacity;
+  uniform float uProgress;
+  varying vec2 vUv;
+  varying float vDist;
+
+  void main() {
+    float dist = vDist;
+    float t = uTime;
+    float prog = uProgress;
+
+    // Multi-harmonic ring
+    float ring1 = smoothstep(0.0, 0.04, abs(dist - prog));
+    float ring2 = smoothstep(0.0, 0.06, abs(dist - prog * 0.92));
+    float ring3 = smoothstep(0.0, 0.08, abs(dist - prog * 1.08));
+
+    float combined = (1.0 - ring1) * 1.0 + (1.0 - ring2) * 0.5 + (1.0 - ring3) * 0.25;
+    combined *= smoothstep(1.0, 0.75, prog); // fade as it expands
+    combined *= smoothstep(0.0, 0.1, prog);  // fade in at start
+
+    // Chromatic leading edge
+    vec2 center = vUv - 0.5;
+    float angle = atan(center.y, center.x);
+    float chroma = sin(angle * 6.0 + t * 2.0) * 0.5 + 0.5;
+
+    vec3 color = mix(vec3(1.0, 0.08, 0.22), vec3(1.0, 0.5, 0.4), chroma * combined);
+    color += vec3(0.9, 0.9, 1.0) * (1.0 - ring1) * 0.6; // white-hot core
+
+    float alpha = combined * uOpacity;
+    if (alpha < 0.003) discard;
+
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: FLOOR PARTICLES (Atmospheric Dust Motes)
+// Ultra-subtle crimson/white motes that drift across the projection area
+// and get pushed outward during the emergence ripple.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const floorParticleVertexShader = /* glsl */ `
+  attribute float aSize;
+  attribute float aPhase;
+  attribute float aSpeed;
+  varying float vAlpha;
+  varying float vPhase;
+  uniform float uTime;
+  uniform float uOpacity;
+  uniform float uRippleProgress;
+
+  void main() {
+    float t = uTime;
+    vAlpha = 0.25 + 0.2 * sin(t * 0.7 + aPhase);
+    vPhase = aPhase;
+
+    vec3 pos = position;
+
+    // Gentle organic drift
+    pos.x += sin(t * 0.3 + aPhase) * 0.12;
+    pos.z += cos(t * 0.25 + aPhase * 1.3) * 0.1;
+    pos.y += sin(t * 0.4 + aPhase * 0.7) * 0.03;
+
+    // Ripple push: particles are shoved outward during emergence
+    float dist = length(pos.xz);
+    if (uRippleProgress > 0.0 && uRippleProgress < 1.0 && dist > 0.01) {
+      float push = smoothstep(0.0, 0.5, uRippleProgress) * exp(-dist * 0.5) * 0.15;
+      pos.xz += normalize(pos.xz) * push;
+    }
+
+    vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+    gl_Position = projectionMatrix * mv;
+    gl_PointSize = aSize * (40.0 / max(1.0, -mv.z));
+  }
+`;
+
+const floorParticleFragmentShader = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uOpacity;
+  varying float vAlpha;
+  varying float vPhase;
+
+  void main() {
+    vec2 uv = gl_PointCoord - vec2(0.5);
+    float d = length(uv);
+    if (d > 0.5) discard;
+
+    float core = smoothstep(0.5, 0.0, d);
+    float glow = smoothstep(0.5, 0.2, d) * 0.4;
+    float halo = smoothstep(0.5, 0.35, d) * 0.15;
+
+    // Rare white-hot particles
+    vec3 color = mix(uColor, vec3(1.0, 0.95, 0.95), core * 0.6);
+
+    float alpha = (core * 0.9 + glow * 0.5 + halo * 0.2) * vAlpha * uOpacity;
+    if (alpha < 0.004) discard;
+
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: ENERGY RETICLE RING
+// Rotating targeting rings that sit on the floor like a holographic HUD.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const reticleVertexShader = /* glsl */ `
+  varying vec2 vUv;
+  varying float vDist;
+  void main() {
+    vUv = uv;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vDist = length(uv - 0.5) * 2.0;
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const reticleFragmentShader = /* glsl */ `
+  uniform float uTime;
+  uniform float uOpacity;
+  uniform float uPulse;
+  uniform vec3 uColor;
+  varying vec2 vUv;
+  varying float vDist;
+
+  void main() {
+    float dist = vDist;
+    float t = uTime;
+
+    // Rotating arc segments
+    float angle = atan(vUv.y - 0.5, vUv.x - 0.5);
+    float arc = sin(angle * 3.0 + t * 0.8) * 0.5 + 0.5;
+    float arc2 = sin(angle * 5.0 - t * 1.2) * 0.5 + 0.5;
+
+    float ring = smoothstep(0.02, 0.0, abs(dist - 0.85)) * arc;
+    float ring2 = smoothstep(0.015, 0.0, abs(dist - 0.62)) * arc2 * 0.6;
+    float ring3 = smoothstep(0.01, 0.0, abs(dist - 0.38)) * 0.3;
+
+    float pulse = 0.8 + 0.2 * sin(t * 1.5) * uPulse;
+
+    vec3 color = uColor * (ring + ring2 + ring3) * pulse;
+    float alpha = (ring + ring2 * 0.7 + ring3 * 0.4) * uOpacity * pulse;
+    if (alpha < 0.003) discard;
+
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UTILITY: Exponential decay lerp (butter-smooth damping)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function damp(current: number, target: number, lambda: number, dt: number): number {
+  return THREE.MathUtils.lerp(current, target, 1.0 - Math.exp(-lambda * dt));
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT: FloorProjection
+// AAA-grade cinematic floor projection system. No early returns before hooks.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export default function FloorProjection({
+  visible,
+  animRef,
+  laptopScreenRef,
+}: FloorProjectionProps) {
+  // ═── Refs ─══════════════════════════════════════════════════════════════════
   const groupRef = useRef<THREE.Group>(null);
   const discRef = useRef<THREE.Mesh>(null);
-  const ringRef = useRef<THREE.Mesh>(null);
-  const shockwaveRef = useRef<THREE.Mesh>(null);
   const gridDecalRef = useRef<THREE.Mesh>(null);
+  const shockwaveRef = useRef<THREE.Mesh>(null);
+  const shockwave2Ref = useRef<THREE.Mesh>(null);
+  const reticleRef = useRef<THREE.Mesh>(null);
+  const reticle2Ref = useRef<THREE.Mesh>(null);
+  const particlesRef = useRef<THREE.Points>(null);
   const lightRef = useRef<THREE.PointLight>(null);
+  const ambientLightRef = useRef<THREE.PointLight>(null);
   const screenWorldPosRef = useRef(new THREE.Vector3());
 
-  // Ripple animation state (all refs — no setState)
+  // Ripple animation state (all refs — zero setState in useFrame)
   const rippleState = useRef({
     progress: 0.0,
     active: false,
@@ -3618,20 +4142,51 @@ export default function FloorProjection({ visible, animRef, laptopScreenRef }: F
   });
   const prevFloorOpacity = useRef(0.0);
   const prevHasEmerged = useRef(false);
+  const smoothOpacity = useRef(0.0);
+  const smoothPulse = useRef(0.0);
 
-  // ── Geometries (useMemo) ─────────────────────────────────────────────
-  const discGeometry = useMemo(() => new THREE.CircleGeometry(6.0, 64), []);
-  const ringGeometry = useMemo(() => new THREE.RingGeometry(2.0, 2.1, 64), []);
-  const shockwaveGeometry = useMemo(() => new THREE.RingGeometry(0.95, 1.0, 64), []);
-  const gridDecalGeometry = useMemo(() => new THREE.CircleGeometry(6.0, 64), []);
+  // ═── Geometries (useMemo) ─══════════════════════════════════════════════════
+  const discGeometry = useMemo(() => new THREE.CircleGeometry(DISC_RADIUS, DISC_SEGMENTS), []);
+  const gridDecalGeometry = useMemo(() => new THREE.CircleGeometry(DISC_RADIUS * 1.05, DISC_SEGMENTS), []);
+  const shockwaveGeometry = useMemo(() => new THREE.RingGeometry(0.96, 1.0, DISC_SEGMENTS), []);
+  const reticleGeometry = useMemo(() => new THREE.RingGeometry(0.92, 0.96, DISC_SEGMENTS), []);
+  const reticle2Geometry = useMemo(() => new THREE.RingGeometry(0.72, 0.75, DISC_SEGMENTS), []);
 
-  // ── Materials (useMemo) ──────────────────────────────────────────────
+  // ═── Dust Particle Data ─══════════════════════════════════════════════════════
+  const PARTICLE_COUNT = 120;
+
+  const {
+    particlePositions,
+    particlePhases,
+    particleSizes,
+  } = useMemo(() => {
+    const pos = new Float32Array(PARTICLE_COUNT * 3);
+    const ph = new Float32Array(PARTICLE_COUNT);
+    const sz = new Float32Array(PARTICLE_COUNT);
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * DISC_RADIUS * 0.92;
+      pos[i3] = Math.cos(angle) * radius;
+      pos[i3 + 1] = 0.02 + Math.random() * 0.08; // Just above floor
+      pos[i3 + 2] = Math.sin(angle) * radius;
+      ph[i] = Math.random() * Math.PI * 2;
+      sz[i] = 0.008 + Math.random() * 0.022;
+    }
+    return { particlePositions: pos, particlePhases: ph, particleSizes: sz };
+  }, []);
+
+  // ═── Materials (useMemo) ─═══════════════════════════════════════════════════
+
   const discUniforms = useMemo(
     () => ({
       uTime: { value: 0.0 },
       uOpacity: { value: 0.0 },
       uRippleProgress: { value: 0.0 },
       uPulse: { value: 0.0 },
+      uChromatic: { value: 0.0 },
+      uBrightness: { value: 1.0 },
     }),
     []
   );
@@ -3653,6 +4208,8 @@ export default function FloorProjection({ visible, animRef, laptopScreenRef }: F
   const gridDecalUniforms = useMemo(
     () => ({
       uOpacity: { value: 0.0 },
+      uTime: { value: 0.0 },
+      uPulse: { value: 0.0 },
     }),
     []
   );
@@ -3665,47 +4222,158 @@ export default function FloorProjection({ visible, animRef, laptopScreenRef }: F
         uniforms: gridDecalUniforms,
         transparent: true,
         depthWrite: false,
+        blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide,
       }),
     [gridDecalUniforms]
   );
 
-  const ringMaterial = useMemo(
-    () =>
-      new THREE.MeshBasicMaterial({
-        color: new THREE.Color("#ff1744"),
-        transparent: true,
-        opacity: 0.0,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
+  const shockwaveUniforms = useMemo(
+    () => ({
+      uTime: { value: 0.0 },
+      uOpacity: { value: 0.0 },
+      uProgress: { value: 0.0 },
+    }),
     []
   );
 
   const shockwaveMaterial = useMemo(
     () =>
-      new THREE.MeshBasicMaterial({
-        color: new THREE.Color("#ffffff"),
+      new THREE.ShaderMaterial({
+        vertexShader: shockwaveVertexShader,
+        fragmentShader: shockwaveFragmentShader,
+        uniforms: shockwaveUniforms,
         transparent: true,
-        opacity: 0.0,
-        blending: THREE.AdditiveBlending,
         depthWrite: false,
+        blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide,
       }),
+    [shockwaveUniforms]
+  );
+
+  const shockwave2Uniforms = useMemo(
+    () => ({
+      uTime: { value: 0.0 },
+      uOpacity: { value: 0.0 },
+      uProgress: { value: 0.0 },
+    }),
     []
   );
 
-  // ── Main Animation Loop ──────────────────────────────────────────────
-  useFrame((state) => {
+  const shockwave2Material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: shockwaveVertexShader,
+        fragmentShader: shockwaveFragmentShader,
+        uniforms: shockwave2Uniforms,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      }),
+    [shockwave2Uniforms]
+  );
+
+  const reticleUniforms = useMemo(
+    () => ({
+      uTime: { value: 0.0 },
+      uOpacity: { value: 0.0 },
+      uPulse: { value: 0.0 },
+      uColor: { value: CRIMSON_CORE.clone() },
+    }),
+    []
+  );
+
+  const reticleMaterial = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: reticleVertexShader,
+        fragmentShader: reticleFragmentShader,
+        uniforms: reticleUniforms,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      }),
+    [reticleUniforms]
+  );
+
+  const reticle2Uniforms = useMemo(
+    () => ({
+      uTime: { value: 0.0 },
+      uOpacity: { value: 0.0 },
+      uPulse: { value: 0.0 },
+      uColor: { value: CRIMSON_SOFT.clone() },
+    }),
+    []
+  );
+
+  const reticle2Material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: reticleVertexShader,
+        fragmentShader: reticleFragmentShader,
+        uniforms: reticle2Uniforms,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      }),
+    [reticle2Uniforms]
+  );
+
+  const particleUniforms = useMemo(
+    () => ({
+      uTime: { value: 0.0 },
+      uOpacity: { value: 0.0 },
+      uRippleProgress: { value: 0.0 },
+      uColor: { value: CRIMSON_CORE.clone() },
+    }),
+    []
+  );
+
+  const particleMaterial = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: floorParticleVertexShader,
+        fragmentShader: floorParticleFragmentShader,
+        uniforms: particleUniforms,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    [particleUniforms]
+  );
+
+  // ═── Main Animation Loop ─═════════════════════════════════════════════════════
+  useFrame((state, delta) => {
     const t = state.clock.getElapsedTime();
     const a = animRef.current;
-    if (!a) return;
+    const group = groupRef.current;
 
-    // Detect emergence trigger for ripple
+    // Guard: if animRef is not ready, hide but keep processing
+    if (!a || !group) {
+      if (group) group.visible = false;
+      return;
+    }
+
+    const dt = Math.min(delta, 0.05);
+
+    // ── Visibility gating (NO early return — hooks-safe) ──
+    const targetOpacity = visible ? a.floorOpacity : 0.0;
+    smoothOpacity.current = damp(smoothOpacity.current, targetOpacity, 12, dt);
+    smoothPulse.current = damp(smoothPulse.current, a.rimPulse, 8, dt);
+
+    if (smoothOpacity.current <= 0.001) {
+      group.visible = false;
+      return;
+    }
+    group.visible = true;
+
+    // ── Detect emergence trigger for one-shot ripple ──
     const justEmerged = a.hasEmerged && !prevHasEmerged.current;
     const floorJustActivated = a.floorOpacity > 0.001 && prevFloorOpacity.current <= 0.001;
-    if ((justEmerged || floorJustActivated) && !rippleState.current.hasTriggered) {
+    if ((justEmerged || floorJustActivated) && !rippleState.current.hasTriggered && visible) {
       rippleState.current.active = true;
       rippleState.current.progress = 0.0;
       rippleState.current.hasTriggered = true;
@@ -3713,80 +4381,117 @@ export default function FloorProjection({ visible, animRef, laptopScreenRef }: F
     prevHasEmerged.current = a.hasEmerged;
     prevFloorOpacity.current = a.floorOpacity;
 
-    // Animate ripple progress
+    // ── Animate ripple progress ──
     if (rippleState.current.active) {
-      rippleState.current.progress += 0.012;
+      rippleState.current.progress += dt * 0.35; // Expand speed
       if (rippleState.current.progress >= 1.0) {
         rippleState.current.progress = 1.0;
         rippleState.current.active = false;
       }
     }
 
-    // Compute disc opacity: 0.08 → 0.18 pulsing range, gated by floorOpacity
-    const discOpacity =
-      a.floorOpacity > 0.001
-        ? 0.13 + 0.05 * Math.sin(t * 1.5) * a.rimPulse
-        : 0.0;
+    const rippleProg = rippleState.current.active || rippleState.current.progress < 1.0
+      ? rippleState.current.progress
+      : 0.0;
 
-    // Update disc shader uniforms via direct assignment
+    // ── Disc shader uniforms ──
     discMaterial.uniforms.uTime.value = t;
-    discMaterial.uniforms.uOpacity.value = discOpacity;
-    discMaterial.uniforms.uRippleProgress.value =
-      rippleState.current.active || rippleState.current.progress < 1.0
-        ? rippleState.current.progress
-        : 0.0;
-    discMaterial.uniforms.uPulse.value = a.rimPulse;
+    discMaterial.uniforms.uOpacity.value = smoothOpacity.current;
+    discMaterial.uniforms.uRippleProgress.value = rippleProg;
+    discMaterial.uniforms.uPulse.value = smoothPulse.current;
+    discMaterial.uniforms.uChromatic.value = a.chromaticAberration * 0.4;
+    discMaterial.uniforms.uBrightness.value = a.brightness;
 
-    // Update grid decal
-    gridDecalMaterial.uniforms.uOpacity.value = a.floorOpacity;
+    // ── Grid decal uniforms ──
+    gridDecalMaterial.uniforms.uOpacity.value = smoothOpacity.current * 0.85;
+    gridDecalMaterial.uniforms.uTime.value = t;
+    gridDecalMaterial.uniforms.uPulse.value = smoothPulse.current;
 
-    // Update energy ring (secondary) — slow rotation + pulse
-    if (ringRef.current) {
-      ringRef.current.rotation.z += 0.004 * (1.0 + a.rimPulse * 0.5);
-      const ringPulse = 0.4 + 0.35 * Math.sin(t * 1.2) * a.rimPulse;
-      ringMaterial.opacity = a.floorOpacity > 0.001 ? ringPulse : 0.0;
-    }
+    // ── Shockwave rings ──
+    const shockOp = smoothOpacity.current * (rippleState.current.active ? 1.0 : 0.0);
+    shockwaveMaterial.uniforms.uTime.value = t;
+    shockwaveMaterial.uniforms.uOpacity.value = shockOp;
+    shockwaveMaterial.uniforms.uProgress.value = rippleProg;
 
-    // Update shockwave ring (tertiary) — expands 0 → 8.0 during emergence
+    // Secondary shockwave (faster, delayed)
+    const rippleProg2 = Math.max(0.0, rippleProg - 0.12) / 0.88;
+    shockwave2Material.uniforms.uTime.value = t;
+    shockwave2Material.uniforms.uOpacity.value = shockOp * 0.6;
+    shockwave2Material.uniforms.uProgress.value = rippleProg2;
+
     if (shockwaveRef.current) {
-      if (rippleState.current.active || rippleState.current.progress < 1.0) {
-        const shockScale = rippleState.current.progress * 8.0;
-        shockwaveRef.current.scale.set(shockScale, shockScale, 1.0);
-        shockwaveMaterial.opacity = a.floorOpacity * (1.0 - rippleState.current.progress) * 0.6;
-        shockwaveRef.current.visible = true;
-      } else {
-        shockwaveRef.current.visible = false;
-      }
+      const s = rippleProg * 10.0; // Expand to 10x
+      shockwaveRef.current.scale.set(s, s, 1.0);
+      shockwaveRef.current.visible = rippleState.current.active || rippleProg > 0.0;
+    }
+    if (shockwave2Ref.current) {
+      const s = rippleProg2 * 8.5;
+      shockwave2Ref.current.scale.set(s, s, 1.0);
+      shockwave2Ref.current.visible = rippleState.current.active || rippleProg2 > 0.0;
     }
 
-    // Update group position to track laptop screen X/Z coordinates
-    if (laptopScreenRef?.current && groupRef.current) {
+    // ── Reticle rings (rotating HUD) ──
+    if (reticleRef.current) {
+      reticleRef.current.rotation.z = t * 0.25;
+      const retOp = smoothOpacity.current * (0.35 + 0.15 * Math.sin(t * 1.2) * smoothPulse.current);
+      reticleMaterial.uniforms.uTime.value = t;
+      reticleMaterial.uniforms.uOpacity.value = retOp;
+      reticleMaterial.uniforms.uPulse.value = smoothPulse.current;
+      reticleRef.current.visible = smoothOpacity.current > 0.01;
+    }
+    if (reticle2Ref.current) {
+      reticle2Ref.current.rotation.z = -t * 0.35;
+      const retOp2 = smoothOpacity.current * (0.25 + 0.1 * Math.sin(t * 1.8 + 1.0) * smoothPulse.current);
+      reticle2Material.uniforms.uTime.value = t;
+      reticle2Material.uniforms.uOpacity.value = retOp2;
+      reticle2Material.uniforms.uPulse.value = smoothPulse.current;
+      reticle2Ref.current.visible = smoothOpacity.current > 0.01;
+    }
+
+    // ── Floor particles ──
+    if (particlesRef.current) {
+      particleMaterial.uniforms.uTime.value = t;
+      particleMaterial.uniforms.uOpacity.value = smoothOpacity.current * 0.45;
+      particleMaterial.uniforms.uRippleProgress.value = rippleProg;
+      particlesRef.current.visible = smoothOpacity.current > 0.02;
+    }
+
+    // ── Lights ──
+    if (lightRef.current) {
+      lightRef.current.intensity = smoothOpacity.current * 3.5 * a.sourceGlow;
+      lightRef.current.color.lerp(
+        a.chromaticAberration > 1.0 ? CRIMSON_DEEP : CRIMSON_CORE,
+        dt * 2.0
+      );
+    }
+    if (ambientLightRef.current) {
+      ambientLightRef.current.intensity = smoothOpacity.current * 1.2 * smoothPulse.current;
+    }
+
+    // ── Track laptop screen position for X/Z alignment ──
+    if (laptopScreenRef?.current && group) {
       const screen = laptopScreenRef.current;
       screen.updateWorldMatrix(true, false);
       screen.getWorldPosition(screenWorldPosRef.current);
-      groupRef.current.position.x = screenWorldPosRef.current.x;
-      groupRef.current.position.z = screenWorldPosRef.current.z;
-    }
-
-    // Update upward point light intensity
-    if (lightRef.current) {
-      lightRef.current.intensity = a.floorOpacity * 2.0;
+      group.position.x = THREE.MathUtils.lerp(group.position.x, screenWorldPosRef.current.x, dt * 6.0);
+      group.position.z = THREE.MathUtils.lerp(group.position.z, screenWorldPosRef.current.z, dt * 6.0);
     }
   });
 
+  // ═── Render ─══════════════════════════════════════════════════════════════════
   return (
-    <group ref={groupRef} position={[0, -2.12, 0]}>
-      {/* ═══ GRID WARP DECAL (darkens grid beneath) ═══ */}
+    <group ref={groupRef} position={[0, -2.12, 0]} visible={false}>
+      {/* ═══ GRID WARP DECAL (darkens & warps the neon grid beneath) ═══ */}
       <mesh
         ref={gridDecalRef}
         geometry={gridDecalGeometry}
         material={gridDecalMaterial}
         rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -0.02, 0]}
+        position={[0, 0.005, 0]}
         renderOrder={1}
       />
 
-      {/* ═══ CORE DISC (main floor projection) ═══ */}
+      {/* ═══ CORE VOLUMETRIC DISC (main floor projection) ═══ */}
       <mesh
         ref={discRef}
         geometry={discGeometry}
@@ -3795,33 +4500,75 @@ export default function FloorProjection({ visible, animRef, laptopScreenRef }: F
         renderOrder={2}
       />
 
-      {/* ═══ SECONDARY ENERGY RING (targeting reticle) ═══ */}
-      <mesh
-        ref={ringRef}
-        geometry={ringGeometry}
-        material={ringMaterial}
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.01, 0]}
-        renderOrder={3}
-      />
-
-      {/* ═══ TERTIARY SHOCKWAVE RING (emergence expansion) ═══ */}
+      {/* ═══ PRIMARY SHOCKWAVE RING (emergence expansion) ═══ */}
       <mesh
         ref={shockwaveRef}
         geometry={shockwaveGeometry}
         material={shockwaveMaterial}
         rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.02, 0]}
+        position={[0, 0.008, 0]}
         renderOrder={3}
         visible={false}
       />
 
-      {/* ═══ UPWARD LIGHT CAST ═══ */}
+      {/* ═══ SECONDARY SHOCKWAVE RING (echo) ═══ */}
+      <mesh
+        ref={shockwave2Ref}
+        geometry={shockwaveGeometry}
+        material={shockwave2Material}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.012, 0]}
+        renderOrder={3}
+        visible={false}
+      />
+
+      {/* ═══ ENERGY RETICLE RING 1 (outer HUD) ═══ */}
+      <mesh
+        ref={reticleRef}
+        geometry={reticleGeometry}
+        material={reticleMaterial}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.015, 0]}
+        renderOrder={4}
+        visible={false}
+      />
+
+      {/* ═══ ENERGY RETICLE RING 2 (inner HUD) ═══ */}
+      <mesh
+        ref={reticle2Ref}
+        geometry={reticle2Geometry}
+        material={reticle2Material}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.018, 0]}
+        renderOrder={4}
+        visible={false}
+      />
+
+      {/* ═══ ATMOSPHERIC FLOOR DUST (volumetric motes) ═══ */}
+      <points ref={particlesRef} material={particleMaterial} renderOrder={5} frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[particlePositions, 3]} />
+          <bufferAttribute attach="attributes-aPhase" args={[particlePhases, 1]} />
+          <bufferAttribute attach="attributes-aSize" args={[particleSizes, 1]} />
+        </bufferGeometry>
+      </points>
+
+      {/* ═══ UPWARD VOLUMETRIC LIGHT (illuminates hologram from below) ═══ */}
       <pointLight
         ref={lightRef}
-        color="#ff1744"
+        color={CRIMSON_CORE}
         intensity={0}
-        distance={12}
+        distance={14}
+        decay={2}
+        position={[0, 0.2, 0]}
+      />
+
+      {/* ═══ AMBIENT FILL LIGHT (soft crimson wash) ═══ */}
+      <pointLight
+        ref={ambientLightRef}
+        color={CRIMSON_DARK}
+        intensity={0}
+        distance={18}
         decay={2}
         position={[0, 0.1, 0]}
       />
@@ -4242,7 +4989,7 @@ export default function HeroName3D({ stageScale = 1 }: { stageScale?: number }) 
 ```typescript
 "use client";
 
-import React, { useRef, useMemo, useEffect } from "react";
+import React, { useRef, useMemo, useEffect, useCallback } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -4251,163 +4998,9 @@ import DashboardHero from "@/components/ui/DashboardHero";
 import FloatingDebris from "./FloatingDebris";
 import FloorProjection from "./FloorProjection";
 
-// ═══════════════════════════════════════════════════════════════════════
-// SHADERS — Volumetric Beam (Light Cone)
-// ═══════════════════════════════════════════════════════════════════════
-
-const beamVertexShader = `
-  varying vec2 vUv;
-  varying vec3 vWorldPos;
-  varying float vDistFromCenter;
-  uniform float uTime;
-  uniform float uOpacity;
-  uniform float uPulse;
-
-  void main() {
-    vUv = uv;
-    vec3 pos = position;
-
-    // Breathing effect: expand/contract radius with time
-    float breathe = 1.0 + sin(uTime * 2.5 + uv.y * 8.0) * 0.08 * uPulse;
-    pos.x *= breathe;
-    pos.z *= breathe;
-
-    // Slight waviness
-    pos.x += sin(uv.y * 12.0 + uTime * 3.0) * 0.12 * uv.y;
-    pos.z += cos(uv.y * 10.0 + uTime * 2.5) * 0.08 * uv.y;
-
-    vec4 worldPos = modelMatrix * vec4(pos, 1.0);
-    vWorldPos = worldPos.xyz;
-    vDistFromCenter = length(vec2(pos.x, pos.z));
-
-    gl_Position = projectionMatrix * viewMatrix * worldPos;
-  }
-`;
-
-const beamFragmentShader = `
-  uniform float uTime;
-  uniform float uOpacity;
-  uniform float uIntensity;
-  varying vec2 vUv;
-  varying vec3 vWorldPos;
-  varying float vDistFromCenter;
-
-  void main() {
-    // Core vs rim
-    float core = 1.0 - smoothstep(0.0, 0.35, vDistFromCenter);
-    float rim = 1.0 - smoothstep(0.2, 0.85, vDistFromCenter);
-
-    // Vertical fade: brighter at bottom (source), dimmer at top
-    float verticalFade = 1.0 - smoothstep(0.3, 1.0, vUv.y);
-    float sourceGlow = 1.0 - smoothstep(0.0, 0.15, vUv.y);
-
-    // Scanlines moving upward
-    float scan = sin(vUv.y * 60.0 - uTime * 8.0) * 0.5 + 0.5;
-    float scanlines = scan * 0.15;
-
-    // Dust sparkle inside beam
-    float sparkle = pow(sin(vUv.y * 120.0 + uTime * 15.0) * 0.5 + 0.5, 12.0) * 0.4;
-
-    // Colors: hot white core, crimson body, deep red edges
-    vec3 coreColor = vec3(1.0, 0.9, 0.9);
-    vec3 midColor = vec3(1.0, 0.08, 0.2);
-    vec3 rimColor = vec3(0.6, 0.02, 0.08);
-
-    vec3 color = mix(rimColor, midColor, rim);
-    color = mix(color, coreColor, core * 0.6);
-
-    // Add scanline tint
-    color += midColor * scanlines;
-    color += coreColor * sparkle;
-
-    // Alpha: core is solid, edges fade, bottom is brightest
-    float alpha = (core * 0.9 + rim * 0.35 + scanlines * 0.5) * verticalFade * uOpacity;
-    alpha += sourceGlow * 0.4 * uOpacity;
-    alpha *= (1.0 - vUv.y * 0.3); // gentle top fade
-
-    if (alpha < 0.002) discard;
-
-    gl_FragColor = vec4(color, alpha);
-  }
-`;
-
-// ═══════════════════════════════════════════════════════════════════════
-// SHADERS — Beam Particles (Dust Motes)
-// ═══════════════════════════════════════════════════════════════════════
-
-const particleVertexShader = `
-  attribute float aSize;
-  attribute float aPhase;
-  attribute float aSpeed;
-  varying float vAlpha;
-  uniform float uTime;
-  uniform float uOpacity;
-
-  void main() {
-    vAlpha = 0.4 + 0.3 * sin(uTime * 0.8 + aPhase);
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_Position = projectionMatrix * mv;
-    gl_PointSize = aSize * (40.0 / max(1.0, -mv.z));
-    gl_PointSize = min(gl_PointSize, 32.0);
-  }
-`;
-
-const particleFragmentShader = `
-  uniform float uOpacity;
-  varying float vAlpha;
-
-  void main() {
-    vec2 uv = gl_PointCoord - vec2(0.5);
-    float d = length(uv);
-    if (d > 0.5) discard;
-
-    float core = smoothstep(0.5, 0.0, d);
-    float glow = smoothstep(0.5, 0.15, d) * 0.5;
-
-    // White-hot center, crimson edge
-    vec3 color = mix(vec3(1.0, 0.08, 0.2), vec3(1.0, 0.9, 0.9), core);
-    float alpha = (core * 0.9 + glow * 0.4) * vAlpha * uOpacity;
-
-    if (alpha < 0.005) discard;
-    gl_FragColor = vec4(color, alpha);
-  }
-`;
-
-// ═══════════════════════════════════════════════════════════════════════
-// SHADERS — Backing Glow (Radial bloom behind panel)
-// ═══════════════════════════════════════════════════════════════════════
-
-const backingVertexShader = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const backingFragmentShader = `
-  uniform float uOpacity;
-  uniform float uTime;
-  varying vec2 vUv;
-
-  void main() {
-    float dist = length(vUv - 0.5);
-    float radial = 1.0 - smoothstep(0.0, 0.5, dist);
-
-    vec3 centerColor = vec3(1.0, 0.9, 0.9);
-    vec3 edgeColor = vec3(1.0, 0.08, 0.2);
-    vec3 color = mix(edgeColor, centerColor, radial);
-
-    float alpha = radial * 0.08 * uOpacity;
-    if (alpha < 0.002) discard;
-
-    gl_FragColor = vec4(color, alpha);
-  }
-`;
-
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface HolographicProjectionProps {
   scrollProgress: number;
@@ -4432,11 +5025,601 @@ interface AnimationValues {
   rimPulse: number;
   hasEmerged: boolean;
   sourceGlow: number;
+  brightness: number;
+  emergenceProgress: number;
+  dissipationProgress: number;
+  panelY: number;
+  hoverPhase: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// COMPONENT
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const CRIMSON = {
+  core: new THREE.Color("#ff1744"),
+  deep: new THREE.Color("#ff0033"),
+  dark: new THREE.Color("#800010"),
+  mid: new THREE.Color("#ff3355"),
+  white: new THREE.Color("#ffffff"),
+  hot: new THREE.Color("#ff8a80"),
+};
+
+const PANEL_WIDTH = 3.9;
+const PANEL_HEIGHT = 2.1;
+const PANEL_DEPTH = 0.15;
+const BEAM_HEIGHT_SEGMENTS_DESKTOP = 24;
+const BEAM_HEIGHT_SEGMENTS_MOBILE = 12;
+const PARTICLE_COUNT_DESKTOP = 150;
+const PARTICLE_COUNT_MOBILE = 0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: VOLUMETRIC BEAM (Light Cone)
+// Overkill: 3D noise displacement, chromatic aberration, heat shimmer,
+// volumetric scattering, scanlines, dust sparkle
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const beamVertexShader = /* glsl */ `
+  uniform float uTime;
+  uniform float uPulse;
+  uniform float uChromatic;
+
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+  varying float vDistFromCenter;
+  varying float vChromatic;
+
+  // Simplex 3D noise
+  vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+  vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+
+  float snoise(vec3 v){ 
+    const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+    vec3 i  = floor(v + dot(v, C.yyy));
+    vec3 x0 = v - i + dot(i, C.xxx);
+    vec3 g = step(x0.yzx, x0.xyz);
+    vec3 l = 1.0 - g;
+    vec3 i1 = min(g.xyz, l.zxy);
+    vec3 i2 = max(g.xyz, l.zxy);
+    vec3 x1 = x0 - i1 + C.xxx;
+    vec3 x2 = x0 - i2 + C.yyy;
+    vec3 x3 = x0 - D.yyy;
+    i = mod(i, 289.0); 
+    vec4 p = permute(permute(permute( 
+              i.z + vec4(0.0, i1.z, i2.z, 1.0))
+            + i.y + vec4(0.0, i1.y, i2.y, 1.0)) 
+            + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+    float n_ = 1.0/7.0;
+    vec3 ns = n_ * D.wyz - D.xzx;
+    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+    vec4 x_ = floor(j * ns.z);
+    vec4 y_ = floor(j - 7.0 * x_);
+    vec4 x = x_ *ns.x + ns.yyyy;
+    vec4 y = y_ *ns.x + ns.yyyy;
+    vec4 h = 1.0 - abs(x) - abs(y);
+    vec4 b0 = vec4(x.xy, y.xy);
+    vec4 b1 = vec4(x.zw, y.zw);
+    vec4 s0 = floor(b0)*2.0 + 1.0;
+    vec4 s1 = floor(b1)*2.0 + 1.0;
+    vec4 sh = -step(h, vec4(0.0));
+    vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+    vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+    vec3 p0 = vec3(a0.xy,h.x);
+    vec3 p1 = vec3(a0.zw,h.y);
+    vec3 p2 = vec3(a1.xy,h.z);
+    vec3 p3 = vec3(a1.zw,h.w);
+    vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+    p0 *= norm.x;
+    p1 *= norm.y;
+    p2 *= norm.z;
+    p3 *= norm.w;
+    vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+    m = m * m;
+    return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+  }
+
+  void main() {
+    vUv = uv;
+    vChromatic = uChromatic;
+
+    vec3 pos = position;
+
+    // Organic breathing: expand/contract radius with time
+    float breathe = 1.0 + sin(uTime * 2.5 + uv.y * 8.0) * 0.08 * uPulse;
+    pos.x *= breathe;
+    pos.z *= breathe;
+
+    // Heat shimmer waviness
+    float noiseVal = snoise(vec3(pos.x * 3.0, pos.y * 2.0 - uTime * 1.5, uTime * 0.5));
+    pos.x += noiseVal * 0.06 * uv.y;
+    pos.z += snoise(vec3(pos.z * 3.0, pos.y * 2.0 + uTime * 1.2, uTime * 0.3)) * 0.04 * uv.y;
+
+    // Sine waviness overlay
+    pos.x += sin(uv.y * 12.0 + uTime * 3.0) * 0.10 * uv.y;
+    pos.z += cos(uv.y * 10.0 + uTime * 2.5) * 0.07 * uv.y;
+
+    vec4 worldPos = modelMatrix * vec4(pos, 1.0);
+    vWorldPos = worldPos.xyz;
+    vDistFromCenter = length(vec2(pos.x, pos.z));
+
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const beamFragmentShader = /* glsl */ `
+  uniform float uTime;
+  uniform float uOpacity;
+  uniform float uIntensity;
+  uniform float uChromatic;
+
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+  varying float vDistFromCenter;
+  varying float vChromatic;
+
+  void main() {
+    float dist = vDistFromCenter;
+
+    // Core vs rim
+    float core = 1.0 - smoothstep(0.0, 0.30, dist);
+    float rim = 1.0 - smoothstep(0.15, 0.80, dist);
+
+    // Vertical fade: brighter at bottom (source), dimmer at top
+    float verticalFade = 1.0 - smoothstep(0.25, 1.0, vUv.y);
+    float sourceGlow = 1.0 - smoothstep(0.0, 0.12, vUv.y);
+
+    // Scanlines moving upward
+    float scan = sin(vUv.y * 70.0 - uTime * 10.0) * 0.5 + 0.5;
+    float scanlines = scan * 0.12;
+
+    // Secondary faster scanline
+    float scan2 = sin(vUv.y * 140.0 - uTime * 18.0) * 0.5 + 0.5;
+    scanlines += scan2 * 0.06;
+
+    // Dust sparkle inside beam
+    float sparkle = pow(sin(vUv.y * 130.0 + uTime * 16.0) * 0.5 + 0.5, 14.0) * 0.5;
+    float sparkle2 = pow(sin(vUv.x * 90.0 + vUv.y * 60.0 + uTime * 12.0) * 0.5 + 0.5, 20.0) * 0.3;
+
+    // Colors: hot white core, crimson body, deep red edges
+    vec3 coreColor = vec3(1.0, 0.95, 0.95);
+    vec3 midColor = vec3(1.0, 0.08, 0.22);
+    vec3 rimColor = vec3(0.65, 0.02, 0.10);
+
+    vec3 color = mix(rimColor, midColor, rim);
+    color = mix(color, coreColor, core * 0.7);
+
+    // Add scanline tint
+    color += midColor * scanlines * 1.2;
+    color += coreColor * (sparkle + sparkle2);
+
+    // Chromatic aberration at edges during dissipation
+    float chroma = vChromatic * smoothstep(0.2, 0.8, dist);
+    color.r += chroma * 0.15;
+    color.b -= chroma * 0.10;
+
+    // Volumetric heat haze tint
+    color += vec3(1.0, 0.3, 0.1) * sin(vUv.y * 20.0 + uTime * 4.0) * 0.02 * (1.0 - dist);
+
+    // Alpha: core is solid, edges fade, bottom is brightest
+    float alpha = (core * 0.95 + rim * 0.40 + scanlines * 0.6) * verticalFade * uOpacity;
+    alpha += sourceGlow * 0.5 * uOpacity;
+    alpha *= (1.0 - vUv.y * 0.25); // gentle top fade
+    alpha += sparkle * 0.3 * uOpacity;
+
+    if (alpha < 0.003) discard;
+
+    gl_FragColor = vec4(color * uIntensity, alpha);
+  }
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: BEAM PARTICLES (Dust Motes)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const particleVertexShader = /* glsl */ `
+  attribute float aSize;
+  attribute float aPhase;
+  attribute float aSpeed;
+  attribute float aLife;
+
+  varying float vAlpha;
+  varying float vLife;
+  uniform float uTime;
+  uniform float uOpacity;
+
+  void main() {
+    float t = uTime;
+    vAlpha = 0.35 + 0.25 * sin(t * 0.9 + aPhase);
+    vLife = aLife;
+
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mv;
+
+    float sizeAtten = aSize * (35.0 / max(1.0, -mv.z));
+    gl_PointSize = min(sizeAtten, 28.0);
+  }
+`;
+
+const particleFragmentShader = /* glsl */ `
+  uniform float uOpacity;
+  varying float vAlpha;
+  varying float vLife;
+
+  void main() {
+    vec2 uv = gl_PointCoord - vec2(0.5);
+    float d = length(uv);
+    if (d > 0.5) discard;
+
+    float core = smoothstep(0.5, 0.0, d);
+    float glow = smoothstep(0.5, 0.12, d) * 0.45;
+    float halo = smoothstep(0.5, 0.30, d) * 0.15;
+
+    // White-hot center, crimson edge
+    vec3 color = mix(vec3(1.0, 0.08, 0.22), vec3(1.0, 0.92, 0.90), core);
+
+    // Life fade: particles die as they reach top
+    float lifeFade = 1.0 - vLife * vLife;
+
+    float alpha = (core * 0.95 + glow * 0.5 + halo * 0.2) * vAlpha * lifeFade * uOpacity;
+    if (alpha < 0.005) discard;
+
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: BACKING GLOW (Radial bloom behind panel)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const backingVertexShader = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const backingFragmentShader = /* glsl */ `
+  uniform float uOpacity;
+  uniform float uTime;
+  uniform float uPulse;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 center = vUv - 0.5;
+    float dist = length(center);
+    float radial = 1.0 - smoothstep(0.0, 0.55, dist);
+
+    // Organic pulse
+    float pulse = 0.85 + 0.15 * sin(uTime * 1.8) * uPulse;
+
+    // Multi-lobed glow for cinematic feel
+    float angle = atan(center.y, center.x);
+    float lobe = sin(angle * 3.0 + uTime * 0.4) * 0.5 + 0.5;
+    radial *= (0.8 + 0.2 * lobe);
+
+    vec3 centerColor = vec3(1.0, 0.92, 0.92);
+    vec3 edgeColor = vec3(1.0, 0.06, 0.18);
+    vec3 color = mix(edgeColor, centerColor, radial * radial);
+
+    float alpha = radial * 0.10 * uOpacity * pulse;
+    if (alpha < 0.002) discard;
+
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: CHROMATIC DISSOLVE (Pixelation / scanline dissolve effect)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const chromaticVertexShader = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const chromaticFragmentShader = /* glsl */ `
+  uniform float uIntensity;
+  uniform float uTime;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 uv = vUv - 0.5;
+    float dist = length(uv);
+
+    // RGB split based on distance from center and intensity
+    float shift = uIntensity * 0.025 * dist;
+
+    vec3 color;
+    color.r = smoothstep(0.5, 0.0, abs(uv.x - shift)) * smoothstep(0.5, 0.0, abs(uv.y));
+    color.g = smoothstep(0.5, 0.0, abs(uv.x)) * smoothstep(0.5, 0.0, abs(uv.y));
+    color.b = smoothstep(0.5, 0.0, abs(uv.x + shift * 0.7)) * smoothstep(0.5, 0.0, abs(uv.y));
+
+    // Scanline dissolve
+    float scan = step(0.5, sin(vUv.y * 80.0 + uTime * 10.0));
+    float dissolve = scan * uIntensity * 0.3;
+
+    float alpha = (color.r + color.g + color.b) * 0.15 * uIntensity + dissolve;
+
+    gl_FragColor = vec4(vec3(1.0, 0.1, 0.2) * color + vec3(0.0, 0.8, 1.0) * color.b * 0.5, alpha);
+  }
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADER: WIREFRAME SPARK (The Breach Cube)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const wireframeVertexShader = /* glsl */ `
+  uniform float uTime;
+  uniform float uScale;
+  uniform float uChromatic;
+  varying float vDist;
+
+  void main() {
+    vec3 pos = position * uScale;
+    // Glitch displacement
+    float glitch = step(0.92, sin(uTime * 25.0 + position.y * 10.0)) * uChromatic * 0.15;
+    pos.x += glitch * (sin(uTime * 40.0) * 0.5 + 0.5);
+    pos.y += glitch * (cos(uTime * 35.0) * 0.5 + 0.5);
+
+    vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+    vDist = length(pos);
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+const wireframeFragmentShader = /* glsl */ `
+  uniform float uOpacity;
+  uniform float uChromatic;
+  uniform float uTime;
+  varying float vDist;
+
+  void main() {
+    float alpha = uOpacity * (0.8 + 0.2 * sin(uTime * 8.0 + vDist * 20.0));
+    vec3 color = vec3(1.0, 0.08, 0.2);
+    color.r += uChromatic * 0.4;
+    color.b += uChromatic * 0.2;
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UTILITY: Smooth value interpolation (exponential decay lerp)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function damp(current: number, target: number, lambda: number, dt: number): number {
+  return THREE.MathUtils.lerp(current, target, 1.0 - Math.exp(-lambda * dt));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: VolumetricBeam
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface BeamProps {
+  beamRef: React.Ref<THREE.Mesh>;
+  material: THREE.ShaderMaterial;
+  isMobile: boolean;
+}
+
+const VolumetricBeam = React.memo(function VolumetricBeam({ beamRef, material, isMobile }: BeamProps) {
+  return (
+    <mesh ref={beamRef} material={material} renderOrder={5} frustumCulled={false}>
+      <cylinderGeometry
+        args={[
+          0.80, // topRadius
+          0.04, // bottomRadius
+          1.0,  // height
+          4,    // radialSegments
+          isMobile ? BEAM_HEIGHT_SEGMENTS_MOBILE : BEAM_HEIGHT_SEGMENTS_DESKTOP,
+          true, // openEnded
+        ]}
+      />
+    </mesh>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: BeamParticles
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface BeamParticlesProps {
+  particlesRef: React.Ref<THREE.Points>;
+  material: THREE.ShaderMaterial;
+  count: number;
+  positions: Float32Array;
+  sizes: Float32Array;
+  phases: Float32Array;
+  speeds: Float32Array;
+  lives: Float32Array;
+}
+
+const BeamParticles = React.memo(function BeamParticles({
+  particlesRef,
+  material,
+  count,
+  positions,
+  sizes,
+  phases,
+  speeds,
+  lives,
+}: BeamParticlesProps) {
+  if (count === 0) return null;
+
+  return (
+    <points ref={particlesRef} material={material} renderOrder={6} frustumCulled={false}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-aSize" args={[sizes, 1]} />
+        <bufferAttribute attach="attributes-aPhase" args={[phases, 1]} />
+        <bufferAttribute attach="attributes-aSpeed" args={[speeds, 1]} />
+        <bufferAttribute attach="attributes-aLife" args={[lives, 1]} />
+      </bufferGeometry>
+    </points>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: GlassSlab
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface GlassSlabProps {
+  glassRef: React.Ref<THREE.Mesh>;
+  material: THREE.Material;
+}
+
+const GlassSlab = React.memo(function GlassSlab({ glassRef, material }: GlassSlabProps) {
+  return (
+    <mesh ref={glassRef} material={material} renderOrder={10} castShadow={false} receiveShadow={false}>
+      <boxGeometry args={[PANEL_WIDTH, PANEL_HEIGHT, PANEL_DEPTH]} />
+    </mesh>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: EdgeGlow
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface EdgeGlowProps {
+  edgeRef: React.Ref<THREE.LineSegments>;
+}
+
+const EdgeGlow = React.memo(function EdgeGlow({ edgeRef }: EdgeGlowProps) {
+  const material = useMemo(
+    () =>
+      new THREE.LineBasicMaterial({
+        color: CRIMSON.core,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    []
+  );
+
+  const geometry = useMemo(
+    () => new THREE.EdgesGeometry(new THREE.BoxGeometry(PANEL_WIDTH, PANEL_HEIGHT, PANEL_DEPTH)),
+    []
+  );
+
+  return (
+    <lineSegments ref={edgeRef} geometry={geometry} material={material} renderOrder={11} />
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: BackingGlow
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface BackingGlowProps {
+  glowRef: React.Ref<THREE.Mesh>;
+  material: THREE.ShaderMaterial;
+}
+
+const BackingGlow = React.memo(function BackingGlow({ glowRef, material }: BackingGlowProps) {
+  return (
+    <mesh
+      ref={glowRef}
+      material={material}
+      position={[0, 0, -0.12]}
+      renderOrder={8}
+      frustumCulled={false}
+    >
+      <planeGeometry args={[PANEL_WIDTH + 0.6, PANEL_HEIGHT + 0.6]} />
+    </mesh>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: ChromaticDissolve
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface ChromaticDissolveProps {
+  chromaticRef: React.Ref<THREE.Mesh>;
+  material: THREE.ShaderMaterial;
+}
+
+const ChromaticDissolve = React.memo(function ChromaticDissolve({ chromaticRef, material }: ChromaticDissolveProps) {
+  return (
+    <mesh
+      ref={chromaticRef}
+      material={material}
+      position={[0, 0, 0.02]}
+      renderOrder={12}
+      frustumCulled={false}
+    >
+      <planeGeometry args={[PANEL_WIDTH + 0.2, PANEL_HEIGHT + 0.2]} />
+    </mesh>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: WireframeSpark
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface WireframeSparkProps {
+  wireframeRef: React.Ref<THREE.Mesh>;
+  material: THREE.ShaderMaterial;
+}
+
+const WireframeSpark = React.memo(function WireframeSpark({ wireframeRef, material }: WireframeSparkProps) {
+  return (
+    <mesh ref={wireframeRef} material={material} renderOrder={7} frustumCulled={false}>
+      <boxGeometry args={[0.1, 0.1, 0.1]} />
+    </mesh>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: RimLight
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface RimLightProps {
+  rimLightRef: React.Ref<THREE.PointLight>;
+}
+
+const RimLight = React.memo(function RimLight({ rimLightRef }: RimLightProps) {
+  return (
+    <pointLight
+      ref={rimLightRef}
+      color={CRIMSON.core}
+      intensity={0}
+      distance={4.5}
+      decay={2}
+      position={[0, 0, 0.3]}
+    />
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENT: BeamBaseLight
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface BeamBaseLightProps {
+  lightRef: React.Ref<THREE.PointLight>;
+}
+
+const BeamBaseLight = React.memo(function BeamBaseLight({ lightRef }: BeamBaseLightProps) {
+  return (
+    <pointLight
+      ref={lightRef}
+      color={CRIMSON.core}
+      intensity={0}
+      distance={3.5}
+      decay={2}
+    />
+  );
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT: HolographicProjection
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export default function HolographicProjection({
   scrollProgress,
@@ -4447,27 +5630,33 @@ export default function HolographicProjection({
   const { camera } = useThree();
   const isMobile = deviceTier === "mobile";
 
-  // ── Refs ─────────────────────────────────────────────────────────────
+  // ── Refs ───────────────────────────────────────────────────────────────────
   const rigRef = useRef<THREE.Group>(null);
-  const beamRef = useRef<THREE.Mesh>(null);
-  const particlesRef = useRef<THREE.Points>(null);
-  const glassRef = useRef<THREE.Mesh>(null);
-  const rimLightRef = useRef<THREE.PointLight>(null);
-  const beamBaseLightRef = useRef<THREE.PointLight>(null);
-  const glowRef = useRef<THREE.Mesh>(null);
-  const edgeTorusRef = useRef<THREE.LineSegments>(null);
-  const wireframeRef = useRef<THREE.Mesh>(null);
+  const beamRef = useRef<THREE.Mesh>(null!);
+  const particlesRef = useRef<THREE.Points>(null!);
+  const glassRef = useRef<THREE.Mesh>(null!);
+  const rimLightRef = useRef<THREE.PointLight>(null!);
+  const beamBaseLightRef = useRef<THREE.PointLight>(null!);
+  const glowRef = useRef<THREE.Mesh>(null!);
+  const edgeTorusRef = useRef<THREE.LineSegments>(null!);
+  const wireframeRef = useRef<THREE.Mesh>(null!);
+  const chromaticRef = useRef<THREE.Mesh>(null!);
   const htmlWrapperRef = useRef<HTMLDivElement>(null);
-  const tlRef = useRef<gsap.core.Timeline | null>(null);
+  const timelineRef = useRef<gsap.core.Timeline | null>(null);
+  const hasEmergedRef = useRef(false);
+  const isVisibleRef = useRef(visible);
+  const scrollRef = useRef(scrollProgress);
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const smoothMouse = useRef({ x: 0, y: 0 });
 
-  // Animation values (all refs — no setState in useFrame)
+  // Animation values (all refs — zero React re-renders during animation)
   const animRef = useRef<AnimationValues>({
     beamOpacity: 0,
     beamScaleY: 0.1,
     glassOpacity: 0,
     htmlOpacity: 0,
-    htmlBlur: 8,
-    panelZ: -2.0,
+    htmlBlur: 12,
+    panelZ: 0,
     panelRotateX: 45,
     panelScale: 0.2,
     chromaticAberration: 0,
@@ -4476,17 +5665,20 @@ export default function HolographicProjection({
     debrisOpacity: 0,
     rimPulse: 0,
     hasEmerged: false,
-    sourceGlow: 0.6,
+    sourceGlow: 0,
+    brightness: 1,
+    emergenceProgress: 0,
+    dissipationProgress: 0,
+    panelY: 0,
+    hoverPhase: 0,
   });
 
-  // Mouse tracking for parallax
-  const mouseRef = useRef({ x: 0, y: 0 });
-  const smoothMouse = useRef({ x: 0, y: 0 });
-
-  // Scratch vectors (persisted across frames)
+  // Scratch vectors (persisted across frames to avoid GC)
   const scratch = useMemo(
     () => ({
       screenPos: new THREE.Vector3(),
+      screenCenter: new THREE.Vector3(),
+      screenUp: new THREE.Vector3(),
       screenQuat: new THREE.Quaternion(),
       screenScale: new THREE.Vector3(),
       screenNormal: new THREE.Vector3(),
@@ -4499,11 +5691,13 @@ export default function HolographicProjection({
       wireframePos: new THREE.Vector3(),
       wireframeQuat: new THREE.Quaternion(),
       wireframeScale: new THREE.Vector3(),
+      cameraDir: new THREE.Vector3(),
     }),
     []
   );
 
-  // ── Beam Material ────────────────────────────────────────────────────
+  // ── Materials ────────────────────────────────────────────────────────────────
+
   const beamMaterial = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -4515,46 +5709,14 @@ export default function HolographicProjection({
           uTime: { value: 0 },
           uOpacity: { value: 0 },
           uPulse: { value: 0 },
-          uIntensity: { value: 1.0 },
+          uIntensity: { value: 1.2 },
+          uChromatic: { value: 0 },
         },
         vertexShader: beamVertexShader,
         fragmentShader: beamFragmentShader,
       }),
     []
   );
-
-  // ── Particle Geometry & Material ─────────────────────────────────────
-  const particleCount = isMobile ? 0 : 150;
-
-  const { particlePositions, particleSizes, particlePhases, particleSpeeds } = useMemo(() => {
-    const pos = new Float32Array(particleCount * 3);
-    const sz = new Float32Array(particleCount);
-    const ph = new Float32Array(particleCount);
-    const spd = new Float32Array(particleCount);
-
-    for (let i = 0; i < particleCount; i++) {
-      const i3 = i * 3;
-      // Distribute inside cone volume
-      const radius = Math.random() * 0.6;
-      const angle = Math.random() * Math.PI * 2;
-      const y = Math.random();
-
-      pos[i3] = Math.cos(angle) * radius * (1.0 - y * 0.5);
-      pos[i3 + 1] = y;
-      pos[i3 + 2] = Math.sin(angle) * radius * (1.0 - y * 0.5);
-
-      sz[i] = 0.5 + Math.random() * 1.5;
-      ph[i] = Math.random() * Math.PI * 2;
-      spd[i] = 0.2 + Math.random() * 0.5;
-    }
-
-    return {
-      particlePositions: pos,
-      particleSizes: sz,
-      particlePhases: ph,
-      particleSpeeds: spd,
-    };
-  }, [particleCount]);
 
   const particleMaterial = useMemo(
     () =>
@@ -4572,7 +5734,6 @@ export default function HolographicProjection({
     []
   );
 
-  // ── Backing Glow Material ────────────────────────────────────────────
   const backingMaterial = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -4583,6 +5744,7 @@ export default function HolographicProjection({
         uniforms: {
           uOpacity: { value: 0 },
           uTime: { value: 0 },
+          uPulse: { value: 0 },
         },
         vertexShader: backingVertexShader,
         fragmentShader: backingFragmentShader,
@@ -4590,14 +5752,50 @@ export default function HolographicProjection({
     []
   );
 
-  // ── Glass Slab Material ──────────────────────────────────────────────
+  const chromaticMaterial = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        uniforms: {
+          uIntensity: { value: 0 },
+          uTime: { value: 0 },
+        },
+        vertexShader: chromaticVertexShader,
+        fragmentShader: chromaticFragmentShader,
+      }),
+    []
+  );
+
+  const wireframeMaterial = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        wireframe: true,
+        uniforms: {
+          uTime: { value: 0 },
+          uOpacity: { value: 0 },
+          uScale: { value: 0.01 },
+          uChromatic: { value: 0 },
+        },
+        vertexShader: wireframeVertexShader,
+        fragmentShader: wireframeFragmentShader,
+      }),
+    []
+  );
+
   const glassMaterial = useMemo(() => {
     if (isMobile) {
       return new THREE.MeshBasicMaterial({
-        color: new THREE.Color("#0a0002"),
+        color: new THREE.Color("#1a0206"),
         transparent: true,
-        opacity: 0.3,
+        opacity: 0,
         side: THREE.DoubleSide,
+        depthWrite: false,
       });
     }
     return new THREE.MeshPhysicalMaterial({
@@ -4610,14 +5808,59 @@ export default function HolographicProjection({
       attenuationDistance: 5.0,
       ior: 1.7,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0,
       side: THREE.DoubleSide,
       envMapIntensity: 2.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.1,
+      depthWrite: true,
     });
   }, [isMobile]);
 
+  // ── Particle Geometry & Data ─────────────────────────────────────────────────
 
-  // ── Mouse listener ───────────────────────────────────────────────────
+  const particleCount = isMobile ? PARTICLE_COUNT_MOBILE : PARTICLE_COUNT_DESKTOP;
+
+  const {
+    particlePositions,
+    particleSizes,
+    particlePhases,
+    particleSpeeds,
+    particleLives,
+  } = useMemo(() => {
+    const pos = new Float32Array(particleCount * 3);
+    const sz = new Float32Array(particleCount);
+    const ph = new Float32Array(particleCount);
+    const spd = new Float32Array(particleCount);
+    const life = new Float32Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      const radius = Math.random() * 0.55;
+      const angle = Math.random() * Math.PI * 2;
+      const y = Math.random();
+
+      pos[i3] = Math.cos(angle) * radius * (1.0 - y * 0.5);
+      pos[i3 + 1] = y;
+      pos[i3 + 2] = Math.sin(angle) * radius * (1.0 - y * 0.5);
+
+      sz[i] = 0.6 + Math.random() * 1.8;
+      ph[i] = Math.random() * Math.PI * 2;
+      spd[i] = 0.15 + Math.random() * 0.45;
+      life[i] = Math.random();
+    }
+
+    return {
+      particlePositions: pos,
+      particleSizes: sz,
+      particlePhases: ph,
+      particleSpeeds: spd,
+      particleLives: life,
+    };
+  }, [particleCount]);
+
+  // ── Mouse Listener ───────────────────────────────────────────────────────────
+
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       mouseRef.current.x = (e.clientX / window.innerWidth - 0.5) * 2;
@@ -4627,113 +5870,264 @@ export default function HolographicProjection({
     return () => window.removeEventListener("mousemove", onMouseMove);
   }, []);
 
-  // ── Emergence Animation Timeline (GSAP) ──────────────────────────────
+  // ── GSAP Emergence Timeline ────────────────────────────────────────────────
+  // Master Prompt Section 5: Emergence Animation Sequence (0.0s → 3.5s)
+
   useEffect(() => {
     if (!visible) {
-      // Reset values when hidden
+      // Reset emergence when hidden
+      if (timelineRef.current) {
+        timelineRef.current.kill();
+        timelineRef.current = null;
+      }
+      hasEmergedRef.current = false;
       const a = animRef.current;
+      a.emergenceProgress = 0;
       a.beamOpacity = 0;
       a.beamScaleY = 0.1;
       a.glassOpacity = 0;
       a.htmlOpacity = 0;
-      a.htmlBlur = 8;
-      a.panelZ = -2.0;
-      a.panelRotateX = 45;
-      a.panelScale = 0.2;
-      a.chromaticAberration = 0;
+      a.htmlBlur = 12;
       a.wireframeScale = 0.01;
       a.floorOpacity = 0;
       a.debrisOpacity = 0;
       a.rimPulse = 0;
       a.hasEmerged = false;
-      a.sourceGlow = 0.6;
+      a.sourceGlow = 0;
       return;
     }
 
-    const a = animRef.current;
-    const tl = gsap.timeline();
-    tlRef.current = tl;
+    // Only start timeline if not already emerged
+    if (hasEmergedRef.current || timelineRef.current) return;
 
-    // ═══════════════════════════════════════════════════════════════════
-    // PHASE 1: THE SPARK (0.0s - 0.4s)
-    // ═══════════════════════════════════════════════════════════════════
+    const a = animRef.current;
+    const tl = gsap.timeline({
+      onComplete: () => {
+        hasEmergedRef.current = true;
+        a.hasEmerged = true;
+      },
+    });
+    timelineRef.current = tl;
+
+    // Phase 1: The Spark (0.0s - 0.4s)
     tl.to(
       a,
       {
         wireframeScale: 0.3,
+        beamOpacity: 0.15,
+        beamScaleY: 0.2,
         sourceGlow: 3.0,
-        duration: 0.2,
+        duration: 0.4,
         ease: "power2.out",
-        onComplete: () => {
-          gsap.to(a, { sourceGlow: 0.8, duration: 0.2 });
-        },
       },
       0
     );
-    tl.to(a, { beamOpacity: 0.15, duration: 0.4, ease: "power2.out" }, 0);
 
-    // ═══════════════════════════════════════════════════════════════════
-    // PHASE 2: THE BREACH (0.4s - 1.2s)
-    // ═══════════════════════════════════════════════════════════════════
-    tl.to(a, { beamOpacity: 0.85, duration: 0.8, ease: "power4.out" }, 0.4);
-    tl.to(a, { beamScaleY: 1.0, duration: 0.8, ease: "power4.out" }, 0.4);
-    tl.to(a, { glassOpacity: 0.15, duration: 0.8 }, 0.4);
-    tl.to(a, { chromaticAberration: 4.0, duration: 0.3, yoyo: true, repeat: 3 }, 0.5);
-
-    // ═══════════════════════════════════════════════════════════════════
-    // PHASE 3: MATERIALIZATION (1.2s - 2.2s)
-    // ═══════════════════════════════════════════════════════════════════
-    tl.to(a, { chromaticAberration: 0, duration: 0.3 }, 1.2);
-    tl.to(a, { glassOpacity: 0.3, duration: 1.0 }, 1.2);
-    tl.to(a, { htmlOpacity: 1, duration: 1.0, ease: "power2.out" }, 1.2);
-    tl.to(a, { htmlBlur: 0, duration: 1.0, ease: "power2.out" }, 1.2);
-    tl.to(a, { floorOpacity: 0.12, duration: 0.8, ease: "power2.out" }, 1.4);
+    // Phase 2: The Breach (0.4s - 1.2s)
     tl.to(
       a,
       {
-        panelZ: 0,
-        panelRotateX: 8,
-        panelScale: 1.0,
+        wireframeScale: 0.01,
+        beamOpacity: 0.85,
+        beamScaleY: 1.0,
+        glassOpacity: isMobile ? 0.4 : 0.3,
+        chromaticAberration: 4.0,
+        duration: 0.8,
+        ease: "power4.out",
+      },
+      0.4
+    );
+
+    // Phase 3: Materialization (1.2s - 2.2s)
+    tl.to(
+      a,
+      {
+        chromaticAberration: 0,
+        glassOpacity: isMobile ? 0.4 : 0.3,
+        htmlOpacity: 1,
+        htmlBlur: 0,
+        rimPulse: 1,
+        floorOpacity: 0.12,
+        debrisOpacity: 1,
         duration: 1.0,
-        ease: "power3.out",
+        ease: "power2.out",
       },
       1.2
     );
 
-    // ═══════════════════════════════════════════════════════════════════
-    // PHASE 4: STABILIZATION (2.2s - 3.5s)
-    // ═══════════════════════════════════════════════════════════════════
-    tl.to(a, { debrisOpacity: 1, duration: 1.3 }, 2.2);
-    tl.to(a, { rimPulse: 1, duration: 1.3 }, 2.2);
-    tl.call(
-      () => {
-        a.hasEmerged = true;
+    // Phase 4: Stabilization (2.2s - 3.5s)
+    tl.to(
+      a,
+      {
+        sourceGlow: 0.6,
+        duration: 1.3,
+        ease: "sine.inOut",
       },
-      [],
-      3.5
+      2.2
     );
 
     return () => {
       tl.kill();
+      timelineRef.current = null;
     };
-  }, [visible]);
+  }, [visible, isMobile]);
 
-  // ── Speed up timeline if user scrolls early ──────────────────────────
-  useEffect(() => {
-    if (!visible || !tlRef.current) return;
-    const tl = tlRef.current;
-    if (scrollProgress > 0.01 && !animRef.current.hasEmerged && tl.progress() < scrollProgress * 6) {
-      tl.time(scrollProgress * 21);
-    }
-  }, [scrollProgress, visible]);
+  // ── Scroll-Driven Lifecycle (useFrame) ───────────────────────────────────────
 
-  // ── Main Animation Loop ──────────────────────────────────────────────
-  useFrame((state) => {
+  useFrame((state, delta) => {
+    const dt = Math.min(delta, 0.05); // Cap delta for stability
+    const t = state.clock.getElapsedTime();
     const screen = laptopScreenRef.current;
     const rig = rigRef.current;
-    const t = state.clock.getElapsedTime();
     const a = animRef.current;
 
+    // Sync refs
+    isVisibleRef.current = visible;
+    scrollRef.current = scrollProgress;
+
+    // If not visible and not emerging, hide everything
+    if (!visible && !hasEmergedRef.current) {
+      if (rig) rig.visible = false;
+      if (beamRef.current) beamRef.current.visible = false;
+      if (particlesRef.current) particlesRef.current.visible = false;
+      if (wireframeRef.current) wireframeRef.current.visible = false;
+      if (chromaticRef.current) chromaticRef.current.visible = false;
+      return;
+    }
+
+    // Smooth mouse interpolation
+    smoothMouse.current.x = damp(smoothMouse.current.x, mouseRef.current.x, 8, dt);
+    smoothMouse.current.y = damp(smoothMouse.current.y, mouseRef.current.y, 8, dt);
+    const mx = smoothMouse.current.x;
+    const my = smoothMouse.current.y;
+
+    // ── Scroll Phase Calculations ──
+    const p = Math.max(0, Math.min(1, scrollProgress));
+
+    // Speed up emergence if user scrolls before auto-emergence completes
+    if (p > 0.01 && p <= 0.15 && timelineRef.current && !hasEmergedRef.current) {
+      const targetProgress = Math.min(1, p / 0.15);
+      timelineRef.current.progress(targetProgress);
+    }
+
+    // Scroll-driven values (independent of emergence)
+    let targetPanelZ: number;
+    let targetRotateX: number;
+    let targetScale: number;
+    let targetY: number;
+    let targetBeamOpacity: number;
+    let targetBeamScaleY: number;
+    let targetGlassOpacity: number;
+    let targetHtmlOpacity: number;
+    let targetHtmlBlur: number;
+    let targetChromatic: number;
+    let targetBrightness: number;
+    let targetDissipation: number;
+    let mouseParallaxActive: boolean;
+
+    if (p <= 0.15) {
+      // EMERGENCE / APPROACH
+      const s = p / 0.15;
+      targetPanelZ = THREE.MathUtils.lerp(0.2, 2.2, s); // Forward from screen
+      targetRotateX = THREE.MathUtils.lerp(45, 8, s);
+      targetScale = THREE.MathUtils.lerp(0.2, 1.0, s);
+      targetY = THREE.MathUtils.lerp(0.0, 0.35, s);
+      targetBeamOpacity = a.beamOpacity; // Controlled by GSAP
+      targetBeamScaleY = a.beamScaleY;
+      targetGlassOpacity = a.glassOpacity;
+      targetHtmlOpacity = a.htmlOpacity;
+      targetHtmlBlur = a.htmlBlur;
+      targetChromatic = a.chromaticAberration;
+      targetBrightness = 1.0;
+      targetDissipation = 0;
+      mouseParallaxActive = false;
+    } else if (p <= 0.50) {
+      // STABILIZED HERO
+      targetPanelZ = 2.2;
+      targetRotateX = 8;
+      targetScale = 1.0;
+      targetY = 0.35;
+      targetBeamOpacity = 0.85;
+      targetBeamScaleY = 1.0;
+      targetGlassOpacity = isMobile ? 0.4 : 0.3;
+      targetHtmlOpacity = 1.0;
+      targetHtmlBlur = 0;
+      targetChromatic = 0;
+      targetBrightness = 1.0;
+      targetDissipation = 0;
+      mouseParallaxActive = true;
+    } else if (p <= 0.75) {
+      // DEEP READ
+      const s = (p - 0.50) / 0.25;
+      targetPanelZ = 2.2;
+      targetRotateX = 8 + s * 2; // Slight tilt
+      targetScale = 1.0;
+      targetY = 0.35;
+      targetBeamOpacity = 0.85;
+      targetBeamScaleY = 1.0;
+      targetGlassOpacity = isMobile ? 0.4 : 0.3;
+      targetHtmlOpacity = 1.0;
+      targetHtmlBlur = 0;
+      targetChromatic = 0;
+      targetBrightness = THREE.MathUtils.lerp(1.0, 0.85, s);
+      targetDissipation = 0;
+      mouseParallaxActive = true;
+    } else if (p <= 0.90) {
+      // ASCENSION
+      const s = (p - 0.75) / 0.15;
+      targetPanelZ = THREE.MathUtils.lerp(2.2, 2.5, s);
+      targetRotateX = THREE.MathUtils.lerp(8, -15, s);
+      targetScale = THREE.MathUtils.lerp(1.0, 0.92, s);
+      targetY = THREE.MathUtils.lerp(0.35, 0.75, s); // Lift up
+      targetBeamOpacity = THREE.MathUtils.lerp(0.85, 0.4, s);
+      targetBeamScaleY = THREE.MathUtils.lerp(1.0, 0.6, s);
+      targetGlassOpacity = THREE.MathUtils.lerp(isMobile ? 0.4 : 0.3, 0.05, s);
+      targetHtmlOpacity = THREE.MathUtils.lerp(1.0, 0.5, s);
+      targetHtmlBlur = s * 3;
+      targetChromatic = s * 2;
+      targetBrightness = 0.85;
+      targetDissipation = s * 0.3;
+      mouseParallaxActive = false;
+    } else {
+      // DISSIPATION
+      const s = (p - 0.90) / 0.10;
+      targetPanelZ = 2.5;
+      targetRotateX = -15;
+      targetScale = 0.92;
+      targetY = 0.75;
+      targetBeamOpacity = THREE.MathUtils.lerp(0.4, 0, s);
+      targetBeamScaleY = THREE.MathUtils.lerp(0.6, 0.1, s);
+      targetGlassOpacity = THREE.MathUtils.lerp(0.05, 0, s);
+      targetHtmlOpacity = THREE.MathUtils.lerp(0.5, 0, s);
+      targetHtmlBlur = 3 + s * 10;
+      targetChromatic = 2 + s * 8; // RGB split intensifies
+      targetBrightness = 0.85;
+      targetDissipation = 0.3 + s * 0.7;
+      mouseParallaxActive = false;
+    }
+
+    // Lerp current values toward targets for buttery smoothness
+    const lambda = 12; // High responsiveness but smooth
+    a.panelZ = damp(a.panelZ, targetPanelZ, lambda, dt);
+    a.panelRotateX = damp(a.panelRotateX, targetRotateX, lambda, dt);
+    a.panelScale = damp(a.panelScale, targetScale, lambda, dt);
+    a.panelY = damp(a.panelY, targetY, lambda, dt);
+    a.brightness = damp(a.brightness, targetBrightness, lambda, dt);
+    a.chromaticAberration = damp(a.chromaticAberration, targetChromatic, lambda, dt);
+    a.dissipationProgress = damp(a.dissipationProgress, targetDissipation, lambda, dt);
+
+    // Beam values: use GSAP during emergence, then scroll-driven
+    if (p > 0.15 || hasEmergedRef.current) {
+      a.beamOpacity = damp(a.beamOpacity, targetBeamOpacity, lambda, dt);
+      a.beamScaleY = damp(a.beamScaleY, targetBeamScaleY, lambda, dt);
+    }
+    if (p > 0.15 && hasEmergedRef.current) {
+      a.glassOpacity = damp(a.glassOpacity, targetGlassOpacity, lambda, dt);
+      a.htmlOpacity = damp(a.htmlOpacity, targetHtmlOpacity, lambda, dt);
+      a.htmlBlur = damp(a.htmlBlur, targetHtmlBlur, lambda, dt);
+    }
+
+    // ── Laptop Screen Transform Decomposition ──
     if (!screen || !rig) {
       if (htmlWrapperRef.current) {
         htmlWrapperRef.current.style.opacity = "0";
@@ -4741,13 +6135,6 @@ export default function HolographicProjection({
       return;
     }
 
-    // Smooth mouse interpolation
-    smoothMouse.current.x += (mouseRef.current.x - smoothMouse.current.x) * 0.08;
-    smoothMouse.current.y += (mouseRef.current.y - smoothMouse.current.y) * 0.08;
-    const mx = smoothMouse.current.x;
-    const my = smoothMouse.current.y;
-
-    // Decompose laptop screen world transform
     screen.updateWorldMatrix(true, false);
     screen.matrixWorld.decompose(
       scratch.screenPos,
@@ -4755,299 +6142,231 @@ export default function HolographicProjection({
       scratch.screenScale
     );
 
-    // Screen normal (pointing out of laptop screen)
     scratch.screenNormal.set(0, 0, 1).applyQuaternion(scratch.screenQuat).normalize();
+    scratch.screenUp.set(0, 1, 0).applyQuaternion(scratch.screenQuat).normalize();
 
-    // ── Scroll-driven targets ──────────────────────────────────────────
-    const p = Math.max(0, Math.min(1, scrollProgress));
+    // Screen center (hinge + 0.75 up along screen face)
+    scratch.screenCenter.copy(scratch.screenPos).addScaledVector(scratch.screenUp, 0.75);
 
-    let targetZ = 0;
-    let targetRotateX = 8;
-    let targetScale = 1.0;
-    let targetY = 0;
-    let targetOpacity = 1.0;
-    let targetBeamOpacity = 0.85;
-    let targetBeamScale = 1.0;
-    let targetChromatic = 0;
-    let targetBrightness = 1.0;
-    let mouseParallaxActive = false;
+    // ── Mouse Parallax ──
+    const parallaxX = mouseParallaxActive ? mx * 3.0 : 0;
+    const parallaxY = mouseParallaxActive ? my * 3.0 : 0;
 
-    if (p < 0.15) {
-      // EMERGENCE (0.00 - 0.15)
-      const s = p / 0.15;
-      targetZ = THREE.MathUtils.lerp(-2.0, 0, s);
-      targetRotateX = THREE.MathUtils.lerp(45, 8, s);
-      targetScale = THREE.MathUtils.lerp(0.2, 1.0, s);
-    } else if (p >= 0.15 && p < 0.5) {
-      // STABILIZED HERO (0.15 - 0.50)
-      targetRotateX = 8;
-      targetScale = 1.0;
-      mouseParallaxActive = true;
-    } else if (p >= 0.5 && p < 0.75) {
-      // DEEP READ (0.50 - 0.75)
-      const s = (p - 0.5) / 0.25;
-      targetBrightness = THREE.MathUtils.lerp(1.0, 0.85, s);
-      mouseParallaxActive = true;
-    } else if (p >= 0.75 && p < 0.9) {
-      // ASCENSION (0.75 - 0.90)
-      const s = (p - 0.75) / 0.15;
-      targetY = THREE.MathUtils.lerp(0, -1.2, s);
-      targetRotateX = THREE.MathUtils.lerp(8, -15, s);
-      targetScale = THREE.MathUtils.lerp(1.0, 0.92, s);
-      targetBeamOpacity = THREE.MathUtils.lerp(0.85, 0.4, s);
-    } else if (p >= 0.9) {
-      // DISSIPATION (0.90 - 1.00)
-      const s = (p - 0.9) / 0.1;
-      targetOpacity = THREE.MathUtils.lerp(1.0, 0.0, s);
-      targetChromatic = s * 8;
-      targetBeamOpacity = THREE.MathUtils.lerp(0.4, 0.0, s);
-      targetBeamScale = THREE.MathUtils.lerp(1.0, 0.1, s);
-      targetScale = THREE.MathUtils.lerp(0.92, 0.1, s);
-      targetY = -1.2;
-      targetRotateX = -15;
-    }
+    // ── Panel Hover (gentle sinusoidal float) ──
+    const hoverY = hasEmergedRef.current && p < 0.85
+      ? Math.sin(t * 1.05) * 0.04
+      : 0;
+    a.hoverPhase = t;
 
-    // Blend emergence animation with scroll-driven values
-    const effectiveZ = a.hasEmerged ? targetZ : THREE.MathUtils.lerp(a.panelZ, targetZ, 0.1);
-    const effectiveRotateX = a.hasEmerged
-      ? targetRotateX
-      : THREE.MathUtils.lerp(a.panelRotateX, targetRotateX, 0.1);
-    const effectiveScale = a.hasEmerged
-      ? targetScale
-      : THREE.MathUtils.lerp(a.panelScale, targetScale, 0.1);
-
-    // Mouse parallax (max ±3deg)
-    const parallaxX = mouseParallaxActive ? mx * 3 : 0;
-    const parallaxY = mouseParallaxActive ? my * 3 : 0;
-
-    // Panel hover (Phase 4: gentle sinusoidal Y ±6px, 6s period)
-    const hoverY = a.hasEmerged ? Math.sin(t * 1.05) * 0.06 : 0;
-
-    // ── Position hologram rig ──────────────────────────────────────────
-    // Position above laptop screen, facing camera
-    scratch.rigPos.copy(scratch.screenPos).add(scratch.screenNormal.clone().multiplyScalar(2.5));
-    scratch.rigPos.y += targetY + (mouseParallaxActive ? my * 0.05 : 0) + hoverY;
-    // FIX: Apply scroll-driven Z offset (approaching camera during emergence)
-    scratch.rigPos.add(scratch.screenNormal.clone().multiplyScalar(effectiveZ));
+    // ── Position Hologram Rig ──
+    // Forward along screenNormal from screenCenter
+    scratch.rigPos.copy(scratch.screenCenter).add(scratch.screenNormal.clone().multiplyScalar(a.panelZ));
+    scratch.rigPos.y += a.panelY + parallaxY * 0.015 + hoverY;
 
     rig.position.copy(scratch.rigPos);
+
+    // Make panel face camera (billboard-ish but with tilt)
     rig.lookAt(camera.position);
 
-    // Apply rotations
-    const rotXRad = (effectiveRotateX + parallaxY) * (Math.PI / 180);
+    // Apply cinematic rotations
+    const rotXRad = (a.panelRotateX + parallaxY) * (Math.PI / 180);
     const rotYRad = parallaxX * (Math.PI / 180);
     rig.rotateX(rotXRad);
     rig.rotateY(rotYRad);
-    rig.scale.setScalar(effectiveScale);
+    rig.scale.setScalar(a.panelScale);
 
-    // Visibility
-    const effectiveOpacity = a.hasEmerged ? targetOpacity * a.htmlOpacity : a.htmlOpacity;
-    rig.visible = effectiveOpacity > 0.002 && visible;
+    // Visibility culling
+    const effectiveOpacity = a.htmlOpacity * (1 - a.dissipationProgress);
+    rig.visible = effectiveOpacity > 0.005 && visible;
 
-    // ── Update HTML wrapper opacity, blur, CSS variables & emerged state ──
+    // ── Update HTML Wrapper (via CSS custom properties, NOT React state) ──
     if (htmlWrapperRef.current) {
-      htmlWrapperRef.current.style.opacity = effectiveOpacity.toFixed(4);
-      htmlWrapperRef.current.style.filter = `blur(${a.htmlBlur}px) brightness(${targetBrightness})`;
-      const chromatic = a.hasEmerged ? targetChromatic : a.chromaticAberration;
-      htmlWrapperRef.current.style.transform = `translateZ(0) scale(${1.0 + chromatic * 0.01})`;
-      htmlWrapperRef.current.style.setProperty("--emergence-opacity", a.htmlOpacity.toFixed(4));
-      htmlWrapperRef.current.classList.toggle("has-emerged", a.htmlOpacity > 0.05);
+      const el = htmlWrapperRef.current;
+      el.style.opacity = effectiveOpacity.toFixed(5);
+      el.style.filter = `blur(${a.htmlBlur.toFixed(2)}px) brightness(${a.brightness.toFixed(3)})`;
+      el.style.setProperty("--chromatic-shift", `${a.chromaticAberration.toFixed(2)}px`);
+      el.classList.toggle("has-emerged", a.htmlOpacity > 0.05);
     }
 
-    // ── Update Beam ────────────────────────────────────────────────────
+    // ── Update Volumetric Beam ──
     if (beamRef.current) {
-      const beamOp = a.beamOpacity * targetBeamOpacity;
-      beamRef.current.visible = beamOp > 0.002 && visible;
+      const beamOp = a.beamOpacity;
+      beamRef.current.visible = beamOp > 0.005 && visible;
 
-      // Position beam from screen center to panel center
-      scratch.beamTarget.copy(scratch.rigPos);
-      scratch.beamMid.copy(scratch.screenPos).lerp(scratch.beamTarget, 0.5);
-      scratch.beamDir.copy(scratch.beamTarget).sub(scratch.screenPos).normalize();
+      if (beamRef.current.visible) {
+        // Beam connects screen center to hologram base
+        scratch.beamTarget.copy(scratch.rigPos);
+        scratch.beamTarget.y -= (PANEL_HEIGHT * 0.5 + 0.05) * a.panelScale;
 
-      beamRef.current.position.copy(scratch.beamMid);
-      beamRef.current.quaternion.setFromUnitVectors(scratch.up, scratch.beamDir);
-      beamRef.current.scale.set(
-        1.0,
-        scratch.screenPos.distanceTo(scratch.beamTarget) * a.beamScaleY * targetBeamScale,
-        1.0
-      );
+        scratch.beamMid.copy(scratch.screenCenter).lerp(scratch.beamTarget, 0.5);
+        scratch.beamDir.copy(scratch.beamTarget).sub(scratch.screenCenter).normalize();
 
-      beamMaterial.uniforms.uTime.value = t;
-      beamMaterial.uniforms.uOpacity.value = beamOp;
-      beamMaterial.uniforms.uPulse.value = a.hasEmerged ? 1.0 : 0.5;
+        const beamDistance = scratch.screenCenter.distanceTo(scratch.beamTarget);
+
+        beamRef.current.position.copy(scratch.beamMid);
+        beamRef.current.quaternion.setFromUnitVectors(scratch.up, scratch.beamDir);
+        beamRef.current.scale.set(
+          0.5 * a.panelScale,
+          beamDistance * a.beamScaleY,
+          0.5 * a.panelScale
+        );
+
+        beamMaterial.uniforms.uTime.value = t;
+        beamMaterial.uniforms.uOpacity.value = beamOp;
+        beamMaterial.uniforms.uPulse.value = hasEmergedRef.current ? 1.0 : 0.5;
+        beamMaterial.uniforms.uChromatic.value = a.chromaticAberration * 0.5;
+      }
     }
 
-    // ── Update Particles ───────────────────────────────────────────────
+    // ── Update Beam Particles ──
     if (particlesRef.current && particleCount > 0) {
       particleMaterial.uniforms.uTime.value = t;
-      particleMaterial.uniforms.uOpacity.value = a.beamOpacity * targetBeamOpacity;
-      particlesRef.current.visible = a.beamOpacity > 0.01 && visible;
+      particleMaterial.uniforms.uOpacity.value = a.beamOpacity;
+      particlesRef.current.visible = a.beamOpacity > 0.02 && visible;
 
-      // Animate particles drifting upward
-      const posAttr = particlesRef.current.geometry.attributes.position;
-      const posArray = posAttr.array as Float32Array;
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        posArray[i3 + 1] += particleSpeeds[i] * 0.002;
-        if (posArray[i3 + 1] > 1.2) {
-          posArray[i3 + 1] = 0;
+      if (particlesRef.current.visible) {
+        const posAttr = particlesRef.current.geometry.attributes.position;
+        const posArray = posAttr.array as Float32Array;
+        const lifeAttr = particlesRef.current.geometry.attributes.aLife;
+        const lifeArray = lifeAttr.array as Float32Array;
+
+        for (let i = 0; i < particleCount; i++) {
+          const i3 = i * 3;
+          // Drift upward slowly
+          posArray[i3 + 1] += particleSpeeds[i] * 0.0015;
+          // Reset if too high
+          if (posArray[i3 + 1] > 1.15) {
+            posArray[i3 + 1] = 0;
+            const radius = Math.random() * 0.5;
+            const angle = Math.random() * Math.PI * 2;
+            const y = 0;
+            posArray[i3] = Math.cos(angle) * radius;
+            posArray[i3 + 2] = Math.sin(angle) * radius;
+          }
+          // Update life cycle
+          lifeArray[i] += 0.003;
+          if (lifeArray[i] > 1) lifeArray[i] = 0;
+        }
+        posAttr.needsUpdate = true;
+        lifeAttr.needsUpdate = true;
+      }
+    }
+
+    // ── Update Glass Slab ──
+    if (glassRef.current) {
+      const mat = glassRef.current.material as THREE.MeshPhysicalMaterial | THREE.MeshBasicMaterial;
+      if (mat) {
+        mat.opacity = a.glassOpacity;
+        if ("transmission" in mat && !isMobile) {
+          (mat as THREE.MeshPhysicalMaterial).transmission = a.glassOpacity > 0.01 ? 0.95 : 0;
         }
       }
-      posAttr.needsUpdate = true;
     }
 
-    // ── Update Glass Slab ──────────────────────────────────────────────
-    if (glassRef.current) {
-      const glassMat = glassRef.current.material as THREE.MeshBasicMaterial | THREE.MeshPhysicalMaterial;
-      glassMat.opacity = a.glassOpacity;
-      if (!isMobile && "transmission" in glassMat) {
-        (glassMat as THREE.MeshPhysicalMaterial).transmission = a.glassOpacity > 0.01 ? 0.95 : 0;
+    // ── Update Edge Glow ──
+    if (edgeTorusRef.current) {
+      const pulse = 0.4 + Math.sin(t * 1.5) * 0.25 * a.rimPulse;
+      const mat = edgeTorusRef.current.material as THREE.LineBasicMaterial;
+      if (mat) {
+        mat.opacity = pulse * a.glassOpacity * (1 - a.dissipationProgress);
       }
     }
 
-    // ── Update Edge Glow ───────────────────────────────────────────────
-    if (edgeTorusRef.current) {
-      const pulse = 0.5 + Math.sin(t * 1.5) * 0.2 * a.rimPulse;
-      const lineMat = edgeTorusRef.current.material as THREE.LineBasicMaterial;
-      if (lineMat) lineMat.opacity = pulse * a.glassOpacity;
-    }
-
-    // ── Update Backing Glow ────────────────────────────────────────────
+    // ── Update Backing Glow ──
     if (glowRef.current) {
-      backingMaterial.uniforms.uOpacity.value = a.glassOpacity * a.rimPulse;
+      backingMaterial.uniforms.uOpacity.value = a.glassOpacity * a.rimPulse * (1 - a.dissipationProgress);
       backingMaterial.uniforms.uTime.value = t;
+      backingMaterial.uniforms.uPulse.value = a.rimPulse;
     }
 
-    // ── Update Rim Light (panel glow) ──────────────────────────────────
+    // ── Update Chromatic Dissolve Overlay ──
+    if (chromaticRef.current) {
+      chromaticRef.current.visible = a.chromaticAberration > 0.1 && visible;
+      chromaticMaterial.uniforms.uIntensity.value = a.chromaticAberration;
+      chromaticMaterial.uniforms.uTime.value = t;
+    }
+
+    // ── Update Rim Light ──
     if (rimLightRef.current) {
       rimLightRef.current.position.copy(scratch.rigPos);
-      rimLightRef.current.intensity = a.beamOpacity * 2.4 * targetOpacity;
+      rimLightRef.current.position.z += 0.3;
+      rimLightRef.current.intensity = a.beamOpacity * 2.8 * (1 - a.dissipationProgress);
     }
 
-    // ── Update Beam Base Light (red tint on laptop chassis) ────────────
+    // ── Update Beam Base Light (red tint on laptop chassis) ──
     if (beamBaseLightRef.current) {
-      beamBaseLightRef.current.position.copy(scratch.screenPos);
-      beamBaseLightRef.current.intensity = a.beamOpacity * 1.5;
+      beamBaseLightRef.current.position.copy(scratch.screenCenter);
+      beamBaseLightRef.current.position.y -= 0.1;
+      beamBaseLightRef.current.intensity = a.beamOpacity * 1.8 * a.sourceGlow;
+    }
+
+    // ── Update Wireframe Spark ──
+    if (wireframeRef.current) {
+      screen.matrixWorld.decompose(
+        scratch.wireframePos,
+        scratch.wireframeQuat,
+        scratch.wireframeScale
+      );
+      wireframeRef.current.position.copy(scratch.wireframePos);
+      wireframeRef.current.quaternion.copy(scratch.wireframeQuat);
+      wireframeRef.current.scale.setScalar(Math.max(0.001, a.wireframeScale));
+      wireframeRef.current.visible = a.wireframeScale > 0.001 && visible;
+
+      wireframeMaterial.uniforms.uTime.value = t;
+      wireframeMaterial.uniforms.uOpacity.value = a.wireframeScale > 0.01 ? 0.8 : 0;
+      wireframeMaterial.uniforms.uScale.value = a.wireframeScale;
+      wireframeMaterial.uniforms.uChromatic.value = a.chromaticAberration;
     }
   });
 
-  // ── Wireframe Cube Animation (separate useFrame) ─────────────────────
-  useFrame(() => {
-    const screen = laptopScreenRef.current;
-    const wire = wireframeRef.current;
-    const a = animRef.current;
-    if (!screen || !wire) return;
-
-    screen.updateWorldMatrix(true, false);
-    screen.matrixWorld.decompose(
-      scratch.wireframePos,
-      scratch.wireframeQuat,
-      scratch.wireframeScale
-    );
-
-    wire.position.copy(scratch.wireframePos);
-    wire.scale.setScalar(Math.max(0.001, a.wireframeScale));
-    wire.visible = a.wireframeScale > 0.001 && visible;
-  });
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   if (!visible) return null;
 
   return (
     <group>
       {/* ═══ VOLUMETRIC BEAM ═══ */}
-      <mesh ref={beamRef} material={beamMaterial} renderOrder={5}>
-        <cylinderGeometry args={[0.8, 0.04, 1, 4, isMobile ? 12 : 24, true]} />
-      </mesh>
+      <VolumetricBeam beamRef={beamRef} material={beamMaterial} isMobile={isMobile} />
 
       {/* ═══ BEAM PARTICLES ═══ */}
-      {particleCount > 0 && (
-        <points ref={particlesRef} material={particleMaterial} renderOrder={6}>
-          <bufferGeometry>
-            <bufferAttribute
-              attach="attributes-position"
-              args={[particlePositions, 3]}
-            />
-            <bufferAttribute
-              attach="attributes-aSize"
-              args={[particleSizes, 1]}
-            />
-            <bufferAttribute
-              attach="attributes-aPhase"
-              args={[particlePhases, 1]}
-            />
-            <bufferAttribute
-              attach="attributes-aSpeed"
-              args={[particleSpeeds, 1]}
-            />
-          </bufferGeometry>
-        </points>
-      )}
-
-      {/* ═══ PHASE 1 WIREFRAME CUBE (The Spark) ═══ */}
-      <mesh ref={wireframeRef} visible={false} renderOrder={7}>
-        <boxGeometry args={[0.1, 0.1, 0.1]} />
-        <meshBasicMaterial
-          color="#ff1744"
-          wireframe
-          transparent
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* ═══ BEAM BASE LIGHT (subtle red tint on laptop chassis) ═══ */}
-      <pointLight
-        ref={beamBaseLightRef}
-        color="#ff1744"
-        intensity={0}
-        distance={3}
-        decay={2}
+      <BeamParticles
+        particlesRef={particlesRef}
+        material={particleMaterial}
+        count={particleCount}
+        positions={particlePositions}
+        sizes={particleSizes}
+        phases={particlePhases}
+        speeds={particleSpeeds}
+        lives={particleLives}
       />
 
-      {/* ═══ HOLOGRAM RIG ═══ */}
-      <group ref={rigRef}>
-        {/* ── Glass Panel Backing ── */}
-        <mesh ref={glassRef} material={glassMaterial} renderOrder={10}>
-          <boxGeometry args={[14.2, 7.2, 0.15]} />
-        </mesh>
+      {/* ═══ PHASE 1 WIREFRAME CUBE (The Spark) ═══ */}
+      <WireframeSpark wireframeRef={wireframeRef} material={wireframeMaterial} />
 
-        {/* ── Edge Glow (rectangular rim tracing the glass slab perimeter) ── */}
-        <lineSegments ref={edgeTorusRef} renderOrder={11}>
-          <edgesGeometry args={[new THREE.BoxGeometry(14.2, 7.2, 0.15)]} />
-          <lineBasicMaterial
-            color="#ff1744"
-            transparent
-            opacity={0}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </lineSegments>
+      {/* ═══ BEAM BASE LIGHT ═══ */}
+      <BeamBaseLight lightRef={beamBaseLightRef} />
+
+      {/* ═══ HOLOGRAM RIG ═══ */}
+      <group ref={rigRef} visible={false}>
+        {/* ── Physical Glass Slab ── */}
+        <GlassSlab glassRef={glassRef} material={glassMaterial} />
+
+        {/* ── Edge Glow (rectangular rim) ── */}
+        <EdgeGlow edgeRef={edgeTorusRef} />
 
         {/* ── Backing Glow (radial bloom behind panel) ── */}
-        <mesh
-          ref={glowRef}
-          material={backingMaterial}
-          position={[0, 0, -0.3]}
-          renderOrder={8}
-        >
-          <planeGeometry args={[16, 9]} />
-        </mesh>
+        <BackingGlow glowRef={glowRef} material={backingMaterial} />
+
+        {/* ── Chromatic Dissolve Overlay ── */}
+        <ChromaticDissolve chromaticRef={chromaticRef} material={chromaticMaterial} />
 
         {/* ── Rim Light (crimson glow at panel) ── */}
-        <pointLight
-          ref={rimLightRef}
-          color="#ff1744"
-          intensity={0}
-          distance={4.5}
-          decay={2}
-        />
+        <RimLight rimLightRef={rimLightRef} />
 
         {/* ── HTML Content (DashboardHero) ── */}
         <Html
           transform
           center
-          distanceFactor={1.0}
+          distanceFactor={0.27}
           zIndexRange={[20, 60]}
           style={{ pointerEvents: "auto", userSelect: "none" }}
         >
@@ -5056,11 +6375,11 @@ export default function HolographicProjection({
             style={{
               width: isMobile ? "100vw" : "1400px",
               maxWidth: isMobile ? "100vw" : "1400px",
-              padding: "48px 56px",
+              padding: "32px 40px",
               background: "transparent",
               opacity: 0,
               transformOrigin: "center center",
-              willChange: "opacity, filter, transform",
+              willChange: "opacity, filter",
             }}
           >
             <DashboardHero scrollProgress={scrollProgress} stageScale={1} spatial />
@@ -5778,86 +7097,419 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import * as THREE from "three";
 
 export interface PostProcessingProps {
   hologramActive?: boolean;
+  scrollProgress?: number;
+  powerUpStage?: string;
 }
 
-const DEFAULT_STRENGTH = 0.32;
-const DEFAULT_RADIUS = 0.35;
-const DEFAULT_THRESHOLD = 0.40;
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. CHROMATIC ABERRATION — RGB edge-split, intensifies with hologram
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ChromaticShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uIntensity: { value: 0.0 },
+    uTime: { value: 0.0 },
+    uScroll: { value: 0.0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uIntensity;
+    uniform float uTime;
+    uniform float uScroll;
+    varying vec2 vUv;
 
-const HOLOGRAM_STRENGTH = 0.55;
-const HOLOGRAM_RADIUS = 0.45;
-const HOLOGRAM_THRESHOLD = 0.35;
+    void main() {
+      vec2 uv = vUv;
+      vec2 center = uv - 0.5;
+      float dist = length(center);
 
-const LERP_FACTOR = 0.05;
+      // Radial shift — stronger at edges, animated micro-jitter
+      float shift = uIntensity * 0.014 * pow(dist, 1.6);
+      float jitter = sin(uTime * 18.0 + dist * 12.0) * 0.0012 * uIntensity;
+      float scrollBoost = uScroll * 0.003;
 
-export default function PostProcessing({ hologramActive }: PostProcessingProps) {
+      float r = texture2D(tDiffuse, uv + vec2(shift + jitter + scrollBoost, 0.0)).r;
+      float g = texture2D(tDiffuse, uv + vec2(jitter * 0.5, 0.0)).g;
+      float b = texture2D(tDiffuse, uv - vec2(shift * 0.8 + jitter - scrollBoost, 0.0)).b;
+
+      // Vertical chromatic split (subtle)
+      float vShift = shift * 0.25;
+      r = mix(r, texture2D(tDiffuse, uv + vec2(0.0, vShift)).r, 0.15);
+      b = mix(b, texture2D(tDiffuse, uv - vec2(0.0, vShift * 0.6)).b, 0.15);
+
+      gl_FragColor = vec4(r, g, b, 1.0);
+    }
+  `,
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. VIGNETTE — Cinematic corner-darkening, crimson-tinted in hologram mode
+   ═══════════════════════════════════════════════════════════════════════════ */
+const VignetteShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uIntensity: { value: 0.08 },
+    uColor: { value: new THREE.Color("#000000") },
+    uCrimsonTint: { value: 0.0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uIntensity;
+    uniform vec3 uColor;
+    uniform float uCrimsonTint;
+    varying vec2 vUv;
+
+    void main() {
+      vec4 texel = texture2D(tDiffuse, vUv);
+      vec2 uv = vUv - 0.5;
+      float dist = length(uv * vec2(1.0, 0.88));
+      float vignette = 1.0 - smoothstep(0.35, 1.25, dist);
+      vignette = mix(1.0, vignette, uIntensity);
+
+      vec3 crimson = vec3(0.04, 0.0, 0.01);
+      vec3 vignetteColor = mix(uColor, crimson, uCrimsonTint);
+      texel.rgb = mix(vignetteColor * texel.rgb * 0.85, texel.rgb, vignette);
+
+      gl_FragColor = texel;
+    }
+  `,
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. FILM GRAIN + SCANLINES + FLICKER — Organic celluloid feel
+   ═══════════════════════════════════════════════════════════════════════════ */
+const FilmShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uTime: { value: 0.0 },
+    uGrain: { value: 0.028 },
+    uScanline: { value: 0.035 },
+    uFlicker: { value: 0.012 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uGrain;
+    uniform float uScanline;
+    uniform float uFlicker;
+    varying vec2 vUv;
+
+    float rand(vec2 co) {
+      return fract(sin(dot(co.xy, vec2(12.9898,78.233))) * 43758.5453);
+    }
+
+    void main() {
+      vec4 texel = texture2D(tDiffuse, vUv);
+
+      // Grain
+      float g = rand(vUv * 600.0 + uTime * 3.0) * uGrain;
+      texel.rgb += g - uGrain * 0.5;
+
+      // Scanlines
+      float sl = sin(vUv.y * 900.0 + uTime * 0.4) * 0.5 + 0.5;
+      sl = pow(sl, 2.0) * uScanline;
+      texel.rgb *= 1.0 - sl;
+
+      // Flicker
+      float flick = 1.0 + sin(uTime * 24.0 + vUv.x * 40.0) * uFlicker;
+      texel.rgb *= flick;
+
+      gl_FragColor = texel;
+    }
+  `,
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. COLOR GRADING — ACES-inspired tone curve + crimson lift
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ColorGradeShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uContrast: { value: 1.08 },
+    uSaturation: { value: 1.12 },
+    uCrimsonLift: { value: 0.0 },
+    uBrightness: { value: 1.0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uContrast;
+    uniform float uSaturation;
+    uniform float uCrimsonLift;
+    uniform float uBrightness;
+    varying vec2 vUv;
+
+    vec3 applyContrast(vec3 c, float cst) {
+      return (c - 0.5) * cst + 0.5;
+    }
+
+    vec3 applySaturation(vec3 c, float sat) {
+      float lum = dot(c, vec3(0.299, 0.587, 0.114));
+      return mix(vec3(lum), c, sat);
+    }
+
+    void main() {
+      vec4 texel = texture2D(tDiffuse, vUv);
+      vec3 col = texel.rgb;
+
+      col = applyContrast(col, uContrast);
+      col = applySaturation(col, uSaturation);
+      col *= uBrightness;
+
+      // Crimson lift in shadows when hologram is active
+      vec3 lift = vec3(0.04, 0.001, 0.005) * uCrimsonLift;
+      col += lift * (1.0 - max(max(col.r, col.g), col.b));
+
+      // S-curve for cinematic punch
+      col = col * (col * (col * 0.14 + 0.68) + 0.18);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), texel.a);
+    }
+  `,
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. LENS DISTORTION / BARREL — Subtle warping for anamorphic feel
+   ═══════════════════════════════════════════════════════════════════════════ */
+const LensDistortShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uStrength: { value: 0.0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uStrength;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 uv = vUv - 0.5;
+      float dist = length(uv);
+      float factor = 1.0 + uStrength * dist * dist;
+      vec2 distorted = uv * factor + 0.5;
+
+      if (distorted.x < 0.0 || distorted.x > 1.0 || distorted.y < 0.0 || distorted.y > 1.0) {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+      } else {
+        gl_FragColor = texture2D(tDiffuse, distorted);
+      }
+    }
+  `,
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BLOOM PRESETS
+   ═══════════════════════════════════════════════════════════════════════════ */
+const BLOOM_DEFAULT = { strength: 0.32, radius: 0.35, threshold: 0.40 };
+const BLOOM_HOLOGRAM = { strength: 0.55, radius: 0.45, threshold: 0.35 };
+const BLOOM_WORMHOLE = { strength: 0.72, radius: 0.55, threshold: 0.28 };
+const BLOOM_DISSIPATE = { strength: 0.68, radius: 0.50, threshold: 0.30 };
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN POST-PROCESSING COMPONENT
+   ═══════════════════════════════════════════════════════════════════════════ */
+export default function PostProcessing({
+  hologramActive,
+  scrollProgress = 0,
+  powerUpStage,
+}: PostProcessingProps) {
   const { gl, scene, camera, size } = useThree();
-  const bloomPassRef = useRef<UnrealBloomPass | null>(null);
 
-  const bloomStrength = useRef(DEFAULT_STRENGTH);
-  const bloomRadius = useRef(DEFAULT_RADIUS);
-  const bloomThreshold = useRef(DEFAULT_THRESHOLD);
+  const bloomRef = useRef<UnrealBloomPass | null>(null);
+  const chromaticRef = useRef<ShaderPass | null>(null);
+  const vignetteRef = useRef<ShaderPass | null>(null);
+  const filmRef = useRef<ShaderPass | null>(null);
+  const colorGradeRef = useRef<ShaderPass | null>(null);
+  const lensRef = useRef<ShaderPass | null>(null);
+
+  // Smooth animated values (refs — zero React re-renders)
+  const smoothBloom = useRef({ s: BLOOM_DEFAULT.strength, r: BLOOM_DEFAULT.radius, t: BLOOM_DEFAULT.threshold });
+  const smoothChromatic = useRef(0.0);
+  const smoothVignette = useRef(0.08);
+  const smoothCrimsonTint = useRef(0.0);
+  const smoothFilm = useRef({ grain: 0.028, scanline: 0.035, flicker: 0.012 });
+  const smoothColor = useRef({ contrast: 1.08, saturation: 1.12, lift: 0.0, brightness: 1.0 });
+  const smoothLens = useRef(0.0);
 
   const composer = useMemo(() => {
-    const instance = new EffectComposer(gl);
-    const renderPass = new RenderPass(scene, camera);
+    const comp = new EffectComposer(gl);
 
-    const bloomPass = new UnrealBloomPass(
+    // 1. Render
+    comp.addPass(new RenderPass(scene, camera));
+
+    // 2. Bloom (Unreal)
+    const bloom = new UnrealBloomPass(
       new THREE.Vector2(size.width, size.height),
-      DEFAULT_STRENGTH,
-      DEFAULT_RADIUS,
-      DEFAULT_THRESHOLD
+      BLOOM_DEFAULT.strength,
+      BLOOM_DEFAULT.radius,
+      BLOOM_DEFAULT.threshold
     );
-    bloomPassRef.current = bloomPass;
+    bloomRef.current = bloom;
+    comp.addPass(bloom);
 
-    const outputPass = new OutputPass();
+    // 3. Chromatic Aberration
+    const chromatic = new ShaderPass(ChromaticShader);
+    chromaticRef.current = chromatic;
+    comp.addPass(chromatic);
 
-    instance.addPass(renderPass);
-    instance.addPass(bloomPass);
-    instance.addPass(outputPass);
+    // 4. Lens Distortion
+    const lens = new ShaderPass(LensDistortShader);
+    lensRef.current = lens;
+    comp.addPass(lens);
 
-    return instance;
+    // 5. Vignette
+    const vignette = new ShaderPass(VignetteShader);
+    vignetteRef.current = vignette;
+    comp.addPass(vignette);
+
+    // 6. Film Grain + Scanlines
+    const film = new ShaderPass(FilmShader);
+    filmRef.current = film;
+    comp.addPass(film);
+
+    // 7. Color Grading
+    const colorGrade = new ShaderPass(ColorGradeShader);
+    colorGradeRef.current = colorGrade;
+    comp.addPass(colorGrade);
+
+    // 8. Output (ACES tone mapping handled by R3F, this is gamma + color space)
+    comp.addPass(new OutputPass());
+
+    return comp;
   }, [gl, scene, camera]);
 
   useEffect(() => {
     composer.setSize(size.width, size.height);
-    return () => {
-      composer.dispose();
-    };
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    composer.setPixelRatio(dpr);
+    return () => { composer.dispose(); };
   }, [composer, size.width, size.height]);
 
-  useFrame(() => {
-    if (bloomPassRef.current) {
-      const targetStrength = hologramActive ? HOLOGRAM_STRENGTH : DEFAULT_STRENGTH;
-      const targetRadius = hologramActive ? HOLOGRAM_RADIUS : DEFAULT_RADIUS;
-      const targetThreshold = hologramActive ? HOLOGRAM_THRESHOLD : DEFAULT_THRESHOLD;
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    const p = Math.max(0, Math.min(1, scrollProgress));
+    const isWormhole = powerUpStage === "wormhole" || powerUpStage === "rift" || powerUpStage === "emergence";
+    const isDissipate = p > 0.90;
 
-      bloomStrength.current = THREE.MathUtils.lerp(
-        bloomStrength.current,
-        targetStrength,
-        LERP_FACTOR
-      );
-      bloomRadius.current = THREE.MathUtils.lerp(
-        bloomRadius.current,
-        targetRadius,
-        LERP_FACTOR
-      );
-      bloomThreshold.current = THREE.MathUtils.lerp(
-        bloomThreshold.current,
-        targetThreshold,
-        LERP_FACTOR
-      );
+    /* ── Determine target bloom ── */
+    let targetBloom = BLOOM_DEFAULT;
+    if (isWormhole) targetBloom = BLOOM_WORMHOLE;
+    else if (isDissipate) targetBloom = BLOOM_DISSIPATE;
+    else if (hologramActive) targetBloom = BLOOM_HOLOGRAM;
 
-      bloomPassRef.current.strength = bloomStrength.current;
-      bloomPassRef.current.radius = bloomRadius.current;
-      bloomPassRef.current.threshold = bloomThreshold.current;
+    /* ── Smooth lerp all values ── */
+    const dt = Math.min(state.clock.getDelta(), 0.05);
+    const lambda = 6.0;
+    const lerp = (c: number, tgt: number) => c + (tgt - c) * (1.0 - Math.exp(-lambda * dt));
+
+    smoothBloom.current.s = lerp(smoothBloom.current.s, targetBloom.strength);
+    smoothBloom.current.r = lerp(smoothBloom.current.r, targetBloom.radius);
+    smoothBloom.current.t = lerp(smoothBloom.current.t, targetBloom.threshold);
+
+    if (bloomRef.current) {
+      bloomRef.current.strength = smoothBloom.current.s;
+      bloomRef.current.radius = smoothBloom.current.r;
+      bloomRef.current.threshold = smoothBloom.current.t;
     }
 
+    /* ── Chromatic aberration ── */
+    let targetChromatic = 0.0;
+    if (hologramActive && p > 0.85) targetChromatic = 3.5 + (p - 0.85) * 40.0; // Dissipation burst
+    else if (isWormhole) targetChromatic = 2.2;
+    else if (hologramActive) targetChromatic = 0.6;
+
+    smoothChromatic.current = lerp(smoothChromatic.current, targetChromatic);
+    if (chromaticRef.current) {
+      chromaticRef.current.uniforms.uIntensity.value = smoothChromatic.current;
+      chromaticRef.current.uniforms.uTime.value = t;
+      chromaticRef.current.uniforms.uScroll.value = p;
+    }
+
+    /* ── Vignette ── */
+    let targetVignette = 0.08;
+    let targetCrimsonTint = 0.0;
+    if (hologramActive) { targetVignette = 0.18; targetCrimsonTint = 0.35; }
+    if (isWormhole) { targetVignette = 0.22; targetCrimsonTint = 0.55; }
+    if (p > 0.85) { targetVignette = 0.28; targetCrimsonTint = 0.65; }
+
+    smoothVignette.current = lerp(smoothVignette.current, targetVignette);
+    smoothCrimsonTint.current = lerp(smoothCrimsonTint.current, targetCrimsonTint);
+    if (vignetteRef.current) {
+      vignetteRef.current.uniforms.uIntensity.value = smoothVignette.current;
+      vignetteRef.current.uniforms.uCrimsonTint.value = smoothCrimsonTint.current;
+    }
+
+    /* ── Film grain / scanlines ── */
+    let targetGrain = 0.028;
+    let targetScanline = 0.035;
+    let targetFlicker = 0.012;
+    if (hologramActive) { targetGrain = 0.038; targetScanline = 0.045; targetFlicker = 0.018; }
+    if (isWormhole) { targetGrain = 0.055; targetScanline = 0.065; targetFlicker = 0.035; }
+
+    smoothFilm.current.grain = lerp(smoothFilm.current.grain, targetGrain);
+    smoothFilm.current.scanline = lerp(smoothFilm.current.scanline, targetScanline);
+    smoothFilm.current.flicker = lerp(smoothFilm.current.flicker, targetFlicker);
+    if (filmRef.current) {
+      filmRef.current.uniforms.uGrain.value = smoothFilm.current.grain;
+      filmRef.current.uniforms.uScanline.value = smoothFilm.current.scanline;
+      filmRef.current.uniforms.uFlicker.value = smoothFilm.current.flicker;
+      filmRef.current.uniforms.uTime.value = t;
+    }
+
+    /* ── Color grading ── */
+    let targetContrast = 1.08;
+    let targetSat = 1.12;
+    let targetLift = 0.0;
+    let targetBrightness = 1.0;
+    if (hologramActive) { targetContrast = 1.14; targetSat = 1.22; targetLift = 0.12; targetBrightness = 1.05; }
+    if (isWormhole) { targetContrast = 1.22; targetSat = 1.35; targetLift = 0.22; targetBrightness = 1.12; }
+    if (p > 0.85) { targetBrightness = 0.88; targetSat = 0.95; }
+
+    smoothColor.current.contrast = lerp(smoothColor.current.contrast, targetContrast);
+    smoothColor.current.saturation = lerp(smoothColor.current.saturation, targetSat);
+    smoothColor.current.lift = lerp(smoothColor.current.lift, targetLift);
+    smoothColor.current.brightness = lerp(smoothColor.current.brightness, targetBrightness);
+    if (colorGradeRef.current) {
+      colorGradeRef.current.uniforms.uContrast.value = smoothColor.current.contrast;
+      colorGradeRef.current.uniforms.uSaturation.value = smoothColor.current.saturation;
+      colorGradeRef.current.uniforms.uCrimsonLift.value = smoothColor.current.lift;
+      colorGradeRef.current.uniforms.uBrightness.value = smoothColor.current.brightness;
+    }
+
+    /* ── Lens distortion ── */
+    let targetLens = 0.0;
+    if (isWormhole) targetLens = 0.035;
+    else if (hologramActive && p > 0.5) targetLens = 0.012;
+    smoothLens.current = lerp(smoothLens.current, targetLens);
+    if (lensRef.current) {
+      lensRef.current.uniforms.uStrength.value = smoothLens.current;
+    }
+
+    /* ── Render ── */
     composer.render();
   }, 1);
 
@@ -8635,18 +10287,93 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════════
    TYPES
-   ═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════════════ */
 interface DashboardHeroProps {
   scrollProgress: number;
   stageScale?: number;
   spatial?: boolean;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   EASING UTILITIES
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+const C = {
+  crimson: "#ff1744",
+  crimsonBright: "#ff3355",
+  crimsonDark: "#800010",
+  cyan: "#00f0ff",
+  white: "#ffffff",
+  void: "#0a0002",
+  emerald: "#34d399",
+  amber: "#fbbf24",
+} as const;
+
+const BADGES = [
+  {
+    icon: Activity,
+    title: "HEALTHGPT",
+    subtitle: "ML Healthcare Diagnostics",
+    delay: 0.0,
+    dir: -1,
+    color: C.crimson,
+    glow: "rgba(255, 23, 68, 0.35)",
+  },
+  {
+    icon: Terminal,
+    title: "CAMPUS PORTAL",
+    subtitle: "React 18 + Flask Ecosystem",
+    delay: 0.08,
+    dir: 1,
+    color: C.crimsonBright,
+    glow: "rgba(255, 51, 85, 0.35)",
+  },
+  {
+    icon: Code2,
+    title: "DSA MASTERY",
+    subtitle: "110+ Solved • LeetCode / GFG",
+    delay: 0.16,
+    dir: -1,
+    color: C.amber,
+    glow: "rgba(251, 191, 36, 0.25)",
+  },
+  {
+    icon: Shield,
+    title: "CYBERSECURITY",
+    subtitle: "TryHackMe Voyager Rank",
+    delay: 0.24,
+    dir: 1,
+    color: C.emerald,
+    glow: "rgba(52, 211, 153, 0.25)",
+  },
+] as const;
+
+const SOCIALS = [
+  {
+    icon: Globe,
+    href: "https://github.com/POSHANMS",
+    label: "GitHub",
+    color: C.crimson,
+  },
+  {
+    icon: Briefcase,
+    href: "https://linkedin.com/in/poshanms/",
+    label: "LinkedIn",
+    color: C.crimsonBright,
+  },
+  {
+    icon: FileText,
+    href: "mailto:siddeshwaraprasanna5@gmail.com",
+    label: "Email",
+    color: C.white,
+  },
+] as const;
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MATH UTILITIES
+   ═══════════════════════════════════════════════════════════════════════════════ */
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
 const easeOutBack = (t: number) => {
   const c1 = 1.70158;
@@ -8656,64 +10383,622 @@ const easeOutBack = (t: number) => {
 const easeInOutQuart = (t: number) =>
   t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
 
-/* ═══════════════════════════════════════════════════════════════════════
-   CONTENT DATA — Master Prompt Layout
-   ═══════════════════════════════════════════════════════════════════════ */
-const BADGES = [
-  { icon: Activity, title: "HEALTHGPT", subtitle: "ML Healthcare System", delay: 0.0, dir: -1 },
-  { icon: Terminal, title: "CAMPUS PORTAL", subtitle: "React 18 + Flask", delay: 0.07, dir: 1 },
-  { icon: Code2, title: "DSA", subtitle: "110+ Solved • LeetCode / GFG", delay: 0.14, dir: -1 },
-  { icon: Shield, title: "CYBERSECURITY", subtitle: "TryHackMe Voyager", delay: 0.21, dir: 1 },
-] as const;
+/* ═══════════════════════════════════════════════════════════════════════════════
+   CINEMATIC KEYFRAMES — Injected via <style> for self-containment
+   ═══════════════════════════════════════════════════════════════════════════════ */
+const CinematicStyles = React.memo(function CinematicStyles() {
+  return (
+    <style
+      dangerouslySetInnerHTML={{
+        __html: `
+      @keyframes corner-draw {
+        0% { stroke-dashoffset: 80; opacity: 0; filter: drop-shadow(0 0 0px rgba(255,23,68,0)); }
+        60% { opacity: 1; }
+        100% { stroke-dashoffset: 0; opacity: 1; filter: drop-shadow(0 0 8px rgba(255,23,68,0.9)); }
+      }
+      @keyframes scanline-drift {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(4px); }
+      }
+      @keyframes grain-shift {
+        0%,100%{transform:translate(0,0)} 10%{transform:translate(-2%,-1%)} 20%{transform:translate(1%,2%)}
+        30%{transform:translate(-1%,1%)} 40%{transform:translate(2%,-1%)} 50%{transform:translate(-2%,0%)}
+        60%{transform:translate(1%,0%)} 70%{transform:translate(0%,2%)} 80%{transform:translate(0%,-1%)}
+        90%{transform:translate(2%,1%)}
+      }
+      @keyframes border-breathe {
+        0%,100%{ box-shadow: inset 0 1px 1px rgba(255,255,255,0.12), inset 0 0 40px rgba(255,23,68,0.06), 0 0 55px rgba(255,23,68,0.16), 0 0 110px rgba(255,23,68,0.06), 0 40px 100px rgba(0,0,0,0.85); }
+        50%{ box-shadow: inset 0 1px 1px rgba(255,255,255,0.16), inset 0 0 55px rgba(255,23,68,0.10), 0 0 80px rgba(255,23,68,0.24), 0 0 130px rgba(255,23,68,0.10), 0 40px 100px rgba(0,0,0,0.85); }
+      }
+      @keyframes hologram-flicker {
+        0%,100%{opacity:0.98} 5%{opacity:0.95} 10%{opacity:0.99} 15%{opacity:0.94} 20%{opacity:1}
+        50%{opacity:0.96} 52%{opacity:1} 55%{opacity:0.95} 80%{opacity:0.98} 85%{opacity:0.94} 90%{opacity:0.97}
+      }
+      @keyframes float-orb-1 {
+        0%,100%{transform:translateY(0px) rotate(0deg)} 50%{transform:translateY(-12px) rotate(1deg)}
+      }
+      @keyframes float-orb-2 {
+        0%,100%{transform:translateY(0px) rotate(12deg)} 50%{transform:translateY(-16px) rotate(14deg)}
+      }
+      @keyframes status-blink {
+        0%,100%{opacity:1} 50%{opacity:0.25}
+      }
+      @keyframes data-stream {
+        0%{background-position:0% 0%} 100%{background-position:0% 100%}
+      }
+      @keyframes waveform-pulse {
+        from { transform: scaleY(0.3); opacity: 0.4; }
+        to { transform: scaleY(1); opacity: 1; }
+      }
+      @keyframes dust-float {
+        0% { transform: translate(0, 0); opacity: 0.25; }
+        100% { transform: translate(6px, -10px); opacity: 0.6; }
+      }
+      @keyframes rotate-slow {
+        from { transform: rotate(0deg); } to { transform: rotate(360deg); }
+      }
+      @keyframes rotate-slow-reverse {
+        from { transform: rotate(360deg); } to { transform: rotate(0deg); }
+      }
+      .dashboard-glass {
+        animation: border-breathe 4s ease-in-out infinite, hologram-flicker 5s infinite;
+      }
+      .corner-bracket-anim {
+        animation: corner-draw 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation-delay: var(--delay, 0s);
+      }
+      .orb-float-1 { animation: float-orb-1 5.5s ease-in-out infinite; }
+      .orb-float-2 { animation: float-orb-2 6.5s ease-in-out infinite; }
+      .status-dot { animation: status-blink 2s ease-in-out infinite; }
+      .scanline-layer {
+        background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,23,68,0.025) 2px, rgba(255,23,68,0.025) 4px);
+        animation: scanline-drift 0.5s linear infinite;
+      }
+      .grain-layer {
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+        background-size: 200px 200px;
+        animation: grain-shift 0.5s steps(1) infinite;
+      }
+    `,
+      }}
+    />
+  );
+});
 
-const SOCIALS = [
-  { icon: Globe, href: "https://github.com/POSHANMS", label: "GitHub" },
-  { icon: Briefcase, href: "https://linkedin.com/in/poshanms/", label: "LinkedIn" },
-  { icon: FileText, href: "mailto:siddeshwaraprasanna5@gmail.com", label: "CV" },
-] as const;
 
-/* ═══════════════════════════════════════════════════════════════════════
-   MAIN COMPONENT — DashboardHero
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════════
+   VISUAL SUB-COMPONENTS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/** Animated SVG corner bracket with stroke-draw effect */
+function CornerBracket({
+  position,
+  delay = 0,
+  size = 32,
+  strokeWidth = 1.5,
+}: {
+  position: "tl" | "tr" | "bl" | "br";
+  delay?: number;
+  size?: number;
+  strokeWidth?: number;
+}) {
+  const paths = {
+    tl: `M${size} 2H2V${size}`,
+    tr: `M0 2H${size - 2}V${size}`,
+    bl: `M${size} ${size - 2}H2V0`,
+    br: `M0 ${size - 2}H${size - 2}V0`,
+  };
+
+  const posStyle: React.CSSProperties = {
+    position: "absolute",
+    top: position === "tl" || position === "tr" ? 20 : undefined,
+    bottom: position === "bl" || position === "br" ? 20 : undefined,
+    left: position === "tl" || position === "bl" ? 20 : undefined,
+    right: position === "tr" || position === "br" ? 20 : undefined,
+    width: size,
+    height: size,
+    zIndex: 20,
+    pointerEvents: "none",
+  };
+
+  return (
+    <div style={posStyle}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        fill="none"
+        style={{ overflow: "visible" }}
+      >
+        <path
+          d={paths[position]}
+          stroke={C.crimson}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="corner-bracket-anim"
+          style={{
+            strokeDasharray: 80,
+            strokeDashoffset: 80,
+            filter: `drop-shadow(0 0 6px ${C.crimson})`,
+            ["--delay" as string]: `${delay}s`,
+          }}
+        />
+      </svg>
+    </div>
+  );
+}
+
+/** Status indicator with dual-ring ping animation */
+function StatusPulse({
+  color = C.emerald,
+  delay = 0,
+  size = 2.5,
+}: {
+  color?: string;
+  delay?: number;
+  size?: number;
+}) {
+  const s = size;
+  return (
+    <span className="relative inline-flex" style={{ width: s * 4, height: s * 4 }}>
+      <span
+        className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
+        style={{ backgroundColor: color, animationDelay: `${delay}s` }}
+      />
+      <span
+        className="relative inline-flex rounded-full status-dot"
+        style={{
+          width: s * 4,
+          height: s * 4,
+          backgroundColor: color,
+          boxShadow: `0 0 ${s * 6}px ${color}`,
+          animationDelay: `${delay}s`,
+        }}
+      />
+    </span>
+  );
+}
+
+/** High-fidelity scanline overlay */
+function ScanlineOverlay({ opacity = 0.35 }: { opacity?: number }) {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none scanline-layer mix-blend-overlay"
+      style={{ opacity, zIndex: 10 }}
+    />
+  );
+}
+
+/** Film grain noise overlay */
+function GrainOverlay({ opacity = 0.035 }: { opacity?: number }) {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none grain-layer mix-blend-overlay"
+      style={{ opacity, zIndex: 11 }}
+    />
+  );
+}
+
+/** Cinematic vignette — darkens edges for focus */
+function VignetteOverlay({ opacity = 0.15 }: { opacity?: number }) {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        background: `radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,${opacity}) 100%)`,
+        mixBlendMode: "multiply",
+        zIndex: 15,
+      }}
+    />
+  );
+}
+
+/** Specular edge highlight — gives glass physical presence */
+function SpecularHighlight({ radius = 28 }: { radius?: number }) {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        borderRadius: radius,
+        background: `linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 25%, transparent 75%, rgba(255,23,68,0.25) 100%)`,
+        maskImage: `linear-gradient(to bottom, black 0%, transparent 5%, transparent 95%, black 100%), linear-gradient(to right, black 0%, transparent 5%, transparent 95%, black 100%)`,
+        WebkitMaskImage: `linear-gradient(to bottom, black 0%, transparent 5%, transparent 95%, black 100%), linear-gradient(to right, black 0%, transparent 5%, transparent 95%, black 100%)`,
+        mixBlendMode: "overlay",
+        opacity: 0.8,
+        zIndex: 12,
+      }}
+    />
+  );
+}
+
+/** Inner holographic grid — subtle structural lines */
+function Hologrid({ opacity = 0.035, size = 40 }: { opacity?: number; size?: number }) {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        backgroundImage: `linear-gradient(rgba(255,23,68,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,23,68,0.3) 1px, transparent 1px)`,
+        backgroundSize: `${size}px ${size}px`,
+        opacity,
+        zIndex: 8,
+      }}
+    />
+  );
+}
+
+/** Animated top glow line — scans across top edge */
+function TopGlowLine({ t }: { t: number }) {
+  return (
+    <div
+      className="absolute inset-x-0 top-0 h-px pointer-events-none"
+      style={{
+        background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.7), rgba(255,34,68,0.85), transparent)`,
+        opacity: 0.75 + Math.sin(t * 3.2) * 0.15,
+        zIndex: 16,
+      }}
+    />
+  );
+}
+
+/** Data stream decoration — vertical flowing lines */
+function DataStream({
+  position,
+  active,
+}: {
+  position: { left?: string; right?: string; top?: string };
+  active: number;
+}) {
+  return (
+    <div
+      className="absolute pointer-events-none hidden lg:block"
+      style={{
+        ...position,
+        width: 2,
+        height: 120,
+        opacity: active * 0.22,
+        background: `linear-gradient(to bottom, transparent, ${C.crimson}, transparent)`,
+        backgroundSize: "100% 200%",
+        animation: "data-stream 2s linear infinite",
+        filter: "blur(1px)",
+        zIndex: 5,
+      }}
+    />
+  );
+}
+
+/** Rotating decorative ring around panel */
+function DecoRing({
+  size,
+  duration,
+  reverse = false,
+  opacity = 0.08,
+}: {
+  size: number;
+  duration: number;
+  reverse?: boolean;
+  opacity?: number;
+}) {
+  return (
+    <div
+      className="absolute pointer-events-none"
+      style={{
+        inset: -size / 2,
+        border: `1px solid ${C.crimson}`,
+        borderRadius: "50%",
+        opacity,
+        animation: `${reverse ? "rotate-slow-reverse" : "rotate-slow"} ${duration}s linear infinite`,
+        zIndex: 3,
+      }}
+    />
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   CINEMATIC HOOKS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/** Real-time synchronized animation clock */
+function useCinematicTime() {
+  const timeRef = useRef(0);
+  const rafRef = useRef(0);
+  useEffect(() => {
+    let last = performance.now();
+    const tick = (now: number) => {
+      timeRef.current += Math.min((now - last) / 1000, 0.05);
+      last = now;
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+  return timeRef;
+}
+
+/** Smooth mouse parallax with exponential decay */
+function useMouseParallax(smoothing = 0.08) {
+  const [mouse, setMouse] = useState({ x: 0, y: 0 });
+  const smooth = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      setMouse({
+        x: (e.clientX / window.innerWidth - 0.5) * 2,
+        y: (e.clientY / window.innerHeight - 0.5) * 2,
+      });
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
+  smooth.current.x += (mouse.x - smooth.current.x) * smoothing;
+  smooth.current.y += (mouse.y - smooth.current.y) * smoothing;
+  return smooth.current;
+}
+
+/** Live clock for status bar */
+function useLiveClock() {
+  const [time, setTime] = useState("");
+  useEffect(() => {
+    const update = () => {
+      const n = new Date();
+      setTime(
+        n.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }) +
+        " UTC"
+      );
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return time;
+}
+
+/** Typewriter effect for cinematic subtitle reveal */
+function useTypewriter(text: string, speed = 45, delay = 600) {
+  const [display, setDisplay] = useState("");
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    let i = 0;
+    let timer: ReturnType<typeof setInterval>;
+    const start = setTimeout(() => {
+      timer = setInterval(() => {
+        i++;
+        setDisplay(text.slice(0, i));
+        if (i >= text.length) {
+          clearInterval(timer);
+          setDone(true);
+        }
+      }, speed);
+    }, delay);
+    return () => {
+      clearTimeout(start);
+      clearInterval(timer);
+    };
+  }, [text, speed, delay]);
+  return { display, done };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   CONTENT SUB-COMPONENTS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/** Animated sound-wave bars for status bar */
+function SoundWave({ active = true, count = 5 }: { active?: boolean; count?: number }) {
+  return (
+    <span className="inline-flex items-end gap-[2px] h-3">
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className="inline-block w-[2px] rounded-full bg-emerald-400/80"
+          style={{
+            height: active ? undefined : 3,
+            animation: active ? `waveform-pulse 1.1s ease-in-out ${i * 0.12}s infinite alternate` : undefined,
+            boxShadow: active ? "0 0 4px rgba(52,211,153,0.6)" : undefined,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** Glass project badge with chromatic hover */
+function BadgeCard({
+  badge,
+  reveal,
+}: {
+  badge: (typeof BADGES)[number];
+  reveal: number;
+}) {
+  const b = clamp(reveal - badge.delay, 0, 1);
+  const dir = badge.dir;
+  return (
+    <div
+      style={{
+        opacity: b,
+        transform: `translateX(${(1 - b) * dir * 50}px) translateY(${(1 - b) * 12}px)`,
+        transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
+      }}
+    >
+      <div
+        className="group relative flex items-center gap-3.5 rounded-xl border px-5 py-4 font-mono text-[11px] font-medium transition-all duration-300 hover:-translate-y-1 cursor-default overflow-hidden"
+        style={{
+          borderColor: `rgba(255, 23, 68, 0.28)`,
+          background: `linear-gradient(135deg, rgba(255,23,68,0.06), rgba(255,23,68,0.02))`,
+          boxShadow: `0 0 18px rgba(255,23,68,0.06), inset 0 1px 0 rgba(255,255,255,0.06)`,
+        }}
+        onMouseEnter={(e) => {
+          const el = e.currentTarget;
+          el.style.borderColor = "rgba(255, 23, 68, 0.7)";
+          el.style.boxShadow = `0 0 32px ${badge.glow}, inset 0 1px 0 rgba(255,255,255,0.12)`;
+          el.style.background = `linear-gradient(135deg, ${badge.glow.replace("0.35", "0.14")}, rgba(255,23,68,0.04))`;
+        }}
+        onMouseLeave={(e) => {
+          const el = e.currentTarget;
+          el.style.borderColor = "rgba(255, 23, 68, 0.28)";
+          el.style.boxShadow = `0 0 18px rgba(255,23,68,0.06), inset 0 1px 0 rgba(255,255,255,0.06)`;
+          el.style.background = `linear-gradient(135deg, rgba(255,23,68,0.06), rgba(255,23,68,0.02))`;
+        }}
+      >
+        {/* Hover chromatic aberration overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          style={{
+            background: `linear-gradient(90deg, transparent 30%, ${badge.glow.replace("0.35", "0.08")} 50%, transparent 70%)`,
+            mixBlendMode: "screen",
+          }}
+        />
+        <badge.icon className="relative z-10 h-4 w-4 shrink-0 transition-transform duration-300 group-hover:scale-110" style={{ color: badge.color }} />
+        <div className="relative z-10 flex flex-col gap-0.5">
+          <span className="font-bold tracking-wider" style={{ color: badge.color }}>
+            [ {badge.title} ]
+          </span>
+          <span className="text-white/65">{badge.subtitle}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Social icon orb */
+function SocialOrb({
+  social,
+  reveal,
+  index,
+}: {
+  social: (typeof SOCIALS)[number];
+  reveal: number;
+  index: number;
+}) {
+  const s = clamp(reveal - 0.25 - index * 0.06, 0, 1);
+  return (
+    <a
+      href={social.href}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={social.label}
+      className="group relative flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-300 hover:scale-110 hover:-translate-y-1"
+      style={{
+        opacity: s,
+        transform: `translateY(${(1 - s) * 18}px)`,
+        borderColor: "rgba(255, 23, 68, 0.35)",
+        background: "rgba(0,0,0,0.35)",
+        boxShadow: "0 0 12px rgba(255,23,68,0.08)",
+        backdropFilter: "blur(8px)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = social.color;
+        e.currentTarget.style.color = social.color;
+        e.currentTarget.style.boxShadow = `0 0 24px ${social.color}66`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "rgba(255, 23, 68, 0.35)";
+        e.currentTarget.style.color = "rgba(255,255,255,0.65)";
+        e.currentTarget.style.boxShadow = "0 0 12px rgba(255,23,68,0.08)";
+      }}
+    >
+      <social.icon className="h-4 w-4 text-white/65 transition-colors duration-300 group-hover:text-current" />
+    </a>
+  );
+}
+
+/** Floating stat orb */
+function StatOrb({
+  value,
+  label,
+  position,
+  floatClass,
+  reveal,
+}: {
+  value: string;
+  label: string;
+  position: React.CSSProperties;
+  floatClass: string;
+  reveal: number;
+}) {
+  const timeRef = useCinematicTime();
+  const t = timeRef.current;
+  const op = reveal * 0.85;
+  return (
+    <div
+      className={`absolute hidden xl:flex flex-col items-center justify-center pointer-events-none ${floatClass}`}
+      style={{
+        ...position,
+        opacity: op,
+        width: 110,
+        height: 110,
+        borderRadius: "50%",
+        border: "1px solid rgba(255, 23, 68, 0.22)",
+        background: "linear-gradient(145deg, rgba(255,23,68,0.07), rgba(255,23,68,0.02))",
+        backdropFilter: "blur(14px)",
+        boxShadow: `0 0 35px rgba(255,23,68,0.1), inset 0 0 20px rgba(255,23,68,0.04)`,
+      }}
+    >
+      <div className="text-3xl font-black text-white/90" style={{ textShadow: "0 0 16px rgba(255,23,68,0.5)" }}>
+        {value}
+      </div>
+      <div className="text-[9px] font-mono text-white/50 tracking-[0.2em] mt-1">{label}</div>
+      {/* Orbiting ring */}
+      <div
+        className="absolute inset-0 rounded-full pointer-events-none"
+        style={{
+          border: "1px solid rgba(255, 23, 68, 0.15)",
+          transform: `rotate(${t * 12}deg) scale(1.15)`,
+        }}
+      />
+    </div>
+  );
+}
+
+/** CSS Particle dust overlay */
+function ParticleDust({ opacity = 0.4 }: { opacity?: number }) {
+  const dust = useMemo(() => {
+    return Array.from({ length: 30 }, (_, i) => ({
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      size: 1 + Math.random() * 2,
+      delay: Math.random() * 5,
+      duration: 3 + Math.random() * 4,
+    }));
+  }, []);
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {dust.map((d, i) => (
+        <div
+          key={i}
+          className="absolute rounded-full"
+          style={{
+            left: d.left,
+            top: d.top,
+            width: d.size,
+            height: d.size,
+            background: "rgba(255, 200, 200, 0.35)",
+            boxShadow: `0 0 ${d.size * 3}px rgba(255,23,68,0.25)`,
+            animation: `dust-float ${d.duration}s ease-in-out ${d.delay}s infinite alternate`,
+            opacity: opacity,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MAIN DASHBOARD HERO COMPONENT
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
 export default function DashboardHero({
   scrollProgress,
   stageScale = 1,
   spatial = false,
 }: DashboardHeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const timeRef = useRef(0);
-  const rafRef = useRef(0);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const smoothMouse = useRef({ x: 0, y: 0 });
+  const timeRef = useCinematicTime();
+  const mouse = useMouseParallax(0.08);
+  const clock = useLiveClock();
+  const t = timeRef.current;
 
-  /* ── Mouse tracking for parallax ── */
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const x = (e.clientX / window.innerWidth - 0.5) * 2;
-      const y = (e.clientY / window.innerHeight - 0.5) * 2;
-      setMousePos({ x, y });
-    };
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
-
-  /* ── Time loop for floating animations ── */
-  useEffect(() => {
-    const tick = () => {
-      timeRef.current += 0.016;
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
-
-  /* ── Smooth mouse interpolation ── */
-  smoothMouse.current.x += (mousePos.x - smoothMouse.current.x) * 0.08;
-  smoothMouse.current.y += (mousePos.y - smoothMouse.current.y) * 0.08;
-  const mx = smoothMouse.current.x;
-  const my = smoothMouse.current.y;
-
-  /* ── Scroll phase calculations (direct, no unneeded useMemo) ── */
+  /* ── Scroll phase math ── */
   const p = scrollProgress;
   const phases = {
     emergence: Math.min(1, p / 0.18),
@@ -8723,45 +11008,55 @@ export default function DashboardHero({
     dissipation: Math.min(1, Math.max(0, (p - 0.78) / 0.22)),
   };
 
-  const t = timeRef.current;
   const emerge = easeOutExpo(phases.emergence);
+  const mat = spatial ? 1 : phases.materialize;
+  const stable = phases.stabilize;
   const ascend = easeInOutQuart(phases.ascension);
   const dissipate = phases.dissipation;
 
-  /* ── Panel 3D projection transforms (non-spatial only) ── */
+  /* ── Non-spatial 3D panel transforms ── */
   const panelRotateX = 58 * (1 - emerge) - 18 * ascend;
-  const panelRotateY = mx * 6 * phases.stabilize;
-  const panelScale =
-    (0.32 + 0.68 * easeOutBack(Math.min(1, emerge * 1.15))) * stageScale;
+  const panelRotateY = mouse.x * 6 * stable;
+  const panelScale = (0.32 + 0.68 * easeOutBack(Math.min(1, emerge * 1.15))) * stageScale;
   const panelY = 220 * (1 - emerge) - 140 * ascend;
   const panelZ = -500 * (1 - emerge) + 180 * ascend;
-  const panelOpacity =
-    Math.min(1, emerge * 2.5) * (1 - Math.pow(dissipate, 1.8));
+  const panelOpacity = Math.min(1, emerge * 2.5) * (1 - Math.pow(dissipate, 1.8));
 
-  /* ── Volumetric light beam (non-spatial only) ── */
+  /* ── Non-spatial beam ── */
   const beamOpacity = emerge * 0.75 * (1 - dissipate * 0.95);
   const beamScale = 0.25 + 0.75 * emerge;
-  const beamPulse = 1 + Math.sin(t * 3) * 0.08 * phases.stabilize;
+  const beamPulse = 1 + Math.sin(t * 3) * 0.08 * stable;
 
-  /* ── Content stagger animation ── */
-  const mat = spatial ? 1 : phases.materialize;
+  /* ── Content stagger ── */
   const contentOpacity = Math.min(1, mat * 2.2);
   const contentBlur = Math.max(0, 10 * (1 - mat));
   const contentLift = 30 * (1 - mat);
 
   /* ── Floating orbs physics ── */
-  const floatActive = phases.stabilize * (1 - phases.ascension);
-  const bob1 = Math.sin(t * 1.2) * 8 * floatActive;
-  const bob2 = Math.cos(t * 0.9) * 10 * floatActive;
+  const floatActive = stable * (1 - phases.ascension);
+
+  /* ── Typewriter subtitle ── */
+  const subtitleText = "Full-Stack & AI Developer | Computer Science Engineer";
+  const { display: typedSubtitle, done: subtitleDone } = useTypewriter(
+    subtitleText,
+    40,
+    spatial ? 400 : 800
+  );
+
+  /* ── Spatial size compensation ──
+     Parent Html uses distanceFactor={0.27} which renders the panel
+     too small. We compensate with an internal CSS scale so the
+     hologram dominates the viewport as intended.                        */
+  const SPATIAL_COMPENSATION = 2.8;
 
   /* ═══════════════════════════════════════════════════════════════════════
-     SPATIAL MODE — Holographic Projection Content
-     Master Prompt: Section 4 — THE HTML CONTENT (DashboardHero)
+     SPATIAL RENDER — Inside R3F Html (Holographic Projection)
      ═══════════════════════════════════════════════════════════════════════ */
   if (spatial) {
     const spatialLock = Math.min(1, Math.max(0, (p - 0.28) / 0.08));
     const dissolve = Math.min(1, Math.max(0, (p - 0.8) / 0.2));
     const stableGlow = 0.7 + Math.sin(t * 2.4) * 0.16 * spatialLock;
+    const reveal = Math.min(1, mat * 1.8);
 
     return (
       <div
@@ -8771,133 +11066,73 @@ export default function DashboardHero({
         style={{
           width: "100%",
           background: "transparent",
+          transform: `scale(${SPATIAL_COMPENSATION})`,
+          transformOrigin: "center top",
           transformStyle: "preserve-3d",
           opacity: 1 - dissolve * 0.92,
         }}
       >
+        <CinematicStyles />
+
         {/* Ambient halo behind panel */}
         <div
-          className="absolute -inset-16 rounded-[36px] pointer-events-none"
+          className="absolute -inset-20 rounded-[40px] pointer-events-none"
           style={{
-            background:
-              "radial-gradient(circle at 50% 48%, rgba(255,34,68,0.22), rgba(255,34,68,0.08) 32%, transparent 68%), radial-gradient(circle at 22% 16%, rgba(255,180,190,0.12), transparent 42%)",
-            filter: "blur(42px)",
+            background: `radial-gradient(circle at 50% 48%, rgba(255,34,68,0.22), rgba(255,34,68,0.08) 32%, transparent 68%), radial-gradient(circle at 22% 16%, rgba(255,180,190,0.12), transparent 42%)`,
+            filter: "blur(48px)",
             opacity: stableGlow,
           }}
         />
 
+        {/* Decorative outer rings */}
+        <DecoRing size={60} duration={28} opacity={0.06 * spatialLock} />
+        <DecoRing size={90} duration={42} reverse opacity={0.04 * spatialLock} />
+
         {/* ═══ MAIN GLASS PANEL ═══ */}
         <div
-          className="relative overflow-hidden rounded-[28px]"
+          className="dashboard-glass relative overflow-hidden rounded-[28px]"
           style={{
-            background:
-              "linear-gradient(145deg, rgba(14,12,18,0.78), rgba(8,6,12,0.9) 52%, rgba(10,8,14,0.84))",
+            background: `linear-gradient(145deg, rgba(14,12,18,0.78), rgba(8,6,12,0.9) 52%, rgba(10,8,14,0.84))`,
             backdropFilter: "blur(56px) saturate(185%)",
             WebkitBackdropFilter: "blur(56px) saturate(185%)",
             border: "1px solid rgba(255, 23, 68, 0.35)",
-            boxShadow:
-              "inset 0 1px 1px rgba(255,255,255,0.16), inset 0 0 52px rgba(255,23,68,0.1), 0 0 72px rgba(255,23,68,0.24), 0 0 150px rgba(255,23,68,0.1), 0 48px 120px rgba(0,0,0,0.86)",
+            boxShadow: `inset 0 1px 1px rgba(255,255,255,0.16), inset 0 0 52px rgba(255,23,68,0.1), 0 0 72px rgba(255,23,68,0.24), 0 0 150px rgba(255,23,68,0.1), 0 48px 120px rgba(0,0,0,0.86)`,
           }}
         >
-          {/* ── Corner Brackets: SVG draw-on animation (triggered by parent .has-emerged class) ── */}
-          <div className="absolute top-5 left-5 w-6 h-6 pointer-events-none">
-            <svg className="w-full h-full text-[#ff1744] drop-shadow-[0_0_8px_rgba(255,23,68,0.8)]" viewBox="0 0 32 32" fill="none">
-              <path d="M32 2H2V32" stroke="currentColor" strokeWidth="2" className="corner-bracket-path" />
-            </svg>
-          </div>
-          <div className="absolute top-5 right-5 w-6 h-6 pointer-events-none">
-            <svg className="w-full h-full text-[#ff1744] drop-shadow-[0_0_8px_rgba(255,23,68,0.8)]" viewBox="0 0 32 32" fill="none">
-              <path d="M0 2H30V32" stroke="currentColor" strokeWidth="2" className="corner-bracket-path" />
-            </svg>
-          </div>
-          <div className="absolute bottom-5 left-5 w-6 h-6 pointer-events-none">
-            <svg className="w-full h-full text-[#ff1744] drop-shadow-[0_0_8px_rgba(255,23,68,0.8)]" viewBox="0 0 32 32" fill="none">
-              <path d="M32 30H2V0" stroke="currentColor" strokeWidth="2" className="corner-bracket-path" />
-            </svg>
-          </div>
-          <div className="absolute bottom-5 right-5 w-6 h-6 pointer-events-none">
-            <svg className="w-full h-full text-[#ff1744] drop-shadow-[0_0_8px_rgba(255,23,68,0.8)]" viewBox="0 0 32 32" fill="none">
-              <path d="M0 30H30V0" stroke="currentColor" strokeWidth="2" className="corner-bracket-path" />
-            </svg>
-          </div>
+          {/* Layered glass effects */}
+          <CornerBracket position="tl" delay={0.2} size={36} strokeWidth={1.5} />
+          <CornerBracket position="tr" delay={0.35} size={36} strokeWidth={1.5} />
+          <CornerBracket position="bl" delay={0.5} size={36} strokeWidth={1.5} />
+          <CornerBracket position="br" delay={0.65} size={36} strokeWidth={1.5} />
+          <ScanlineOverlay opacity={0.3} />
+          <GrainOverlay opacity={0.04} />
+          <VignetteOverlay opacity={0.18} />
+          <SpecularHighlight radius={28} />
+          <Hologrid opacity={0.04} size={36} />
+          <TopGlowLine t={t} />
+          <ParticleDust opacity={0.5} />
 
-          {/* ── Scanlines overlay (0.03 opacity) ── */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,23,68,0.03) 2px, rgba(255,23,68,0.03) 4px)",
-              mixBlendMode: "overlay",
-            }}
-          />
-
-          {/* ── Film grain overlay (0.04 opacity, mix-blend-mode overlay) ── */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-              backgroundSize: "180px 180px",
-              opacity: 0.04,
-              mixBlendMode: "overlay",
-            }}
-          />
-
-          {/* ── Specular edge highlight ── */}
-          <div
-            className="absolute inset-0 rounded-[28px] pointer-events-none"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 25%, transparent 75%, rgba(255,23,68,0.25) 100%)",
-              maskImage:
-                "linear-gradient(to bottom, black 0%, transparent 6%, transparent 94%, black 100%), linear-gradient(to right, black 0%, transparent 6%, transparent 94%, black 100%)",
-              WebkitMaskImage:
-                "linear-gradient(to bottom, black 0%, transparent 6%, transparent 94%, black 100%), linear-gradient(to right, black 0%, transparent 6%, transparent 94%, black 100%)",
-              mixBlendMode: "overlay",
-            }}
-          />
-
-          {/* ── Holographic grid overlay ── */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage:
-                "linear-gradient(rgba(255,23,68,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,23,68,0.3) 1px, transparent 1px)",
-              backgroundSize: "40px 40px",
-              opacity: 0.04,
-            }}
-          />
-
-          {/* ── Top glow line ── */}
-          <div
-            className="absolute inset-x-0 top-0 h-px pointer-events-none"
-            style={{
-              background:
-                "linear-gradient(90deg, transparent, rgba(255,255,255,0.72), rgba(255,34,68,0.72), transparent)",
-              opacity: 0.78 + Math.sin(t * 3.2) * 0.16,
-            }}
-          />
+          {/* Data stream decorations */}
+          <DataStream position={{ left: "8%", top: "20%" }} active={spatialLock} />
+          <DataStream position={{ right: "8%", top: "35%" }} active={spatialLock} />
 
           {/* ═══ CONTENT ═══ */}
           <div
-            className="relative z-10"
+            className="relative z-10 p-8 md:p-10"
             style={{
-              background: "transparent",
-              opacity: 1,
-              filter: "none",
-              transform: "none",
+              opacity: contentOpacity,
+              filter: `blur(${contentBlur}px)`,
+              transform: `translateY(${contentLift}px)`,
             }}
           >
             {/* ── Header: [● LIVE] + Socials ── */}
-            <div className="flex items-center justify-between mb-10 border-b border-white/[0.08] pb-5">
+            <div className="flex items-center justify-between mb-8 border-b border-white/[0.08] pb-5">
               <div className="flex items-center gap-3">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                  <span
-                    className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400"
-                    style={{ boxShadow: "0 0 10px rgba(52,211,153,0.9)" }}
-                  />
-                </span>
-                <span className="font-mono text-[11px] font-bold tracking-[0.25em] text-emerald-400 uppercase">
+                <StatusPulse color={C.emerald} delay={0} size={2.5} />
+                <span
+                  className="font-mono text-[11px] font-bold tracking-[0.25em] uppercase"
+                  style={{ color: C.emerald, textShadow: `0 0 10px ${C.emerald}` }}
+                >
                   Hologram Interface Online
                 </span>
                 <span className="hidden md:inline font-mono text-[10px] text-white/25 tracking-[0.2em]">
@@ -8906,28 +11141,9 @@ export default function DashboardHero({
               </div>
 
               <div className="flex items-center gap-2.5">
-                {SOCIALS.map((social, i) => {
-                  const s = Math.min(
-                    1,
-                    Math.max(0, (mat - 0.2 - i * 0.06) * 5)
-                  );
-                  return (
-                    <a
-                      key={social.label}
-                      href={social.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={social.label}
-                      className="group flex h-10 w-10 items-center justify-center rounded-full border border-[#ff1744]/35 bg-black/35 text-white/65 transition-all duration-300 hover:scale-110 hover:border-[#ff1744]/80 hover:text-[#ff1744] hover:shadow-[0_0_22px_rgba(255,34,68,0.42)] hover:-translate-y-1"
-                      style={{
-                        opacity: s,
-                        transform: `translateY(${(1 - s) * 15}px)`,
-                      }}
-                    >
-                      <social.icon className="h-4 w-4" />
-                    </a>
-                  );
-                })}
+                {SOCIALS.map((s, i) => (
+                  <SocialOrb key={s.label} social={s} reveal={mat} index={i} />
+                ))}
               </div>
             </div>
 
@@ -8936,153 +11152,106 @@ export default function DashboardHero({
               <h1
                 className="font-black uppercase"
                 style={{
-                  fontSize: "clamp(5rem, 10vw, 9rem)",
-                  lineHeight: 1.0,
+                  fontSize: "clamp(4.5rem, 9vw, 8.5rem)",
+                  lineHeight: 0.95,
                   letterSpacing: "-0.03em",
-                  background:
-                    "linear-gradient(180deg, #ffffff 0%, #ffcdd2 25%, #ff1744 55%, #800010 85%, #400008 100%)",
+                  background: "linear-gradient(180deg, #ffffff 0%, #ffcdd2 25%, #ff1744 55%, #800010 85%, #400008 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
-                  filter:
-                    "drop-shadow(0 0 30px rgba(255,23,68,0.45)) drop-shadow(0 0 80px rgba(255,23,68,0.25))",
-                  textShadow:
-                    "-2px 0 0 rgba(255, 0, 51, 0.4), 2px 0 0 rgba(0, 240, 255, 0.3), 0 0 40px rgba(255, 23, 68, 0.5)",
+                  filter: "drop-shadow(0 0 30px rgba(255,23,68,0.45)) drop-shadow(0 0 80px rgba(255,23,68,0.25))",
+                  textShadow: "-2px 0 0 rgba(255, 0, 51, 0.4), 2px 0 0 rgba(0, 240, 255, 0.3), 0 0 40px rgba(255, 23, 68, 0.5)",
                 }}
               >
                 POSHAN M S
               </h1>
             </div>
 
-            {/* ── Subtitle ── */}
-            <div className="mb-8">
+            {/* ── Subtitle: typewriter + glow ── */}
+            <div className="mb-6 h-8">
               <h2
                 className="font-mono font-semibold tracking-[0.18em] uppercase"
                 style={{
-                  fontSize: "clamp(1.2rem, 2vw, 1.8rem)",
-                  color: "#ff1744",
-                  textShadow:
-                    "0 0 20px rgba(255,23,68,0.7), 0 0 40px rgba(255,23,68,0.3)",
-                  opacity: Math.min(1, (mat - 0.3) * 3),
-                  transform: `translateX(${(1 - Math.min(1, (mat - 0.3) * 3)) * -20}px)`,
+                  fontSize: "clamp(1rem, 1.6vw, 1.5rem)",
+                  color: C.crimson,
+                  textShadow: "0 0 20px rgba(255,23,68,0.7), 0 0 40px rgba(255,23,68,0.3)",
+                  opacity: Math.min(1, (mat - 0.2) * 3),
                 }}
               >
-                Full-Stack & AI Developer | Computer Science Engineer
+                {typedSubtitle}
+                {!subtitleDone && (
+                  <span className="inline-block w-[2px] h-[1em] bg-[#ff1744] ml-1 align-middle animate-pulse" />
+                )}
               </h2>
             </div>
 
             {/* ── Quote ── */}
             <p
-              className="max-w-2xl mb-10"
+              className="max-w-2xl mb-8"
               style={{
-                fontSize: "16px",
+                fontSize: "15px",
                 lineHeight: 1.7,
                 color: "rgba(255,255,255,0.75)",
-                opacity: Math.min(1, (mat - 0.4) * 2.5),
-                transform: `translateY(${(1 - Math.min(1, (mat - 0.4) * 2.5)) * 15}px)`,
+                opacity: Math.min(1, (mat - 0.35) * 2.5),
+                transform: `translateY(${(1 - Math.min(1, (mat - 0.35) * 2.5)) * 12}px)`,
+                transition: "opacity 0.8s ease, transform 0.8s ease",
               }}
             >
-              <span className="text-[#ff1744]/60">&ldquo;</span>
-              Architecting scalable web platforms, intelligent ML diagnostics,
-              and secure systems.
-              <span className="text-[#ff1744]/60">&rdquo;</span>
+              <span style={{ color: "rgba(255,23,68,0.6)" }}>&ldquo;</span>
+              Architecting scalable web platforms, intelligent ML diagnostics, and secure systems with precision engineering.
+              <span style={{ color: "rgba(255,23,68,0.6)" }}>&rdquo;</span>
             </p>
 
-            {/* ── Project Badges: 2x2 grid, glass, hover lift -4px ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10">
-              {BADGES.map((badge) => {
-                const b = Math.min(
-                  1,
-                  Math.max(0, (mat - 0.45 - badge.delay) * 4)
-                );
-                return (
-                  <div
-                    key={badge.title}
-                    style={{
-                      opacity: b,
-                      transform: `translateX(${(1 - b) * badge.dir * 40}px)`,
-                    }}
-                  >
-                    <div className="group flex items-center gap-3 rounded-xl border border-[#ff1744]/25 bg-[#ff1744]/[0.06] px-4 py-3.5 font-mono text-[11px] font-medium text-[#ff8a95] shadow-[0_0_14px_rgba(255,23,68,0.08)] transition-all duration-300 hover:border-[#ff1744]/60 hover:bg-[#ff1744]/12 hover:shadow-[0_0_30px_rgba(255,23,68,0.2)] hover:-translate-y-1 cursor-default">
-                      <badge.icon className="h-4 w-4 text-[#ff1744] transition-transform duration-300 group-hover:scale-110 shrink-0" />
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[#ff1744] font-bold tracking-wider">
-                          [ {badge.title} ]
-                        </span>
-                        <span className="text-white/70">{badge.subtitle}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* ── Project Badges: 2x2 grid ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+              {BADGES.map((badge) => (
+                <BadgeCard key={badge.title} badge={badge} reveal={mat} />
+              ))}
             </div>
 
             {/* ── Footer Status Bar ── */}
             <div className="flex items-center justify-between border-t border-white/[0.08] pt-5">
               <div className="flex items-center gap-4 font-mono text-[10px] text-white/40 tracking-[0.15em]">
                 <span className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <SoundWave active />
                   SYSTEM OPERATIONAL
                 </span>
                 <span className="text-white/20">|</span>
                 <span>CORE: STABLE</span>
                 <span className="text-white/20">|</span>
                 <span>LATENCY: 12ms</span>
+                <span className="text-white/20">|</span>
+                <span className="hidden md:inline text-white/30">{clock}</span>
               </div>
-              <div className="flex items-center gap-2 font-mono text-[10px] text-[#ff1744]/60 tracking-widest">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#ff1744] animate-ping" />
+              <div className="flex items-center gap-2 font-mono text-[10px] tracking-widest" style={{ color: "rgba(255,23,68,0.7)" }}>
+                <StatusPulse color={C.crimson} delay={0.3} size={2} />
                 LIVE
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── Floating Stat Orb: Right (Projects) ── */}
-        <div
-          className="absolute -right-20 top-1/4 hidden xl:flex flex-col items-center justify-center w-28 h-28 rounded-full border border-[#ff1744]/20 bg-[#ff1744]/[0.06] backdrop-blur-md pointer-events-none"
-          style={{
-            opacity: floatActive * 0.8,
-            transform: `translateY(${bob1}px)`,
-            boxShadow:
-              "0 0 40px rgba(255,23,68,0.12), inset 0 0 20px rgba(255,23,68,0.05)",
-            animation:
-              floatActive > 0.1
-                ? "hero-float-1 4s ease-in-out infinite"
-                : "none",
-          }}
-        >
-          <div className="text-3xl font-black text-white/90">20+</div>
-          <div className="text-[9px] font-mono text-white/50 tracking-[0.2em] mt-1">
-            PROJECTS
-          </div>
-        </div>
-
-        {/* ── Floating Stat Orb: Left (Years) ── */}
-        <div
-          className="absolute -left-16 bottom-1/4 hidden xl:flex flex-col items-center justify-center w-24 h-24 rounded-2xl border border-[#ff1744]/20 bg-[#ff1744]/[0.06] backdrop-blur-md rotate-12 pointer-events-none"
-          style={{
-            opacity: floatActive * 0.8,
-            transform: `translateY(${bob2}px) rotate(12deg)`,
-            boxShadow: "0 0 30px rgba(255,23,68,0.1)",
-            animation:
-              floatActive > 0.1
-                ? "hero-float-2 5s ease-in-out infinite"
-                : "none",
-          }}
-        >
-          <div className="text-2xl font-black text-white/90 -rotate-12">
-            3+
-          </div>
-          <div className="text-[8px] font-mono text-white/50 tracking-[0.2em] mt-0.5 -rotate-12">
-            YEARS EXP
-          </div>
-        </div>
+        {/* ── Floating Stat Orbs ── */}
+        <StatOrb
+          value="20+"
+          label="PROJECTS"
+          position={{ right: -28, top: "15%" }}
+          floatClass="orb-float-1"
+          reveal={floatActive}
+        />
+        <StatOrb
+          value="3+"
+          label="YEARS EXP"
+          position={{ left: -20, bottom: "18%" }}
+          floatClass="orb-float-2"
+          reveal={floatActive}
+        />
       </div>
     );
   }
 
   /* ═══════════════════════════════════════════════════════════════════════
-     NON-SPATIAL MODE — Preserved existing implementation
+     NON-SPATIAL RENDER — Regular DOM hero section
      ═══════════════════════════════════════════════════════════════════════ */
   return (
     <section
@@ -9091,9 +11260,9 @@ export default function DashboardHero({
       className="pointer-events-none relative z-10 h-screen w-screen overflow-hidden"
       style={{ perspective: "1500px", perspectiveOrigin: "50% 65%" }}
     >
-      {/* ═══════════════════════════════════════════════════════════════════
-          VOLUMETRIC LIGHT CONE — Projects from laptop screen upward
-          ═══════════════════════════════════════════════════════════════════ */}
+      <CinematicStyles />
+
+      {/* Volumetric light cone */}
       <div
         className="absolute bottom-0 left-1/2 pointer-events-none"
         style={{
@@ -9104,7 +11273,6 @@ export default function DashboardHero({
           transition: "opacity 0.05s linear",
         }}
       >
-        {/* Primary conic beam */}
         <div
           className="absolute inset-0"
           style={{
@@ -9114,7 +11282,6 @@ export default function DashboardHero({
             transformOrigin: "bottom center",
           }}
         />
-        {/* Radial core glow */}
         <div
           className="absolute inset-0"
           style={{
@@ -9124,7 +11291,6 @@ export default function DashboardHero({
             transformOrigin: "bottom center",
           }}
         />
-        {/* Scanline overlay on beam */}
         <div
           className="absolute inset-0"
           style={{
@@ -9136,19 +11302,17 @@ export default function DashboardHero({
             className="absolute inset-0 opacity-30"
             style={{
               background: `repeating-linear-gradient(0deg, transparent, transparent 8px, rgba(255,23,68,0.08) 8px, rgba(255,23,68,0.08) 9px)`,
-              animation: "beam-scan 0.8s linear infinite",
+              animation: "scanline-drift 0.8s linear infinite",
             }}
           />
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          MAIN HOLOGRAPHIC PANEL — Apple Vision Pro grade glassmorphism
-          ═══════════════════════════════════════════════════════════════════ */}
+      {/* Main holographic panel */}
       <div
         className="absolute inset-0 flex items-center justify-center px-4 md:px-8"
         style={{
-          transform: `translate3d(${mx * 10 * phases.stabilize}px, ${panelY + my * 6 * phases.stabilize}px, ${panelZ}px) rotateX(${panelRotateX}deg) rotateY(${panelRotateY}deg) scale(${panelScale})`,
+          transform: `translate3d(${mouse.x * 10 * stable}px, ${panelY + mouse.y * 6 * stable}px, ${panelZ}px) rotateX(${panelRotateX}deg) rotateY(${panelRotateY}deg) scale(${panelScale})`,
           opacity: panelOpacity,
           transformOrigin: "center 80%",
           transition: "none",
@@ -9156,81 +11320,40 @@ export default function DashboardHero({
         }}
       >
         <div className="relative w-full max-w-[920px] pointer-events-auto">
-
-          {/* Ambient Halo — pulsating glow behind panel */}
+          {/* Ambient halo */}
           <div
             className="absolute -inset-10 rounded-[40px] pointer-events-none"
             style={{
               background: `radial-gradient(circle at 50% 50%, rgba(255,23,68,0.18) 0%, rgba(255,23,68,0.08) 30%, transparent 65%), radial-gradient(circle at 30% 20%, rgba(255,100,80,0.1) 0%, transparent 50%)`,
               filter: "blur(40px)",
-              opacity: 0.8 + Math.sin(t * 2) * 0.2 * phases.stabilize,
+              opacity: 0.8 + Math.sin(t * 2) * 0.2 * stable,
             }}
           />
 
-          {/* Main Glass Card */}
+          {/* Glass card */}
           <div
-            className="relative overflow-hidden rounded-[28px] hero-glass-panel"
+            className="dashboard-glass relative overflow-hidden rounded-[28px]"
             style={{
-              background: `linear-gradient(145deg, rgba(14, 12, 18, 0.78) 0%, rgba(8, 6, 12, 0.88) 50%, rgba(10, 8, 14, 0.82) 100%)`,
+              background: `linear-gradient(145deg, rgba(14,12,18,0.78) 0%, rgba(8,6,12,0.88) 50%, rgba(10,8,14,0.82) 100%)`,
               backdropFilter: "blur(56px) saturate(180%)",
               WebkitBackdropFilter: "blur(56px) saturate(180%)",
               border: "1.5px solid rgba(255, 23, 68, 0.32)",
               boxShadow: `inset 0 1px 1px rgba(255,255,255,0.14), inset 0 0 50px rgba(255,23,68,0.08), 0 0 60px rgba(255,23,68,0.18), 0 0 120px rgba(255,23,68,0.08), 0 50px 120px rgba(0,0,0,0.85)`,
-              animation: phases.stabilize > 0.1 ? "border-glow-pulse 4s ease-in-out infinite" : "none",
+              animation: stable > 0.1 ? "border-breathe 4s ease-in-out infinite" : "none",
             }}
           >
-            {/* Film grain noise overlay */}
-            <div
-              className="absolute inset-0 opacity-[0.035] pointer-events-none mix-blend-overlay"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-                backgroundSize: "180px 180px",
-              }}
-            />
+            <GrainOverlay opacity={0.035} />
+            <SpecularHighlight radius={28} />
+            <Hologrid opacity={0.035} size={40} />
+            <TopGlowLine t={t} />
+            <ParticleDust opacity={0.35} />
 
-            {/* Specular edge highlight */}
-            <div
-              className="absolute inset-0 rounded-[28px] pointer-events-none"
-              style={{
-                background: `linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 25%, transparent 75%, rgba(255,23,68,0.25) 100%)`,
-                maskImage: `linear-gradient(to bottom, black 0%, transparent 6%, transparent 94%, black 100%), linear-gradient(to right, black 0%, transparent 6%, transparent 94%, black 100%)`,
-                WebkitMaskImage: `linear-gradient(to bottom, black 0%, transparent 6%, transparent 94%, black 100%), linear-gradient(to right, black 0%, transparent 6%, transparent 94%, black 100%)`,
-                mixBlendMode: "overlay",
-              }}
-            />
+            <CornerBracket position="tl" delay={0.2} size={32} />
+            <CornerBracket position="tr" delay={0.35} size={32} />
+            <CornerBracket position="bl" delay={0.5} size={32} />
+            <CornerBracket position="br" delay={0.65} size={32} />
 
-            {/* Holographic grid overlay */}
-            <div
-              className="absolute inset-0 opacity-[0.04] pointer-events-none"
-              style={{
-                backgroundImage: `linear-gradient(rgba(255,23,68,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,23,68,0.3) 1px, transparent 1px)`,
-                backgroundSize: "40px 40px",
-              }}
-            />
-
-            {/* Glowing corner brackets with SVG draw-on animation */}
-            <div className="absolute top-5 left-5 w-8 h-8 pointer-events-none">
-              <svg className="w-full h-full text-[#ff1744] drop-shadow-[0_0_8px_rgba(255,23,68,0.8)]" viewBox="0 0 32 32" fill="none">
-                <path d="M32 2H2V32" stroke="currentColor" strokeWidth="2" className="corner-bracket-path" />
-              </svg>
-            </div>
-            <div className="absolute top-5 right-5 w-8 h-8 pointer-events-none">
-              <svg className="w-full h-full text-[#ff1744] drop-shadow-[0_0_8px_rgba(255,23,68,0.8)]" viewBox="0 0 32 32" fill="none">
-                <path d="M0 2H30V32" stroke="currentColor" strokeWidth="2" className="corner-bracket-path" />
-              </svg>
-            </div>
-            <div className="absolute bottom-5 left-5 w-8 h-8 pointer-events-none">
-              <svg className="w-full h-full text-[#ff1744] drop-shadow-[0_0_8px_rgba(255,23,68,0.8)]" viewBox="0 0 32 32" fill="none">
-                <path d="M32 30H2V0" stroke="currentColor" strokeWidth="2" className="corner-bracket-path" />
-              </svg>
-            </div>
-            <div className="absolute bottom-5 right-5 w-8 h-8 pointer-events-none">
-              <svg className="w-full h-full text-[#ff1744] drop-shadow-[0_0_8px_rgba(255,23,68,0.8)]" viewBox="0 0 32 32" fill="none">
-                <path d="M0 30H30V0" stroke="currentColor" strokeWidth="2" className="corner-bracket-path" />
-              </svg>
-            </div>
-
-            {/* ── CONTENT ── */}
+            {/* Content */}
             <div
               className="relative z-10 p-8 md:p-12"
               style={{
@@ -9242,45 +11365,31 @@ export default function DashboardHero({
               {/* Header */}
               <div className="flex items-center justify-between mb-10 border-b border-white/[0.08] pb-5">
                 <div className="flex items-center gap-3">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" style={{ boxShadow: "0 0 10px rgba(52,211,153,0.9)" }} />
-                  </span>
-                  <span className="font-mono text-[11px] font-bold tracking-[0.25em] text-emerald-400 uppercase">
+                  <StatusPulse color={C.emerald} delay={0} />
+                  <span
+                    className="font-mono text-[11px] font-bold tracking-[0.25em] uppercase"
+                    style={{ color: C.emerald }}
+                  >
                     Hologram Interface Online
                   </span>
                   <span className="hidden md:inline font-mono text-[10px] text-white/25 tracking-[0.2em]">
-                    | SPATIAL PROJECTION v2.4
+                    | SPATIAL PROJECTION v3.0
                   </span>
                 </div>
-
                 <div className="flex items-center gap-2.5">
-                  {SOCIALS.map((social, i) => {
-                    const s = Math.min(1, Math.max(0, (mat - 0.25 - i * 0.06) * 5));
-                    return (
-                      <a
-                        key={social.label}
-                        href={social.href}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={social.label}
-                        className="group flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff1744]/25 bg-black/30 text-white/60 transition-all duration-300 hover:scale-110 hover:border-[#ff1744]/70 hover:text-[#ff1744] hover:shadow-[0_0_20px_rgba(255,23,68,0.35)] hover:-translate-y-1"
-                        style={{ opacity: s, transform: `translateY(${(1 - s) * 15}px)` }}
-                      >
-                        <social.icon className="h-4 w-4" />
-                      </a>
-                    );
-                  })}
+                  {SOCIALS.map((s, i) => (
+                    <SocialOrb key={s.label} social={s} reveal={mat} index={i} />
+                  ))}
                 </div>
               </div>
 
-              {/* Name — Massive gradient with bloom */}
+              {/* Name */}
               <div className="mb-3">
                 <h1
                   className="font-black uppercase"
                   style={{
                     fontSize: "clamp(3rem, 7vw, 6rem)",
-                    lineHeight: 1.0,
+                    lineHeight: 0.95,
                     letterSpacing: "-0.03em",
                     background: "linear-gradient(180deg, #ffffff 0%, #ffcdd2 25%, #ff1744 55%, #800010 85%, #400008 100%)",
                     WebkitBackgroundClip: "text",
@@ -9294,17 +11403,19 @@ export default function DashboardHero({
               </div>
 
               {/* Subtitle */}
-              <div className="mb-8">
+              <div className="mb-8 h-7">
                 <h2
                   className="font-mono text-sm md:text-base font-semibold tracking-[0.18em] uppercase"
                   style={{
-                    color: "#ff1744",
+                    color: C.crimson,
                     textShadow: "0 0 20px rgba(255,23,68,0.7), 0 0 40px rgba(255,23,68,0.3)",
-                    opacity: Math.min(1, (mat - 0.3) * 3),
-                    transform: `translateX(${(1 - Math.min(1, (mat - 0.3) * 3)) * -20}px)`,
+                    opacity: Math.min(1, (mat - 0.25) * 3),
                   }}
                 >
-                  Full-Stack & AI Developer | Computer Science Engineer
+                  {typedSubtitle}
+                  {!subtitleDone && (
+                    <span className="inline-block w-[2px] h-[1em] bg-[#ff1744] ml-1 align-middle animate-pulse" />
+                  )}
                 </h2>
               </div>
 
@@ -9312,95 +11423,68 @@ export default function DashboardHero({
               <p
                 className="text-sm md:text-[15px] text-white/75 max-w-2xl leading-[1.7] mb-10"
                 style={{
-                  opacity: Math.min(1, (mat - 0.4) * 2.5),
-                  transform: `translateY(${(1 - Math.min(1, (mat - 0.4) * 2.5)) * 15}px)`,
+                  opacity: Math.min(1, (mat - 0.35) * 2.5),
+                  transform: `translateY(${(1 - Math.min(1, (mat - 0.35) * 2.5)) * 12}px)`,
+                  transition: "opacity 0.8s ease, transform 0.8s ease",
                 }}
               >
-                <span className="text-[#ff1744]/60">&ldquo;</span>
-                Architecting scalable web platforms, intelligent ML diagnostics, and secure systems.
-                <span className="text-[#ff1744]/60">&rdquo;</span>
+                <span style={{ color: "rgba(255,23,68,0.6)" }}>&ldquo;</span>
+                Architecting scalable web platforms, intelligent ML diagnostics, and secure systems with precision engineering.
+                <span style={{ color: "rgba(255,23,68,0.6)" }}>&rdquo;</span>
               </p>
 
-              {/* Project Badges — staggered slide-in */}
+              {/* Badges */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10">
-                {BADGES.map((badge) => {
-                  const b = Math.min(1, Math.max(0, (mat - 0.45 - badge.delay) * 4));
-                  return (
-                    <div
-                      key={badge.title}
-                      className="group flex items-center gap-3 rounded-xl border border-[#ff1744]/25 bg-[#ff1744]/[0.06] px-4 py-3.5 font-mono text-[11px] font-medium text-[#ff8a95] shadow-[0_0_14px_rgba(255,23,68,0.08)] transition-all duration-300 hover:border-[#ff1744]/55 hover:bg-[#ff1744]/12 hover:shadow-[0_0_28px_rgba(255,23,68,0.18)] hover:-translate-y-0.5 cursor-default"
-                      style={{
-                        opacity: b,
-                        transform: `translateX(${(1 - b) * badge.dir * 40}px)`,
-                      }}
-                    >
-                      <badge.icon className="h-4 w-4 text-[#ff1744] transition-transform duration-300 group-hover:scale-110 shrink-0" />
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[#ff1744] font-bold tracking-wider">[ {badge.title} ]</span>
-                        <span className="text-white/70">{badge.subtitle}</span>
-                      </div>
-                    </div>
-                  );
-                })}
+                {BADGES.map((badge) => (
+                  <BadgeCard key={badge.title} badge={badge} reveal={mat} />
+                ))}
               </div>
 
-              {/* Footer Status Bar */}
+              {/* Footer */}
               <div className="flex items-center justify-between border-t border-white/[0.08] pt-5">
                 <div className="flex items-center gap-4 font-mono text-[10px] text-white/40 tracking-[0.15em]">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <SoundWave active />
                     SYSTEM OPERATIONAL
                   </span>
                   <span className="text-white/20">|</span>
                   <span>CORE: STABLE</span>
                   <span className="text-white/20">|</span>
                   <span>LATENCY: 12ms</span>
+                  <span className="text-white/20">|</span>
+                  <span className="hidden md:inline text-white/30">{clock}</span>
                 </div>
-                <div className="flex items-center gap-2 font-mono text-[10px] text-[#ff1744]/60 tracking-widest">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#ff1744] animate-ping" />
+                <div className="flex items-center gap-2 font-mono text-[10px] tracking-widest" style={{ color: "rgba(255,23,68,0.7)" }}>
+                  <StatusPulse color={C.crimson} delay={0.3} size={2} />
                   LIVE
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Floating Stat Orb — Right (Projects) */}
-          <div
-            className="absolute -right-20 top-1/4 hidden xl:flex flex-col items-center justify-center w-28 h-28 rounded-full border border-[#ff1744]/20 bg-[#ff1744]/[0.06] backdrop-blur-md pointer-events-none"
-            style={{
-              opacity: floatActive * 0.8,
-              transform: `translateY(${bob1}px)`,
-              boxShadow: "0 0 40px rgba(255,23,68,0.12), inset 0 0 20px rgba(255,23,68,0.05)",
-              animation: floatActive > 0.1 ? "hero-float-1 4s ease-in-out infinite" : "none",
-            }}
-          >
-            <div className="text-3xl font-black text-white/90">20+</div>
-            <div className="text-[9px] font-mono text-white/50 tracking-[0.2em] mt-1">PROJECTS</div>
-          </div>
-
-          {/* Floating Stat Orb — Left (Years) */}
-          <div
-            className="absolute -left-16 bottom-1/4 hidden xl:flex flex-col items-center justify-center w-24 h-24 rounded-2xl border border-[#ff1744]/20 bg-[#ff1744]/[0.06] backdrop-blur-md rotate-12 pointer-events-none"
-            style={{
-              opacity: floatActive * 0.8,
-              transform: `translateY(${bob2}px) rotate(12deg)`,
-              boxShadow: "0 0 30px rgba(255,23,68,0.1)",
-              animation: floatActive > 0.1 ? "hero-float-2 5s ease-in-out infinite" : "none",
-            }}
-          >
-            <div className="text-2xl font-black text-white/90 -rotate-12">3+</div>
-            <div className="text-[8px] font-mono text-white/50 tracking-[0.2em] mt-0.5 -rotate-12">YEARS EXP</div>
-          </div>
+          {/* Floating orbs */}
+          <StatOrb
+            value="20+"
+            label="PROJECTS"
+            position={{ right: -20, top: "15%" }}
+            floatClass="orb-float-1"
+            reveal={floatActive}
+          />
+          <StatOrb
+            value="3+"
+            label="YEARS EXP"
+            position={{ left: -16, bottom: "18%" }}
+            floatClass="orb-float-2"
+            reveal={floatActive}
+          />
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          BOTTOM SCROLL CTA — Fades during ascension
-          ═══════════════════════════════════════════════════════════════════ */}
+      {/* Bottom scroll CTA */}
       <div
         className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
         style={{
-          opacity: (1 - phases.ascension) * phases.stabilize,
+          opacity: (1 - phases.ascension) * stable,
           transform: `translateY(${phases.ascension * 50}px)`,
         }}
       >
@@ -15024,7 +17108,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-project_codebase.md
+# Ignore context markdown files
+Master_prompt.md
+Thinking.md
+Previous.MD
+Project__codebase.md
 ```
 
 ## File: `README.md`
