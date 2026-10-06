@@ -83,7 +83,7 @@ export default function ActFiveWorld({
   }), []);
 
   useFrame((state, delta) => {
-    const reveal = smoothstep(0.902, 0.922, scrollProgress) * (1 - smoothstep(0.997, 0.999, scrollProgress));
+    const reveal = smoothstep(0.902, 0.922, scrollProgress) * (1 - smoothstep(0.956, 0.962, scrollProgress));
     const active = actFourPhase !== "inside" && actFourPhase !== "warping";
     const visibility = active ? reveal : 0;
     const time = state.clock.getElapsedTime();
