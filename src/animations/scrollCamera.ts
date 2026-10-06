@@ -103,13 +103,20 @@ const sceneCoordinates = [
     camera: new THREE.Vector3(-0.72, 1.82, 9.7),
     lookAt: new THREE.Vector3(1.35, 0.72, -5.15),
     fov: 47,
-    progress: 0.997,
+    progress: 0.956,
   },
   {
-    // Act VI — final portfolio contact shot, everything visible again.
-    camera: new THREE.Vector3(0.0, 4.95, 14.85),
-    lookAt: new THREE.Vector3(0.8, 0.18, -2.4),
-    fov: 58,
+    // Act VI — the final contact signal lives in its own nebula, not the old desk-world.
+    camera: new THREE.Vector3(0, 0.55, 10.2),
+    lookAt: new THREE.Vector3(0, 0.15, -7.4),
+    fov: 45,
+    progress: 0.963,
+  },
+  {
+    // Settle the final frame without reintroducing any previous scene objects.
+    camera: new THREE.Vector3(0, 0.55, 10.2),
+    lookAt: new THREE.Vector3(0, 0.15, -7.4),
+    fov: 45,
     progress: 1.0,
   },
 ];
@@ -178,13 +185,22 @@ export function CinematicCamera({
       desiredFov = 51;
     }
 
+    const time = state.clock.getElapsedTime();
+    // Act VI uses a restrained camera orbit. The nebula itself stays fixed.
+    if (p >= 0.963 && actFourPhase === "locked") {
+      const orbit = time * 0.06;
+      desiredPosition.x += Math.sin(orbit) * 0.28;
+      desiredPosition.y += Math.cos(orbit * 0.82) * 0.12;
+      desiredLookAt.x += Math.sin(orbit * 0.72) * 0.12;
+      desiredLookAt.y += Math.cos(orbit * 0.82) * 0.05;
+    }
+
     const cameraDamping = actFourPhase === "locked" || actFourPhase === "ready" ? 8.4 : 4.6;
     currentPos.current.lerp(desiredPosition, 1 - Math.exp(-cameraDamping * delta));
     currentLookAt.current.lerp(desiredLookAt, 1 - Math.exp(-cameraDamping * delta));
     currentFov.current = THREE.MathUtils.damp(currentFov.current, desiredFov, cameraDamping, delta);
 
     // Subtle handheld-cinema drift while scrolling; very small so the scene stays premium.
-    const time = state.clock.getElapsedTime();
     const drift = Math.sin(time * 0.45 + p * Math.PI * 2) * 0.01;
 
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0));
