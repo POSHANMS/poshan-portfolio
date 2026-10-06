@@ -358,15 +358,17 @@ export default function StarField({
         </lineSegments>
       )}
 
-      <points ref={heroStarsRef}>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[heroPositions, 3]} />
-          <bufferAttribute attach="attributes-color" args={[heroColors, 3]} />
-          <bufferAttribute attach="attributes-aSize" args={[heroSizes, 1]} />
-          <bufferAttribute attach="attributes-aPhase" args={[heroPhases, 1]} />
-        </bufferGeometry>
-        <primitive object={heroStarMaterial} attach="material" />
-      </points>
+      {showConstellations && (
+        <points ref={heroStarsRef}>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[heroPositions, 3]} />
+            <bufferAttribute attach="attributes-color" args={[heroColors, 3]} />
+            <bufferAttribute attach="attributes-aSize" args={[heroSizes, 1]} />
+            <bufferAttribute attach="attributes-aPhase" args={[heroPhases, 1]} />
+          </bufferGeometry>
+          <primitive object={heroStarMaterial} attach="material" />
+        </points>
+      )}
     </group>
   );
 }
