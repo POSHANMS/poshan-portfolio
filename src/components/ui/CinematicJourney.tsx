@@ -581,10 +581,9 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
   return (
     <Panel presence={presence} side="center" className="left-1/2 top-[15vh] w-[min(42rem,calc(100vw-3rem))]">
       <div
-        className="relative border-y border-[#ff1744]/45 py-8 text-center"
+        className="relative py-8 text-center"
         style={{ opacity: signal, transform: `translateY(${(1 - signal) * 22}px)`, willChange: "opacity, transform" }}
       >
-        <div aria-hidden="true" className="absolute -inset-x-16 -inset-y-10 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(36,0,7,0.88),rgba(0,0,0,0.25)_64%,transparent_82%)]" />
         <div className="mb-5 flex items-center justify-center gap-3">
           <Kicker act="ACT VI" label="Contact" />
           <Radio className="h-5 w-5 text-[#ff5a66]" style={{ opacity: pulse }} />
@@ -599,15 +598,15 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
           Full Stack Developer and AI Developer from Karnataka, India.
         </p>
           <div className="mx-auto mt-7 grid max-w-xl gap-3 font-mono text-xs" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 24}px)`, willChange: "opacity, transform" }}>
-          <a href={`mailto:${PROFILE.email}`} className="group flex items-center justify-between border border-[#ff1744]/36 bg-black/25 px-4 py-3 text-white/76 transition duration-300 hover:border-[#ff5a66] hover:bg-[#ff1744]/10 hover:text-white">
+          <a href={`mailto:${PROFILE.email}`} className="group flex items-center justify-between border border-[#ff1744]/36 bg-transparent px-4 py-3 text-white/76 transition duration-300 hover:border-[#ff5a66] hover:bg-[#ff1744]/10 hover:text-white">
             <span className="flex items-center gap-3"><Mail className="h-4 w-4 text-[#ff5a66]" /> {PROFILE.email}</span>
             <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
           </a>
-          <a href={PROFILE.github} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/14 bg-black/20 px-4 py-3 text-white/68 transition duration-300 hover:border-[#ff1744]/70 hover:bg-[#ff1744]/10 hover:text-white">
+          <a href={PROFILE.github} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/14 bg-transparent px-4 py-3 text-white/68 transition duration-300 hover:border-[#ff1744]/70 hover:bg-[#ff1744]/10 hover:text-white">
             <span className="flex items-center gap-3"><TerminalSquare className="h-4 w-4 text-[#ff5a66]" /> github.com/POSHANMS</span>
             <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
           </a>
-          <a href={PROFILE.linkedin} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/14 bg-black/20 px-4 py-3 text-white/68 transition duration-300 hover:border-[#ff1744]/70 hover:bg-[#ff1744]/10 hover:text-white">
+          <a href={PROFILE.linkedin} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/14 bg-transparent px-4 py-3 text-white/68 transition duration-300 hover:border-[#ff1744]/70 hover:bg-[#ff1744]/10 hover:text-white">
             <span className="flex items-center gap-3"><Network className="h-4 w-4 text-[#ff5a66]" /> linkedin.com/in/poshanms</span>
             <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
           </a>
