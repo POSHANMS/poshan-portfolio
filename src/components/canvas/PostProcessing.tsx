@@ -10,6 +10,7 @@ import * as THREE from "three";
 
 export interface PostProcessingProps {
   hologramActive?: boolean;
+  cosmicActive?: boolean;
 }
 
 const DEFAULT_STRENGTH = 0.32;
@@ -20,9 +21,13 @@ const HOLOGRAM_STRENGTH = 0.55;
 const HOLOGRAM_RADIUS = 0.45;
 const HOLOGRAM_THRESHOLD = 0.35;
 
+const COSMIC_STRENGTH = 0.52;
+const COSMIC_RADIUS = 0.38;
+const COSMIC_THRESHOLD = 0.96;
+
 const LERP_FACTOR = 0.05;
 
-export default function PostProcessing({ hologramActive }: PostProcessingProps) {
+export default function PostProcessing({ hologramActive, cosmicActive }: PostProcessingProps) {
   const { gl, scene, camera, size } = useThree();
   const bloomPassRef = useRef<UnrealBloomPass | null>(null);
 
@@ -60,9 +65,9 @@ export default function PostProcessing({ hologramActive }: PostProcessingProps) 
 
   useFrame(() => {
     if (bloomPassRef.current) {
-      const targetStrength = hologramActive ? HOLOGRAM_STRENGTH : DEFAULT_STRENGTH;
-      const targetRadius = hologramActive ? HOLOGRAM_RADIUS : DEFAULT_RADIUS;
-      const targetThreshold = hologramActive ? HOLOGRAM_THRESHOLD : DEFAULT_THRESHOLD;
+      const targetStrength = cosmicActive ? COSMIC_STRENGTH : hologramActive ? HOLOGRAM_STRENGTH : DEFAULT_STRENGTH;
+      const targetRadius = cosmicActive ? COSMIC_RADIUS : hologramActive ? HOLOGRAM_RADIUS : DEFAULT_RADIUS;
+      const targetThreshold = cosmicActive ? COSMIC_THRESHOLD : hologramActive ? HOLOGRAM_THRESHOLD : DEFAULT_THRESHOLD;
 
       bloomStrength.current = THREE.MathUtils.lerp(
         bloomStrength.current,
