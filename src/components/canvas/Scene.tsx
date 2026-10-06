@@ -23,6 +23,7 @@ import PostProcessing from "./PostProcessing";
 import StoryWorld from "./StoryWorld";
 import ActFourWorld from "./ActFourWorld";
 import ActFiveWorld from "./ActFiveWorld";
+import ActSixWorld from "./ActSixWorld";
 import type { ActFourPhase } from "@/types/actFour";
 
 function smoothstep(edge0: number, edge1: number, value: number) {
@@ -47,11 +48,13 @@ function SceneLights({
   isPowerUpActive,
   isProjectCore,
   isActFive,
+  isActSix,
 }: {
   powerUpValues?: PowerUpStageValues;
   isPowerUpActive?: boolean;
   isProjectCore: boolean;
   isActFive: boolean;
+  isActSix: boolean;
 }) {
   // Smooth multipliers — direct JSX calculation, no useFrame mutation hacks
   const s = isPowerUpActive && powerUpValues ? powerUpValues.sceneOpacity : 1;
@@ -61,7 +64,7 @@ function SceneLights({
   const st = isPowerUpActive && powerUpValues ? powerUpValues.starsOpacity : 1;
   const c = isPowerUpActive && powerUpValues ? powerUpValues.cubesOpacity : 1;
   const g = isPowerUpActive && powerUpValues ? powerUpValues.globeOpacity : 1;
-  const exteriorLight = isProjectCore || isActFive ? 0.08 : 1;
+  const exteriorLight = isProjectCore || isActFive || isActSix ? 0.08 : 1;
 
   return (
     <>
@@ -121,7 +124,7 @@ export default function Scene({
   // only once its portal transform has started, preventing a duplicate flash.
   const showLaptop = wormholeActive && wormholeValues
     ? wormholeValues.laptopScale > 0.001
-    : !isPowerUpActive || (powerUpValues && powerUpValues.laptopOpacity > 0.0001);
+    : scrollProgress < 0.55 && (!isPowerUpActive || (powerUpValues && powerUpValues.laptopOpacity > 0.0001));
 
   const floorOpacity = powerUpValues?.floorOpacity ?? 1;
   const starsOpacity = powerUpValues?.starsOpacity ?? 1;
@@ -132,8 +135,10 @@ export default function Scene({
   const skillVaultStrength = smoothstep(0.55, 0.62, scrollProgress) * (1 - smoothstep(0.80, 0.85, scrollProgress));
   const exteriorStrength = 1 - skillVaultStrength;
   // Act V is a true location change: retain the stars, but leave the physical desk-world behind.
-  const actFiveStrength = smoothstep(0.902, 0.922, scrollProgress) * (1 - smoothstep(0.997, 0.999, scrollProgress));
+  const actFiveStrength = smoothstep(0.902, 0.922, scrollProgress) * (1 - smoothstep(0.956, 0.962, scrollProgress));
   const isActFive = actFiveStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
+  const actSixStrength = smoothstep(0.956, 0.965, scrollProgress);
+  const isActSix = actSixStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
   const isInsideProjectCore = actFourPhase === "inside";
   const isProjectTransit = actFourPhase === "warping" || isInsideProjectCore;
 
@@ -165,28 +170,29 @@ export default function Scene({
           isPowerUpActive={isPowerUpActive}
           isProjectCore={isInsideProjectCore}
           isActFive={isActFive}
+          isActSix={isActSix}
         />
 
         <Suspense fallback={null}>
           {/* Warp owns the starfield during transit so the streaks read as speed, not background noise. */}
           <group visible={showStars && !isProjectTransit}>
-            {!isActFive && <NebulaBackground />}
+            {!isActFive && !isActSix && <NebulaBackground />}
             <StarField
-              starsOpacity={starsOpacity * (isActFive ? 1 : 0.24 + exteriorStrength * 0.76)}
-              showConstellations={!isActFive}
+              starsOpacity={starsOpacity * (isActFive || isActSix ? 1 : 0.24 + exteriorStrength * 0.76)}
+              showConstellations={!isActFive && !isActSix}
             />
-            {!isActFive && <ShootingStars />}
+            {!isActFive && !isActSix && <ShootingStars />}
           </group>
 
-          <group visible={showGlobe && !isActFive}>
+          <group visible={showGlobe && !isActFive && !isActSix}>
             <DeepSpaceGlobe scrollProgress={scrollProgress} globeOpacity={globeOpacity * exteriorStrength * (isInsideProjectCore ? 0 : 1)} />
           </group>
 
-          {!isInsideProjectCore && !isActFive && <VolumetricRays />}
-          {!isInsideProjectCore && !isActFive && <MagneticParticles />}
-          {!isInsideProjectCore && !isActFive && <FloatingHexParticles />}
+          {!isInsideProjectCore && !isActFive && !isActSix && <VolumetricRays />}
+          {!isInsideProjectCore && !isActFive && !isActSix && <MagneticParticles />}
+          {!isInsideProjectCore && !isActFive && !isActSix && <FloatingHexParticles />}
 
-          <group visible={showCubes && !isActFive}>
+          <group visible={showCubes && !isActFive && !isActSix}>
             <TechCubes cubesOpacity={cubesOpacity} scrollProgress={scrollProgress} actFourPhase={actFourPhase} />
           </group>
 
@@ -198,7 +204,7 @@ export default function Scene({
             />
           )}
 
-          <group visible={!!showLaptop && !isActFive}>
+          <group visible={!!showLaptop && !isActFive && !isActSix}>
             <FloatingLaptop
               powerUpStage={powerUpStage}
               laptopOpacity={laptopOpacity}
@@ -210,14 +216,15 @@ export default function Scene({
             />
           </group>
 
-          <group visible={showFloor && !isInsideProjectCore && !isActFive}>
+          <group visible={showFloor && !isInsideProjectCore && !isActFive && !isActSix}>
             <NeonGrid floorOpacity={floorOpacity} />
             <FloorRings />
           </group>
 
-          {!isInsideProjectCore && !isActFive && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
-          <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} />
+          {!isInsideProjectCore && !isActFive && !isActSix && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
+          {!isActFive && !isActSix && <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} />}
           <ActFiveWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />
+          <ActSixWorld scrollProgress={scrollProgress} />
 
           <PostProcessing hologramActive={hologramVisible} />
         </Suspense>
