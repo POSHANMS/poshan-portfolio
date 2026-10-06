@@ -15,13 +15,13 @@ import type { ActFourPhase } from "@/types/actFour";
 
 type ChapterId = "hero" | "laptop" | "skills" | "projects" | "journey" | "contact";
 
-const chapters: { id: ChapterId; act: string; label: string; range: [number, number]; holdUntilEnd?: boolean }[] = [
+const chapters: { id: ChapterId; act: string; label: string; range: [number, number]; holdUntilEnd?: boolean; persistAtEnd?: boolean }[] = [
   { id: "hero", act: "ACT I", label: "Hero", range: [0.0, 0.17] },
   { id: "laptop", act: "ACT II", label: "About", range: [0.18, 0.54] },
   { id: "skills", act: "ACT III", label: "Skills", range: [0.55, 0.82] },
   { id: "projects", act: "ACT IV", label: "Projects", range: [0.825, 0.9] },
-  { id: "journey", act: "ACT V", label: "Education", range: [0.91, 0.997], holdUntilEnd: true },
-  { id: "contact", act: "ACT VI", label: "Contact", range: [0.998, 1.0] },
+  { id: "journey", act: "ACT V", label: "Education", range: [0.91, 0.956], holdUntilEnd: true },
+  { id: "contact", act: "ACT VI", label: "Contact", range: [0.963, 1.0], persistAtEnd: true },
 ];
 
 function clamp(value: number, min = 0, max = 1) {
@@ -33,11 +33,11 @@ function smoothstep(edge0: number, edge1: number, x: number) {
   return t * t * (3 - 2 * t);
 }
 
-function chapterPresence(progress: number, range: [number, number], holdUntilEnd = false) {
+function chapterPresence(progress: number, range: [number, number], holdUntilEnd = false, persistAtEnd = false) {
   const [start, end] = range;
   const fade = Math.min(0.065, (end - start) * 0.34);
   const enter = start <= 0 ? 1 : smoothstep(start, start + fade, progress);
-  const exit = holdUntilEnd ? (progress < end ? 1 : 0) : 1 - smoothstep(end - fade, end, progress);
+  const exit = persistAtEnd ? 1 : holdUntilEnd ? (progress < end ? 1 : 0) : 1 - smoothstep(end - fade, end, progress);
   return clamp(enter * exit);
 }
 
@@ -574,29 +574,41 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
 
 function ContactChapter({ presence, progress }: { presence: number; progress: number }) {
   const pulse = 0.82 + Math.sin(progress * Math.PI * 4) * 0.18;
+  const signal = smoothstep(0.04, 0.28, progress);
+  const titleSignal = smoothstep(0.13, 0.46, progress);
+  const detailsSignal = smoothstep(0.28, 0.62, progress);
 
   return (
-    <Panel presence={presence} side="center" className="left-1/2 top-[17vh] w-[min(42rem,calc(100vw-3rem))]">
-      <div className="border-y border-[#ff1744]/35 py-7 text-center">
+    <Panel presence={presence} side="center" className="left-1/2 top-[15vh] w-[min(42rem,calc(100vw-3rem))]">
+      <div
+        className="relative border-y border-[#ff1744]/45 py-8 text-center"
+        style={{ opacity: signal, transform: `translateY(${(1 - signal) * 22}px)`, willChange: "opacity, transform" }}
+      >
+        <div aria-hidden="true" className="absolute -inset-x-16 -inset-y-10 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(36,0,7,0.88),rgba(0,0,0,0.25)_64%,transparent_82%)]" />
         <div className="mb-5 flex items-center justify-center gap-3">
           <Kicker act="ACT VI" label="Contact" />
-          <Radio className="h-5 w-5 text-[#ff6b7f]" style={{ opacity: pulse }} />
+          <Radio className="h-5 w-5 text-[#ff5a66]" style={{ opacity: pulse }} />
         </div>
-        <h2 className="text-4xl font-black uppercase leading-none text-white md:text-6xl">Contact Poshan</h2>
-        <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-white/64">
+        <h2
+          className="text-4xl font-black uppercase leading-none text-white md:text-6xl"
+          style={{ opacity: titleSignal, transform: `translate3d(0, ${(1 - titleSignal) * 30}px, 0) scale(${0.96 + titleSignal * 0.04})`, filter: `blur(${(1 - titleSignal) * 7}px)`, willChange: "opacity, transform, filter" }}
+        >
+          Contact Poshan
+        </h2>
+          <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-white/72" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 18}px)`, willChange: "opacity, transform" }}>
           Full Stack Developer and AI Developer from Karnataka, India.
         </p>
-        <div className="mx-auto mt-7 grid max-w-xl gap-3 font-mono text-xs">
-          <a href={`mailto:${PROFILE.email}`} className="group flex items-center justify-between border border-[#ff1744]/24 bg-black/20 px-4 py-3 text-white/72 transition hover:border-[#ff1744] hover:text-white">
-            <span className="flex items-center gap-3"><Mail className="h-4 w-4 text-[#ff6b7f]" /> {PROFILE.email}</span>
+          <div className="mx-auto mt-7 grid max-w-xl gap-3 font-mono text-xs" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 24}px)`, willChange: "opacity, transform" }}>
+          <a href={`mailto:${PROFILE.email}`} className="group flex items-center justify-between border border-[#ff1744]/36 bg-black/25 px-4 py-3 text-white/76 transition duration-300 hover:border-[#ff5a66] hover:bg-[#ff1744]/10 hover:text-white">
+            <span className="flex items-center gap-3"><Mail className="h-4 w-4 text-[#ff5a66]" /> {PROFILE.email}</span>
             <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
           </a>
-          <a href={PROFILE.github} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/10 bg-black/15 px-4 py-3 text-white/62 transition hover:border-[#ff1744]/60 hover:text-white">
-            <span className="flex items-center gap-3"><TerminalSquare className="h-4 w-4 text-[#ff6b7f]" /> github.com/POSHANMS</span>
+          <a href={PROFILE.github} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/14 bg-black/20 px-4 py-3 text-white/68 transition duration-300 hover:border-[#ff1744]/70 hover:bg-[#ff1744]/10 hover:text-white">
+            <span className="flex items-center gap-3"><TerminalSquare className="h-4 w-4 text-[#ff5a66]" /> github.com/POSHANMS</span>
             <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
           </a>
-          <a href={PROFILE.linkedin} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/10 bg-black/15 px-4 py-3 text-white/62 transition hover:border-[#ff1744]/60 hover:text-white">
-            <span className="flex items-center gap-3"><Network className="h-4 w-4 text-[#ff6b7f]" /> linkedin.com/in/poshanms</span>
+          <a href={PROFILE.linkedin} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/14 bg-black/20 px-4 py-3 text-white/68 transition duration-300 hover:border-[#ff1744]/70 hover:bg-[#ff1744]/10 hover:text-white">
+            <span className="flex items-center gap-3"><Network className="h-4 w-4 text-[#ff5a66]" /> linkedin.com/in/poshanms</span>
             <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
           </a>
         </div>
@@ -676,7 +688,7 @@ export default function CinematicJourney({
         chapters.map((chapter) => [
           chapter.id,
           {
-            presence: visible ? chapterPresence(scrollProgress, chapter.range, chapter.holdUntilEnd) : 0,
+            presence: visible ? chapterPresence(scrollProgress, chapter.range, chapter.holdUntilEnd, chapter.persistAtEnd) : 0,
             progress: localProgress(scrollProgress, chapter.range),
           },
         ]),
@@ -686,7 +698,7 @@ export default function CinematicJourney({
   const activeChapter = useMemo(
     () => {
       const bestVisible = chapters.reduce((best, chapter) => {
-        const presence = chapterPresence(scrollProgress, chapter.range, chapter.holdUntilEnd);
+        const presence = chapterPresence(scrollProgress, chapter.range, chapter.holdUntilEnd, chapter.persistAtEnd);
         return presence > best.presence ? { id: chapter.id, presence } : best;
       }, { id: "hero" as ChapterId, presence: 0 });
 
@@ -789,7 +801,7 @@ export default function CinematicJourney({
 
       <div className="absolute right-8 top-24 hidden flex-col items-end gap-2 font-mono text-[9px] uppercase tracking-[0.26em] text-white/30 md:flex">
         {chapters.map((chapter) => {
-          const active = chapterPresence(scrollProgress, chapter.range, chapter.holdUntilEnd);
+          const active = chapterPresence(scrollProgress, chapter.range, chapter.holdUntilEnd, chapter.persistAtEnd);
           return (
             <div key={chapter.id} className="flex items-center gap-2" style={{ opacity: 0.24 + active * 0.76 }}>
               <span>{chapter.label}</span>
