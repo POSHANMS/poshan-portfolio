@@ -3,278 +3,88 @@
 import React, { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { useMousePosition } from "@/hooks/useMousePosition";
+
+function makeArc(radius: number, start: number, span: number) {
+  const points: THREE.Vector3[] = [];
+  for (let index = 0; index <= 40; index += 1) {
+    const angle = start + (index / 40) * span;
+    points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
+  }
+  return new THREE.BufferGeometry().setFromPoints(points);
+}
 
 export default function FloorRings() {
-  const ringsRef = useRef<THREE.Group>(null);
-  const energyRef = useRef<THREE.Group>(null);
-  const glowRef = useRef<THREE.Group>(null);
-  const secondaryRingsRef = useRef<THREE.Group>(null);
-  const timeRef = useRef(0);
-  const mouse = useMousePosition(0.08);
-
-  const ringGeometries = useMemo(() => {
-    const rings: THREE.BufferGeometry[] = [];
-    const radii = [0.4, 0.8, 1.3, 1.9, 2.6, 3.4, 4.3, 5.3, 6.4, 7.7];
-
-    for (const radius of radii) {
-      const points: THREE.Vector3[] = [];
-      const segments = Math.max(80, Math.floor(radius * 40));
-      for (let i = 0; i <= segments; i++) {
-        const angle = (i / segments) * Math.PI * 2;
-        points.push(new THREE.Vector3(
-          Math.cos(angle) * radius,
-          0,
-          Math.sin(angle) * radius
-        ));
-      }
-      rings.push(new THREE.BufferGeometry().setFromPoints(points));
-    }
-    return rings;
-  }, []);
-
-  const secondaryRingGeometries = useMemo(() => {
-    const rings: THREE.BufferGeometry[] = [];
-    const radii = [0.6, 1.05, 1.55, 2.2, 2.9, 3.8, 4.8, 5.8, 7.0];
-
-    for (const radius of radii) {
-      const points: THREE.Vector3[] = [];
-      const segments = Math.max(64, Math.floor(radius * 32));
-      for (let i = 0; i <= segments; i++) {
-        const angle = (i / segments) * Math.PI * 2;
-        points.push(new THREE.Vector3(
-          Math.cos(angle) * radius,
-          0,
-          Math.sin(angle) * radius
-        ));
-      }
-      rings.push(new THREE.BufferGeometry().setFromPoints(points));
-    }
-    return rings;
-  }, []);
-
-  const energyGeometries = useMemo(() => {
-    const segments: THREE.BufferGeometry[] = [];
-    const radii = [0.8, 1.5, 2.4, 3.5, 4.7, 6.1, 7.4];
-    
-    for (const radius of radii) {
-      const points: THREE.Vector3[] = [];
-      const arcLength = Math.PI * 0.5;
-      const segments_count = 48;
-      for (let i = 0; i <= segments_count; i++) {
-        const angle = (i / segments_count) * arcLength;
-        points.push(new THREE.Vector3(
-          Math.cos(angle) * radius,
-          0,
-          Math.sin(angle) * radius
-        ));
-      }
-      segments.push(new THREE.BufferGeometry().setFromPoints(points));
-    }
-    return segments;
-  }, []);
-
-  const rippleGeometries = useMemo(() => {
-    const ripples: THREE.BufferGeometry[] = [];
-    for (let r = 0; r < 6; r++) {
-      const points: THREE.Vector3[] = [];
-      const segments = 160;
-      for (let i = 0; i <= segments; i++) {
-        const angle = (i / segments) * Math.PI * 2;
-        points.push(new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)));
-      }
-      ripples.push(new THREE.BufferGeometry().setFromPoints(points));
-    }
-    return ripples;
-  }, []);
-
+  const fastTrack = useRef<THREE.Group>(null);
+  const slowTrack = useRef<THREE.Group>(null);
+  const rippleTrack = useRef<THREE.Group>(null);
   const { viewport } = useThree();
   const laptopX = Math.max(0.8, viewport.width * 0.08);
 
+  const arcs = useMemo(() => {
+    const values: THREE.BufferGeometry[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      values.push(makeArc(1.48, index * ((Math.PI * 2) / 5) + 0.12, Math.PI * 0.29));
+    }
+    return values;
+  }, []);
+
+  const ripples = useMemo(
+    () => Array.from({ length: 3 }, () => new THREE.RingGeometry(0.98, 1.005, 96)),
+    [],
+  );
+
   useFrame((state) => {
-    const dt = state.clock.getDelta();
-    
-    // Proximity to laptop base on floor
-    const dx = mouse.x - 0.25;
-    const dy = mouse.y + 0.15;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const proximity = Math.exp(-dist * dist * 4.0); // 1.0 close, 0.0 far
-    
-    // Rings pulse up to 2.2x faster near mouse
-    const speedFactor = 1.0 + proximity * 1.2;
-    timeRef.current += dt * speedFactor;
-    const t = timeRef.current;
-    
-    if (ringsRef.current) {
-      ringsRef.current.children.forEach((child, i) => {
-        const line = child as THREE.Line;
-        if (line && line.scale) {
-          const heartbeat = 1.0 + Math.sin(t * 0.85 + i * 0.45) * 0.035;
-          line.scale.set(heartbeat, heartbeat, heartbeat);
-        }
-        if (line.material) {
-          const mat = line.material as THREE.LineBasicMaterial;
-          const baseOpacity = Math.max(0.04, 0.12 - i * 0.008);
-          mat.opacity = baseOpacity + Math.sin(t * 0.55 + i * 0.65) * 0.04;
-        }
-      });
-    }
-
-    if (secondaryRingsRef.current) {
-      secondaryRingsRef.current.children.forEach((child, i) => {
-        const line = child as THREE.Line;
-        if (line.material) {
-          const mat = line.material as THREE.LineBasicMaterial;
-          mat.opacity = 0.04 + Math.sin(t * 0.7 + i * 1.0) * 0.025;
-        }
-      });
-    }
-
-    if (energyRef.current) {
-      energyRef.current.children.forEach((child, i) => {
-        const line = child as THREE.Line;
-        if (line) {
-          const speed = 0.42 + i * 0.15;
-          line.rotation.y = t * speed + i * 1.8;
-        }
-        if (line.material) {
-          const mat = line.material as THREE.LineBasicMaterial;
-          mat.opacity = 0.22 + Math.sin(t * 2.8 + i * 2.0) * 0.12;
-        }
-      });
-    }
-
-    if (glowRef.current) {
-      glowRef.current.children.forEach((child, i) => {
-        const mesh = child as THREE.Mesh;
-        if (mesh.material) {
-          const mat = mesh.material as THREE.MeshBasicMaterial;
-          const pulse = Math.sin(t * 0.5 + i * 1.2) * 0.5 + 0.5;
-          mat.opacity = 0.025 + pulse * 0.065;
-          const scale = 1.0 + pulse * 0.7;
-          mesh.scale.set(scale, scale, scale);
-        }
-      });
-    }
+    const time = state.clock.getElapsedTime();
+    if (fastTrack.current) fastTrack.current.rotation.y = time * 0.58;
+    if (slowTrack.current) slowTrack.current.rotation.y = -time * 0.19;
+    rippleTrack.current?.children.forEach((child, index) => {
+      const cycle = (time * 0.28 + index * 0.34) % 1;
+      const scale = 1.12 + cycle * 1.75;
+      child.scale.setScalar(scale);
+      const material = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      material.opacity = (1 - cycle) * 0.22;
+    });
   });
 
   return (
-    <group position={[laptopX + 0.2, -2.14, -1.24]}>
-      <group ref={ringsRef}>
-        {ringGeometries.map((geometry, i) => (
-          <primitive 
-            key={`ring-${i}`}
-            object={new THREE.Line(
-              geometry, 
-              new THREE.LineBasicMaterial({
-                color: i % 4 === 0 ? "#ff1744" : i % 3 === 0 ? "#ff3355" : "#cc1133",
-                transparent: true,
-                opacity: Math.max(0.04, 0.12 - i * 0.008),
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-              })
-            )} 
-          />
-        ))}
-      </group>
+    <group position={[laptopX + 0.18, -2.125, -1.24]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, 0]}>
+        <ringGeometry args={[0.78, 0.83, 128]} />
+        <meshBasicMaterial color="#fff1f4" transparent opacity={0.96} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+        <ringGeometry args={[1.02, 1.045, 128]} />
+        <meshBasicMaterial color="#ff1744" transparent opacity={0.88} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]}>
+        <ringGeometry args={[1.72, 1.735, 128]} />
+        <meshBasicMaterial color="#ff3355" transparent opacity={0.48} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
 
-      <group ref={secondaryRingsRef}>
-        {secondaryRingGeometries.map((geometry, i) => (
-          <primitive 
-            key={`secondary-${i}`}
-            object={new THREE.Line(
-              geometry, 
-              new THREE.LineBasicMaterial({
-                color: "#880022",
-                transparent: true,
-                opacity: 0.04,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-              })
-            )} 
-          />
-        ))}
-      </group>
-
-      <group ref={energyRef}>
-        {energyGeometries.map((geometry, i) => (
+      <group ref={fastTrack}>
+        {arcs.map((geometry, index) => (
           <primitive
-            key={`energy-${i}`}
-            object={new THREE.Line(
-              geometry,
-              new THREE.LineBasicMaterial({
-                color: i % 2 === 0 ? "#ff1744" : "#ff6688",
-                transparent: true,
-                opacity: 0.22,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-              })
-            )}
+            key={index}
+            object={new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: "#fff1f4", transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }))}
           />
         ))}
       </group>
-
-      <group ref={glowRef}>
-        {rippleGeometries.map((_, i) => (
-          <mesh key={`ripple-${i}`} rotation={[-Math.PI / 2, 0, 0]} scale={[0.4 + i * 1.3, 0.4 + i * 1.3, 1]}>
-            <ringGeometry args={[0.97, 1.0, 128]} />
-            <meshBasicMaterial
-              color="#ff1744"
-              transparent
-              opacity={0.025}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-              side={THREE.DoubleSide}
-            />
+      <group ref={slowTrack} rotation={[0, Math.PI / 5, 0]}>
+        {arcs.map((geometry, index) => (
+          <primitive
+            key={index}
+            object={new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: "#ff1744", transparent: true, opacity: 0.48, blending: THREE.AdditiveBlending, depthWrite: false }))}
+          />
+        ))}
+      </group>
+      <group ref={rippleTrack}>
+        {ripples.map((geometry, index) => (
+          <mesh key={index} geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
+            <meshBasicMaterial color="#ff1744" transparent opacity={0.18} blending={THREE.AdditiveBlending} depthWrite={false} />
           </mesh>
         ))}
       </group>
-
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <circleGeometry args={[3.5, 64]} />
-        <meshBasicMaterial
-          color="#ff1744"
-          transparent
-          opacity={0.05}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
-        <circleGeometry args={[1.2, 48]} />
-        <meshBasicMaterial
-          color="#ff4466"
-          transparent
-          opacity={0.10}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      <pointLight position={[0, 0.5, 0]} intensity={2.0} color="#ff1744" distance={10} decay={2} />
-
-      {[
-        [-1.5, 0.02, 1.0],
-        [0.2, 0.02, 1.8],
-        [1.6, 0.02, 0.6],
-        [-0.8, 0.02, -0.5],
-        [2.2, 0.02, 1.5],
-        [-2.0, 0.02, 0.3],
-        [1.0, 0.02, -1.0],
-        [-1.2, 0.02, 2.0],
-      ].map((pos, i) => (
-        <mesh key={`node-${i}`} position={pos as [number, number, number]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.05 + (i % 3) * 0.01, 24]} />
-          <meshBasicMaterial
-            color={i % 2 === 0 ? "#ff1744" : "#ff4466"}
-            transparent
-            opacity={0.08}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
+      <pointLight position={[0, 0.5, 0]} color="#ff1744" intensity={2.4} distance={6.5} decay={2} />
     </group>
   );
 }
