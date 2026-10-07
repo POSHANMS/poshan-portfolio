@@ -17,6 +17,7 @@ import FloatingHexParticles from "./FloatingHexParticles";
 import TechCubes from "./TechCubes";
 import FloatingLaptop from "./FloatingLaptop";
 import WormholeLaptopEntry from "./WormholeLaptopEntry";
+import ActOneHoloFX from "./ActOneHoloFX";
 import NeonGrid from "./NeonGrid";
 import FloorRings from "./FloorRings";
 import PostProcessing from "./PostProcessing";
@@ -214,6 +215,12 @@ export default function Scene({
               wormholeActive={wormholeActive}
               laptopScreenRef={laptopScreenRef}
               actFourPhase={actFourPhase}
+            />
+            {/* Act 1 Gemini Holographic FX (Binary Code Rain, Assembly Helix, Floating HUD Widgets) */}
+            <ActOneHoloFX
+              scrollProgress={scrollProgress}
+              powerUpStage={powerUpStage}
+              laptopOpacity={laptopOpacity}
             />
           </group>
 
