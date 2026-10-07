@@ -186,6 +186,20 @@ export function CinematicCamera({
     }
 
     const time = state.clock.getElapsedTime();
+    // Act I breathes before the first scroll: a small authored arc from the
+    // lower/front angle toward the right. It fades before the first scroll
+    // keyframe, leaving every real scene transition under scroll control.
+    if (p < 0.082 && actFourPhase === "locked") {
+      const settle = 1 - THREE.MathUtils.smoothstep(p, 0.026, 0.082);
+      const heroArc = time * 0.105 - Math.PI * 0.52;
+      desiredPosition.x += Math.sin(heroArc) * 0.48 * settle;
+      desiredPosition.y += Math.cos(heroArc * 0.72) * 0.1 * settle;
+      desiredPosition.z += (Math.cos(heroArc) - 0.25) * 0.14 * settle;
+      desiredLookAt.x += Math.sin(heroArc * 0.78) * 0.13 * settle;
+      desiredLookAt.y += Math.cos(heroArc * 0.7) * 0.045 * settle;
+      desiredFov -= 0.55 * settle;
+    }
+
     // Act VI uses a restrained camera orbit. The nebula itself stays fixed.
     if (p >= 0.963 && actFourPhase === "locked") {
       const orbit = time * 0.06;
