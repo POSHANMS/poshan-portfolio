@@ -75,6 +75,8 @@ export default function FloatingLaptop({
     lastBlinkTime: 0,
     initialized: false,
     locked: false,
+    screenTextureAttached: false,
+    lastScreenRender: 0,
   });
 
   useMemo(() => {
@@ -94,7 +96,7 @@ export default function FloatingLaptop({
       metalness:          0.55,
       roughness:          0.48,
       emissive:          "#ff1744",
-      emissiveIntensity:  0.18,
+      emissiveIntensity:  0.58,
     });
 
     const trackpadMaterial = new THREE.MeshStandardMaterial({
@@ -170,12 +172,13 @@ export default function FloatingLaptop({
       const mesh = screenMeshRef.current;
       if (texture && mesh) {
         const mat = mesh.material as THREE.MeshStandardMaterial;
-        if (!mat.map) {
+        if (!animRef.current.screenTextureAttached) {
           mat.map = texture;
           mat.emissiveMap = texture;
           mat.emissive = new THREE.Color("#ff2244");
           mat.emissiveIntensity = 0;
           mat.needsUpdate = true;
+          animRef.current.screenTextureAttached = true;
           clearInterval(id);
         }
       }
@@ -183,8 +186,8 @@ export default function FloatingLaptop({
     return () => clearInterval(id);
   }, []);
 
-  // Helper to draw terminal frame to canvas
-  const drawTerminal = (screenOn: boolean) => {
+  // Helper to draw split-screen IDE + terminal frame to canvas (matching Gemini video)
+  const drawTerminal = (screenOn: boolean, elapsed = 0) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -200,37 +203,126 @@ export default function FloatingLaptop({
       return;
     }
 
-    // Black background
-    ctx.fillStyle = "#050508";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const W = canvas.width;
+    const H = canvas.height;
+    const splitX = Math.floor(W * 0.52);
 
-    // Subtle crimson scanlines
-    for (let y = 0; y < canvas.height; y += 3) {
-      ctx.fillStyle = "rgba(255,0,30,0.04)";
-      ctx.fillRect(0, y, canvas.width, 1);
+    // Dark sleek cyberpunk background
+    ctx.fillStyle = "#060308";
+    ctx.fillRect(0, 0, W, H);
+
+    // Cool scanlines keep the live code readable against the red scene lighting.
+    for (let y = 0; y < H; y += 3) {
+      ctx.fillStyle = "rgba(86, 221, 255, 0.028)";
+      ctx.fillRect(0, y, W, 1);
     }
 
-    // Typography
-    ctx.font = "bold 13.5px monospace";
-    const lineH = 32, padX = 22, padY = 55;
+    // Top Title Bar
+    ctx.fillStyle = "rgba(7, 12, 20, 0.92)";
+    ctx.fillRect(0, 0, W, 22);
+    ctx.strokeStyle = "rgba(91, 222, 255, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, 22);
+    ctx.lineTo(W, 22);
+    ctx.stroke();
 
-    // Faded completed lines
-    ctx.globalAlpha = 0.65;
-    ctx.fillStyle   = "#ff2244";
+    // Title bar tabs
+    ctx.font = "bold 9px monospace";
+    ctx.fillStyle = "#75e5ff";
+    ctx.fillText("portfolio.scene.tsx", 16, 15);
+    ctx.fillStyle = "#ffd166";
+    ctx.fillText("system.live", splitX + 16, 15);
+
+    // Vertical Split Divider
+    ctx.strokeStyle = "rgba(117, 229, 255, 0.26)";
+    ctx.beginPath();
+    ctx.moveTo(splitX, 0);
+    ctx.lineTo(splitX, H);
+    ctx.stroke();
+
+    // ── LEFT PANE: SYNTAX-HIGHLIGHTED CODE (matching Gemini video) ──
+    const codeLines = [
+      { text: "import { Canvas } from '@react-three/fiber';", color: "#81eaff" },
+      { text: "export default function PortfolioScene() {", color: "#f6f8ff" },
+      { text: "  const mode = useSystem('ONLINE');", color: "#c7adff" },
+      { text: "  return (", color: "#f6f8ff" },
+      { text: "    <ExperienceEngine>", color: "#6cf2bb" },
+      { text: "      <CoreRenderer fps={120} />", color: "#ffd166" },
+      { text: "      <NeuralMesh active />", color: "#81eaff" },
+      { text: "    </ExperienceEngine>", color: "#6cf2bb" },
+      { text: "  );", color: "#f6f8ff" },
+      { text: "}", color: "#f6f8ff" },
+    ];
+
+    ctx.font = "bold 10px monospace";
+    const lineH = 18;
+    const startY = 42;
+    for (let i = 0; i < codeLines.length; i++) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+      ctx.fillText(`${i + 1}`, 12, startY + i * lineH); // Line number
+      ctx.fillStyle = codeLines[i].color;
+      ctx.fillText(codeLines[i].text, 32, startY + i * lineH);
+    }
+
+    // ── RIGHT PANE: REAL-TIME TERMINAL & DIAGNOSTIC STREAM ──
+    ctx.font = "bold 9.5px monospace";
+    const rPadX = splitX + 14;
+    let rY = 42;
+
+    // Faded completed boot lines
+    ctx.globalAlpha = 0.72;
+    ctx.fillStyle = "#ffd166";
     for (let i = 0; i < anim.completedLines.length; i++) {
-      ctx.fillText(anim.completedLines[i], padX, padY + i * lineH);
+      ctx.fillText(anim.completedLines[i], rPadX, rY);
+      rY += 22;
     }
 
-    // Active typing line — full brightness
+    // Active typing line
     ctx.globalAlpha = 1.0;
-    const curY = padY + anim.completedLines.length * lineH;
-    ctx.fillText(anim.currentText, padX, curY);
+    ctx.fillStyle = "#78f2c1";
+    ctx.fillText(anim.currentText, rPadX, rY);
 
-    // 1Hz blinking cursor
+    // Blinking cursor
     if (anim.cursorVisible) {
       const tw = ctx.measureText(anim.currentText).width;
-      ctx.fillText("\u2588", padX + tw, curY);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText("\u2588", rPadX + tw, rY);
     }
+
+    // A small live mesh makes the screen read as an active workstation.
+    const panelY = 174;
+    const panelHeight = 100;
+    ctx.strokeStyle = "rgba(117, 229, 255, 0.32)";
+    ctx.strokeRect(rPadX, panelY, W - rPadX - 14, panelHeight);
+    ctx.font = "8px monospace";
+    ctx.fillStyle = "#75e5ff";
+    ctx.fillText("WEBGL // NODE MESH", rPadX + 8, panelY + 14);
+    const panelWidth = W - rPadX - 30;
+    const nodes = Array.from({ length: 7 }, (_, index) => ({
+      x: rPadX + 12 + (index / 6) * panelWidth,
+      y: panelY + 57 + Math.sin(elapsed * 2.4 + index * 1.36) * 16 + (index % 2) * 8,
+    }));
+    ctx.strokeStyle = "rgba(255, 209, 102, 0.68)";
+    ctx.beginPath();
+    nodes.forEach((node, index) => {
+      if (index === 0) ctx.moveTo(node.x, node.y);
+      else ctx.lineTo(node.x, node.y);
+    });
+    ctx.stroke();
+    nodes.forEach((node, index) => {
+      ctx.fillStyle = index === 3 ? "#ff405f" : "#75e5ff";
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, index === 3 ? 3 : 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Small status footer
+    ctx.fillStyle = "rgba(255, 23, 68, 0.42)";
+    ctx.fillRect(0, H - 16, W, 16);
+    ctx.font = "8px monospace";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("● POSHAN_OS // PIPELINE: ONLINE // STATUS: 200 OK", 14, H - 5);
 
     ctx.globalAlpha = 1.0;
     textureDirtyRef.current = true;
@@ -287,7 +379,7 @@ export default function FloatingLaptop({
       if (t - anim.lastBlinkTime > 0.5) {
         anim.cursorVisible = !anim.cursorVisible;
         anim.lastBlinkTime = t;
-        drawTerminal(true);
+        drawTerminal(true, t);
       }
 
       // Typewriter Advance (every 45ms) until locked
@@ -296,7 +388,7 @@ export default function FloatingLaptop({
         const line = TERMINAL_LINES[anim.lineIndex];
         if (anim.currentText.length < line.length) {
           anim.currentText += line[anim.currentText.length];
-          drawTerminal(true);
+          drawTerminal(true, t);
         } else {
           anim.completedLines.push(anim.currentText);
           anim.currentText = "";
@@ -305,11 +397,17 @@ export default function FloatingLaptop({
             anim.locked = true; // Permanently locked — never reset or clear
             anim.cursorVisible = true;
           }
-          drawTerminal(true);
+          drawTerminal(true, t);
         }
       }
     } else if (anim.booting) {
-      drawTerminal(true);
+      drawTerminal(true, t);
+    }
+
+    // Keep the node mesh animated after the typewriter reaches its final line.
+    if (anim.booted && t - anim.lastScreenRender > 0.12) {
+      anim.lastScreenRender = t;
+      drawTerminal(true, t);
     }
 
     // Upload updated canvas texture to GPU
@@ -400,7 +498,7 @@ export default function FloatingLaptop({
 
       if (screenMeshRef.current) {
         const mat = screenMeshRef.current.material as THREE.MeshStandardMaterial;
-        const storyScreenGlow = (0.58 + portal * 1.05 + inside * 0.35 + pullback * 0.24) * (1 - actFourSeal);
+        const storyScreenGlow = (1.08 + portal * 0.92 + inside * 0.32 + pullback * 0.22) * (1 - actFourSeal);
         mat.emissiveIntensity = THREE.MathUtils.lerp(mat.emissiveIntensity, storyScreenGlow, 0.05);
       }
     }
@@ -411,7 +509,7 @@ export default function FloatingLaptop({
       const dist = Math.sqrt(dx * dx + dy * dy);
       const proximity = Math.exp(-dist * dist * 4.0);
 
-      kbLightRef.current.intensity = (0.8 + proximity * 2.5) * laptopOpacity;
+      kbLightRef.current.intensity = (1.35 + proximity * 2.5) * laptopOpacity;
       kbLightRef.current.intensity += phase(scrollProgress, 0.09, 0.36) * 2.6;
       kbLightRef.current.distance = 2.5 + proximity * 2.0;
     }
@@ -464,9 +562,17 @@ export default function FloatingLaptop({
 
         <pointLight
           position={[0, 0.3, 2.8]}
-          intensity={1.2 * effectiveOpacity}
+          intensity={2.35 * effectiveOpacity}
           color="#ffb3c1"
-          distance={10}
+          distance={12}
+          decay={2}
+        />
+
+        <pointLight
+          position={[0.2, 1.15, 1.35]}
+          intensity={1.15 * effectiveOpacity}
+          color="#76e7ff"
+          distance={7}
           decay={2}
         />
 
@@ -481,7 +587,7 @@ export default function FloatingLaptop({
         <pointLight
           ref={kbLightRef}
           position={[0.3, -0.12, 0.35]}
-          intensity={1.2 * effectiveOpacity}
+          intensity={2.4 * effectiveOpacity}
           distance={3.5}
           color="#ff6680"
           decay={2}
