@@ -124,14 +124,69 @@ function WarpStarfield({ phase }: { phase: ActFourPhase }) {
 }
 
 function HeroChapter({ presence }: { presence: number }) {
+  const [entered, setEntered] = useState(false);
+  const [typedTitle, setTypedTitle] = useState("");
+  const fullTitle = "FULL STACK DEVELOPER | AI DEVELOPER";
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setEntered(true));
+    let index = 0;
+    const interval = setInterval(() => {
+      index++;
+      setTypedTitle(fullTitle.slice(0, index));
+      if (index >= fullTitle.length) {
+        clearInterval(interval);
+      }
+    }, 45);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
-    <Panel presence={presence} side="left" className="left-6 top-[14vh] w-[min(36rem,calc(100vw-3rem))] md:left-16">
-      <Kicker act="ACT I" label="Hero Landing" />
-      <p className="mb-3 max-w-sm font-mono text-xs uppercase tracking-[0.14em] text-[#ff6b7f]">{PROFILE.title}</p>
-      <h1 className="max-w-xl text-6xl font-black uppercase leading-[0.86] tracking-normal text-white md:text-8xl">
-        Poshan MS
+    <Panel presence={presence} side="left" className="left-6 top-[14vh] w-[min(38rem,calc(100vw-3rem))] md:left-16">
+      <div
+        style={{
+          opacity: entered ? 1 : 0,
+          transform: `translate3d(${entered ? 0 : -26}px, 0, 0)`,
+          transition: "opacity 700ms cubic-bezier(0.16, 1, 0.3, 1), transform 700ms cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+      >
+        <Kicker act="ACT I" label="Hero Landing" />
+      </div>
+      <h1 className="max-w-xl overflow-hidden text-5xl font-black uppercase leading-[0.94] tracking-tight text-white drop-shadow-[0_0_24px_rgba(255,23,68,0.25)] md:text-7xl">
+        <span
+          className="block"
+          style={{
+            opacity: entered ? 1 : 0,
+            transform: `translate3d(${entered ? 0 : -70}px, 0, 0) skewX(${entered ? 0 : -8}deg)`,
+            filter: `blur(${entered ? 0 : 8}px)`,
+            transition: "opacity 760ms cubic-bezier(0.16, 1, 0.3, 1) 90ms, transform 760ms cubic-bezier(0.16, 1, 0.3, 1) 90ms, filter 760ms cubic-bezier(0.16, 1, 0.3, 1) 90ms",
+          }}
+        >
+          POSHAN <span className="text-[#ffe9ed]">MS</span>
+        </span>
       </h1>
-      <p className="mt-5 max-w-sm font-mono text-sm uppercase leading-7 tracking-[0.16em] text-white/62">
+      <p
+        className="mt-4 flex items-center font-mono text-xs uppercase tracking-[0.16em] text-[#ff6b7f]"
+        style={{
+          opacity: entered ? 1 : 0,
+          transform: `translateY(${entered ? 0 : 14}px)`,
+          transition: "opacity 560ms ease-out 530ms, transform 560ms cubic-bezier(0.16, 1, 0.3, 1) 530ms",
+        }}
+      >
+        <span>{typedTitle}</span>
+        <span className="ml-1 inline-block h-3.5 w-1.5 animate-pulse bg-[#ff1744]" />
+      </p>
+      <p
+        className="mt-5 max-w-sm font-mono text-sm uppercase leading-7 tracking-[0.16em] text-white/62"
+        style={{
+          opacity: entered ? 1 : 0,
+          transform: `translateY(${entered ? 0 : 14}px)`,
+          transition: "opacity 560ms ease-out 670ms, transform 560ms cubic-bezier(0.16, 1, 0.3, 1) 670ms",
+        }}
+      >
         Scroll to enter the laptop and open the portfolio world.
       </p>
     </Panel>
