@@ -9,7 +9,7 @@ import {
   Radio,
   TerminalSquare,
 } from "lucide-react";
-import { JOURNEY_MILESTONES, PROFILE, PROJECTS, RESUME_SUMMARY, SKILL_GROUPS, STATS } from "@/utils/constants";
+import { PROFILE, PROJECTS, RESUME_SUMMARY, SKILL_GROUPS, STATS } from "@/utils/constants";
 import HoldToWarp from "./HoldToWarp";
 import type { ActFourPhase } from "@/types/actFour";
 
@@ -595,43 +595,25 @@ function ProjectsChapter({
 
 function JourneyChapter({ presence, progress }: { presence: number; progress: number }) {
   const intro = smoothstep(0.02, 0.3, progress);
+  const checkpoint = progress < 0.335 ? 1 : progress < 0.6 ? 2 : progress < 0.865 ? 3 : 4;
 
   return (
-    <Panel presence={presence} side="left" className="left-6 top-[7vh] w-[min(42rem,calc(100vw-3rem))] md:left-16">
-      <div aria-hidden="true" className="pointer-events-none absolute -inset-x-10 -inset-y-8 -z-10 bg-[radial-gradient(ellipse_at_18%_45%,rgba(0,0,0,0.78),rgba(0,0,0,0.42)_52%,transparent_78%)]" />
+    <Panel presence={presence} side="left" className="left-6 top-[6vh] w-[min(31rem,calc(100vw-3rem))] md:left-16">
+      <div aria-hidden="true" className="pointer-events-none absolute -inset-x-10 -inset-y-8 -z-10 bg-[radial-gradient(ellipse_at_18%_25%,rgba(0,0,0,0.74),rgba(0,0,0,0.32)_55%,transparent_82%)]" />
       <div style={{ opacity: intro, transform: `translateY(${(1 - intro) * 12}px)`, willChange: "opacity, transform" }}>
         <Kicker act="ACT V" label="Education And Practice" />
       </div>
       <div className="flex items-center gap-4" style={{ opacity: intro, transform: `translateX(${(1 - intro) * -22}px)`, willChange: "opacity, transform" }}>
-        <GraduationCap className="h-8 w-8 text-[#ff6b7f]" />
-        <h2 className="text-3xl font-black uppercase leading-none text-white md:text-4xl">How The Work Was Built</h2>
+        <GraduationCap className="h-8 w-8 shrink-0 text-[#ff6b7f]" />
+        <div>
+          <h2 className="text-3xl font-black uppercase leading-none text-white md:text-4xl">How The Work Was Built</h2>
+          <p className="mt-3 max-w-sm font-mono text-[10px] uppercase tracking-[0.18em] text-white/65">Four milestones orbit the reactor. Scroll to move through the work.</p>
+        </div>
       </div>
-      <div className="mt-3 space-y-2">
-        {JOURNEY_MILESTONES.map((item, index) => {
-            const reveal = smoothstep(0.08 + index * 0.14, 0.28 + index * 0.14, progress);
-          return (
-              <div
-                key={item.title}
-                className="grid grid-cols-[1.5rem_1fr] gap-3"
-                style={{
-                  opacity: reveal,
-                  transform: `translate3d(0, ${(1 - reveal) * 26}px, 0)`,
-                  filter: `blur(${(1 - reveal) * 3}px)`,
-                  willChange: "opacity, transform, filter",
-                }}
-              >
-              <div className="relative flex justify-center">
-                <div className="mt-1 h-3 w-3 border border-[#ff1744] bg-black shadow-[0_0_18px_rgba(255,23,68,0.8)]" />
-                  {index < JOURNEY_MILESTONES.length - 1 && <div className="absolute top-5 h-9 w-px bg-[#ff1744]/24" />}
-              </div>
-                <div style={{ transform: `translateX(${(1 - reveal) * 20}px)`, willChange: "transform" }}>
-                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#ff1744]">checkpoint 0{index + 1}</p>
-                  <h3 className="mt-0.5 text-base font-bold text-white">{item.title}</h3>
-                  <p className="mt-1 text-xs leading-4 text-white/70">{item.body}</p>
-              </div>
-            </div>
-          );
-        })}
+      <div className="mt-6 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[#ff9cab]" style={{ opacity: intro }}>
+        <span>Checkpoint 0{checkpoint} / 04</span>
+        <span className="h-px w-16 bg-[#ff1744]/55"><span className="block h-full bg-[#ff4c63] transition-[width] duration-300" style={{ width: `${checkpoint * 25}%` }} /></span>
+        <span className="text-white/45">Scroll to inspect</span>
       </div>
     </Panel>
   );

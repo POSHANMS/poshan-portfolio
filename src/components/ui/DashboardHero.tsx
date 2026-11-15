@@ -677,7 +677,7 @@ function StatOrb({
 /** CSS Particle dust overlay */
 function ParticleDust({ opacity = 0.4 }: { opacity?: number }) {
   const dust = useMemo(() => {
-    return Array.from({ length: 30 }, (_, i) => ({
+    return Array.from({ length: 30 }, () => ({
       left: `${Math.random() * 100}%`,
       top: `${Math.random() * 100}%`,
       size: 1 + Math.random() * 2,
@@ -781,7 +781,6 @@ export default function DashboardHero({
     const spatialLock = Math.min(1, Math.max(0, (p - 0.28) / 0.08));
     const dissolve = Math.min(1, Math.max(0, (p - 0.8) / 0.2));
     const stableGlow = 0.7 + Math.sin(t * 2.4) * 0.16 * spatialLock;
-    const reveal = Math.min(1, mat * 1.8);
 
     return (
       <div

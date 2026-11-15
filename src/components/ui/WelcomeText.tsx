@@ -10,7 +10,6 @@ interface WelcomeTextProps {
 
 const FULL_TEXT = "POSHAN MS PORTFOLIO";
 const LINE_1 = "POSHAN MS";
-const LINE_2 = "PORTFOLIO";
 const BOOT_LINES = [
   "// FULL STACK DEVELOPER //",
   "BE COMPUTER SCIENCE ENGINEERING",
@@ -307,7 +306,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
   useEffect(() => {
     if (phase !== "warp") return;
 
-    let startTime = performance.now();
+    const startTime = performance.now();
     const duration = 600; // 0.6s total warp duration
 
     const warpLoop = () => {
@@ -443,7 +442,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
       {/* ═══ TOP BOOT INFO ═══ */}
       <div className="absolute top-[10vh] left-0 right-0 text-center">
         <p className="font-mono text-[9px] uppercase tracking-[0.5em] text-[#ff0033]/40">
-          // Poshan MS // Portfolio Entry
+          {"// Poshan MS // Portfolio Entry"}
         </p>
         {phase === "boot" && (
           <div className="mt-3 flex justify-center">
@@ -536,7 +535,7 @@ export default function WelcomeText({ onComplete, layoutMode = "stacked" }: Welc
             className="font-mono text-[10px] uppercase tracking-[0.6em] text-white/50"
             style={{ textShadow: "0 0 10px rgba(255,0,51,0.35)" }}
           >
-            // Computer Science Graduate Portfolio
+            {"// Computer Science Graduate Portfolio"}
           </p>
         </div>
       </div>

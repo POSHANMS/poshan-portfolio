@@ -45,7 +45,6 @@ const CRIMSON_CORE = new THREE.Color("#ff1744");
 const CRIMSON_DEEP = new THREE.Color("#ff0033");
 const CRIMSON_DARK = new THREE.Color("#800010");
 const CRIMSON_SOFT = new THREE.Color("#ff3355");
-const WHITE_HOT = new THREE.Color("#ffffff");
 
 const DISC_RADIUS = 6.5;
 const DISC_SEGMENTS = 128;

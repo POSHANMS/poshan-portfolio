@@ -25,13 +25,11 @@ import { useEffect, useCallback, useState } from "react";
 // Module-Level Singleton Nodes
 let _ctx: AudioContext | null = null;
 let _masterGain: GainNode | null = null;
-let _ambientGain: GainNode | null = null;
 let _bootGain: GainNode | null = null;
 let _activeBreachGain: GainNode | null = null;
 let _activeBreachCompressor: DynamicsCompressorNode | null = null;
 let _breachCleanupTimer: ReturnType<typeof setTimeout> | null = null;
 let _bootStopTimer: ReturnType<typeof setTimeout> | null = null;
-let _convolver: ConvolverNode | null = null;
 let _filter: BiquadFilterNode | null = null;
 let _subOsc: OscillatorNode | null = null;
 let _droneOsc: OscillatorNode | null = null;
@@ -276,7 +274,8 @@ export function useSuspenseAudio() {
     }
 
     try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
       const ctx = new AudioContextClass();
       _ctx = ctx;
 
@@ -296,7 +295,6 @@ export function useSuspenseAudio() {
       const ambientBus = ctx.createGain();
       ambientBus.gain.setValueAtTime(1.0, ctx.currentTime);
       ambientBus.connect(bootBus);
-      _ambientGain = ambientBus;
 
       // Convolver Reverb
       const convolver = ctx.createConvolver();
@@ -310,7 +308,6 @@ export function useSuspenseAudio() {
       }
       convolver.buffer = reverbBuf;
       convolver.connect(master);
-      _convolver = convolver;
 
       playCRTBootSound(ctx, bootBus);
 
@@ -658,7 +655,7 @@ export function useSuspenseAudio() {
     } catch (e) {
       console.warn("Error playing detonation blast sound:", e);
     }
-  }, []);
+  }, [stopLoaderDrones]);
 
   const stop = useCallback(() => {
     if (_heartbeatTimer) {
@@ -669,7 +666,6 @@ export function useSuspenseAudio() {
       try { _ctx.close(); } catch {}
       _ctx = null;
       _masterGain = null;
-      _ambientGain = null;
       _bootGain = null;
       _activeBreachGain = null;
       _activeBreachCompressor = null;
@@ -677,7 +673,6 @@ export function useSuspenseAudio() {
       if (_breachCleanupTimer) clearTimeout(_breachCleanupTimer);
       _bootStopTimer = null;
       _breachCleanupTimer = null;
-      _convolver = null;
       _filter = null;
       _subOsc = null;
       _droneOsc = null;

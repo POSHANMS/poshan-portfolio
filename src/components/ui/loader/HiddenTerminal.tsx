@@ -17,6 +17,7 @@ export default function HiddenTerminal({ onOverride, onThemeChange }: HiddenTerm
   ]);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const performanceMemory = performance as Performance & { memory?: { usedJSHeapSize: number } };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -64,7 +65,7 @@ export default function HiddenTerminal({ onOverride, onThemeChange }: HiddenTerm
         newHistory.push(
           "SYSTEM TELEMETRY DUMP:",
           `  CORES: ${navigator.hardwareConcurrency || 8} logical threads`,
-          `  MEMORY: ${(performance as any).memory ? Math.round((performance as any).memory.usedJSHeapSize / 1048576) + 'MB used' : '64MB heap allocated'}`,
+          `  MEMORY: ${performanceMemory.memory ? Math.round(performanceMemory.memory.usedJSHeapSize / 1048576) + "MB used" : "unavailable in this browser"}`,
           `  DISPLAY: ${window.innerWidth}x${window.innerHeight} @ DPR ${window.devicePixelRatio}`,
           "  UPLINK: STABLE 100Gbps (0.00% packet drop)",
           "  ENCRYPTION: G-256 QUANTUM LOCK"
@@ -121,7 +122,7 @@ export default function HiddenTerminal({ onOverride, onThemeChange }: HiddenTerm
         <div className="fixed bottom-16 right-6 z-[400] w-[380px] max-w-[90vw] h-[260px] bg-black/90 border border-[#ff0033]/80 rounded-lg p-4 font-mono text-xs shadow-[0_0_30px_rgba(255,0,51,0.4)] backdrop-blur-md flex flex-col pointer-events-auto">
           {/* Header Bar */}
           <div className="flex justify-between items-center pb-2 mb-2 border-b border-[#ff0033]/40 text-[#ff0033]">
-            <span className="text-[10px] tracking-widest font-bold">// NEURAL_CLI_v2.4</span>
+            <span className="text-[10px] tracking-widest font-bold">{"// NEURAL_CLI_v2.4"}</span>
             <button
               onClick={() => setIsOpen(false)}
               className="text-[#ff0033] hover:text-white text-sm"

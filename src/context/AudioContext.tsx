@@ -20,8 +20,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 export function useAudio() {
   const context = useContext(AudioContextInstance);
   if (!context) {
-    // Fallback to hook if outside provider
-    return useSuspenseAudio();
+    throw new Error("useAudio must be used within AudioProvider");
   }
   return context;
 }

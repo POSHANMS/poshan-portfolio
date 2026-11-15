@@ -121,6 +121,43 @@ const sceneCoordinates = [
   },
 ];
 
+const ACT_FIVE_ORIGIN = new THREE.Vector3(0, 0, -5.15);
+const ACT_FIVE_KEY_T = [0, 0.2, 0.47, 0.73, 1];
+const ACT_FIVE_POSITIONS = [
+  [-10.5, 3.6, 9.8],
+  [-7.6, 1.05, 6.2],
+  [-3.1, -0.35, 9.8],
+  [3.1, 0.45, 9.8],
+  [7.6, -0.55, 6.2],
+].map(([x, y, z]) => new THREE.Vector3(x, y, z).add(ACT_FIVE_ORIGIN));
+const ACT_FIVE_TARGETS = [
+  [0, 0, 0],
+  [-4.2, 0.65, 1.8],
+  [-1.8, -0.3, 4.2],
+  [1.8, 0.35, 4.2],
+  [4.2, -0.45, 1.8],
+].map(([x, y, z]) => new THREE.Vector3(x, y, z).add(ACT_FIVE_ORIGIN));
+const ACT_FIVE_POSITION_CURVE = new THREE.CatmullRomCurve3(ACT_FIVE_POSITIONS, false, "centripetal", 0.5);
+const ACT_FIVE_TARGET_CURVE = new THREE.CatmullRomCurve3(ACT_FIVE_TARGETS, false, "centripetal", 0.5);
+const ACT_FIVE_ENTRY_CAMERA = new THREE.Vector3(-11.5, 4.8, 11).add(ACT_FIVE_ORIGIN);
+const ACT_FIVE_ENTRY_TARGET = ACT_FIVE_ORIGIN.clone();
+const ACT_FIVE_EXIT_CAMERA = new THREE.Vector3(0, 0.55, 10.2);
+const ACT_FIVE_EXIT_TARGET = new THREE.Vector3(0, 0.15, -7.4);
+
+function pointOnKeyedCurve(curve: THREE.CatmullRomCurve3, value: number) {
+  const t = THREE.MathUtils.clamp(value, 0, 1);
+  let segment = ACT_FIVE_KEY_T.length - 2;
+  for (let index = 0; index < ACT_FIVE_KEY_T.length - 1; index += 1) {
+    if (t <= ACT_FIVE_KEY_T[index + 1]) {
+      segment = index;
+      break;
+    }
+  }
+  const span = ACT_FIVE_KEY_T[segment + 1] - ACT_FIVE_KEY_T[segment];
+  const local = span > 0 ? (t - ACT_FIVE_KEY_T[segment]) / span : 0;
+  return curve.getPoint((segment + local) / (ACT_FIVE_KEY_T.length - 1));
+}
+
 export function CinematicCamera({
   scrollProgress,
   lensDistortion = 0,
@@ -135,6 +172,7 @@ export function CinematicCamera({
   const currentFov = useRef(45);
   const smoothProgress = useRef(0);
   const warpProgress = useRef(0);
+  const cameraRoll = useRef(0);
 
   const clampedProgress = Math.max(0, Math.min(1, scrollProgress));
 
@@ -165,6 +203,36 @@ export function CinematicCamera({
     const desiredPosition = new THREE.Vector3().lerpVectors(from.camera, to.camera, easedT);
     const desiredLookAt = new THREE.Vector3().lerpVectors(from.lookAt, to.lookAt, easedT);
     let desiredFov = THREE.MathUtils.lerp(from.fov, to.fov, easedT);
+    let authoredActFiveRoll = 0;
+    let actFiveCameraActive = false;
+
+    // The Act V entry blends out of the existing Act IV camera, then follows
+    // keyed Catmull-Rom position and target splines through all four artifacts.
+    if (p >= 0.89 && p <= 0.956 && actFourPhase === "locked") {
+      actFiveCameraActive = true;
+      if (p < 0.915) {
+        const entry = THREE.MathUtils.smoothstep(p, 0.89, 0.915);
+        desiredPosition.lerp(ACT_FIVE_ENTRY_CAMERA, entry);
+        desiredLookAt.lerp(ACT_FIVE_ENTRY_TARGET, entry);
+        desiredFov = 50 + Math.sin(entry * Math.PI) * 26;
+        authoredActFiveRoll = -0.24 * Math.sin(entry * Math.PI);
+      } else {
+        const progress = THREE.MathUtils.clamp((p - 0.915) / (0.956 - 0.915), 0, 1);
+        desiredPosition.copy(pointOnKeyedCurve(ACT_FIVE_POSITION_CURVE, progress));
+        desiredLookAt.copy(pointOnKeyedCurve(ACT_FIVE_TARGET_CURVE, progress));
+        const velocity = clampedProgress - p;
+        desiredFov = 50 + Math.min(Math.abs(velocity) * 90, 22);
+        authoredActFiveRoll = THREE.MathUtils.clamp(-velocity * 1.65, -0.28, 0.28);
+      }
+      desiredPosition.x += state.pointer.x * 0.35;
+      desiredPosition.y -= state.pointer.y * 0.35;
+    } else if (p > 0.956 && p < 0.963 && actFourPhase === "locked") {
+      // Carry the final card's camera into Contact instead of jumping between rigs.
+      const transition = THREE.MathUtils.smoothstep(p, 0.956, 0.963);
+      desiredPosition.lerpVectors(ACT_FIVE_POSITIONS[4], ACT_FIVE_EXIT_CAMERA, transition);
+      desiredLookAt.lerpVectors(ACT_FIVE_TARGETS[4], ACT_FIVE_EXIT_TARGET, transition);
+      desiredFov = THREE.MathUtils.lerp(50, 45, transition);
+    }
 
     const isWarping = actFourPhase === "warping";
     warpProgress.current = THREE.MathUtils.damp(warpProgress.current, isWarping ? 1 : 0, isWarping ? 3.2 : 5.6, delta);
@@ -219,6 +287,12 @@ export function CinematicCamera({
 
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0));
     camera.lookAt(currentLookAt.current);
+    const scrollVelocity = clampedProgress - p;
+    const targetRoll = actFiveCameraActive
+      ? THREE.MathUtils.clamp(-scrollVelocity * 1.65 + authoredActFiveRoll, -0.28, 0.28)
+      : 0;
+    cameraRoll.current = THREE.MathUtils.lerp(cameraRoll.current, targetRoll, 0.08);
+    camera.rotateZ(cameraRoll.current);
     camera.fov = currentFov.current + lensDistortion * 15;
     camera.updateProjectionMatrix();
   });

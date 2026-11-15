@@ -32,7 +32,7 @@ export default function HUDSystem() {
             <span className="w-1.5 h-1.5 rounded-full bg-[#ff0033] animate-ping" />
             SECURE_NET_CONNECTION
           </div>
-          <div className="text-red-400/90">// PORTAL_GATE: [CHARGING...]</div>
+          <div className="text-red-400/90">{"// PORTAL_GATE: [CHARGING...]"}</div>
           <div className="flex gap-4 text-[9px] pt-1 text-red-500/80">
             <span>UPLINK: STABLE</span>
             <span>LATENCY: {latency}ms</span>

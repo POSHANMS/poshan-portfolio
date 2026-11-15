@@ -627,14 +627,20 @@ interface LoaderProps {
 
 export default function Loader({ onComplete }: LoaderProps) {
   const { audioEnabled, initAudio, finishLoaderAudio, setProgress: setAudioProgress, triggerTear: triggerAudioTear } = useSuspenseAudio();
+  const onCompleteRef = useRef(onComplete);
   const [isComplete, setIsComplete] = useState(false);
   const completionTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const loaderExitedRef = useRef(false);
 
   useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    const completionTimers = completionTimersRef.current;
     return () => {
-      completionTimersRef.current.forEach(clearTimeout);
-      completionTimersRef.current.clear();
+      completionTimers.forEach(clearTimeout);
+      completionTimers.clear();
       if (!loaderExitedRef.current) finishLoaderAudio();
     };
   }, [finishLoaderAudio]);
@@ -680,8 +686,6 @@ export default function Loader({ onComplete }: LoaderProps) {
   const hbRingsRef = useRef<{ birth: number }[]>([]);
   const lastHbRef = useRef(0);
   const themeColorRef = useRef("#ff0033");
-  const logoScaleRef = useRef(0);
-  const logoOpacityRef = useRef(0);
 
   const initDrops = (w: number, h: number) => {
     const drops: MicroDrop[] = [];
@@ -760,7 +764,7 @@ export default function Loader({ onComplete }: LoaderProps) {
         loaderExitedRef.current = true;
         finishLoaderAudio();
         setIsComplete(true);
-        onComplete?.();
+        onCompleteRef.current?.();
       }, 1200);
     };
 
@@ -922,7 +926,7 @@ export default function Loader({ onComplete }: LoaderProps) {
             loaderExitedRef.current = true;
             finishLoaderAudio();
             setIsComplete(true);
-            onComplete?.();
+            onCompleteRef.current?.();
           }, 150); // 150ms buffer as bloom opacity drops to 20%
         }
       }
@@ -1101,7 +1105,7 @@ export default function Loader({ onComplete }: LoaderProps) {
       window.removeEventListener("touchmove", handleTouchMove);
       cancelAnimationFrame(rafRef.current);
     };
-  }, []);
+  }, [finishLoaderAudio, setAudioProgress, triggerAudioTear]);
 
   if (isComplete) return null;
 

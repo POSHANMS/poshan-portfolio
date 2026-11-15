@@ -43,7 +43,7 @@ export default function ParticleNetwork() {
 
   const {
     positions, sizes, phases, lifetimes, maxLifetimes,
-    trailVelocities, trailColors,
+    trailVelocities,
   } = useMemo(() => {
     const pos = new Float32Array(TOTAL * 3);
     const sz = new Float32Array(TOTAL);
@@ -51,7 +51,6 @@ export default function ParticleNetwork() {
     const life = new Float32Array(TOTAL);
     const maxLife = new Float32Array(TOTAL);
     const tVel = new Float32Array(TRAIL_COUNT * 3);
-    const tCol = new Float32Array(TOTAL); // 0=ambient, 0-1=trail age
 
     // --- Ambient particles ---
     for (let i = 0; i < AMBIENT_COUNT; i++) {
@@ -64,7 +63,6 @@ export default function ParticleNetwork() {
       ph[i] = Math.random() * Math.PI * 2;
       life[i] = -1; // -1 = ambient, always alive
       maxLife[i] = -1;
-      tCol[i] = 0;
     }
 
     // --- Trail particles (all start dead) ---
@@ -77,7 +75,6 @@ export default function ParticleNetwork() {
       ph[i] = Math.random() * Math.PI * 2;
       life[i] = 0;
       maxLife[i] = 0;
-      tCol[i] = 1;
     }
 
     return {
@@ -87,7 +84,6 @@ export default function ParticleNetwork() {
       lifetimes: life,
       maxLifetimes: maxLife,
       trailVelocities: tVel,
-      trailColors: tCol,
     };
   }, []);
 

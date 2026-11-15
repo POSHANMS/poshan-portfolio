@@ -166,6 +166,7 @@ export default function Scene({
         <CinematicCamera scrollProgress={scrollProgress} lensDistortion={lensDistortion} actFourPhase={actFourPhase} />
 
         <color attach="background" args={["#000000"]} />
+        {isActFive && <fogExp2 attach="fog" args={["#040103", 0.026]} />}
 
         <SceneLights
           powerUpValues={powerUpValues}
@@ -234,7 +235,7 @@ export default function Scene({
           {scrollProgress < 0.956 && <ActFiveWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
           <ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} />
 
-          <PostProcessing hologramActive={hologramVisible} cosmicActive={isActSix} />
+          <PostProcessing hologramActive={hologramVisible} cosmicActive={isActSix} reactorActive={isActFive} />
         </Suspense>
       </Canvas>
     </div>

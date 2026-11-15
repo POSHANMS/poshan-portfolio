@@ -204,7 +204,6 @@ function createProjectTexture(projectIndex: number) {
 }
 
 function OrbitProjectCard({ index, activeFloat }: { index: number; activeFloat: number }) {
-  const project = PROJECTS[index];
   const groupRef = useRef<THREE.Group>(null);
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const glassRef = useRef<THREE.MeshPhysicalMaterial>(null);
@@ -277,6 +276,7 @@ function ProjectOrbit({ phase, projectIndex }: { phase: ActFourPhase; projectInd
 export default function ActFourWorld({ phase, projectIndex }: { phase: ActFourPhase; projectIndex: number }) {
   return (
     <group>
+      <WarpSpeedTunnel phase={phase} />
       <LivingCore phase={phase} />
       <ProjectOrbit phase={phase} projectIndex={projectIndex} />
     </group>

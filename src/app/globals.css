@@ -126,6 +126,22 @@ body {
   mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
 }
 
+@keyframes actFiveGlassPass {
+  0%, 68% { transform: translate3d(-150%, 0, 0) skewX(-18deg); opacity: 0; }
+  76% { opacity: 0.55; }
+  100% { transform: translate3d(210%, 0, 0) skewX(-18deg); opacity: 0; }
+}
+
+.act-five-glass-sheen {
+  width: 46%;
+  background: linear-gradient(105deg, transparent, rgba(255, 238, 242, 0.16), transparent);
+  opacity: 0;
+}
+
+.act-five-glass-sheen-active {
+  animation: actFiveGlassPass 6.5s ease-in-out infinite;
+}
+
 /* ═══════ STAGE GRID ═══════
    1760px × 920px absolute, scaled to viewport.
    3 rows:

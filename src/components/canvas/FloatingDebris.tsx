@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useMemo, useEffect } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useMousePosition } from "@/hooks/useMousePosition";
 
@@ -166,7 +166,6 @@ const HexShardSystem = React.memo(function HexShardSystem({
   mousePos,
 }: HexShardSystemProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const { camera } = useThree();
 
   // Scratch objects — persisted across frames to eliminate GC pressure
   const dummy = useMemo(() => new THREE.Object3D(), []);

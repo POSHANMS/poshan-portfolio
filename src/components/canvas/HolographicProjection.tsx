@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo, useEffect, useCallback } from "react";
+import React, { useRef, useMemo, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -1250,7 +1250,6 @@ export default function HolographicProjection({
             posArray[i3 + 1] = 0;
             const radius = Math.random() * 0.5;
             const angle = Math.random() * Math.PI * 2;
-            const y = 0;
             posArray[i3] = Math.cos(angle) * radius;
             posArray[i3 + 2] = Math.sin(angle) * radius;
           }

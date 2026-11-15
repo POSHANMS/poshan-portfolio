@@ -9,7 +9,7 @@ declare module "@react-three/postprocessing" {
   }
 
   export interface BloomProps {
-    ref?: React.Ref<any>;
+    ref?: React.Ref<unknown>;
     intensity?: number;
     radius?: number;
     luminanceThreshold?: number;

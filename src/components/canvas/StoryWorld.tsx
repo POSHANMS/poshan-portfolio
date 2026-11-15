@@ -81,8 +81,6 @@ function StarWarpTunnel({ scrollProgress }: { scrollProgress: number }) {
       const z = seed.z + flow;
       const stretch = seed.len * (1 + warp * 5);
       const pull = 1 - warp * 0.22;
-      const i6 = i * 6;
-
       attr.setXYZ(i * 2, seed.x * pull, seed.y, z);
       attr.setXYZ(i * 2 + 1, seed.x * (pull * 0.98), seed.y, z - stretch);
     }
@@ -584,6 +582,7 @@ export default function StoryWorld({ scrollProgress, actFourPhase = "locked" }: 
       <EntryProbe scrollProgress={scrollProgress} />
       <LaptopPortal scrollProgress={scrollProgress} />
       <InteriorWorld scrollProgress={scrollProgress} />
+      <SkillConstellation scrollProgress={scrollProgress} />
       {actFourPhase === "locked" && <ProjectBeacons scrollProgress={scrollProgress} />}
       {actFourPhase === "locked" && <TransmissionSignal scrollProgress={scrollProgress} />}
     </group>

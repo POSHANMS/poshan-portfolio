@@ -11,6 +11,7 @@ import * as THREE from "three";
 export interface PostProcessingProps {
   hologramActive?: boolean;
   cosmicActive?: boolean;
+  reactorActive?: boolean;
 }
 
 const DEFAULT_STRENGTH = 0.32;
@@ -24,10 +25,13 @@ const HOLOGRAM_THRESHOLD = 0.35;
 const COSMIC_STRENGTH = 0.52;
 const COSMIC_RADIUS = 0.38;
 const COSMIC_THRESHOLD = 0.96;
+const REACTOR_STRENGTH = 0.62;
+const REACTOR_RADIUS = 0.4;
+const REACTOR_THRESHOLD = 0.28;
 
 const LERP_FACTOR = 0.05;
 
-export default function PostProcessing({ hologramActive, cosmicActive }: PostProcessingProps) {
+export default function PostProcessing({ hologramActive, cosmicActive, reactorActive }: PostProcessingProps) {
   const { gl, scene, camera, size } = useThree();
   const bloomPassRef = useRef<UnrealBloomPass | null>(null);
 
@@ -54,7 +58,7 @@ export default function PostProcessing({ hologramActive, cosmicActive }: PostPro
     instance.addPass(outputPass);
 
     return instance;
-  }, [gl, scene, camera]);
+  }, [gl, scene, camera, size.width, size.height]);
 
   useEffect(() => {
     composer.setSize(size.width, size.height);
@@ -65,9 +69,9 @@ export default function PostProcessing({ hologramActive, cosmicActive }: PostPro
 
   useFrame(() => {
     if (bloomPassRef.current) {
-      const targetStrength = cosmicActive ? COSMIC_STRENGTH : hologramActive ? HOLOGRAM_STRENGTH : DEFAULT_STRENGTH;
-      const targetRadius = cosmicActive ? COSMIC_RADIUS : hologramActive ? HOLOGRAM_RADIUS : DEFAULT_RADIUS;
-      const targetThreshold = cosmicActive ? COSMIC_THRESHOLD : hologramActive ? HOLOGRAM_THRESHOLD : DEFAULT_THRESHOLD;
+      const targetStrength = cosmicActive ? COSMIC_STRENGTH : reactorActive ? REACTOR_STRENGTH : hologramActive ? HOLOGRAM_STRENGTH : DEFAULT_STRENGTH;
+      const targetRadius = cosmicActive ? COSMIC_RADIUS : reactorActive ? REACTOR_RADIUS : hologramActive ? HOLOGRAM_RADIUS : DEFAULT_RADIUS;
+      const targetThreshold = cosmicActive ? COSMIC_THRESHOLD : reactorActive ? REACTOR_THRESHOLD : hologramActive ? HOLOGRAM_THRESHOLD : DEFAULT_THRESHOLD;
 
       bloomStrength.current = THREE.MathUtils.lerp(
         bloomStrength.current,
