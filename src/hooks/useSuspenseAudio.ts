@@ -26,6 +26,11 @@ import { useEffect, useCallback, useState } from "react";
 let _ctx: AudioContext | null = null;
 let _masterGain: GainNode | null = null;
 let _ambientGain: GainNode | null = null;
+let _bootGain: GainNode | null = null;
+let _activeBreachGain: GainNode | null = null;
+let _activeBreachCompressor: DynamicsCompressorNode | null = null;
+let _breachCleanupTimer: ReturnType<typeof setTimeout> | null = null;
+let _bootStopTimer: ReturnType<typeof setTimeout> | null = null;
 let _convolver: ConvolverNode | null = null;
 let _filter: BiquadFilterNode | null = null;
 let _subOsc: OscillatorNode | null = null;
@@ -283,9 +288,14 @@ export function useSuspenseAudio() {
       master.connect(ctx.destination);
       _masterGain = master;
 
+      const bootBus = ctx.createGain();
+      bootBus.gain.setValueAtTime(1, ctx.currentTime);
+      bootBus.connect(master);
+      _bootGain = bootBus;
+
       const ambientBus = ctx.createGain();
       ambientBus.gain.setValueAtTime(1.0, ctx.currentTime);
-      ambientBus.connect(master);
+      ambientBus.connect(bootBus);
       _ambientGain = ambientBus;
 
       // Convolver Reverb
@@ -302,7 +312,7 @@ export function useSuspenseAudio() {
       convolver.connect(master);
       _convolver = convolver;
 
-      playCRTBootSound(ctx, master);
+      playCRTBootSound(ctx, bootBus);
 
       const filter = ctx.createBiquadFilter();
       filter.type = "lowpass";
@@ -381,7 +391,7 @@ export function useSuspenseAudio() {
 
       noise.connect(rainFilter);
       rainFilter.connect(noiseGain);
-      noiseGain.connect(master);
+      noiseGain.connect(bootBus);
       noise.start();
       _noiseNode = noise;
 
@@ -403,7 +413,7 @@ export function useSuspenseAudio() {
         kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
         kick1.connect(kickGain);
-        kickGain.connect(master);
+        kickGain.connect(bootBus);
         kick1.start(now);
         kick1.stop(now + 0.16);
 
@@ -417,7 +427,7 @@ export function useSuspenseAudio() {
         kickGain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
 
         kick2.connect(kickGain2);
-        kickGain2.connect(master);
+        kickGain2.connect(bootBus);
         kick2.start(now + 0.18);
         kick2.stop(now + 0.33);
       };
@@ -470,6 +480,42 @@ export function useSuspenseAudio() {
     try { if (_noiseNode){ _noiseNode.stop(now);_noiseNode= null; } } catch {}
   }, []);
 
+  // Fade only boot and detonation buses so the next screen's keystroke audio
+  // remains available on the shared master bus.
+  const finishLoaderAudio = useCallback(() => {
+    if (!_ctx) {
+      stopLoaderDrones();
+      return;
+    }
+
+    const ctx = _ctx;
+    const now = ctx.currentTime;
+    const fadeEnd = now + 0.25;
+    for (const gain of [_bootGain, _activeBreachGain]) {
+      if (!gain) continue;
+      try {
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), now);
+        gain.gain.linearRampToValueAtTime(0.0001, fadeEnd);
+      } catch {}
+    }
+
+    if (_bootStopTimer) clearTimeout(_bootStopTimer);
+    _bootStopTimer = setTimeout(() => {
+      stopLoaderDrones();
+      _bootStopTimer = null;
+    }, 260);
+
+    if (_breachCleanupTimer) clearTimeout(_breachCleanupTimer);
+    _breachCleanupTimer = setTimeout(() => {
+      try { _activeBreachCompressor?.disconnect(); } catch {}
+      try { _activeBreachGain?.disconnect(); } catch {}
+      _activeBreachCompressor = null;
+      _activeBreachGain = null;
+      _breachCleanupTimer = null;
+    }, 300);
+  }, [stopLoaderDrones]);
+
   // ═══════════════════════════════════════════════════════════════════════
   // DETONATION IMPACT & LOADER AUDIO TERMINATION
   // ═══════════════════════════════════════════════════════════════════════
@@ -493,6 +539,7 @@ export function useSuspenseAudio() {
       const blastTime = now + 0.02;
 
       const compressor = ctx.createDynamicsCompressor();
+      _activeBreachCompressor = compressor;
       compressor.threshold.setValueAtTime(-14, blastTime);
       compressor.knee.setValueAtTime(4, blastTime);
       compressor.ratio.setValueAtTime(14, blastTime);
@@ -501,6 +548,7 @@ export function useSuspenseAudio() {
       compressor.connect(ctx.destination);
 
       const breachMaster = ctx.createGain();
+      _activeBreachGain = breachMaster;
       breachMaster.gain.setValueAtTime(1.0, blastTime);
       breachMaster.gain.exponentialRampToValueAtTime(0.001, blastTime + 1.4);
       breachMaster.connect(compressor);
@@ -598,9 +646,13 @@ export function useSuspenseAudio() {
       bell1.stop(blastTime + 1.2);
       bell2.stop(blastTime + 1.2);
 
-      setTimeout(() => {
+      if (_breachCleanupTimer) clearTimeout(_breachCleanupTimer);
+      _breachCleanupTimer = setTimeout(() => {
         try { compressor.disconnect(); } catch {}
         try { breachMaster.disconnect(); } catch {}
+        if (_activeBreachCompressor === compressor) _activeBreachCompressor = null;
+        if (_activeBreachGain === breachMaster) _activeBreachGain = null;
+        _breachCleanupTimer = null;
       }, 2000);
 
     } catch (e) {
@@ -618,6 +670,13 @@ export function useSuspenseAudio() {
       _ctx = null;
       _masterGain = null;
       _ambientGain = null;
+      _bootGain = null;
+      _activeBreachGain = null;
+      _activeBreachCompressor = null;
+      if (_bootStopTimer) clearTimeout(_bootStopTimer);
+      if (_breachCleanupTimer) clearTimeout(_breachCleanupTimer);
+      _bootStopTimer = null;
+      _breachCleanupTimer = null;
       _convolver = null;
       _filter = null;
       _subOsc = null;
@@ -656,5 +715,5 @@ export function useSuspenseAudio() {
     };
   }, [initAudio]);
 
-  return { audioEnabled, initAudio, stopLoaderDrones, setProgress, triggerTear, stop, playCursorPlink, playTypingKeystrokeSound, playEnterPunchSound };
+  return { audioEnabled, initAudio, stopLoaderDrones, finishLoaderAudio, setProgress, triggerTear, stop, playCursorPlink, playTypingKeystrokeSound, playEnterPunchSound };
 }

@@ -540,6 +540,16 @@ function ProjectsChapter({
           <div className="mt-3 flex flex-wrap gap-1.5">
             {project.stack.slice(0, 6).map((item) => <span key={item} className="border border-[#ff6b7f]/35 bg-[#ff1744]/10 px-2 py-1 font-mono text-[9px] text-white/84">{item}</span>)}
           </div>
+          <div className="mt-4 flex flex-wrap gap-2" style={{ pointerEvents: "auto" }}>
+            <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()} className="pointer-events-auto relative z-[60] border border-[#ff5a66]/65 bg-[#260008]/85 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white shadow-[0_0_16px_rgba(255,23,68,0.16)] transition hover:-translate-y-0.5 hover:border-white hover:bg-[#5b0017]/90">
+              GitHub
+            </a>
+            {project.href && (
+              <a href={project.href} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()} className="pointer-events-auto relative z-[60] border border-[#ff5a66]/65 bg-[#260008]/85 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white shadow-[0_0_16px_rgba(255,23,68,0.16)] transition hover:-translate-y-0.5 hover:border-white hover:bg-[#5b0017]/90">
+                Live Demo
+              </a>
+            )}
+          </div>
           <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.18em] text-white/42">
             {exitArmed ? "Final project secured. Recall vector ready." : projectIndex === PROJECTS.length - 1 ? "Scroll once to prepare your return." : "Continue scrolling to orbit the next project"}
           </p>
@@ -653,15 +663,15 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
           Full Stack Developer and AI Developer from Karnataka, India.
         </p>
           <div className="mx-auto mt-7 grid max-w-xl gap-3 font-mono text-xs" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 24}px)`, willChange: "opacity, transform" }}>
-          <a href={`mailto:${PROFILE.email}`} className="group flex items-center justify-between border border-[#ff1744]/36 bg-transparent px-4 py-3 text-white/76 transition duration-300 hover:border-[#ff5a66] hover:bg-[#ff1744]/10 hover:text-white">
+          <a href={`mailto:${PROFILE.email}`} className="group flex items-center justify-between border border-[rgba(255,40,70,0.35)] bg-[rgba(10,5,8,0.82)] px-4 py-3 text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.85)] backdrop-blur-[12px] transition duration-300 hover:-translate-y-0.5 hover:border-[#ff5a66] hover:shadow-[0_0_18px_rgba(255,40,70,0.22)]">
             <span className="flex items-center gap-3"><Mail className="h-4 w-4 text-[#ff5a66]" /> {PROFILE.email}</span>
             <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
           </a>
-          <a href={PROFILE.github} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/14 bg-transparent px-4 py-3 text-white/68 transition duration-300 hover:border-[#ff1744]/70 hover:bg-[#ff1744]/10 hover:text-white">
+          <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" className="group flex items-center justify-between border border-[rgba(255,40,70,0.35)] bg-[rgba(10,5,8,0.82)] px-4 py-3 text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.85)] backdrop-blur-[12px] transition duration-300 hover:-translate-y-0.5 hover:border-[#ff5a66] hover:shadow-[0_0_18px_rgba(255,40,70,0.22)]">
             <span className="flex items-center gap-3"><TerminalSquare className="h-4 w-4 text-[#ff5a66]" /> github.com/POSHANMS</span>
             <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
           </a>
-          <a href={PROFILE.linkedin} target="_blank" rel="noreferrer" className="group flex items-center justify-between border border-white/14 bg-transparent px-4 py-3 text-white/68 transition duration-300 hover:border-[#ff1744]/70 hover:bg-[#ff1744]/10 hover:text-white">
+          <a href={PROFILE.linkedin} target="_blank" rel="noopener noreferrer" className="group flex items-center justify-between border border-[rgba(255,40,70,0.35)] bg-[rgba(10,5,8,0.82)] px-4 py-3 text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.85)] backdrop-blur-[12px] transition duration-300 hover:-translate-y-0.5 hover:border-[#ff5a66] hover:shadow-[0_0_18px_rgba(255,40,70,0.22)]">
             <span className="flex items-center gap-3"><Network className="h-4 w-4 text-[#ff5a66]" /> linkedin.com/in/poshanms</span>
             <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
           </a>
@@ -817,7 +827,7 @@ export default function CinematicJourney({
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter}>
+    <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
       <WarpStarfield phase={actFourPhase} />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,transparent_0%,transparent_53%,rgba(0,0,0,0.28)_100%)]" />
       <HeroChapter presence={states.hero.presence} />

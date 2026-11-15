@@ -24,7 +24,7 @@ export const PROJECTS = [
     subtitle: "Campus Lost & Found Portal",
     stack: ["React", "Flask", "PostgreSQL", "Redis", "Socket.io", "JWT", "Docker", "Leaflet.js"],
     liveLabel: "Deployed on Vercel",
-    href: "",
+    href: "https://findit-portal.vercel.app/",
     description:
       "Built a full-stack portal that matches lost and found items and alerts users in real time with Socket.io, JWT auth, Redis caching, GPS location pinning, Docker, and Vercel deployment.",
   },
@@ -59,8 +59,8 @@ export const PROJECTS = [
     name: "NoteFlash",
     subtitle: "Flask + MySQL Notes App",
     stack: ["Flask", "MySQL", "Railway"],
-    liveLabel: "noteflash.up.railway.app",
-    href: "https://noteflash.up.railway.app",
+    liveLabel: "Flask + MySQL notes app",
+    href: "",
     description:
       "Deployed on Railway with a custom subdomain and a focused note management workflow for creating, organizing, and managing notes.",
   },

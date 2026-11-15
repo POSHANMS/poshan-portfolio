@@ -9,7 +9,7 @@ import HiddenTerminal from "@/components/ui/loader/HiddenTerminal";
 // CINEMATIC BREACH CONFIGURATION — Professional spacetime tear
 // ═══════════════════════════════════════════════════════════════════════
 const CONFIG = {
-  LOAD_DURATION: 10000,
+  LOAD_DURATION: 5000,
   CONVERGE_DURATION: 2000,
   DROP_COUNTS: { back: 300, mid: 150, front: 50 },
   MOUSE_RADIUS: 220,
@@ -626,14 +626,27 @@ interface LoaderProps {
 }
 
 export default function Loader({ onComplete }: LoaderProps) {
-  const { audioEnabled, initAudio, stopLoaderDrones, setProgress: setAudioProgress, triggerTear: triggerAudioTear } = useSuspenseAudio();
+  const { audioEnabled, initAudio, finishLoaderAudio, setProgress: setAudioProgress, triggerTear: triggerAudioTear } = useSuspenseAudio();
   const [isComplete, setIsComplete] = useState(false);
+  const completionTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const loaderExitedRef = useRef(false);
 
   useEffect(() => {
     return () => {
-      stopLoaderDrones();
+      completionTimersRef.current.forEach(clearTimeout);
+      completionTimersRef.current.clear();
+      if (!loaderExitedRef.current) finishLoaderAudio();
     };
-  }, [stopLoaderDrones]);
+  }, [finishLoaderAudio]);
+
+  const scheduleCompletion = (callback: () => void, delay: number) => {
+    const timer = setTimeout(() => {
+      completionTimersRef.current.delete(timer);
+      callback();
+    }, delay);
+    completionTimersRef.current.add(timer);
+    return timer;
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const matrixCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -743,7 +756,9 @@ export default function Loader({ onComplete }: LoaderProps) {
         bigCounterRef.current.style.display = "none";
       }
 
-      setTimeout(() => {
+      scheduleCompletion(() => {
+        loaderExitedRef.current = true;
+        finishLoaderAudio();
         setIsComplete(true);
         onComplete?.();
       }, 1200);
@@ -903,7 +918,9 @@ export default function Loader({ onComplete }: LoaderProps) {
             flashRef.current.style.transition = "opacity 0.4s ease-out";
             flashRef.current.style.opacity = "0";
           }
-          setTimeout(() => {
+          scheduleCompletion(() => {
+            loaderExitedRef.current = true;
+            finishLoaderAudio();
             setIsComplete(true);
             onComplete?.();
           }, 150); // 150ms buffer as bloom opacity drops to 20%
@@ -1092,6 +1109,7 @@ export default function Loader({ onComplete }: LoaderProps) {
     <div
       ref={containerRef}
       onClick={() => initAudio()}
+      onDragStart={(event) => event.preventDefault()}
       className="fixed inset-0 z-[99999] overflow-hidden cursor-pointer"
       style={{ background: CONFIG.VOID_BLACK }}
     >

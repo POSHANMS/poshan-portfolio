@@ -29,6 +29,23 @@ body {
   overscroll-behavior-y: none;
 }
 
+main,
+main *,
+[data-cinematic-track],
+[data-cinematic-track] *,
+[data-cinematic-track] h1,
+[data-cinematic-track] h2,
+[data-cinematic-track] h3,
+[data-cinematic-track] button,
+[data-cinematic-track] a,
+[data-cinematic-track] [role="button"] {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 body {
   scrollbar-gutter: stable;
 }

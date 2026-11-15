@@ -157,7 +157,7 @@ export default function Home() {
     powerUpStage === "complete";
 
   return (
-    <main className="relative w-full bg-[#000000]">
+    <main className="relative w-full bg-[#000000]" onDragStart={(event) => event.preventDefault()}>
       {/* LOADER */}
       {!loaderComplete && <Loader onComplete={handleLoaderComplete} />}
 

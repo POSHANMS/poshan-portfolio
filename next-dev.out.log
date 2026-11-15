@@ -1,0 +1,36 @@
+
+> poshanms-portfolio@0.1.0 dev
+> next dev -p 3002
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3002
+
+ ✓ Starting...
+ ✓ Ready in 8.7s
+ ○ Compiling / ...
+ ✓ Compiled / in 9.9s (1788 modules)
+ GET / 200 in 10728ms
+ ✓ Compiled in 268ms (888 modules)
+ GET / 200 in 76ms
+ ✓ Compiled /favicon.ico in 333ms (932 modules)
+ GET /favicon.ico 200 in 534ms
+ ✓ Compiled in 492ms (1774 modules)
+ ✓ Compiled in 439ms (1788 modules)
+ ✓ Compiled in 443ms (1788 modules)
+ ✓ Compiled in 557ms (1788 modules)
+ ✓ Compiled in 667ms (1788 modules)
+ ✓ Compiled in 573ms (1788 modules)
+ ✓ Compiled in 421ms (1788 modules)
+ ✓ Compiled in 318ms (1774 modules)
+ GET /?act4exit=5 200 in 206ms
+ GET / 200 in 43ms
+ ✓ Compiled /favicon.ico in 334ms (932 modules)
+ GET /favicon.ico 200 in 416ms
+ GET /favicon.ico 200 in 12ms
+ ✓ Compiled in 618ms (1788 modules)
+ GET / 200 in 173ms
+ ✓ Compiled /favicon.ico in 228ms (932 modules)
+ GET /favicon.ico 200 in 333ms
+ GET /?return-dock=6 200 in 132ms
+ GET / 200 in 61ms
+ GET /favicon.ico 200 in 14ms
