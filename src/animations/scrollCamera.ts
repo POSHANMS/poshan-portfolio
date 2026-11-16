@@ -163,6 +163,8 @@ export function CinematicCamera({
   const smoothProgress = useRef(0);
   const warpProgress = useRef(0);
   const cameraRoll = useRef(0);
+  const cameraPitch = useRef(0);
+  const cameraYaw = useRef(0);
 
   const clampedProgress = Math.max(0, Math.min(1, scrollProgress));
 
@@ -194,6 +196,8 @@ export function CinematicCamera({
     const desiredLookAt = new THREE.Vector3().lerpVectors(from.lookAt, to.lookAt, easedT);
     let desiredFov = THREE.MathUtils.lerp(from.fov, to.fov, easedT);
     let authoredActFiveRoll = 0;
+    let authoredActFivePitch = 0;
+    let authoredActFiveYaw = 0;
     let actFiveCameraActive = false;
 
     // The Act V entry blends out of the existing Act IV camera, then follows
@@ -206,8 +210,14 @@ export function CinematicCamera({
         desiredPosition.lerp(ACT_FIVE_ENTRY_CAMERA, entry);
         desiredLookAt.lerp(ACT_FIVE_ENTRY_TARGET, entry);
         const entryPunch = Math.sin(entry * Math.PI);
-        desiredFov = THREE.MathUtils.lerp(48, 57, entry) + entryPunch * 2.2;
-        authoredActFiveRoll = Math.sin(entry * Math.PI) * 0.08;
+        const entryArc = Math.sin(entry * Math.PI * 0.82);
+        desiredPosition.x += entryArc * 0.3;
+        desiredPosition.y += entryPunch * 0.16;
+        desiredLookAt.x += entryArc * 0.12;
+        desiredFov = THREE.MathUtils.lerp(49, 53, entry) + entryPunch * 6.5;
+        authoredActFiveRoll = Math.sin(entry * Math.PI) * 0.16;
+        authoredActFivePitch = Math.sin(entry * Math.PI) * -0.045;
+        authoredActFiveYaw = entryArc * 0.055;
       } else {
         const progress = THREE.MathUtils.clamp((p - ACT_FIVE_TIMING.cameraStart) / (ACT_FIVE_TIMING.sceneExit - ACT_FIVE_TIMING.cameraStart), 0, 1);
         desiredPosition.copy(pointOnKeyedCurve(ACT_FIVE_POSITION_CURVE, progress));
@@ -221,6 +231,8 @@ export function CinematicCamera({
           const travel = Math.sin(blend * Math.PI);
           const turnSign = index % 2 === 0 ? 1 : -1;
           bank += travel * turnSign * 0.255;
+          authoredActFivePitch += travel * (index % 2 === 0 ? -0.038 : 0.032);
+          authoredActFiveYaw += travel * turnSign * 0.045;
           speedRamp = Math.max(speedRamp, travel);
           if (travel > 0) {
             const forward = desiredLookAt.clone().sub(desiredPosition).normalize();
@@ -231,6 +243,8 @@ export function CinematicCamera({
         }
         const exitBlend = THREE.MathUtils.smoothstep(progress, 0.68, 1.0);
         bank += Math.sin(exitBlend * Math.PI) * 0.18;
+        authoredActFivePitch += Math.sin(exitBlend * Math.PI) * -0.055;
+        authoredActFiveYaw += Math.sin(exitBlend * Math.PI) * 0.06;
         speedRamp = Math.max(speedRamp, Math.sin(exitBlend * Math.PI) * 0.7);
         desiredFov = 51.5 + speedRamp * 10.5;
         authoredActFiveRoll = bank;
@@ -291,7 +305,13 @@ export function CinematicCamera({
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0));
     camera.lookAt(currentLookAt.current);
     const targetRoll = actFiveCameraActive ? authoredActFiveRoll : 0;
+    const targetPitch = actFiveCameraActive ? authoredActFivePitch : 0;
+    const targetYaw = actFiveCameraActive ? authoredActFiveYaw : 0;
     cameraRoll.current = THREE.MathUtils.damp(cameraRoll.current, targetRoll, actFiveCameraActive ? 5.5 : 8, delta);
+    cameraPitch.current = THREE.MathUtils.damp(cameraPitch.current, targetPitch, actFiveCameraActive ? 5.2 : 8, delta);
+    cameraYaw.current = THREE.MathUtils.damp(cameraYaw.current, targetYaw, actFiveCameraActive ? 5.2 : 8, delta);
+    camera.rotateY(cameraYaw.current);
+    camera.rotateX(cameraPitch.current);
     camera.rotateZ(cameraRoll.current);
     camera.fov = currentFov.current + lensDistortion * 15;
     camera.updateProjectionMatrix();
