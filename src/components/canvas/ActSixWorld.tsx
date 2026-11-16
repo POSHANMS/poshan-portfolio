@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { DeviceTier } from "@/hooks/useDeviceSize";
+import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
 
 const ARM_COUNT = 4;
 const INITIAL_SIMULATION_SECONDS = 18;
@@ -97,7 +98,7 @@ export default function ActSixWorld({
   const groupRef = useRef<THREE.Group>(null);
   // Start from a wound, asymmetric pose instead of the raw four-arm cross.
   const activeTimeRef = useRef(INITIAL_SIMULATION_SECONDS);
-  const reveal = smoothstep(0.975, 0.985, scrollProgress);
+  const reveal = smoothstep(ACT_FIVE_TIMING.sceneExit, ACT_FIVE_TIMING.galaxyFullReveal, scrollProgress);
   // Geometry is static on the CPU. Lower tiers keep the same field shape while
   // the GPU shader supplies all of the motion, bloom, and atmosphere.
   const particleCount = deviceTier === "mobile" ? 20000 : deviceTier === "tablet" ? 34000 : 46000;

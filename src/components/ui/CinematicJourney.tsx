@@ -12,6 +12,7 @@ import {
 import { PROFILE, PROJECTS, RESUME_SUMMARY, SKILL_GROUPS, STATS } from "@/utils/constants";
 import HoldToWarp from "./HoldToWarp";
 import type { ActFourPhase } from "@/types/actFour";
+import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
 
 type ChapterId = "hero" | "laptop" | "skills" | "projects" | "journey" | "contact";
 
@@ -818,11 +819,11 @@ export default function CinematicJourney({
 
   const actFourInterior = actFourPhase === "inside" || actFourPhase === "warping";
   const actFourReturning = actFourPhase === "returning" && scrollProgress < 0.905;
-  const actFiveProgress = clamp((scrollProgress - 0.915) / (0.975 - 0.915));
-  const actFiveHudPresence = scrollProgress >= 0.902 && scrollProgress <= 0.958
+  const actFiveProgress = clamp((scrollProgress - ACT_FIVE_TIMING.cameraStart) / (ACT_FIVE_TIMING.sceneExit - ACT_FIVE_TIMING.cameraStart));
+  const actFiveHudPresence = scrollProgress >= ACT_FIVE_TIMING.revealInStart && scrollProgress <= ACT_FIVE_TIMING.cameraExitStart
     ? 1
     : Math.max(states.journey.presence, smoothstep(0, 0.05, actFiveProgress))
-      * (1 - smoothstep(0.958, 0.975, scrollProgress));
+      * (1 - smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress));
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>

@@ -26,6 +26,7 @@ import ActFourWorld from "./ActFourWorld";
 import ActFiveWorld from "./ActFiveWorld";
 import ActSixWorld from "./ActSixWorld";
 import type { ActFourPhase } from "@/types/actFour";
+import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
 
 function smoothstep(edge0: number, edge1: number, value: number) {
   const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
@@ -136,11 +137,12 @@ export default function Scene({
   const skillVaultStrength = smoothstep(0.55, 0.62, scrollProgress) * (1 - smoothstep(0.80, 0.85, scrollProgress));
   const exteriorStrength = 1 - skillVaultStrength;
   // Act V is a true location change: retain the stars, but leave the physical desk-world behind.
-  const actFiveStrength = smoothstep(0.902, 0.922, scrollProgress) * (1 - smoothstep(0.958, 0.975, scrollProgress));
+  const actFiveStrength = smoothstep(ACT_FIVE_TIMING.revealInStart, ACT_FIVE_TIMING.revealInEnd, scrollProgress)
+    * (1 - smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress));
   const isActFive = actFiveStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
   // Let the Act V reactor finish its opacity fade before the Contact galaxy
   // reaches full luminance; the camera is already moving through the exit arc.
-  const actSixStrength = smoothstep(0.975, 0.985, scrollProgress);
+  const actSixStrength = smoothstep(ACT_FIVE_TIMING.sceneExit, ACT_FIVE_TIMING.galaxyFullReveal, scrollProgress);
   const isActSix = actSixStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
   const isInsideProjectCore = actFourPhase === "inside";
   const isProjectTransit = actFourPhase === "warping" || isInsideProjectCore;
@@ -234,7 +236,13 @@ export default function Scene({
 
           {!isInsideProjectCore && !isActFive && !isActSix && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
           {!isActFive && !isActSix && <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} />}
-          {scrollProgress < 0.975 && <ActFiveWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
+          {scrollProgress < ACT_FIVE_TIMING.sceneExit && (
+            <ActFiveWorld
+              scrollProgress={scrollProgress}
+              actFourPhase={actFourPhase}
+              particleCount={deviceTier === "mobile" ? 3_600 : deviceTier === "tablet" ? 6_800 : 11_000}
+            />
+          )}
           <ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} />
 
           <PostProcessing hologramActive={hologramVisible} cosmicActive={isActSix} reactorActive={isActFive} />
