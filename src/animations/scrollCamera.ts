@@ -152,7 +152,7 @@ const ACT_FIVE_CHECKPOINT_STOPS = ACT_FIVE_ORBIT_ANGLES.map((degrees, index) => 
   // the look target in camera-screen space so the full card stays in-frame.
   const viewForward = target.clone().sub(camera).normalize();
   const screenRight = viewForward.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
-  target.addScaledVector(screenRight, [0, 0, 0, 1.8][index]);
+  target.addScaledVector(screenRight, [0, 0, 0, 1.1][index]);
   return { camera, target };
 });
 
