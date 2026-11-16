@@ -65,14 +65,14 @@ export function useActFourSequence(scrollProgress: number) {
       clearWarpTimer();
       clearReturnTimer();
       lockedScrollY.current = null;
-      setExitArmed(false);
-      setProjectIndex(0);
-      setPhase("locked");
+      if (exitArmed) setExitArmed(false);
+      if (projectIndex !== 0) setProjectIndex(0);
+      if (phase !== "locked") setPhase("locked");
       return;
     }
 
     if (phase === "locked") setPhase("ready");
-  }, [clearReturnTimer, clearWarpTimer, phase, scrollProgress]);
+  }, [clearReturnTimer, clearWarpTimer, exitArmed, phase, projectIndex, scrollProgress]);
 
   useEffect(() => () => {
     clearWarpTimer();
