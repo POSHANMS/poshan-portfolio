@@ -92,25 +92,25 @@ const sceneCoordinates = [
     progress: 0.89,
   },
   {
-    // Act V — the camera clears the recall and gives the education orbit its own frame.
-    camera: new THREE.Vector3(-0.72, 1.82, 9.7),
-    lookAt: new THREE.Vector3(1.35, 0.72, -5.15),
-    fov: 47,
-    progress: 0.935,
+    // Act V — the card orbit owns its camera from 0.89 through the exit arc.
+    camera: new THREE.Vector3(0, 0.55, 10.2),
+    lookAt: new THREE.Vector3(0, 0.15, -7.4),
+    fov: 60,
+    progress: 0.94,
   },
   {
-    // Hold Act V until its final checkpoint has been read.
-    camera: new THREE.Vector3(-0.72, 1.82, 9.7),
-    lookAt: new THREE.Vector3(1.35, 0.72, -5.15),
-    fov: 47,
-    progress: 0.956,
+    // Hold the contact-facing end of the Act V arc while both scenes crossfade.
+    camera: new THREE.Vector3(0, 0.55, 10.2),
+    lookAt: new THREE.Vector3(0, 0.15, -7.4),
+    fov: 60,
+    progress: 0.958,
   },
   {
     // Act VI — the final contact signal lives in its own nebula, not the old desk-world.
     camera: new THREE.Vector3(0, 0.55, 10.2),
     lookAt: new THREE.Vector3(0, 0.15, -7.4),
     fov: 45,
-    progress: 0.963,
+    progress: 0.975,
   },
   {
     // Settle the final frame without reintroducing any previous scene objects.
@@ -122,27 +122,63 @@ const sceneCoordinates = [
 ];
 
 const ACT_FIVE_ORIGIN = new THREE.Vector3(0, 0, -5.15);
-const ACT_FIVE_KEY_T = [0, 0.2, 0.47, 0.73, 1];
-const ACT_FIVE_POSITIONS = [
-  [-10.5, 3.6, 9.8],
-  [-7.6, 1.05, 6.2],
-  [-3.1, -0.35, 9.8],
-  [3.1, 0.45, 9.8],
-  [7.6, -0.55, 6.2],
-].map(([x, y, z]) => new THREE.Vector3(x, y, z).add(ACT_FIVE_ORIGIN));
-const ACT_FIVE_TARGETS = [
-  [0, 0, 0],
-  [-4.2, 0.65, 1.8],
-  [-1.8, -0.3, 4.2],
-  [1.8, 0.35, 4.2],
-  [4.2, -0.45, 1.8],
-].map(([x, y, z]) => new THREE.Vector3(x, y, z).add(ACT_FIVE_ORIGIN));
-const ACT_FIVE_POSITION_CURVE = new THREE.CatmullRomCurve3(ACT_FIVE_POSITIONS, false, "centripetal", 0.5);
-const ACT_FIVE_TARGET_CURVE = new THREE.CatmullRomCurve3(ACT_FIVE_TARGETS, false, "centripetal", 0.5);
-const ACT_FIVE_ENTRY_CAMERA = new THREE.Vector3(-11.5, 4.8, 11).add(ACT_FIVE_ORIGIN);
-const ACT_FIVE_ENTRY_TARGET = ACT_FIVE_ORIGIN.clone();
+const ACT_FIVE_ORBIT_RADIUS = 10.2;
+const ACT_FIVE_ORBIT_ANGLES = [-75, -25, 25, 75];
 const ACT_FIVE_EXIT_CAMERA = new THREE.Vector3(0, 0.55, 10.2);
 const ACT_FIVE_EXIT_TARGET = new THREE.Vector3(0, 0.15, -7.4);
+const ACT_FIVE_CHECKPOINT_STOPS = ACT_FIVE_ORBIT_ANGLES.map((degrees, index) => {
+  const angle = THREE.MathUtils.degToRad(degrees);
+  const radial = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+  const tangent = new THREE.Vector3(Math.cos(angle), 0, -Math.sin(angle));
+  const heights = [0.35, -0.2, 0.2, -0.3];
+  const card = ACT_FIVE_ORIGIN.clone().addScaledVector(radial, ACT_FIVE_ORBIT_RADIUS);
+  card.y += heights[index];
+
+  // A 5.4-unit front offset plus a 1.6-unit tangential offset gives a
+  // 5.63-unit reading distance and reveals the reactor behind-left of the card.
+  const camera = card.clone()
+    .addScaledVector(radial, 5.4)
+    .addScaledVector(tangent, -1.6)
+    .add(new THREE.Vector3(0, 0.28, 0));
+  const viewDirection = card.clone().sub(camera);
+  const cameraRight = viewDirection.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+  const target = card.clone()
+    .addScaledVector(cameraRight, -1.0)
+    .add(new THREE.Vector3(0, 0.45, 0));
+  return { camera, target };
+});
+
+// Hold on each checkpoint while its HUD label is active; short blends happen
+// only at the boundaries, followed by a long camera exit into Contact.
+const ACT_FIVE_KEY_T = [0, 0.16, 0.17, 0.33, 0.34, 0.50, 0.51, 0.68, 0.72, 1];
+const ACT_FIVE_POSITIONS = [
+  ACT_FIVE_CHECKPOINT_STOPS[0].camera,
+  ACT_FIVE_CHECKPOINT_STOPS[0].camera.clone(),
+  ACT_FIVE_CHECKPOINT_STOPS[1].camera,
+  ACT_FIVE_CHECKPOINT_STOPS[1].camera.clone(),
+  ACT_FIVE_CHECKPOINT_STOPS[2].camera,
+  ACT_FIVE_CHECKPOINT_STOPS[2].camera.clone(),
+  ACT_FIVE_CHECKPOINT_STOPS[3].camera,
+  ACT_FIVE_CHECKPOINT_STOPS[3].camera.clone(),
+  ACT_FIVE_CHECKPOINT_STOPS[3].camera.clone(),
+  ACT_FIVE_EXIT_CAMERA,
+];
+const ACT_FIVE_TARGETS = [
+  ACT_FIVE_CHECKPOINT_STOPS[0].target,
+  ACT_FIVE_CHECKPOINT_STOPS[0].target.clone(),
+  ACT_FIVE_CHECKPOINT_STOPS[1].target,
+  ACT_FIVE_CHECKPOINT_STOPS[1].target.clone(),
+  ACT_FIVE_CHECKPOINT_STOPS[2].target,
+  ACT_FIVE_CHECKPOINT_STOPS[2].target.clone(),
+  ACT_FIVE_CHECKPOINT_STOPS[3].target,
+  ACT_FIVE_CHECKPOINT_STOPS[3].target.clone(),
+  ACT_FIVE_CHECKPOINT_STOPS[3].target.clone(),
+  ACT_FIVE_EXIT_TARGET,
+];
+const ACT_FIVE_POSITION_CURVE = new THREE.CatmullRomCurve3(ACT_FIVE_POSITIONS, false, "centripetal", 0.5);
+const ACT_FIVE_TARGET_CURVE = new THREE.CatmullRomCurve3(ACT_FIVE_TARGETS, false, "centripetal", 0.5);
+const ACT_FIVE_ENTRY_CAMERA = ACT_FIVE_CHECKPOINT_STOPS[0].camera.clone().add(new THREE.Vector3(-2.2, 1.2, 1.4));
+const ACT_FIVE_ENTRY_TARGET = ACT_FIVE_CHECKPOINT_STOPS[0].target.clone();
 
 function pointOnKeyedCurve(curve: THREE.CatmullRomCurve3, value: number) {
   const t = THREE.MathUtils.clamp(value, 0, 1);
@@ -209,30 +245,21 @@ export function CinematicCamera({
     // The Act V entry blends out of the existing Act IV camera, then follows
     // keyed Catmull-Rom position and target splines through all four artifacts.
     const insideProjectWorld = actFourPhase === "inside" || actFourPhase === "warping";
-    if (p >= 0.89 && p <= 0.956 && !insideProjectWorld) {
+    if (p >= 0.89 && p < 0.975 && !insideProjectWorld) {
       actFiveCameraActive = true;
       if (p < 0.915) {
         const entry = THREE.MathUtils.smoothstep(p, 0.89, 0.915);
         desiredPosition.lerp(ACT_FIVE_ENTRY_CAMERA, entry);
         desiredLookAt.lerp(ACT_FIVE_ENTRY_TARGET, entry);
-        desiredFov = 50 + Math.sin(entry * Math.PI) * 26;
-        authoredActFiveRoll = -0.24 * Math.sin(entry * Math.PI);
+        desiredFov = THREE.MathUtils.lerp(47, 60, entry);
+        authoredActFiveRoll = 0;
       } else {
-        const progress = THREE.MathUtils.clamp((p - 0.915) / (0.956 - 0.915), 0, 1);
+        const progress = THREE.MathUtils.clamp((p - 0.915) / (0.975 - 0.915), 0, 1);
         desiredPosition.copy(pointOnKeyedCurve(ACT_FIVE_POSITION_CURVE, progress));
         desiredLookAt.copy(pointOnKeyedCurve(ACT_FIVE_TARGET_CURVE, progress));
-        const velocity = clampedProgress - p;
-        desiredFov = 50 + Math.min(Math.abs(velocity) * 90, 22);
+        desiredFov = 60;
         authoredActFiveRoll = 0;
       }
-      desiredPosition.x += state.pointer.x * 0.35;
-      desiredPosition.y -= state.pointer.y * 0.35;
-    } else if (p > 0.956 && p < 0.963 && !insideProjectWorld) {
-      // Carry the final card's camera into Contact instead of jumping between rigs.
-      const transition = THREE.MathUtils.smoothstep(p, 0.956, 0.963);
-      desiredPosition.lerpVectors(ACT_FIVE_POSITIONS[4], ACT_FIVE_EXIT_CAMERA, transition);
-      desiredLookAt.lerpVectors(ACT_FIVE_TARGETS[4], ACT_FIVE_EXIT_TARGET, transition);
-      desiredFov = THREE.MathUtils.lerp(50, 45, transition);
     }
 
     const isWarping = actFourPhase === "warping";
@@ -270,7 +297,7 @@ export function CinematicCamera({
     }
 
     // Act VI uses a restrained camera orbit. The nebula itself stays fixed.
-    if (p >= 0.963 && actFourPhase === "locked") {
+    if (p >= 0.975 && actFourPhase === "locked") {
       const orbit = time * 0.06;
       desiredPosition.x += Math.sin(orbit) * 0.28;
       desiredPosition.y += Math.cos(orbit * 0.82) * 0.12;
@@ -288,11 +315,10 @@ export function CinematicCamera({
 
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0));
     camera.lookAt(currentLookAt.current);
-    const scrollVelocity = clampedProgress - p;
-    const targetRoll = actFiveCameraActive
-      ? THREE.MathUtils.clamp(-scrollVelocity * 1.65 + authoredActFiveRoll, -0.28, 0.28)
-      : 0;
-    cameraRoll.current = THREE.MathUtils.lerp(cameraRoll.current, targetRoll, 0.08);
+    const targetRoll = actFiveCameraActive ? authoredActFiveRoll : 0;
+    cameraRoll.current = actFiveCameraActive
+      ? 0
+      : THREE.MathUtils.damp(cameraRoll.current, targetRoll, 8, delta);
     camera.rotateZ(cameraRoll.current);
     camera.fov = currentFov.current + lensDistortion * 15;
     camera.updateProjectionMatrix();

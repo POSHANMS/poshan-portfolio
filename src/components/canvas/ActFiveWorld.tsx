@@ -2,7 +2,7 @@
 
 import { Html, Line, RoundedBox } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { ActFourPhase } from "@/types/actFour";
 import { JOURNEY_MILESTONES } from "@/utils/constants";
@@ -12,6 +12,24 @@ const AMBIENT_EMBER_COUNT = 400;
 // The Act V composition has its own local origin while remaining in the shared
 // world coordinates used by the portfolio's other acts and scroll camera.
 const ACT_FIVE_ORIGIN: [number, number, number] = [0, 0, -5.15];
+const MONOLITH_ORBIT_RADIUS = 10.2;
+const MONOLITH_ORBIT_ANGLES = [-75, -25, 25, 75] as const;
+
+function monolithOrbitPosition(angleDegrees: number, height: number): [number, number, number] {
+  const angle = THREE.MathUtils.degToRad(angleDegrees);
+  return [
+    Math.sin(angle) * MONOLITH_ORBIT_RADIUS,
+    height,
+    Math.cos(angle) * MONOLITH_ORBIT_RADIUS,
+  ];
+}
+
+const MONOLITH_POSITIONS = [
+  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[0], 0.35),
+  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[1], -0.2),
+  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[2], 0.2),
+  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[3], -0.3),
+];
 
 const MONOLITHS = [
   {
@@ -19,36 +37,28 @@ const MONOLITHS = [
     title: "COMPUTER SCIENCE ENGINEERING",
     body: `${JOURNEY_MILESTONES[0].body} Core systems, algorithms, architecture, and disciplined engineering foundations shape the work.`,
     telemetry: "SYS.STATUS: VERIFIED // CORE ARCHITECTURE",
-    position: [-6.16, 0.85, 2.87] as [number, number, number],
-    lookAt: [0, 0.4, 9.5] as [number, number, number],
-    roll: 0.04,
+    position: MONOLITH_POSITIONS[0],
   },
   {
     tag: "02 // ARCHITECTURE",
     title: "REAL-TIME FULL-STACK SYSTEMS",
     body: "Production web and cloud systems engineered with Python, Flask, React, Supabase, PostgreSQL, Redis, and Three.js.",
     telemetry: "LATENCY: <12MS // FULL-STACK PIPELINE",
-    position: [-2.55, -0.45, 6.3] as [number, number, number],
-    lookAt: [0, -0.2, 10.5] as [number, number, number],
-    roll: -0.03,
+    position: MONOLITH_POSITIONS[1],
   },
   {
     tag: "03 // INTELLIGENCE",
     title: "AGENTIC AI & DEEP LEARNING",
     body: "Multi-agent MCP architectures like ZaminSaathi and multi-stage CNN clinical pipelines like HealthGPT.",
     telemetry: "NEURAL ENGINE: ACTIVE // MULTI-AGENT MCP",
-    position: [2.55, 0.55, 6.3] as [number, number, number],
-    lookAt: [0, 0.2, 10.5] as [number, number, number],
-    roll: 0.03,
+    position: MONOLITH_POSITIONS[2],
   },
   {
     tag: "04 // EXECUTION",
     title: "SECURITY, HARDWARE & PRACTICE",
     body: "Cyber security, ethical hacking, ESP8266 automated hardware systems, rapid hackathon execution, and 110+ DSA problems. Build and delivery practice includes Docker, GitHub, Vercel, Railway, Render, and Cloudinary.",
     telemetry: "SEC.PROTOCOL: HARDENED // FIELD TESTED",
-    position: [6.16, -0.65, 2.87] as [number, number, number],
-    lookAt: [0, -0.3, 9.5] as [number, number, number],
-    roll: -0.04,
+    position: MONOLITH_POSITIONS[3],
   },
 ] as const;
 
@@ -193,13 +203,13 @@ function MonolithCard({ index, active }: { index: number; active: boolean }) {
       <article
         className="relative flex h-[344px] w-[544px] flex-col overflow-hidden rounded-[4px] border px-7 py-6 text-left text-white"
         style={{
-          background: "linear-gradient(135deg, rgba(22, 6, 12, 0.86) 0%, rgba(8, 2, 5, 0.92) 100%)",
-          backdropFilter: "blur(18px) saturate(165%)",
-          WebkitBackdropFilter: "blur(18px) saturate(165%)",
+          background: "rgba(7, 2, 4, 0.96)",
+          opacity: active ? 1 : 0.35,
           borderColor: `rgba(255, 38, 70, ${active ? 0.95 : 0.42})`,
-          boxShadow: "0 20px 50px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.14), 0 0 28px rgba(255,26,53,0.22)",
-          transform: `scale(${active ? 1.06 : 1})`,
-          transition: "transform 500ms cubic-bezier(.2,.75,.2,1), border-color 400ms ease, box-shadow 400ms ease",
+          boxShadow: active
+            ? "0 24px 60px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.14), 0 0 34px rgba(255,26,53,0.52)"
+            : "0 20px 52px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.06)",
+          transition: "opacity 420ms ease, border-color 420ms ease, box-shadow 420ms ease",
         }}
       >
         <div className={`act-five-glass-sheen pointer-events-none absolute inset-y-0 left-0 ${active ? "act-five-glass-sheen-active" : ""}`} aria-hidden="true" />
@@ -224,6 +234,8 @@ function MonolithCard({ index, active }: { index: number; active: boolean }) {
 function Monolith({ index, active }: { index: number; active: boolean }) {
   const item = MONOLITHS[index];
   const group = useRef<THREE.Group>(null);
+  const previousQuaternion = useRef(new THREE.Quaternion());
+  const facingQuaternion = useRef(new THREE.Quaternion());
   const bracketGeometry = useMemo(() => {
     const positions: number[] = [];
     const w = 1.72;
@@ -241,31 +253,39 @@ function Monolith({ index, active }: { index: number; active: boolean }) {
     return geometry;
   }, []);
 
-  useLayoutEffect(() => {
-    if (group.current) {
-      const target = new THREE.Vector3(...item.lookAt);
-      const position = new THREE.Vector3(...item.position);
-      const orientation = new THREE.Matrix4().lookAt(target, position, new THREE.Vector3(0, 1, 0));
-      group.current.quaternion.setFromRotationMatrix(orientation);
-      group.current.rotateZ(item.roll);
-    }
-  }, [item.lookAt, item.position, item.roll]);
+  useFrame(({ camera }, delta) => {
+    if (!group.current) return;
+
+    // Face the active card directly toward the camera. A world-up vector keeps
+    // the card upright; no roll or negative scale can invert its text.
+    group.current.up.set(0, 1, 0);
+    previousQuaternion.current.copy(group.current.quaternion);
+    group.current.lookAt(camera.position);
+    facingQuaternion.current.copy(group.current.quaternion);
+    const rotationSpeed = active ? 22 : 5;
+    group.current.quaternion.copy(previousQuaternion.current).slerp(
+      facingQuaternion.current,
+      1 - Math.exp(-rotationSpeed * delta),
+    );
+
+    const targetScale = active ? 1 : 0.88;
+    const scale = THREE.MathUtils.damp(group.current.scale.x, targetScale, 9, delta);
+    group.current.scale.setScalar(scale);
+  });
 
   return (
     <group ref={group} position={item.position}>
       <RoundedBox args={[3.4, 2.15, 0.08]} radius={0.075} smoothness={3}>
         <meshPhysicalMaterial
-          color="#090306"
-          emissive="#22040a"
-          emissiveIntensity={active ? 0.62 : 0.4}
-          transmission={0.85}
+          color="#070204"
+          emissive="#1a0308"
+          emissiveIntensity={active ? 0.38 : 0.12}
+          transmission={0}
           transparent
-          opacity={0.88}
-          roughness={0.15}
-          metalness={0.2}
-          ior={1.45}
-          thickness={0.6}
-          depthWrite={false}
+          opacity={0.96}
+          roughness={0.38}
+          metalness={0.16}
+          depthWrite
         />
       </RoundedBox>
       <lineSegments geometry={bracketGeometry}>
@@ -361,13 +381,13 @@ export default function ActFiveWorld({
     return geometry;
   }, []);
 
-  const reveal = THREE.MathUtils.smoothstep(scrollProgress, 0.902, 0.92)
-    * (1 - THREE.MathUtils.smoothstep(scrollProgress, 0.956, 0.963));
+  const reveal = THREE.MathUtils.smoothstep(scrollProgress, 0.902, 0.922)
+    * (1 - THREE.MathUtils.smoothstep(scrollProgress, 0.958, 0.975));
   const active = actFourPhase !== "inside" && actFourPhase !== "warping";
   const visible = active ? reveal : 0;
-  const localProgress = THREE.MathUtils.clamp((scrollProgress - 0.91) / (0.956 - 0.91), 0, 1);
-  // Match the active card transitions to the nonuniform Catmull-Rom key times.
-  const activeIndex = localProgress < 0.2 ? 0 : localProgress < 0.47 ? 1 : localProgress < 0.73 ? 2 : 3;
+  const localProgress = THREE.MathUtils.clamp((scrollProgress - 0.915) / (0.975 - 0.915), 0, 1);
+  // Match each active-card handoff to the authored camera stop timestamps.
+  const activeIndex = localProgress < 0.17 ? 0 : localProgress < 0.34 ? 1 : localProgress < 0.51 ? 2 : 3;
 
   useFrame((state, delta) => {
     const time = state.clock.getElapsedTime();

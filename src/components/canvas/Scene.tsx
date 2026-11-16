@@ -136,7 +136,7 @@ export default function Scene({
   const skillVaultStrength = smoothstep(0.55, 0.62, scrollProgress) * (1 - smoothstep(0.80, 0.85, scrollProgress));
   const exteriorStrength = 1 - skillVaultStrength;
   // Act V is a true location change: retain the stars, but leave the physical desk-world behind.
-  const actFiveStrength = smoothstep(0.902, 0.922, scrollProgress) * (1 - smoothstep(0.956, 0.962, scrollProgress));
+  const actFiveStrength = smoothstep(0.902, 0.922, scrollProgress) * (1 - smoothstep(0.958, 0.975, scrollProgress));
   const isActFive = actFiveStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
   const actSixStrength = smoothstep(0.956, 0.965, scrollProgress);
   const isActSix = actSixStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
@@ -232,7 +232,7 @@ export default function Scene({
 
           {!isInsideProjectCore && !isActFive && !isActSix && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
           {!isActFive && !isActSix && <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} />}
-          {scrollProgress < 0.956 && <ActFiveWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
+          {scrollProgress < 0.975 && <ActFiveWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
           <ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} />
 
           <PostProcessing hologramActive={hologramVisible} cosmicActive={isActSix} reactorActive={isActFive} />
