@@ -205,8 +205,9 @@ export function CinematicCamera({
         const entry = THREE.MathUtils.smoothstep(p, ACT_FIVE_TIMING.cameraIntroStart, ACT_FIVE_TIMING.cameraStart);
         desiredPosition.lerp(ACT_FIVE_ENTRY_CAMERA, entry);
         desiredLookAt.lerp(ACT_FIVE_ENTRY_TARGET, entry);
-        desiredFov = THREE.MathUtils.lerp(47, 54, entry);
-        authoredActFiveRoll = 0;
+        const entryPunch = Math.sin(entry * Math.PI);
+        desiredFov = THREE.MathUtils.lerp(48, 57, entry) + entryPunch * 2.2;
+        authoredActFiveRoll = Math.sin(entry * Math.PI) * 0.08;
       } else {
         const progress = THREE.MathUtils.clamp((p - ACT_FIVE_TIMING.cameraStart) / (ACT_FIVE_TIMING.sceneExit - ACT_FIVE_TIMING.cameraStart), 0, 1);
         desiredPosition.copy(pointOnKeyedCurve(ACT_FIVE_POSITION_CURVE, progress));
@@ -218,13 +219,20 @@ export function CinematicCamera({
           const end = ACT_FIVE_TIMING.localCheckpointStops[index + 1];
           const blend = THREE.MathUtils.clamp((progress - start) / (end - start), 0, 1);
           const travel = Math.sin(blend * Math.PI);
-          bank += travel * (index % 2 === 0 ? 1 : -1) * 0.15;
+          const turnSign = index % 2 === 0 ? 1 : -1;
+          bank += travel * turnSign * 0.255;
           speedRamp = Math.max(speedRamp, travel);
+          if (travel > 0) {
+            const forward = desiredLookAt.clone().sub(desiredPosition).normalize();
+            const lateral = forward.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+            desiredPosition.addScaledVector(lateral, turnSign * travel * 0.52);
+            desiredPosition.y += travel * (index % 2 === 0 ? 0.28 : -0.22);
+          }
         }
         const exitBlend = THREE.MathUtils.smoothstep(progress, 0.68, 1.0);
-        bank += Math.sin(exitBlend * Math.PI) * 0.1;
+        bank += Math.sin(exitBlend * Math.PI) * 0.18;
         speedRamp = Math.max(speedRamp, Math.sin(exitBlend * Math.PI) * 0.7);
-        desiredFov = 53 + speedRamp * 6.5;
+        desiredFov = 51.5 + speedRamp * 10.5;
         authoredActFiveRoll = bank;
       }
     }

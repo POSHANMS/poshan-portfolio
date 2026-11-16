@@ -14,6 +14,7 @@ import {
 } from "@/animations/actFiveChoreography";
 
 const PARTICLE_COUNT = 11_000;
+const ACT_FIVE_STAR_COUNT = 1_350;
 const TETHER_SEGMENTS = 56;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const TETHER_VERTEX_SHADER = /* glsl */ `
@@ -75,20 +76,39 @@ const CORE_FRAGMENT_SHADER = /* glsl */ `
   varying vec3 vViewDirection;
   uniform float uTime;
   uniform float uReveal;
+  float hash31(vec3 p) {
+    p = fract(p * 0.1031);
+    p += dot(p, p.yzx + 33.33);
+    return fract((p.x + p.y) * p.z);
+  }
+  float valueNoise(vec3 p) {
+    vec3 cell = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(hash31(cell), hash31(cell + vec3(1,0,0)), f.x),
+                   mix(hash31(cell + vec3(0,1,0)), hash31(cell + vec3(1,1,0)), f.x), f.y),
+               mix(mix(hash31(cell + vec3(0,0,1)), hash31(cell + vec3(1,0,1)), f.x),
+                   mix(hash31(cell + vec3(0,1,1)), hash31(cell + vec3(1,1,1)), f.x), f.y), f.z);
+  }
   void main() {
     float angle = atan(vObjectPosition.z, vObjectPosition.x);
-    float strata = sin(angle * 7.0 + vObjectPosition.y * 4.0 + uTime * 0.22);
-    float turbulence = sin(vObjectPosition.y * 17.0 - angle * 5.0 + uTime * 0.34);
-    float veinField = abs(sin(strata * 1.7 + turbulence * 0.24));
-    float veins = 1.0 - smoothstep(0.035, 0.12, veinField);
-    float pulse = 0.74 + 0.26 * sin(uTime * 1.7 + angle * 2.0 + turbulence);
-    vec3 obsidian = vec3(0.018, 0.0004, 0.004);
-    vec3 volcanic = vec3(0.075, 0.0015, 0.012);
-    vec3 magma = vec3(0.82, 0.002, 0.045) * pulse;
-    vec3 base = mix(obsidian, volcanic, smoothstep(-0.35, 0.52, turbulence) * 0.34);
-    vec3 color = mix(base, magma, veins * 0.92);
-    float fresnel = pow(1.0 - abs(dot(normalize(vViewNormal), normalize(vViewDirection))), 3.2);
-    color += vec3(0.92, 0.001, 0.036) * fresnel * (0.55 + pulse * 0.45);
+    vec3 surface = vObjectPosition * 5.2;
+    float plateNoise = valueNoise(surface + vec3(0.0, uTime * 0.025, 0.0));
+    float plateEdge = abs(plateNoise - 0.5);
+    float tectonicSeam = 1.0 - smoothstep(0.025, 0.075, plateEdge);
+    float striation = sin(angle * 17.0 + vObjectPosition.y * 13.0 + sin(angle * 4.0) * 1.4);
+    float hairline = 1.0 - smoothstep(0.025, 0.11, abs(striation));
+    float vein = max(tectonicSeam * 0.82, hairline * 0.32);
+    float pulse = 0.72 + 0.28 * sin(uTime * 1.65 + angle * 2.0 + plateNoise * 5.0);
+    float plateLight = smoothstep(0.18, 0.82, plateNoise) * 0.055;
+    vec3 obsidian = vec3(0.008, 0.00025, 0.0014);
+    vec3 volcanic = vec3(0.035, 0.00055, 0.004);
+    vec3 magma = vec3(1.0, 0.0025, 0.032) * pulse;
+    vec3 color = mix(obsidian, volcanic, plateLight * 5.0);
+    color += vec3(plateLight * 0.16, plateLight * 0.008, plateLight * 0.02);
+    color = mix(color, magma, vein * 0.96);
+    float fresnel = pow(1.0 - abs(dot(normalize(vViewNormal), normalize(vViewDirection))), 4.0);
+    color += vec3(0.82, 0.001, 0.022) * fresnel * (0.22 + pulse * 0.3);
     gl_FragColor = vec4(color, uReveal);
   }
 `;
@@ -107,16 +127,18 @@ const SWARM_VERTEX_SHADER = /* glsl */ `
     float angle = uTime * aSpeed * (0.48 + 1.8 / (radius + 1.1));
     float c = cos(angle), s = sin(angle);
     p.xz = mat2(c, -s, s, c) * p.xz;
-    p.y *= 0.68;
-    p.y += sin(uTime * 0.72 + aPhase + radius * 0.6) * 0.075;
-    p.xz *= 1.0 + sin(uTime * 0.38 + aPhase) * 0.018;
-    vec3 ember = vec3(0.34, 0.0015, 0.018);
-    vec3 hot = vec3(1.0, 0.012, 0.075);
-    vColor = mix(ember, hot, smoothstep(0.42, 0.98, aHeat));
-    vAlpha = (0.62 + 0.38 * sin(uTime * 1.8 + aPhase)) * uReveal;
+    p.y *= 0.86;
+    p.y += sin(uTime * 0.72 + aPhase + radius * 0.6) * 0.11;
+    p.x += sin(uTime * 0.31 + aPhase * 1.7 + p.z) * 0.045;
+    p.z += cos(uTime * 0.27 + aPhase * 1.3 + p.x) * 0.045;
+    p.xz *= 1.0 + sin(uTime * 0.38 + aPhase) * 0.022;
+    vec3 ember = vec3(0.22, 0.001, 0.012);
+    vec3 hot = vec3(1.0, 0.018, 0.085);
+    vColor = mix(ember, hot, smoothstep(0.34, 0.98, aHeat));
+    vAlpha = (0.54 + 0.46 * sin(uTime * 1.8 + aPhase)) * uReveal;
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = min(4.4, aSize * (190.0 / max(22.0, -mv.z)));
+    gl_PointSize = min(5.2, aSize * (205.0 / max(22.0, -mv.z)));
   }
 `;
 const SWARM_FRAGMENT_SHADER = /* glsl */ `
@@ -182,18 +204,21 @@ function makeAccretionDisc(count: number) {
   const heat = new Float32Array(count);
   for (let i = 0; i < count; i += 1) {
     const i3 = i * 3;
-    const arm = i % 2;
-    const radius = 1.85 + Math.pow(seed(i, 5), 0.72) * 4.8;
-    const spiral = seed(i, 11) * Math.PI * 2 + radius * 0.83 + arm * Math.PI;
-    const scatter = (seed(i, 17) - 0.5) * (0.11 + radius * 0.038);
+    const arm = i % 4;
+    const isArmParticle = arm !== 3;
+    const radius = isArmParticle
+      ? 0.62 + Math.pow(seed(i, 5), 0.78) * 6.05
+      : 0.9 + Math.sqrt(seed(i, 7)) * 5.72;
+    const spiral = seed(i, 11) * Math.PI * 2 + radius * 1.13 + (arm % 3) * (Math.PI * 2 / 3);
+    const scatter = (seed(i, 17) - 0.5) * (isArmParticle ? 0.17 + radius * 0.035 : 0.9);
     const theta = spiral + scatter;
     positions[i3] = Math.cos(theta) * radius;
-    positions[i3 + 1] = (seed(i, 23) - 0.5) * (0.54 + radius * 0.18);
+    positions[i3 + 1] = (seed(i, 23) - 0.5) * (0.68 + radius * 0.22);
     positions[i3 + 2] = Math.sin(theta) * radius;
     phase[i] = seed(i, 29) * Math.PI * 2;
     speed[i] = 0.22 + seed(i, 31) * 0.22;
-    size[i] = 1.05 + seed(i, 37) * 2.1;
-    heat[i] = 1 - Math.min(1, radius / 7.0) * 0.72 + seed(i, 41) * 0.18;
+    size[i] = 1.15 + seed(i, 37) * 2.35;
+    heat[i] = 1 - Math.min(1, radius / 7.0) * 0.68 + seed(i, 41) * 0.2;
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -204,38 +229,110 @@ function makeAccretionDisc(count: number) {
   return geometry;
 }
 
+function makeActFiveStars() {
+  const positions = new Float32Array(ACT_FIVE_STAR_COUNT * 3);
+  const sizes = new Float32Array(ACT_FIVE_STAR_COUNT);
+  const phases = new Float32Array(ACT_FIVE_STAR_COUNT);
+  for (let i = 0; i < ACT_FIVE_STAR_COUNT; i += 1) {
+    const i3 = i * 3;
+    const depth = seed(i, 203);
+    positions[i3] = (seed(i, 211) - 0.5) * 54;
+    positions[i3 + 1] = (seed(i, 223) - 0.5) * 30;
+    positions[i3 + 2] = -14 - depth * 36;
+    sizes[i] = 0.65 + Math.pow(seed(i, 227), 3) * 2.2;
+    phases[i] = seed(i, 229) * Math.PI * 2;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+  geometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
+  return geometry;
+}
+
+const ACT_FIVE_STARS_VERTEX = /* glsl */ `
+  attribute float aSize;
+  attribute float aPhase;
+  uniform float uTime;
+  uniform float uStrength;
+  varying float vAlpha;
+  void main() {
+    vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * viewPosition;
+    gl_PointSize = min(4.0, aSize * (150.0 / max(18.0, -viewPosition.z)));
+    vAlpha = (0.36 + 0.42 * (0.5 + 0.5 * sin(uTime * 0.55 + aPhase))) * uStrength;
+  }
+`;
+const ACT_FIVE_STARS_FRAGMENT = /* glsl */ `
+  varying float vAlpha;
+  void main() {
+    float d = length(gl_PointCoord - 0.5);
+    if (d > 0.5) discard;
+    float core = 1.0 - smoothstep(0.0, 0.34, d);
+    float halo = 1.0 - smoothstep(0.12, 0.5, d);
+    gl_FragColor = vec4(vec3(0.86, 0.79, 0.78) * (0.8 + core * 0.5), (core * 0.72 + halo * 0.2) * vAlpha);
+  }
+`;
+
+function ActFiveStarfield({ strength }: { strength: number }) {
+  const geometry = useMemo(() => makeActFiveStars(), []);
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uStrength: { value: 0 } },
+    vertexShader: ACT_FIVE_STARS_VERTEX,
+    fragmentShader: ACT_FIVE_STARS_FRAGMENT,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  }), []);
+  useFrame(({ clock }, delta) => {
+    material.uniforms.uTime.value = clock.getElapsedTime();
+    material.uniforms.uStrength.value = THREE.MathUtils.damp(material.uniforms.uStrength.value, strength, 5, delta);
+  });
+  return <points geometry={geometry} frustumCulled={false} renderOrder={-2}><primitive object={material} attach="material" /></points>;
+}
+
 function ReactorRing({ radius, index, strength }: { radius: number; index: number; strength: number }) {
   const ringRef = useRef<THREE.Group>(null);
   const tickRef = useRef<THREE.InstancedMesh>(null);
   const ringMaterial = useRef<THREE.MeshBasicMaterial>(null);
-  const tickGeometry = useMemo(() => new THREE.BoxGeometry(0.018, 0.11, 0.018), []);
+  const tickGeometry = useMemo(() => new THREE.BoxGeometry(0.022, 0.13, 0.028), []);
   const tickMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: "#ff6b7a", transparent: true, opacity: 0, toneMapped: false }), []);
   useLayoutEffect(() => {
     if (!tickRef.current) return undefined;
     const dummy = new THREE.Object3D();
-    for (let i = 0; i < 96; i += 1) {
-      const angle = (i / 96) * Math.PI * 2;
+    for (let i = 0; i < 120; i += 1) {
+      const angle = (i / 120) * Math.PI * 2;
       dummy.position.set(Math.cos(angle) * (radius + 0.11), Math.sin(angle) * (radius + 0.11), 0);
       dummy.rotation.set(0, 0, angle);
-      dummy.scale.set(1, i % 8 === 0 ? 1.65 : 0.72, 1);
+      dummy.scale.set(1, i % 10 === 0 ? 1.9 : 0.62, 1);
       dummy.updateMatrix();
       tickRef.current?.setMatrixAt(i, dummy.matrix);
     }
     if (tickRef.current) tickRef.current.instanceMatrix.needsUpdate = true;
     return undefined;
   }, [radius]);
-  useFrame((_, delta) => {
-    if (ringRef.current) ringRef.current.rotation.z += (index % 2 === 0 ? 1 : -1) * (0.075 + index * 0.018) * delta;
-    tickMaterial.opacity = 0.82 * strength;
-    if (ringMaterial.current) ringMaterial.current.opacity = 0.9 * strength;
+  useFrame(({ clock }, delta) => {
+    const time = clock.getElapsedTime();
+    const energyPulse = 0.9 + Math.sin(time * 1.7 + index * 1.9) * 0.1;
+    if (ringRef.current) ringRef.current.rotation.z += (index % 2 === 0 ? 1 : -1) * (0.16 + index * 0.055) * delta;
+    tickMaterial.opacity = 0.88 * strength * energyPulse;
+    if (ringMaterial.current) ringMaterial.current.opacity = 0.96 * strength * energyPulse;
   });
   return (
     <group ref={ringRef} rotation={[[0.52, 0.08, 0.22], [-0.48, 0.24, -0.32], [0.88, -0.15, 0.12]][index] as [number, number, number]}>
       <mesh>
-        <torusGeometry args={[radius, index === 1 ? 0.026 : 0.019, 8, 180]} />
-        <meshBasicMaterial ref={ringMaterial} color="#ff1738" transparent opacity={0.9 * strength} toneMapped={false} />
+        <torusGeometry args={[radius, index === 1 ? 0.074 : 0.058, 12, 220]} />
+        <meshStandardMaterial color={index === 1 ? "#42121c" : "#291018"} emissive="#5c0014" emissiveIntensity={0.32 + strength * 0.45} metalness={0.9} roughness={0.28} transparent opacity={strength} />
       </mesh>
-      <instancedMesh ref={tickRef} args={[tickGeometry, tickMaterial, 96]} />
+      <mesh>
+        <torusGeometry args={[radius, 0.012, 8, 220]} />
+        <meshBasicMaterial ref={ringMaterial} color="#ff1738" transparent opacity={0.96 * strength} toneMapped={false} />
+      </mesh>
+      <mesh>
+        <torusGeometry args={[radius - 0.09, 0.009, 6, 220]} />
+        <meshBasicMaterial color="#ff5a68" transparent opacity={0.42 * strength} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <instancedMesh ref={tickRef} args={[tickGeometry, tickMaterial, 120]} />
     </group>
   );
 }
@@ -327,30 +424,33 @@ function MonolithCard({ index, focus, opacity, progress }: { index: number; focu
   return (
     <Html transform center distanceFactor={3.2} position={[0, 0, 0.075]} zIndexRange={[120, 0]}>
       <article
-        className="relative flex h-[344px] w-[min(544px,82vw)] flex-col overflow-hidden rounded-[4px] border px-7 py-5 text-left text-white"
+        className="relative flex h-[344px] w-[min(544px,82vw)] flex-col overflow-hidden rounded-[5px] border px-7 py-5 text-left text-[#151923]"
         style={{
-          backgroundImage: "linear-gradient(rgba(255,40,75,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,40,75,.05) 1px,transparent 1px),linear-gradient(118deg,transparent 30%,rgba(255,60,90,.1) 48%,transparent 62%),radial-gradient(120% 100% at 0% 50%,rgba(255,18,52,.18) 0%,rgba(14,3,8,.92) 55%,rgba(6,1,4,.96) 100%)",
-          backgroundSize: "24px 24px,24px 24px,100% 100%,100% 100%",
+          backgroundColor: "rgba(232,238,245,.78)",
+          backgroundImage: "linear-gradient(rgba(126,18,38,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(126,18,38,.035) 1px,transparent 1px),linear-gradient(118deg,rgba(255,255,255,.55) 0%,transparent 34%,rgba(255,255,255,.16) 49%,transparent 66%),linear-gradient(135deg,rgba(255,255,255,.55),rgba(234,240,247,.6) 52%,rgba(247,249,252,.68))",
+          backgroundSize: "26px 26px,26px 26px,100% 100%,100% 100%",
+          backdropFilter: "blur(22px) saturate(150%)",
+          WebkitBackdropFilter: "blur(22px) saturate(150%)",
           opacity,
-          borderColor: `rgba(255,36,70,${0.25 + focus * 0.7})`,
-          boxShadow: `0 24px 60px rgba(0,0,0,.9),inset 0 0 32px rgba(255,20,55,.14),inset 1px 1px 0 rgba(255,255,255,.16),0 0 ${10 + focus * 26}px rgba(255,20,52,${0.08 + focus * 0.3})`,
+          borderColor: `rgba(255,255,255,${0.48 + focus * 0.38})`,
+          boxShadow: `0 30px 82px rgba(0,0,0,.5),inset 0 0 0 1px rgba(115,20,38,.18),inset 0 1px 0 rgba(255,255,255,.96),inset 0 -1px 0 rgba(111,19,34,.16),0 0 ${14 + focus * 32}px rgba(255,24,56,${0.08 + focus * 0.23})`,
           transition: "opacity 220ms linear,border-color 280ms ease,box-shadow 280ms ease",
         }}
       >
         <div className="act-five-glass-sheen act-five-glass-sheen-active pointer-events-none absolute inset-y-0 left-0" aria-hidden="true" />
-        <header className="relative flex items-center justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.22em] text-[#ff7189]">
-          <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-[#ff2446] shadow-[0_0_12px_#ff2446]" />{card.eyebrow}</span>
-          <span className="shrink-0 text-white/55">ACT V // FIELD NOTES</span>
+        <header className="relative flex items-center justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.22em] text-[#9c102b]">
+          <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-[#ff1738] shadow-[0_0_12px_#ff2446]" />{card.eyebrow}</span>
+          <span className="shrink-0 text-[#53606d]">ACT V // FIELD NOTES</span>
         </header>
-        <h3 className="relative mt-5 max-w-[440px] text-[clamp(22px,2vw,28px)] font-black uppercase leading-[1.05] tracking-[-0.025em] text-white [text-shadow:0_2px_16px_rgba(0,0,0,.85)]">{card.title}</h3>
-        <p className="relative mt-4 max-w-[470px] text-[14px] leading-[1.55] text-white/85 [text-shadow:0_2px_8px_rgba(0,0,0,.85)]">{card.body}</p>
+        <h3 className="relative mt-5 max-w-[440px] text-[clamp(22px,2vw,28px)] font-black uppercase leading-[1.05] tracking-[-0.025em] text-[#10141b] [text-shadow:0_1px_0_rgba(255,255,255,.9)]">{card.title}</h3>
+        <p className="relative mt-4 max-w-[470px] text-[14px] leading-[1.55] text-[#303a45] [text-shadow:0_1px_0_rgba(255,255,255,.72)]">{card.body}</p>
         <ul className="relative mt-4 grid grid-cols-2 gap-2" aria-label={`${card.eyebrow} milestone metrics`}>
-          {card.metrics.map((metric) => <li key={metric} className="w-fit max-w-full rounded-sm border border-[#ff2446]/40 bg-[#19050b]/75 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-[#ffd5dc] shadow-[inset_0_0_12px_rgba(255,23,56,.08)]">{metric}</li>)}
+          {card.metrics.map((metric) => <li key={metric} className="w-fit max-w-full rounded-sm border border-[#a21b35]/35 bg-[rgba(255,255,255,.56)] px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#651326] shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_2px_6px_rgba(31,9,14,.06)]">{metric}</li>)}
         </ul>
-        <footer className="relative mt-auto border-t border-[#ff2646]/35 pt-3 font-mono text-[9px] uppercase tracking-[0.13em] text-[#ff9cab]">
+        <footer className="relative mt-auto border-t border-[#962039]/30 pt-3 font-mono text-[9px] uppercase tracking-[0.13em] text-[#5a2330]">
           <div className="mb-2 flex items-center justify-between gap-4">
-            <span className="min-w-0 truncate"><b className="mr-2 text-[#ff2446]">SYS.STATUS</b>{card.telemetry}</span>
-            <strong className="shrink-0 rounded-sm border border-[#ff2446]/60 bg-[#19050b]/85 px-2 py-1 text-[12px] tracking-[0.18em] text-white shadow-[0_0_14px_rgba(255,23,56,.22)]">0{index + 1} / 04</strong>
+            <span className="min-w-0 truncate"><b className="mr-2 text-[#aa102d]">SYS.STATUS</b>{card.telemetry}</span>
+            <strong className="shrink-0 rounded-sm border border-[#a91935]/50 bg-[rgba(255,255,255,.65)] px-2 py-1 text-[12px] tracking-[0.18em] text-[#79142b] shadow-[0_0_12px_rgba(255,23,56,.1)]">0{index + 1} / 04</strong>
           </div>
           <div className="flex h-[3px] gap-[3px]" aria-hidden="true">{Array.from({ length: 32 }, (_, tick) => <i key={tick} className="flex-1" style={{ background: tick / 32 < progress ? "#ff2446" : "rgba(255,36,70,.18)", boxShadow: tick / 32 < progress && focus > 0.5 ? "0 0 6px rgba(255,36,70,.75)" : "none" }} />)}</div>
         </footer>
@@ -364,15 +464,16 @@ function Monolith({
   focus,
   opacity,
   progress,
+  scrollProgress,
   groupRef,
 }: {
   index: number;
   focus: number;
   opacity: number;
   progress: number;
+  scrollProgress: number;
   groupRef: (node: THREE.Group | null) => void;
 }) {
-  const item = CARD_CONTENT[index];
   const position = ACT_FIVE_CARD_POSITIONS[index];
   const group = useRef<THREE.Group>(null);
   const quaternion = useRef(new THREE.Quaternion());
@@ -380,6 +481,9 @@ function Monolith({
   const offsetQuaternion = useRef(new THREE.Quaternion());
   const radial = useMemo(() => new THREE.Vector3(position.x, 0, position.z).normalize(), [position]);
   const targetPosition = useMemo(() => new THREE.Vector3(), []);
+  const exitSlide = index === 3
+    ? THREE.MathUtils.smoothstep(scrollProgress, ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit)
+    : 0;
   const bracketGeometry = useMemo(() => {
     const pts = [
       [-1.68,1.02,-1.46,1.02],[-1.68,1.02,-1.68,.8],[1.68,1.02,1.46,1.02],[1.68,1.02,1.68,.8],
@@ -403,16 +507,24 @@ function Monolith({
     targetQuaternion.current.multiply(offsetQuaternion.current);
     group.current.quaternion.copy(quaternion.current).slerp(targetQuaternion.current, 1 - Math.exp(-8.5 * delta));
     targetPosition.copy(position).addScaledVector(radial, (1 - focus) * 2.2);
+    // Retract the final card inward as the camera leaves, keeping its glass
+    // edge safely on-screen until the card fades completely into the handoff.
+    targetPosition.x -= exitSlide * 1.65;
     group.current.position.lerp(targetPosition, 1 - Math.exp(-7 * delta));
-    const targetScale = THREE.MathUtils.lerp(0.86, 1, focus);
+    // Keep the HTML glass panel inside the frame while the camera sweeps close
+    // to it during orbital transfers; at each checkpoint stop it returns to
+    // its authored scale and reading distance.
+    const cameraDistance = camera.position.distanceTo(group.current.getWorldPosition(targetPosition));
+    const distanceScale = THREE.MathUtils.clamp(cameraDistance / 5.2, 0.72, 1);
+    const targetScale = THREE.MathUtils.lerp(0.86, 1, focus) * distanceScale;
     const scale = THREE.MathUtils.damp(group.current.scale.x, targetScale, 8, delta);
     group.current.scale.setScalar(scale);
   });
 
   return (
     <group ref={(node) => { group.current = node; groupRef(node); }} position={position}>
-      <RoundedBox args={[3.4, 2.15, 0.12]} radius={0.075} smoothness={4}>
-        <meshPhysicalMaterial color="#070204" emissive="#210008" emissiveIntensity={0.05 + focus * 0.28} roughness={0.3} metalness={0.35} clearcoat={0.75} clearcoatRoughness={0.22} transparent opacity={opacity} depthWrite={focus > 0.2} />
+      <RoundedBox args={[3.4, 2.15, 0.2]} radius={0.075} smoothness={6}>
+        <meshPhysicalMaterial color="#f0f4f8" transmission={0.94} roughness={0.12} ior={1.5} thickness={1.5} attenuationColor="#f1dce1" attenuationDistance={3.2} metalness={0.015} clearcoat={1} clearcoatRoughness={0.08} transparent opacity={opacity} depthWrite={focus > 0.2} />
       </RoundedBox>
       <lineSegments geometry={bracketGeometry}><lineBasicMaterial color="#ff2446" transparent opacity={opacity} toneMapped={false} /></lineSegments>
       {[
@@ -510,6 +622,7 @@ export default function ActFiveWorld({ scrollProgress, actFourPhase, particleCou
 
   return (
     <group position={ACT_FIVE_ORIGIN} visible={active && reveal > 0.001}>
+      <ActFiveStarfield strength={reveal * (active ? 1 : 0)} />
       <PolarGrid strength={reveal * (active ? 1 : 0)} />
       <Reactor strength={reveal * (active ? 1 : 0)} swarmGeometry={swarmGeometry} />
       {CARD_CONTENT.map((_, index) => {
@@ -522,6 +635,7 @@ export default function ActFiveWorld({ scrollProgress, actFourPhase, particleCou
             focus={focus}
             opacity={opacity}
             progress={activeIndex === index ? clamp01((local - (index * 0.17)) / 0.12) : 0}
+            scrollProgress={scrollProgress}
             groupRef={(node) => { cards.current[index] = node; }}
           />
         );

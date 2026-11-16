@@ -240,7 +240,7 @@ export default function Scene({
             <ActFiveWorld
               scrollProgress={scrollProgress}
               actFourPhase={actFourPhase}
-              particleCount={deviceTier === "mobile" ? 3_600 : deviceTier === "tablet" ? 6_800 : 11_000}
+              particleCount={deviceTier === "mobile" ? 4_200 : deviceTier === "tablet" ? 8_600 : 14_500}
             />
           )}
           <ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} />
