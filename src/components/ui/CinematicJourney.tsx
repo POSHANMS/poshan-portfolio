@@ -595,7 +595,7 @@ function ProjectsChapter({
 
 function JourneyChapter({ presence, progress }: { presence: number; progress: number }) {
   const intro = smoothstep(0.02, 0.3, progress);
-  const checkpoint = progress < 0.335 ? 1 : progress < 0.6 ? 2 : progress < 0.865 ? 3 : 4;
+  const checkpoint = progress < 0.2 ? 1 : progress < 0.47 ? 2 : progress < 0.73 ? 3 : 4;
 
   return (
     <Panel presence={presence} side="left" className="left-6 top-[6vh] w-[min(31rem,calc(100vw-3rem))] md:left-16">
@@ -808,6 +808,9 @@ export default function CinematicJourney({
 
   if (!visible) return null;
 
+  const actFourInterior = actFourPhase === "inside" || actFourPhase === "warping";
+  const actFourReturning = actFourPhase === "returning" && scrollProgress < 0.905;
+
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
       <WarpStarfield phase={actFourPhase} />
@@ -842,8 +845,8 @@ export default function CinematicJourney({
         onWarp={onActFourWarp}
         onExit={onActFourExit}
       />
-      <JourneyChapter presence={actFourPhase === "inside" || actFourPhase === "warping" || actFourPhase === "returning" ? 0 : states.journey.presence} progress={states.journey.progress} />
-      <ContactChapter presence={actFourPhase === "inside" || actFourPhase === "warping" || actFourPhase === "returning" ? 0 : states.contact.presence} progress={states.contact.progress} />
+      <JourneyChapter presence={actFourInterior || actFourReturning ? 0 : states.journey.presence} progress={states.journey.progress} />
+      <ContactChapter presence={actFourInterior || actFourReturning ? 0 : states.contact.presence} progress={states.contact.progress} />
 
       <div className="absolute right-8 top-24 hidden flex-col items-end gap-2 font-mono text-[9px] uppercase tracking-[0.26em] text-white/30 md:flex">
         {chapters.map((chapter) => {

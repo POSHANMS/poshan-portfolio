@@ -17,7 +17,7 @@ const MONOLITHS = [
   {
     tag: "01 // FOUNDATION",
     title: "COMPUTER SCIENCE ENGINEERING",
-    body: JOURNEY_MILESTONES[0].body,
+    body: `${JOURNEY_MILESTONES[0].body} Core systems, algorithms, architecture, and disciplined engineering foundations shape the work.`,
     telemetry: "SYS.STATUS: VERIFIED // CORE ARCHITECTURE",
     position: [-6.16, 0.85, 2.87] as [number, number, number],
     lookAt: [0, 0.4, 9.5] as [number, number, number],
@@ -26,8 +26,8 @@ const MONOLITHS = [
   {
     tag: "02 // ARCHITECTURE",
     title: "REAL-TIME FULL-STACK SYSTEMS",
-    body: JOURNEY_MILESTONES[1].body,
-    telemetry: "STACK: REACT + FLASK // POSTGRESQL + REDIS",
+    body: "Production web and cloud systems engineered with Python, Flask, React, Supabase, PostgreSQL, Redis, and Three.js.",
+    telemetry: "LATENCY: <12MS // FULL-STACK PIPELINE",
     position: [-2.55, -0.45, 6.3] as [number, number, number],
     lookAt: [0, -0.2, 10.5] as [number, number, number],
     roll: -0.03,
@@ -35,8 +35,8 @@ const MONOLITHS = [
   {
     tag: "03 // INTELLIGENCE",
     title: "AGENTIC AI & DEEP LEARNING",
-    body: "Built ZaminSaathi as a three-agent land-document assistant for the Kaggle x Google 5-Day AI Agents course. Also built the Flask backend for HealthGPT, connecting trained ML and CNN models to an eight-condition prediction system.",
-    telemetry: "AI PIPELINE: ZAMINSAATHI // HEALTHGPT",
+    body: "Multi-agent MCP architectures like ZaminSaathi and multi-stage CNN clinical pipelines like HealthGPT.",
+    telemetry: "NEURAL ENGINE: ACTIVE // MULTI-AGENT MCP",
     position: [2.55, 0.55, 6.3] as [number, number, number],
     lookAt: [0, 0.2, 10.5] as [number, number, number],
     roll: 0.03,
@@ -44,8 +44,8 @@ const MONOLITHS = [
   {
     tag: "04 // EXECUTION",
     title: "SECURITY, HARDWARE & PRACTICE",
-    body: "Completed a Deloitte Cyber Security virtual internship, practiced log analysis and vulnerability assessment, and solved 110+ DSA problems. Build and delivery practice includes Docker, GitHub, Vercel, Railway, Render, and Cloudinary.",
-    telemetry: "SECURITY PRACTICE // LOG ANALYSIS + LABS",
+    body: "Cyber security, ethical hacking, ESP8266 automated hardware systems, rapid hackathon execution, and 110+ DSA problems. Build and delivery practice includes Docker, GitHub, Vercel, Railway, Render, and Cloudinary.",
+    telemetry: "SEC.PROTOCOL: HARDENED // FIELD TESTED",
     position: [6.16, -0.65, 2.87] as [number, number, number],
     lookAt: [0, -0.3, 9.5] as [number, number, number],
     roll: -0.04,
@@ -294,6 +294,7 @@ export default function ActFiveWorld({
 }) {
   const rootRef = useRef<THREE.Group>(null);
   const coreRef = useRef<THREE.Mesh>(null);
+  const coreLightRef = useRef<THREE.PointLight>(null);
   const emberRef = useRef<THREE.Points>(null);
   const ringRefs = useRef<(THREE.Mesh | null)[]>([]);
   const shockwaveRef = useRef<THREE.Mesh>(null);
@@ -365,7 +366,8 @@ export default function ActFiveWorld({
   const active = actFourPhase !== "inside" && actFourPhase !== "warping";
   const visible = active ? reveal : 0;
   const localProgress = THREE.MathUtils.clamp((scrollProgress - 0.91) / (0.956 - 0.91), 0, 1);
-  const activeIndex = localProgress < 0.335 ? 0 : localProgress < 0.60 ? 1 : localProgress < 0.865 ? 2 : 3;
+  // Match the active card transitions to the nonuniform Catmull-Rom key times.
+  const activeIndex = localProgress < 0.2 ? 0 : localProgress < 0.47 ? 1 : localProgress < 0.73 ? 2 : 3;
 
   useFrame((state, delta) => {
     const time = state.clock.getElapsedTime();
@@ -382,6 +384,7 @@ export default function ActFiveWorld({
     swarmMaterial.uniforms.uScrollVelocity.value = scrollVelocity.current;
 
     if (coreRef.current) coreRef.current.rotation.y = time * 0.06;
+    if (coreLightRef.current) coreLightRef.current.intensity = 6.5 + Math.sin(time * 2.2) * 1.2;
     if (emberRef.current) {
       emberRef.current.rotation.y += delta * 0.009;
       emberRef.current.rotation.x = Math.sin(time * 0.08) * 0.025;
@@ -415,12 +418,13 @@ export default function ActFiveWorld({
   return (
     <group ref={rootRef} position={ACT_FIVE_ORIGIN} scale={0.001}>
       <ambientLight intensity={0.08} color="#24050a" />
-      <pointLight color="#ff1a35" intensity={6.5} distance={22} decay={1.6} />
+      <pointLight ref={coreLightRef} color="#ff1a35" intensity={6.5} distance={22} decay={1.6} />
       <pointLight position={[0, 4.5, -3.5]} color="#ff5533" intensity={3.2} distance={18} />
       <directionalLight position={[-8, -5, 6]} color="#1a2844" intensity={0.9} />
 
       <mesh ref={coreRef}>
-        <sphereGeometry args={[2.2, 64, 64]} />
+        {/* Detail 5 gives a smooth displaced icosphere without an infeasible 64-level mesh. */}
+        <icosahedronGeometry args={[2.2, 5]} />
         <primitive object={coreMaterial} attach="material" />
       </mesh>
       <points geometry={swarm} frustumCulled={false} renderOrder={2}>

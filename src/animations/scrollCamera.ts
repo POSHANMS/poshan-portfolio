@@ -208,7 +208,8 @@ export function CinematicCamera({
 
     // The Act V entry blends out of the existing Act IV camera, then follows
     // keyed Catmull-Rom position and target splines through all four artifacts.
-    if (p >= 0.89 && p <= 0.956 && actFourPhase === "locked") {
+    const insideProjectWorld = actFourPhase === "inside" || actFourPhase === "warping";
+    if (p >= 0.89 && p <= 0.956 && !insideProjectWorld) {
       actFiveCameraActive = true;
       if (p < 0.915) {
         const entry = THREE.MathUtils.smoothstep(p, 0.89, 0.915);
@@ -222,11 +223,11 @@ export function CinematicCamera({
         desiredLookAt.copy(pointOnKeyedCurve(ACT_FIVE_TARGET_CURVE, progress));
         const velocity = clampedProgress - p;
         desiredFov = 50 + Math.min(Math.abs(velocity) * 90, 22);
-        authoredActFiveRoll = THREE.MathUtils.clamp(-velocity * 1.65, -0.28, 0.28);
+        authoredActFiveRoll = 0;
       }
       desiredPosition.x += state.pointer.x * 0.35;
       desiredPosition.y -= state.pointer.y * 0.35;
-    } else if (p > 0.956 && p < 0.963 && actFourPhase === "locked") {
+    } else if (p > 0.956 && p < 0.963 && !insideProjectWorld) {
       // Carry the final card's camera into Contact instead of jumping between rigs.
       const transition = THREE.MathUtils.smoothstep(p, 0.956, 0.963);
       desiredPosition.lerpVectors(ACT_FIVE_POSITIONS[4], ACT_FIVE_EXIT_CAMERA, transition);
@@ -247,7 +248,7 @@ export function CinematicCamera({
       desiredPosition.set(4.5, 2.5, -6.85);
       desiredLookAt.set(4.5, 2.5, -12.4);
       desiredFov = 48;
-    } else if (actFourPhase === "returning") {
+    } else if (actFourPhase === "returning" && p < 0.905) {
       desiredPosition.set(2.9, 1.85, 4.7);
       desiredLookAt.set(0.9, 0.35, -3.4);
       desiredFov = 51;
