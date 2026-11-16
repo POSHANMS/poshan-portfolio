@@ -596,9 +596,13 @@ function ProjectsChapter({
 function JourneyChapter({ presence, progress }: { presence: number; progress: number }) {
   const intro = smoothstep(0.02, 0.3, progress);
   const checkpoint = progress < 0.17 ? 1 : progress < 0.34 ? 2 : progress < 0.51 ? 3 : 4;
+  const inSwoop = (progress >= 0.12 && progress < 0.17)
+    || (progress >= 0.29 && progress < 0.34)
+    || (progress >= 0.46 && progress < 0.51)
+    || (progress >= 0.63 && progress < 0.68);
 
   return (
-    <Panel presence={presence} side="left" className="left-6 top-[6vh] w-[min(31rem,calc(100vw-3rem))] md:left-16">
+    <Panel presence={presence} side="left" className="left-6 top-[6vh] z-[3] w-[min(30rem,calc(100vw-3rem))] md:left-16">
       <div aria-hidden="true" className="pointer-events-none absolute -inset-x-10 -inset-y-8 -z-10 bg-[radial-gradient(ellipse_at_18%_25%,rgba(0,0,0,0.74),rgba(0,0,0,0.32)_55%,transparent_82%)]" />
       <div style={{ opacity: intro, transform: `translateY(${(1 - intro) * 12}px)`, willChange: "opacity, transform" }}>
         <Kicker act="ACT V" label="Education And Practice" />
@@ -613,7 +617,7 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
       <div className="mt-6 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[#ff9cab]" style={{ opacity: intro }}>
         <span>Checkpoint 0{checkpoint} / 04</span>
         <span className="h-px w-16 bg-[#ff1744]/55"><span className="block h-full bg-[#ff4c63] transition-[width] duration-300" style={{ width: `${checkpoint * 25}%` }} /></span>
-        <span className="text-white/45">Scroll to inspect</span>
+        <span className={inSwoop ? "text-[#ff7189]" : "text-white/45"}>{inSwoop ? "Orbital transfer" : "Scroll to inspect"}</span>
       </div>
     </Panel>
   );

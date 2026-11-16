@@ -1,8 +1,8 @@
 "use client";
 
-import { Html, Line, RoundedBox } from "@react-three/drei";
+import { Html, RoundedBox } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { ActFourPhase } from "@/types/actFour";
 import { JOURNEY_MILESTONES } from "@/utils/constants";
@@ -12,8 +12,8 @@ const AMBIENT_EMBER_COUNT = 400;
 // The Act V composition has its own local origin while remaining in the shared
 // world coordinates used by the portfolio's other acts and scroll camera.
 const ACT_FIVE_ORIGIN: [number, number, number] = [0, 0, -5.15];
-const MONOLITH_ORBIT_RADIUS = 10.2;
-const MONOLITH_ORBIT_ANGLES = [-75, -25, 25, 75] as const;
+const MONOLITH_ORBIT_RADIUS = 10.5;
+const MONOLITH_ORBIT_ANGLES = [-78, -26, 26, 78] as const;
 
 function monolithOrbitPosition(angleDegrees: number, height: number): [number, number, number] {
   const angle = THREE.MathUtils.degToRad(angleDegrees);
@@ -25,10 +25,10 @@ function monolithOrbitPosition(angleDegrees: number, height: number): [number, n
 }
 
 const MONOLITH_POSITIONS = [
-  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[0], 0.35),
-  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[1], -0.2),
-  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[2], 0.2),
-  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[3], -0.3),
+  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[0], 0.6),
+  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[1], -0.5),
+  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[2], 0.5),
+  monolithOrbitPosition(MONOLITH_ORBIT_ANGLES[3], -0.4),
 ];
 
 const MONOLITHS = [
@@ -133,14 +133,14 @@ const coreFragmentShader = /* glsl */ `
   varying float vNoise;
   void main() {
     float heat = smoothstep(-0.18, 0.72, vNoise);
-    vec3 base = vec3(0.071, 0.008, 0.024);
-    vec3 crimson = vec3(1.0, 0.102, 0.208);
-    vec3 hot = vec3(1.0, 0.38, 0.28);
+    vec3 base = vec3(0.051, 0.004, 0.012);
+    vec3 crimson = vec3(1.0, 0.018, 0.11);
+    vec3 hot = vec3(1.0, 0.035, 0.20);
     vec3 color = mix(base, crimson, heat);
-    color = mix(color, hot, smoothstep(0.48, 0.92, vNoise) * 0.64);
+    color = mix(color, hot, smoothstep(0.58, 0.94, vNoise) * 0.42);
     float fresnel = pow(1.0 - abs(dot(normalize(vNormalView), normalize(vViewPosition))), 2.8);
-    color += vec3(1.0, 0.035, 0.12) * fresnel * 1.8;
-    gl_FragColor = vec4(color, 0.9);
+    color += vec3(1.0, 0.012, 0.08) * fresnel * 2.2;
+    gl_FragColor = vec4(color, 0.94);
   }
 `;
 
@@ -167,12 +167,15 @@ const swarmVertexShader = /* glsl */ `
     pos.z += sin(uTime * 1.6 + aPhase + pos.x * 0.8) * 0.18;
     float pulse = 1.0 + sin(uTime * 1.8 + aPhase * 0.5) * 0.06 + uScrollVelocity * 0.15;
     pos *= pulse;
-    vec3 red = vec3(1.0, 0.118, 0.22);
-    vec3 orange = vec3(1.0, 0.333, 0.2);
-    vec3 white = vec3(1.0, 0.9, 0.88);
-    vColor = aColorMix < 0.62
-      ? mix(red, orange, aColorMix / 0.62)
-      : mix(orange, white, (aColorMix - 0.62) / 0.38);
+    vec3 blood = vec3(0.72, 0.0, 0.075);
+    vec3 crimson = vec3(1.0, 0.018, 0.12);
+    vec3 rose = vec3(1.0, 0.12, 0.20);
+    vec3 spark = vec3(1.0, 0.30, 0.25);
+    vColor = aColorMix < 0.45
+      ? mix(blood, crimson, aColorMix / 0.45)
+      : aColorMix < 0.9
+        ? mix(crimson, rose, (aColorMix - 0.45) / 0.45)
+        : mix(rose, spark, (aColorMix - 0.9) / 0.1);
     vAlpha = 0.6 + 0.4 * sin(uTime * 3.0 + aPhase);
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
@@ -196,26 +199,92 @@ function seeded(index: number, salt: number) {
   return value - Math.floor(value);
 }
 
-function MonolithCard({ index, active }: { index: number; active: boolean }) {
+function RingSystem({ radius, index }: { radius: number; index: number }) {
+  const orbit = useRef<THREE.Group>(null);
+  const ticks = useRef<THREE.Group>(null);
+  const instancedTicks = useRef<THREE.InstancedMesh>(null);
+  const tickGeometry = useMemo(() => new THREE.BoxGeometry(0.026, 0.13, 0.026), []);
+  const tickMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: "#ff2446", transparent: true, opacity: 0.76, toneMapped: false }), []);
+  useLayoutEffect(() => {
+    if (!instancedTicks.current) return;
+    const dummy = new THREE.Object3D();
+    const count = 72;
+    for (let i = 0; i < count; i += 1) {
+      const angle = (i / count) * Math.PI * 2;
+      dummy.position.set(Math.cos(angle) * (radius + 0.12), Math.sin(angle) * (radius + 0.12), 0);
+      dummy.rotation.set(0, 0, angle);
+      dummy.scale.set(1, i % 6 === 0 ? 1.55 : 0.8, 1);
+      dummy.updateMatrix();
+      instancedTicks.current.setMatrixAt(i, dummy.matrix);
+    }
+    instancedTicks.current.instanceMatrix.needsUpdate = true;
+  }, [radius]);
+  useFrame((_, delta) => {
+    if (orbit.current) orbit.current.rotation.z += (index % 2 === 0 ? 1 : -1) * (0.1 + index * 0.018) * delta;
+    if (ticks.current) ticks.current.rotation.z -= (0.16 + index * 0.025) * delta;
+  });
+  const tilts: [number, number, number][] = [[0.45, 0.08, 0.24], [-0.56, 0.3, -0.38], [1.1, -0.18, 0.13]];
+  return (
+    <group rotation={tilts[index]}>
+      <group ref={orbit}>
+        <mesh>
+          <torusGeometry args={[radius, 0.032, 16, 128]} />
+          <meshBasicMaterial color="#ff1a3c" transparent opacity={0.85} toneMapped={false} />
+        </mesh>
+        {[0, 1, 2, 3].map((node) => {
+          const angle = node * Math.PI / 2;
+          return <mesh key={node} position={[Math.cos(angle) * radius, Math.sin(angle) * radius, 0]}>
+            <sphereGeometry args={[0.07, 12, 12]} />
+            <meshBasicMaterial color="#ff314e" toneMapped={false} />
+          </mesh>;
+        })}
+      </group>
+      <group ref={ticks}>
+        <instancedMesh ref={instancedTicks} args={[tickGeometry, tickMaterial, 72]} frustumCulled={false} />
+      </group>
+    </group>
+  );
+}
+
+function PolarFloorGrid() {
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+    uniforms: { uTime: { value: 0 } },
+    vertexShader: `varying vec2 vGrid; void main(){ vGrid=uv*28.0-14.0; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `uniform float uTime; varying vec2 vGrid; void main(){ float radius=length(vGrid); float ring=1.0-smoothstep(0.018,0.09,abs(fract(radius*1.35)-0.5)); float angle=atan(vGrid.y,vGrid.x); float ray=1.0-smoothstep(0.008,0.035,abs(sin(angle*36.0))); float ticks=1.0-smoothstep(0.01,0.04,abs(fract(angle*72.0/6.28318)-0.5)); float edge=1.0-smoothstep(9.0,14.0,radius); float pulse=0.86+0.14*sin(uTime*0.45-radius*0.4); float lines=max(ring*0.62, max(ray*0.18,ticks*0.16)); float alpha=lines*edge*0.22*pulse; gl_FragColor=vec4(1.0,0.018,0.12,alpha); }`,
+  }), []);
+  useFrame(({ clock }) => { material.uniforms.uTime.value = clock.getElapsedTime(); });
+  return (
+    <mesh position={[0, -2.8, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[28, 28, 1, 1]} />
+      <primitive object={material} attach="material" />
+    </mesh>
+  );
+}
+
+function MonolithCard({ index, focus, opacity, progress }: { index: number; focus: number; opacity: number; progress: number }) {
   const item = MONOLITHS[index];
   return (
-    <Html transform center distanceFactor={5} position={[0, 0, 0.052]} zIndexRange={[120, 0]}>
+    <Html transform center distanceFactor={3.5} position={[0, 0, 0.072]} zIndexRange={[120, 0]}>
       <article
         className="relative flex h-[344px] w-[544px] flex-col overflow-hidden rounded-[4px] border px-7 py-6 text-left text-white"
         style={{
-          background: "rgba(7, 2, 4, 0.96)",
-          opacity: active ? 1 : 0.35,
-          borderColor: `rgba(255, 38, 70, ${active ? 0.95 : 0.42})`,
-          boxShadow: active
-            ? "0 24px 60px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.14), 0 0 34px rgba(255,26,53,0.52)"
-            : "0 20px 52px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.06)",
-          transition: "opacity 420ms ease, border-color 420ms ease, box-shadow 420ms ease",
+          background: "linear-gradient(115deg, rgba(14,2,7,.97), rgba(7,2,5,.95) 58%, rgba(10,2,6,.97))",
+          opacity,
+          borderColor: `rgba(255, 36, 70, ${0.28 + focus * 0.68})`,
+          boxShadow: `0 24px 60px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,${0.05 + focus * 0.09}), 0 0 ${8 + focus * 30}px rgba(255,20,52,${0.08 + focus * 0.36})`,
+          backgroundImage: "radial-gradient(ellipse at 0% 48%, rgba(255,22,58,.16), transparent 44%), linear-gradient(118deg, transparent 30%, rgba(255,60,90,.08) 48%, transparent 62%), repeating-linear-gradient(0deg, rgba(255,34,68,.035) 0px, rgba(255,34,68,.035) 1px, transparent 1px, transparent 5px), linear-gradient(115deg, rgba(14,2,7,.97), rgba(7,2,5,.95) 58%, rgba(10,2,6,.97))",
+          transition: "opacity 260ms ease, border-color 320ms ease, box-shadow 320ms ease",
         }}
       >
-        <div className={`act-five-glass-sheen pointer-events-none absolute inset-y-0 left-0 ${active ? "act-five-glass-sheen-active" : ""}`} aria-hidden="true" />
-        <div className="relative flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.24em] text-[#ff8b9c]">
-          <span>{item.tag}</span>
-          <span className="text-white/50">ACT V / FIELD NOTES</span>
+        <div className="act-five-glass-sheen pointer-events-none absolute inset-y-0 left-0" aria-hidden="true" />
+        <div className="relative flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.24em] text-[#ff7189]">
+          <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-[#ff2446] shadow-[0_0_12px_#ff2446]" />{item.tag}</span>
+          <span className="text-white/55">ACT V // FIELD NOTES</span>
         </div>
         <h3 className="relative mt-6 max-w-[440px] text-[28px] font-black uppercase leading-[1.05] tracking-[-0.025em] text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.85)]">
           {item.title}
@@ -223,23 +292,28 @@ function MonolithCard({ index, active }: { index: number; active: boolean }) {
         <p className="relative mt-5 max-w-[470px] text-[15px] leading-[1.7] text-white/85 [text-shadow:0_2px_8px_rgba(0,0,0,0.85)]">
           {item.body}
         </p>
-        <div className="relative mt-auto border-t border-[#ff2646]/30 pt-4 font-mono text-[10px] uppercase tracking-[0.15em] text-[#ff9cab]">
-          {item.telemetry}
+        <div className="relative mt-auto border-t border-[#ff2646]/35 pt-3 font-mono text-[10px] uppercase tracking-[0.15em] text-[#ff9cab]">
+          <div className="mb-2 flex items-center justify-between gap-5"><span>{item.telemetry}</span><span className="shrink-0 text-white/60">0{index + 1} / 04</span></div>
+          <div className="flex h-[3px] gap-[3px]" aria-hidden="true">
+            {Array.from({ length: 32 }, (_, tick) => <i key={tick} className="flex-1" style={{ background: tick / 32 < progress ? "#ff2446" : "rgba(255,36,70,.18)", boxShadow: tick / 32 < progress && focus > 0.5 ? "0 0 6px rgba(255,36,70,.75)" : "none" }} />)}
+          </div>
         </div>
       </article>
     </Html>
   );
 }
 
-function Monolith({ index, active }: { index: number; active: boolean }) {
+function Monolith({ index, continuousIndex, progress }: { index: number; continuousIndex: number; progress: number }) {
   const item = MONOLITHS[index];
   const group = useRef<THREE.Group>(null);
   const previousQuaternion = useRef(new THREE.Quaternion());
   const facingQuaternion = useRef(new THREE.Quaternion());
+  const offsetQuaternion = useRef(new THREE.Quaternion());
+  const basePosition = useMemo(() => new THREE.Vector3(...item.position), [item.position]);
   const bracketGeometry = useMemo(() => {
     const positions: number[] = [];
-    const w = 1.72;
-    const h = 1.08;
+    const w = 1.7;
+    const h = 1.075;
     const len = 0.22;
     const points = [
       [-w, h, -w + len, h], [-w, h, -w, h - len],
@@ -247,13 +321,21 @@ function Monolith({ index, active }: { index: number; active: boolean }) {
       [-w, -h, -w + len, -h], [-w, -h, -w, -h + len],
       [w, -h, w - len, -h], [w, -h, w, -h + len],
     ];
-    for (const [x1, y1, x2, y2] of points) positions.push(x1, y1, 0.055, x2, y2, 0.055);
+    for (const [x1, y1, x2, y2] of points) positions.push(x1, y1, 0.085, x2, y2, 0.085);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     return geometry;
   }, []);
 
-  useFrame(({ camera }, delta) => {
+  const distance = Math.abs(continuousIndex - index);
+  const focus = Math.max(0, 1 - distance * 1.35);
+  const recede = THREE.MathUtils.smoothstep(distance, 0.52, 0.98);
+  const visualOpacity = distance <= 0.52
+    ? 0.35 + focus * 0.65
+    : THREE.MathUtils.lerp(0.35 + focus * 0.65, 0.02, THREE.MathUtils.smoothstep(distance, 0.52, 0.66))
+      * (1 - THREE.MathUtils.smoothstep(distance, 1.05, 1.55));
+
+  useFrame(({ camera, pointer }, delta) => {
     if (!group.current) return;
 
     // Face the active card directly toward the camera. A world-up vector keeps
@@ -262,47 +344,90 @@ function Monolith({ index, active }: { index: number; active: boolean }) {
     previousQuaternion.current.copy(group.current.quaternion);
     group.current.lookAt(camera.position);
     facingQuaternion.current.copy(group.current.quaternion);
-    const rotationSpeed = active ? 22 : 5;
-    group.current.quaternion.copy(previousQuaternion.current).slerp(
-      facingQuaternion.current,
-      1 - Math.exp(-rotationSpeed * delta),
-    );
+    offsetQuaternion.current.setFromEuler(new THREE.Euler(
+      THREE.MathUtils.degToRad(3 + pointer.y * 4),
+      THREE.MathUtils.degToRad(-16 + pointer.x * 4),
+      0,
+      "YXZ",
+    ));
+    facingQuaternion.current.multiply(offsetQuaternion.current);
+    group.current.quaternion.copy(previousQuaternion.current).slerp(facingQuaternion.current, 1 - Math.exp(-10 * delta));
 
-    const targetScale = active ? 1 : 0.88;
+    const radial = new THREE.Vector3(basePosition.x, 0, basePosition.z).normalize();
+    const targetPosition = basePosition.clone().addScaledVector(radial, recede * 2.5);
+    group.current.position.lerp(targetPosition, 1 - Math.exp(-7 * delta));
+    const targetScale = THREE.MathUtils.lerp(1, 0.65, recede);
     const scale = THREE.MathUtils.damp(group.current.scale.x, targetScale, 9, delta);
     group.current.scale.setScalar(scale);
   });
 
+  const bracketBars = [
+    [-1.58, 1.02, 0.22, 0.045], [-1.68, 0.92, 0.045, 0.2],
+    [1.58, 1.02, 0.22, 0.045], [1.68, 0.92, 0.045, 0.2],
+    [-1.58, -1.02, 0.22, 0.045], [-1.68, -0.92, 0.045, 0.2],
+    [1.58, -1.02, 0.22, 0.045], [1.68, -0.92, 0.045, 0.2],
+  ] as const;
+
   return (
     <group ref={group} position={item.position}>
-      <RoundedBox args={[3.4, 2.15, 0.08]} radius={0.075} smoothness={3}>
+      <RoundedBox args={[3.4, 2.15, 0.12]} radius={0.075} smoothness={4}>
         <meshPhysicalMaterial
-          color="#070204"
-          emissive="#1a0308"
-          emissiveIntensity={active ? 0.38 : 0.12}
+          color="#090205"
+          emissive="#31000d"
+          emissiveIntensity={0.1 + focus * 0.42}
           transmission={0}
           transparent
-          opacity={0.96}
-          roughness={0.38}
-          metalness={0.16}
+          opacity={0.92}
+          roughness={0.26}
+          metalness={0.38}
+          clearcoat={0.8}
+          clearcoatRoughness={0.2}
           depthWrite
         />
       </RoundedBox>
       <lineSegments geometry={bracketGeometry}>
-        <lineBasicMaterial color="#ff2244" transparent opacity={active ? 0.95 : 0.48} toneMapped={false} />
+        <lineBasicMaterial color="#ff2446" transparent opacity={0.14 + focus * 0.86} toneMapped={false} />
       </lineSegments>
-      <MonolithCard index={index} active={active} />
+      {bracketBars.map(([x, y, width, height], barIndex) => (
+        <mesh key={barIndex} position={[x, y, 0.09]}>
+          <boxGeometry args={[width, height, 0.035]} />
+          <meshStandardMaterial color="#ff2446" emissive="#ff1238" emissiveIntensity={0.3 + focus * 1.5} toneMapped={false} />
+        </mesh>
+      ))}
+      <MonolithCard index={index} focus={focus} opacity={visualOpacity} progress={index === Math.round(continuousIndex) ? progress : 0.12} />
     </group>
   );
 }
 
-function Tether({ position }: { position: [number, number, number] }) {
+function Tether({ position, focus }: { position: [number, number, number]; focus: number }) {
+  const material = useRef<THREE.ShaderMaterial>(null);
   const points = useMemo(() => {
-    const start = new THREE.Vector3(position[0] * 0.92, position[1] * 0.92, position[2] * 0.92);
-    const mid = start.clone().multiplyScalar(0.58).add(new THREE.Vector3(0, 0.2, 0));
-    return new THREE.CatmullRomCurve3([start, mid, new THREE.Vector3(0, 0, 0)]).getPoints(32);
+    const start = new THREE.Vector3(position[0] - Math.sign(position[0]) * 1.48, position[1] - 0.68, position[2]);
+    const mid = start.clone().multiplyScalar(0.58).add(new THREE.Vector3(0, -0.12, 0));
+    return new THREE.CatmullRomCurve3([new THREE.Vector3(0, -0.4, 0), mid, start]).getPoints(64);
   }, [position]);
-  return <Line points={points} color="#ff2244" transparent opacity={0.25} lineWidth={1} />;
+  const beamGeometry = useMemo(() => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 64, 0.025, 8, false), [points]);
+  useFrame(({ clock }) => {
+    if (material.current) {
+      material.current.uniforms.uTime.value = clock.getElapsedTime();
+      material.current.uniforms.uFocus.value = focus;
+    }
+  });
+  return (
+    <mesh>
+      <primitive object={beamGeometry} attach="geometry" />
+      <shaderMaterial
+        ref={material}
+        transparent
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        toneMapped={false}
+        uniforms={{ uTime: { value: 0 }, uFocus: { value: focus } }}
+        vertexShader="varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }"
+        fragmentShader="uniform float uTime; uniform float uFocus; varying vec2 vUv; void main(){ float pulse=pow(max(0.0, sin(vUv.x*18.0-uTime*2.4)), 8.0); float alpha=(0.045+pulse*0.75)*uFocus; gl_FragColor=vec4(1.0,0.015+0.03*pulse,0.10+0.06*pulse,alpha); }"
+      />
+    </mesh>
+  );
 }
 
 export default function ActFiveWorld({
@@ -316,7 +441,6 @@ export default function ActFiveWorld({
   const coreRef = useRef<THREE.Mesh>(null);
   const coreLightRef = useRef<THREE.PointLight>(null);
   const emberRef = useRef<THREE.Points>(null);
-  const ringRefs = useRef<(THREE.Mesh | null)[]>([]);
   const shockwaveRef = useRef<THREE.Mesh>(null);
   const lastProgress = useRef(scrollProgress);
   const scrollVelocity = useRef(0);
@@ -386,8 +510,24 @@ export default function ActFiveWorld({
   const active = actFourPhase !== "inside" && actFourPhase !== "warping";
   const visible = active ? reveal : 0;
   const localProgress = THREE.MathUtils.clamp((scrollProgress - 0.915) / (0.975 - 0.915), 0, 1);
-  // Match each active-card handoff to the authored camera stop timestamps.
-  const activeIndex = localProgress < 0.17 ? 0 : localProgress < 0.34 ? 1 : localProgress < 0.51 ? 2 : 3;
+  // Hold each monolith while its HUD checkpoint is live, blending focus only
+  // over the final part of each camera swoop.
+  const checkpointStops = [0, 0.17, 0.34, 0.51, 0.68];
+  const checkpointBlendStarts = [0, 0.12, 0.29, 0.46, 0.63];
+  let continuousIndex = 3;
+  for (let index = 0; index < 4; index += 1) {
+    if (localProgress <= checkpointBlendStarts[index + 1]) {
+      const blend = THREE.MathUtils.smoothstep(localProgress, checkpointBlendStarts[index + 1], checkpointStops[index + 1]);
+      continuousIndex = index + blend;
+      break;
+    }
+  }
+  const activeIndex = Math.min(3, Math.floor(continuousIndex + 0.5));
+  const activeCheckpointProgress = (() => {
+    const start = checkpointStops[activeIndex];
+    const end = checkpointBlendStarts[activeIndex + 1] ?? 0.68;
+    return THREE.MathUtils.clamp((localProgress - start) / Math.max(0.001, end - start), 0, 1);
+  })();
 
   useFrame((state, delta) => {
     const time = state.clock.getElapsedTime();
@@ -403,30 +543,12 @@ export default function ActFiveWorld({
     swarmMaterial.uniforms.uTime.value = time;
     swarmMaterial.uniforms.uScrollVelocity.value = scrollVelocity.current;
 
-    if (coreRef.current) coreRef.current.rotation.y = time * 0.06;
-    if (coreLightRef.current) coreLightRef.current.intensity = 6.5 + Math.sin(time * 2.2) * 1.2;
+    if (coreRef.current) coreRef.current.rotation.y = time * 0.12;
+    if (coreLightRef.current) coreLightRef.current.intensity = 3.8 + Math.sin(time * 2.2) * 0.36;
     if (emberRef.current) {
       emberRef.current.rotation.y += delta * 0.009;
       emberRef.current.rotation.x = Math.sin(time * 0.08) * 0.025;
     }
-    ringRefs.current.forEach((ring, index) => {
-      if (!ring) return;
-      const speed = 1 + scrollVelocity.current * 4;
-      const rates = [
-        [0.35, 0.12, 0],
-        [0, 0, 0.2],
-        [0, 0, 0.18],
-      ][index];
-      if (index === 0) {
-        ring.rotation.y += rates[0] * speed * delta;
-        ring.rotation.x += rates[1] * speed * delta;
-      } else if (index === 1) {
-        ring.rotation.y -= 0.25 * speed * delta;
-        ring.rotation.z += rates[2] * speed * delta;
-      } else {
-        ring.rotation.z += rates[2] * speed * delta;
-      }
-    });
     if (shockwaveRef.current) {
       const pulse = 1 + (Math.sin(time * 1.2) * 0.5 + 0.5) * 0.12;
       shockwaveRef.current.scale.setScalar(pulse);
@@ -437,43 +559,33 @@ export default function ActFiveWorld({
 
   return (
     <group ref={rootRef} position={ACT_FIVE_ORIGIN} scale={0.001}>
+      <PolarFloorGrid />
       <ambientLight intensity={0.08} color="#24050a" />
-      <pointLight ref={coreLightRef} color="#ff1a35" intensity={6.5} distance={22} decay={1.6} />
-      <pointLight position={[0, 4.5, -3.5]} color="#ff5533" intensity={3.2} distance={18} />
-      <directionalLight position={[-8, -5, 6]} color="#1a2844" intensity={0.9} />
-
-      <mesh ref={coreRef}>
-        {/* Detail 5 gives a smooth displaced icosphere without an infeasible 64-level mesh. */}
-        <icosahedronGeometry args={[2.2, 5]} />
-        <primitive object={coreMaterial} attach="material" />
-      </mesh>
-      <points geometry={swarm} frustumCulled={false} renderOrder={2}>
-        <primitive object={swarmMaterial} attach="material" />
-      </points>
-
-      {[3.1, 3.8, 4.6].map((radius, index) => (
-        <mesh
-          key={radius}
-          ref={(node) => { ringRefs.current[index] = node; }}
-          rotation={[[0.45, 0, 0.25], [-0.6, 0.3, -0.4], [1.2, -0.2, 0.15]][index] as [number, number, number]}
-        >
-          <torusGeometry args={[radius, 0.018, 8, 192]} />
-          <meshBasicMaterial color="#ff2a4b" transparent opacity={0.55} toneMapped={false} />
+      <group position={[0, -0.4, 0]}>
+        <pointLight ref={coreLightRef} color="#ff102e" intensity={3.8} distance={20} decay={1.6} />
+        <pointLight position={[0, 3.8, -3.5]} color="#ff183a" intensity={1.5} distance={16} />
+        <directionalLight position={[-8, -5, 6]} color="#5a0719" intensity={0.45} />
+        <mesh ref={coreRef}>
+          <icosahedronGeometry args={[1.65, 5]} />
+          <primitive object={coreMaterial} attach="material" />
         </mesh>
-      ))}
-      <mesh ref={shockwaveRef} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[2.45, 0.012, 6, 180]} />
-        <meshBasicMaterial color="#ff5533" transparent opacity={0.28} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </mesh>
-
-      <points ref={emberRef} geometry={emberField} frustumCulled={false}>
-        <pointsMaterial color="#ff8590" size={0.028} transparent opacity={0.34} sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </points>
+        <points geometry={swarm} frustumCulled={false} renderOrder={2}>
+          <primitive object={swarmMaterial} attach="material" />
+        </points>
+        {[2.4, 3.1, 3.9].map((radius, index) => <RingSystem key={radius} radius={radius} index={index} />)}
+        <mesh ref={shockwaveRef} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[2.4, 0.012, 8, 180]} />
+          <meshBasicMaterial color="#ff263f" transparent opacity={0.18} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        </mesh>
+        <points ref={emberRef} geometry={emberField} frustumCulled={false}>
+          <pointsMaterial color="#ff263f" size={0.018} transparent opacity={0.22} sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        </points>
+      </group>
 
       {MONOLITHS.map((monolith, index) => (
         <group key={monolith.tag}>
-          <Tether position={monolith.position as [number, number, number]} />
-          <Monolith index={index} active={activeIndex === index && visible > 0.7} />
+          <Tether position={monolith.position as [number, number, number]} focus={Math.max(0, 1 - Math.abs(continuousIndex - index) * 1.35) * visible} />
+          <Monolith index={index} continuousIndex={continuousIndex} progress={activeIndex === index ? activeCheckpointProgress : 0} />
         </group>
       ))}
     </group>

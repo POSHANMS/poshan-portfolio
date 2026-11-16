@@ -122,35 +122,38 @@ const sceneCoordinates = [
 ];
 
 const ACT_FIVE_ORIGIN = new THREE.Vector3(0, 0, -5.15);
-const ACT_FIVE_ORBIT_RADIUS = 10.2;
-const ACT_FIVE_ORBIT_ANGLES = [-75, -25, 25, 75];
+const ACT_FIVE_ORBIT_RADIUS = 10.5;
+const ACT_FIVE_ORBIT_ANGLES = [-78, -26, 26, 78];
 const ACT_FIVE_EXIT_CAMERA = new THREE.Vector3(0, 0.55, 10.2);
 const ACT_FIVE_EXIT_TARGET = new THREE.Vector3(0, 0.15, -7.4);
 const ACT_FIVE_CHECKPOINT_STOPS = ACT_FIVE_ORBIT_ANGLES.map((degrees, index) => {
   const angle = THREE.MathUtils.degToRad(degrees);
   const radial = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
   const tangent = new THREE.Vector3(Math.cos(angle), 0, -Math.sin(angle));
-  const heights = [0.35, -0.2, 0.2, -0.3];
+  const heights = [0.6, -0.5, 0.5, -0.4];
   const card = ACT_FIVE_ORIGIN.clone().addScaledVector(radial, ACT_FIVE_ORBIT_RADIUS);
   card.y += heights[index];
 
-  // A 5.4-unit front offset plus a 1.6-unit tangential offset gives a
-  // 5.63-unit reading distance and reveals the reactor behind-left of the card.
+  // The camera stays 5.2 units from the active slab. The wider 10.5-unit
+  // orbital spacing keeps the reactor clearly left of the card while preserving
+  // a readable card scale at the 54-degree resting lens.
   const camera = card.clone()
-    .addScaledVector(radial, 5.4)
-    .addScaledVector(tangent, -1.6)
-    .add(new THREE.Vector3(0, 0.28, 0));
-  const viewDirection = card.clone().sub(camera);
-  const cameraRight = viewDirection.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
-  const target = card.clone()
-    .addScaledVector(cameraRight, -1.0)
-    .add(new THREE.Vector3(0, 0.45, 0));
+    .addScaledVector(radial, 2.85)
+    .addScaledVector(tangent, -4.35)
+    .add(new THREE.Vector3(0, 0.34, 0));
+  const reactor = ACT_FIVE_ORIGIN.clone().add(new THREE.Vector3(0, -0.2, 0));
+  const target = reactor.add(card).multiplyScalar(0.5);
+  // Later orbit stops need a stronger rightward look offset so the wide HTML
+  // card remains fully in-frame as the camera sweeps around the reactor.
+  const lookRightOffset = [ -0.27, 1.1, 0.82, 1.1 ][index];
+  target.addScaledVector(radial, lookRightOffset).addScaledVector(tangent, 2.41);
+  target.y += [0, -1.2, 0, 0][index];
   return { camera, target };
 });
 
 // Hold on each checkpoint while its HUD label is active; short blends happen
 // only at the boundaries, followed by a long camera exit into Contact.
-const ACT_FIVE_KEY_T = [0, 0.16, 0.17, 0.33, 0.34, 0.50, 0.51, 0.68, 0.72, 1];
+const ACT_FIVE_KEY_T = [0, 0.12, 0.17, 0.29, 0.34, 0.46, 0.51, 0.63, 0.68, 1];
 const ACT_FIVE_POSITIONS = [
   ACT_FIVE_CHECKPOINT_STOPS[0].camera,
   ACT_FIVE_CHECKPOINT_STOPS[0].camera.clone(),
@@ -251,14 +254,24 @@ export function CinematicCamera({
         const entry = THREE.MathUtils.smoothstep(p, 0.89, 0.915);
         desiredPosition.lerp(ACT_FIVE_ENTRY_CAMERA, entry);
         desiredLookAt.lerp(ACT_FIVE_ENTRY_TARGET, entry);
-        desiredFov = THREE.MathUtils.lerp(47, 60, entry);
+        desiredFov = THREE.MathUtils.lerp(47, 54, entry);
         authoredActFiveRoll = 0;
       } else {
         const progress = THREE.MathUtils.clamp((p - 0.915) / (0.975 - 0.915), 0, 1);
         desiredPosition.copy(pointOnKeyedCurve(ACT_FIVE_POSITION_CURVE, progress));
         desiredLookAt.copy(pointOnKeyedCurve(ACT_FIVE_TARGET_CURVE, progress));
-        desiredFov = 60;
-        authoredActFiveRoll = 0;
+        const swoops = [[0.12, 0.17], [0.29, 0.34], [0.46, 0.51], [0.63, 0.68]];
+        let bank = 0;
+        swoops.forEach(([start, end], index) => {
+          const blend = THREE.MathUtils.clamp((progress - start) / (end - start), 0, 1);
+          bank += Math.sin(blend * Math.PI) * (index % 2 === 0 ? 1 : -1) * 0.18;
+        });
+        const speedRamp = swoops.reduce((peak, [start, end]) => {
+          const blend = THREE.MathUtils.clamp((progress - start) / (end - start), 0, 1);
+          return Math.max(peak, Math.sin(blend * Math.PI));
+        }, 0);
+        desiredFov = 54 + speedRamp * 10;
+        authoredActFiveRoll = bank;
       }
     }
 
@@ -316,9 +329,7 @@ export function CinematicCamera({
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0));
     camera.lookAt(currentLookAt.current);
     const targetRoll = actFiveCameraActive ? authoredActFiveRoll : 0;
-    cameraRoll.current = actFiveCameraActive
-      ? 0
-      : THREE.MathUtils.damp(cameraRoll.current, targetRoll, 8, delta);
+    cameraRoll.current = THREE.MathUtils.damp(cameraRoll.current, targetRoll, actFiveCameraActive ? 5.5 : 8, delta);
     camera.rotateZ(cameraRoll.current);
     camera.fov = currentFov.current + lensDistortion * 15;
     camera.updateProjectionMatrix();
