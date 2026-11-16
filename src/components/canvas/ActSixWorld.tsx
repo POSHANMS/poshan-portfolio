@@ -97,7 +97,7 @@ export default function ActSixWorld({
   const groupRef = useRef<THREE.Group>(null);
   // Start from a wound, asymmetric pose instead of the raw four-arm cross.
   const activeTimeRef = useRef(INITIAL_SIMULATION_SECONDS);
-  const reveal = smoothstep(0.956, 0.965, scrollProgress);
+  const reveal = smoothstep(0.975, 0.985, scrollProgress);
   // Geometry is static on the CPU. Lower tiers keep the same field shape while
   // the GPU shader supplies all of the motion, bloom, and atmosphere.
   const particleCount = deviceTier === "mobile" ? 20000 : deviceTier === "tablet" ? 34000 : 46000;

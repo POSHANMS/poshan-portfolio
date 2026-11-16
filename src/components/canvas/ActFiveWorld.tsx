@@ -36,14 +36,16 @@ const MONOLITHS = [
     tag: "01 // FOUNDATION",
     title: "COMPUTER SCIENCE ENGINEERING",
     body: `${JOURNEY_MILESTONES[0].body} Core systems, algorithms, architecture, and disciplined engineering foundations shape the work.`,
-    telemetry: "SYS.STATUS: VERIFIED // CORE ARCHITECTURE",
+    telemetry: "VERIFIED // CORE ARCHITECTURE",
+    metrics: ["B.E. CSE '26", "CGPA 8.16", "NAVKIS COLLEGE", "CORE SYSTEMS"],
     position: MONOLITH_POSITIONS[0],
   },
   {
     tag: "02 // ARCHITECTURE",
     title: "REAL-TIME FULL-STACK SYSTEMS",
     body: "Production web and cloud systems engineered with Python, Flask, React, Supabase, PostgreSQL, Redis, and Three.js.",
-    telemetry: "LATENCY: <12MS // FULL-STACK PIPELINE",
+    telemetry: "FULL-STACK BUILD // REAL-TIME SERVICES",
+    metrics: ["PYTHON & FLASK", "REACT & THREE.JS", "POSTGRESQL + REDIS", "SUPABASE"],
     position: MONOLITH_POSITIONS[1],
   },
   {
@@ -51,6 +53,7 @@ const MONOLITHS = [
     title: "AGENTIC AI & DEEP LEARNING",
     body: "Multi-agent MCP architectures like ZaminSaathi and multi-stage CNN clinical pipelines like HealthGPT.",
     telemetry: "NEURAL ENGINE: ACTIVE // MULTI-AGENT MCP",
+    metrics: ["ZAMINSAATHI MCP", "HEALTHGPT CNN", "MULTI-AGENT AI", "DEEP LEARNING"],
     position: MONOLITH_POSITIONS[2],
   },
   {
@@ -58,6 +61,7 @@ const MONOLITHS = [
     title: "SECURITY, HARDWARE & PRACTICE",
     body: "Cyber security, ethical hacking, ESP8266 automated hardware systems, rapid hackathon execution, and 110+ DSA problems. Build and delivery practice includes Docker, GitHub, Vercel, Railway, Render, and Cloudinary.",
     telemetry: "SEC.PROTOCOL: HARDENED // FIELD TESTED",
+    metrics: ["110+ DSA SOLVED", "35+ TRYHACKME", "ESP8266 HARDWARE", "DOCKER & CI/CD"],
     position: MONOLITH_POSITIONS[3],
   },
 ] as const;
@@ -68,6 +72,7 @@ const coreVertexShader = /* glsl */ `
   varying float vNoise;
   uniform float uTime;
   uniform float uScrollVelocity;
+  uniform float uReveal;
 
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -131,16 +136,19 @@ const coreFragmentShader = /* glsl */ `
   varying vec3 vNormalView;
   varying vec3 vViewPosition;
   varying float vNoise;
+  uniform float uReveal;
   void main() {
-    float heat = smoothstep(-0.18, 0.72, vNoise);
-    vec3 base = vec3(0.051, 0.004, 0.012);
-    vec3 crimson = vec3(1.0, 0.018, 0.11);
-    vec3 hot = vec3(1.0, 0.035, 0.20);
-    vec3 color = mix(base, crimson, heat);
-    color = mix(color, hot, smoothstep(0.58, 0.94, vNoise) * 0.42);
-    float fresnel = pow(1.0 - abs(dot(normalize(vNormalView), normalize(vViewPosition))), 2.8);
-    color += vec3(1.0, 0.012, 0.08) * fresnel * 2.2;
-    gl_FragColor = vec4(color, 0.94);
+    float structure = smoothstep(-0.16, 0.72, vNoise);
+    float ridgeField = abs(sin((vNoise * 2.7 + vNormalView.x * 0.65 - vNormalView.y * 0.48) * 18.0));
+    float magmaVeins = 1.0 - smoothstep(0.025, 0.105, ridgeField);
+    vec3 obsidian = vec3(0.035, 0.0, 0.008);
+    vec3 volcanic = vec3(0.11, 0.002, 0.018);
+    vec3 crimson = vec3(1.0, 0.0, 0.075);
+    vec3 color = mix(obsidian, volcanic, structure * 0.28);
+    color = mix(color, crimson, magmaVeins * (0.58 + structure * 0.34));
+    float fresnel = pow(1.0 - abs(dot(normalize(vNormalView), normalize(vViewPosition))), 3.2);
+    color += vec3(1.0, 0.0, 0.11) * fresnel * 1.65;
+    gl_FragColor = vec4(color, 0.94 * uReveal);
   }
 `;
 
@@ -151,6 +159,7 @@ const swarmVertexShader = /* glsl */ `
   attribute float aColorMix;
   uniform float uTime;
   uniform float uScrollVelocity;
+  uniform float uReveal;
   varying vec3 vColor;
   varying float vAlpha;
 
@@ -161,6 +170,7 @@ const swarmVertexShader = /* glsl */ `
     pos.xz = mat2(cy, -sy, sy, cy) * pos.xz;
     float tilt = 0.22;
     float cx = cos(tilt), sx = sin(tilt);
+    pos.y *= 0.68;
     pos.yz = mat2(cx, -sx, sx, cx) * pos.yz;
     pos.x += sin(uTime * 1.4 + aPhase + pos.y * 0.8) * 0.18;
     pos.y += cos(uTime * 1.2 + aPhase + pos.z * 0.8) * 0.18;
@@ -169,14 +179,14 @@ const swarmVertexShader = /* glsl */ `
     pos *= pulse;
     vec3 blood = vec3(0.72, 0.0, 0.075);
     vec3 crimson = vec3(1.0, 0.018, 0.12);
-    vec3 rose = vec3(1.0, 0.12, 0.20);
-    vec3 spark = vec3(1.0, 0.30, 0.25);
+    vec3 rose = vec3(0.84, 0.008, 0.045);
+    vec3 spark = vec3(1.0, 0.025, 0.055);
     vColor = aColorMix < 0.45
       ? mix(blood, crimson, aColorMix / 0.45)
       : aColorMix < 0.9
         ? mix(crimson, rose, (aColorMix - 0.45) / 0.45)
         : mix(rose, spark, (aColorMix - 0.9) / 0.1);
-    vAlpha = 0.6 + 0.4 * sin(uTime * 3.0 + aPhase);
+    vAlpha = (0.6 + 0.4 * sin(uTime * 3.0 + aPhase)) * uReveal;
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
     gl_PointSize = min(6.0, aSize * (180.0 / max(40.0, -mvPosition.z)) * 0.75);
@@ -199,12 +209,14 @@ function seeded(index: number, salt: number) {
   return value - Math.floor(value);
 }
 
-function RingSystem({ radius, index }: { radius: number; index: number }) {
+function RingSystem({ radius, index, visibility }: { radius: number; index: number; visibility: number }) {
   const orbit = useRef<THREE.Group>(null);
   const ticks = useRef<THREE.Group>(null);
   const instancedTicks = useRef<THREE.InstancedMesh>(null);
+  const ringMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const nodeMaterials = useRef<THREE.MeshBasicMaterial[]>([]);
   const tickGeometry = useMemo(() => new THREE.BoxGeometry(0.026, 0.13, 0.026), []);
-  const tickMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: "#ff2446", transparent: true, opacity: 0.76, toneMapped: false }), []);
+  const tickMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: "#ff6b7a", transparent: true, opacity: 0.88, toneMapped: false }), []);
   useLayoutEffect(() => {
     if (!instancedTicks.current) return;
     const dummy = new THREE.Object3D();
@@ -222,6 +234,9 @@ function RingSystem({ radius, index }: { radius: number; index: number }) {
   useFrame((_, delta) => {
     if (orbit.current) orbit.current.rotation.z += (index % 2 === 0 ? 1 : -1) * (0.1 + index * 0.018) * delta;
     if (ticks.current) ticks.current.rotation.z -= (0.16 + index * 0.025) * delta;
+    if (ringMaterial.current) ringMaterial.current.opacity = 0.92 * visibility;
+    tickMaterial.opacity = 0.88 * visibility;
+    nodeMaterials.current.forEach((material) => { material.opacity = visibility; });
   });
   const tilts: [number, number, number][] = [[0.45, 0.08, 0.24], [-0.56, 0.3, -0.38], [1.1, -0.18, 0.13]];
   return (
@@ -229,13 +244,13 @@ function RingSystem({ radius, index }: { radius: number; index: number }) {
       <group ref={orbit}>
         <mesh>
           <torusGeometry args={[radius, 0.032, 16, 128]} />
-          <meshBasicMaterial color="#ff1a3c" transparent opacity={0.85} toneMapped={false} />
+          <meshBasicMaterial ref={ringMaterial} color="#ff1738" transparent opacity={0.92} toneMapped={false} />
         </mesh>
         {[0, 1, 2, 3].map((node) => {
           const angle = node * Math.PI / 2;
           return <mesh key={node} position={[Math.cos(angle) * radius, Math.sin(angle) * radius, 0]}>
             <sphereGeometry args={[0.07, 12, 12]} />
-            <meshBasicMaterial color="#ff314e" toneMapped={false} />
+            <meshBasicMaterial ref={(material) => { if (material) nodeMaterials.current[node] = material; }} color="#ff314e" transparent opacity={visibility} toneMapped={false} />
           </mesh>;
         })}
       </group>
@@ -246,18 +261,21 @@ function RingSystem({ radius, index }: { radius: number; index: number }) {
   );
 }
 
-function PolarFloorGrid() {
+function PolarFloorGrid({ visibility }: { visibility: number }) {
   const material = useMemo(() => new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
     blending: THREE.AdditiveBlending,
     toneMapped: false,
-    uniforms: { uTime: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uReveal: { value: 0 } },
     vertexShader: `varying vec2 vGrid; void main(){ vGrid=uv*28.0-14.0; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-    fragmentShader: `uniform float uTime; varying vec2 vGrid; void main(){ float radius=length(vGrid); float ring=1.0-smoothstep(0.018,0.09,abs(fract(radius*1.35)-0.5)); float angle=atan(vGrid.y,vGrid.x); float ray=1.0-smoothstep(0.008,0.035,abs(sin(angle*36.0))); float ticks=1.0-smoothstep(0.01,0.04,abs(fract(angle*72.0/6.28318)-0.5)); float edge=1.0-smoothstep(9.0,14.0,radius); float pulse=0.86+0.14*sin(uTime*0.45-radius*0.4); float lines=max(ring*0.62, max(ray*0.18,ticks*0.16)); float alpha=lines*edge*0.22*pulse; gl_FragColor=vec4(1.0,0.018,0.12,alpha); }`,
+    fragmentShader: `uniform float uTime; uniform float uReveal; varying vec2 vGrid; void main(){ float radius=length(vGrid); float ring=1.0-smoothstep(0.018,0.09,abs(fract(radius*1.35)-0.5)); float angle=atan(vGrid.y,vGrid.x); float ray=1.0-smoothstep(0.008,0.035,abs(sin(angle*36.0))); float ticks=1.0-smoothstep(0.01,0.04,abs(fract(angle*72.0/6.28318)-0.5)); float edge=1.0-smoothstep(9.0,14.0,radius); float pulse=0.86+0.14*sin(uTime*0.45-radius*0.4); float lines=max(ring*0.62, max(ray*0.18,ticks*0.16)); float alpha=lines*edge*0.22*pulse*uReveal; gl_FragColor=vec4(1.0,0.018,0.12,alpha); }`,
   }), []);
-  useFrame(({ clock }) => { material.uniforms.uTime.value = clock.getElapsedTime(); });
+  useFrame(({ clock }) => {
+    material.uniforms.uTime.value = clock.getElapsedTime();
+    material.uniforms.uReveal.value = visibility;
+  });
   return (
     <mesh position={[0, -2.8, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <planeGeometry args={[28, 28, 1, 1]} />
@@ -266,34 +284,44 @@ function PolarFloorGrid() {
   );
 }
 
-function MonolithCard({ index, focus, opacity, progress }: { index: number; focus: number; opacity: number; progress: number }) {
+function MonolithCard({ index, focus, opacity, progress, visibility }: { index: number; focus: number; opacity: number; progress: number; visibility: number }) {
   const item = MONOLITHS[index];
   return (
-    <Html transform center distanceFactor={3.5} position={[0, 0, 0.072]} zIndexRange={[120, 0]}>
+    <Html transform center distanceFactor={3.2} position={[0, 0, 0.072]} zIndexRange={[120, 0]}>
       <article
-        className="relative flex h-[344px] w-[544px] flex-col overflow-hidden rounded-[4px] border px-7 py-6 text-left text-white"
+        className="relative flex h-[344px] w-[544px] flex-col overflow-hidden rounded-[4px] border px-7 py-5 text-left text-white"
         style={{
-          background: "linear-gradient(115deg, rgba(14,2,7,.97), rgba(7,2,5,.95) 58%, rgba(10,2,6,.97))",
-          opacity,
+          backgroundImage: "linear-gradient(rgba(255, 40, 75, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 40, 75, 0.05) 1px, transparent 1px), linear-gradient(118deg, transparent 30%, rgba(255,60,90,.08) 48%, transparent 62%), radial-gradient(120% 100% at 0% 50%, rgba(255, 18, 52, 0.18) 0%, rgba(14, 3, 8, 0.92) 55%, rgba(6, 1, 4, 0.96) 100%)",
+          opacity: opacity * visibility,
           borderColor: `rgba(255, 36, 70, ${0.28 + focus * 0.68})`,
-          boxShadow: `0 24px 60px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,${0.05 + focus * 0.09}), 0 0 ${8 + focus * 30}px rgba(255,20,52,${0.08 + focus * 0.36})`,
-          backgroundImage: "radial-gradient(ellipse at 0% 48%, rgba(255,22,58,.16), transparent 44%), linear-gradient(118deg, transparent 30%, rgba(255,60,90,.08) 48%, transparent 62%), repeating-linear-gradient(0deg, rgba(255,34,68,.035) 0px, rgba(255,34,68,.035) 1px, transparent 1px, transparent 5px), linear-gradient(115deg, rgba(14,2,7,.97), rgba(7,2,5,.95) 58%, rgba(10,2,6,.97))",
+          boxShadow: `0 24px 60px rgba(0, 0, 0, 0.9), inset 0 0 32px rgba(255, 20, 55, ${0.14 + focus * 0.08}), inset 1px 1px 0 rgba(255, 255, 255, 0.16), 0 0 ${8 + focus * 30}px rgba(255,20,52,${0.08 + focus * 0.36})`,
+          backgroundSize: "24px 24px, 24px 24px, 100% 100%, 100% 100%",
           transition: "opacity 260ms ease, border-color 320ms ease, box-shadow 320ms ease",
         }}
       >
-        <div className="act-five-glass-sheen pointer-events-none absolute inset-y-0 left-0" aria-hidden="true" />
+        <div className="act-five-glass-sheen act-five-glass-sheen-active pointer-events-none absolute inset-y-0 left-0" aria-hidden="true" />
         <div className="relative flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.24em] text-[#ff7189]">
           <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-[#ff2446] shadow-[0_0_12px_#ff2446]" />{item.tag}</span>
           <span className="text-white/55">ACT V // FIELD NOTES</span>
         </div>
-        <h3 className="relative mt-6 max-w-[440px] text-[28px] font-black uppercase leading-[1.05] tracking-[-0.025em] text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.85)]">
+        <h3 className="relative mt-5 max-w-[440px] text-[28px] font-black uppercase leading-[1.05] tracking-[-0.025em] text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.85)]">
           {item.title}
         </h3>
-        <p className="relative mt-5 max-w-[470px] text-[15px] leading-[1.7] text-white/85 [text-shadow:0_2px_8px_rgba(0,0,0,0.85)]">
+        <p className="relative mt-4 max-w-[470px] text-[15px] leading-[1.55] text-white/85 [text-shadow:0_2px_8px_rgba(0,0,0,0.85)]">
           {item.body}
         </p>
+        <ul className="relative mt-4 grid grid-cols-2 gap-2" aria-label={`${item.tag} metrics`}>
+          {item.metrics.map((metric) => (
+            <li key={metric} className="w-fit max-w-full rounded-sm border border-[#ff2446]/35 bg-[#19050b]/70 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#ffd5dc] shadow-[inset_0_0_12px_rgba(255,23,56,0.08)]">
+              {metric}
+            </li>
+          ))}
+        </ul>
         <div className="relative mt-auto border-t border-[#ff2646]/35 pt-3 font-mono text-[10px] uppercase tracking-[0.15em] text-[#ff9cab]">
-          <div className="mb-2 flex items-center justify-between gap-5"><span>{item.telemetry}</span><span className="shrink-0 text-white/60">0{index + 1} / 04</span></div>
+          <div className="mb-2 flex items-center justify-between gap-5">
+            <span className="min-w-0 truncate"><span className="mr-2 text-[#ff2446]">SYS.STATUS</span>{item.telemetry}</span>
+            <span className="shrink-0 rounded-sm border border-[#ff2446]/55 bg-[#19050b]/80 px-2 py-1 text-[12px] font-bold tracking-[0.18em] text-white shadow-[0_0_14px_rgba(255,23,56,0.2)]">0{index + 1} / 04</span>
+          </div>
           <div className="flex h-[3px] gap-[3px]" aria-hidden="true">
             {Array.from({ length: 32 }, (_, tick) => <i key={tick} className="flex-1" style={{ background: tick / 32 < progress ? "#ff2446" : "rgba(255,36,70,.18)", boxShadow: tick / 32 < progress && focus > 0.5 ? "0 0 6px rgba(255,36,70,.75)" : "none" }} />)}
           </div>
@@ -303,9 +331,9 @@ function MonolithCard({ index, focus, opacity, progress }: { index: number; focu
   );
 }
 
-function Monolith({ index, continuousIndex, progress }: { index: number; continuousIndex: number; progress: number }) {
+function Monolith({ index, continuousIndex, progress, visibility }: { index: number; continuousIndex: number; progress: number; visibility: number }) {
   const item = MONOLITHS[index];
-  const group = useRef<THREE.Group>(null);
+  const cardGroupRef = useRef<THREE.Group>(null);
   const previousQuaternion = useRef(new THREE.Quaternion());
   const facingQuaternion = useRef(new THREE.Quaternion());
   const offsetQuaternion = useRef(new THREE.Quaternion());
@@ -330,35 +358,33 @@ function Monolith({ index, continuousIndex, progress }: { index: number; continu
   const distance = Math.abs(continuousIndex - index);
   const focus = Math.max(0, 1 - distance * 1.35);
   const recede = THREE.MathUtils.smoothstep(distance, 0.52, 0.98);
-  const visualOpacity = distance <= 0.52
-    ? 0.35 + focus * 0.65
-    : THREE.MathUtils.lerp(0.35 + focus * 0.65, 0.02, THREE.MathUtils.smoothstep(distance, 0.52, 0.66))
-      * (1 - THREE.MathUtils.smoothstep(distance, 1.05, 1.55));
+  const visualOpacity = (1 - THREE.MathUtils.smoothstep(distance, 0.16, 0.78))
+    * (1 - THREE.MathUtils.smoothstep(distance, 1.15, 1.65));
 
   useFrame(({ camera, pointer }, delta) => {
-    if (!group.current) return;
+    if (!cardGroupRef.current) return;
 
     // Face the active card directly toward the camera. A world-up vector keeps
     // the card upright; no roll or negative scale can invert its text.
-    group.current.up.set(0, 1, 0);
-    previousQuaternion.current.copy(group.current.quaternion);
-    group.current.lookAt(camera.position);
-    facingQuaternion.current.copy(group.current.quaternion);
+    cardGroupRef.current.up.set(0, 1, 0);
+    previousQuaternion.current.copy(cardGroupRef.current.quaternion);
+    cardGroupRef.current.lookAt(camera.position);
+    facingQuaternion.current.copy(cardGroupRef.current.quaternion);
     offsetQuaternion.current.setFromEuler(new THREE.Euler(
-      THREE.MathUtils.degToRad(3 + pointer.y * 4),
-      THREE.MathUtils.degToRad(-16 + pointer.x * 4),
+      THREE.MathUtils.degToRad(3 + pointer.y * 2),
+      0.18 + THREE.MathUtils.degToRad(pointer.x * 2),
       0,
       "YXZ",
     ));
     facingQuaternion.current.multiply(offsetQuaternion.current);
-    group.current.quaternion.copy(previousQuaternion.current).slerp(facingQuaternion.current, 1 - Math.exp(-10 * delta));
+    cardGroupRef.current.quaternion.copy(previousQuaternion.current).slerp(facingQuaternion.current, 1 - Math.exp(-10 * delta));
 
     const radial = new THREE.Vector3(basePosition.x, 0, basePosition.z).normalize();
-    const targetPosition = basePosition.clone().addScaledVector(radial, recede * 2.5);
-    group.current.position.lerp(targetPosition, 1 - Math.exp(-7 * delta));
-    const targetScale = THREE.MathUtils.lerp(1, 0.65, recede);
-    const scale = THREE.MathUtils.damp(group.current.scale.x, targetScale, 9, delta);
-    group.current.scale.setScalar(scale);
+    const targetPosition = basePosition.clone().addScaledVector(radial, recede * 2.2);
+    cardGroupRef.current.position.lerp(targetPosition, 1 - Math.exp(-7 * delta));
+    const targetScale = THREE.MathUtils.lerp(0.86, 1, focus);
+    const scale = THREE.MathUtils.damp(cardGroupRef.current.scale.x, targetScale, 9, delta);
+    cardGroupRef.current.scale.setScalar(scale);
   });
 
   const bracketBars = [
@@ -369,7 +395,7 @@ function Monolith({ index, continuousIndex, progress }: { index: number; continu
   ] as const;
 
   return (
-    <group ref={group} position={item.position}>
+    <group ref={cardGroupRef} position={item.position}>
       <RoundedBox args={[3.4, 2.15, 0.12]} radius={0.075} smoothness={4}>
         <meshPhysicalMaterial
           color="#090205"
@@ -377,7 +403,7 @@ function Monolith({ index, continuousIndex, progress }: { index: number; continu
           emissiveIntensity={0.1 + focus * 0.42}
           transmission={0}
           transparent
-          opacity={0.92}
+          opacity={0.96 * visualOpacity * visibility}
           roughness={0.26}
           metalness={0.38}
           clearcoat={0.8}
@@ -386,15 +412,15 @@ function Monolith({ index, continuousIndex, progress }: { index: number; continu
         />
       </RoundedBox>
       <lineSegments geometry={bracketGeometry}>
-        <lineBasicMaterial color="#ff2446" transparent opacity={0.14 + focus * 0.86} toneMapped={false} />
+        <lineBasicMaterial color="#ff2446" transparent opacity={(0.14 + focus * 0.86) * visibility} toneMapped={false} />
       </lineSegments>
       {bracketBars.map(([x, y, width, height], barIndex) => (
         <mesh key={barIndex} position={[x, y, 0.09]}>
           <boxGeometry args={[width, height, 0.035]} />
-          <meshStandardMaterial color="#ff2446" emissive="#ff1238" emissiveIntensity={0.3 + focus * 1.5} toneMapped={false} />
+          <meshStandardMaterial color="#ff2446" emissive="#ff1238" emissiveIntensity={0.3 + focus * 1.5} transparent opacity={visibility} toneMapped={false} />
         </mesh>
       ))}
-      <MonolithCard index={index} focus={focus} opacity={visualOpacity} progress={index === Math.round(continuousIndex) ? progress : 0.12} />
+      <MonolithCard index={index} focus={focus} opacity={visualOpacity} progress={index === Math.round(continuousIndex) ? progress : 0} visibility={visibility} />
     </group>
   );
 }
@@ -402,7 +428,7 @@ function Monolith({ index, continuousIndex, progress }: { index: number; continu
 function Tether({ position, focus }: { position: [number, number, number]; focus: number }) {
   const material = useRef<THREE.ShaderMaterial>(null);
   const points = useMemo(() => {
-    const start = new THREE.Vector3(position[0] - Math.sign(position[0]) * 1.48, position[1] - 0.68, position[2]);
+      const start = new THREE.Vector3(position[0] - Math.sign(position[0]) * 1.48, position[1] - 0.55, position[2]);
     const mid = start.clone().multiplyScalar(0.58).add(new THREE.Vector3(0, -0.12, 0));
     return new THREE.CatmullRomCurve3([new THREE.Vector3(0, -0.4, 0), mid, start]).getPoints(64);
   }, [position]);
@@ -424,7 +450,7 @@ function Tether({ position, focus }: { position: [number, number, number]; focus
         toneMapped={false}
         uniforms={{ uTime: { value: 0 }, uFocus: { value: focus } }}
         vertexShader="varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }"
-        fragmentShader="uniform float uTime; uniform float uFocus; varying vec2 vUv; void main(){ float pulse=pow(max(0.0, sin(vUv.x*18.0-uTime*2.4)), 8.0); float alpha=(0.045+pulse*0.75)*uFocus; gl_FragColor=vec4(1.0,0.015+0.03*pulse,0.10+0.06*pulse,alpha); }"
+        fragmentShader="uniform float uTime; uniform float uFocus; varying vec2 vUv; void main(){ float pulse=pow(max(0.0, sin(vUv.x*18.0-uTime*2.4)), 8.0); float alpha=(0.10+pulse*0.88)*uFocus; gl_FragColor=vec4(1.0,0.0+0.02*pulse,0.09+0.04*pulse,alpha); }"
       />
     </mesh>
   );
@@ -446,7 +472,7 @@ export default function ActFiveWorld({
   const scrollVelocity = useRef(0);
 
   const coreMaterial = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uScrollVelocity: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uScrollVelocity: { value: 0 }, uReveal: { value: 0 } },
     vertexShader: coreVertexShader,
     fragmentShader: coreFragmentShader,
     transparent: true,
@@ -483,7 +509,7 @@ export default function ActFiveWorld({
   }, []);
 
   const swarmMaterial = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uScrollVelocity: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uScrollVelocity: { value: 0 }, uReveal: { value: 0 } },
     vertexShader: swarmVertexShader,
     fragmentShader: swarmFragmentShader,
     transparent: true,
@@ -536,15 +562,16 @@ export default function ActFiveWorld({
     scrollVelocity.current = THREE.MathUtils.damp(scrollVelocity.current, velocity, 4, delta);
     if (rootRef.current) {
       rootRef.current.visible = visible > 0.001;
-      rootRef.current.scale.setScalar(THREE.MathUtils.damp(rootRef.current.scale.x, Math.max(0.001, visible), 5, delta));
     }
     coreMaterial.uniforms.uTime.value = time;
     coreMaterial.uniforms.uScrollVelocity.value = scrollVelocity.current;
+    coreMaterial.uniforms.uReveal.value = visible;
     swarmMaterial.uniforms.uTime.value = time;
     swarmMaterial.uniforms.uScrollVelocity.value = scrollVelocity.current;
+    swarmMaterial.uniforms.uReveal.value = visible;
 
     if (coreRef.current) coreRef.current.rotation.y = time * 0.12;
-    if (coreLightRef.current) coreLightRef.current.intensity = 3.8 + Math.sin(time * 2.2) * 0.36;
+    if (coreLightRef.current) coreLightRef.current.intensity = (3.8 + Math.sin(time * 2.2) * 0.36) * visible;
     if (emberRef.current) {
       emberRef.current.rotation.y += delta * 0.009;
       emberRef.current.rotation.x = Math.sin(time * 0.08) * 0.025;
@@ -553,18 +580,18 @@ export default function ActFiveWorld({
       const pulse = 1 + (Math.sin(time * 1.2) * 0.5 + 0.5) * 0.12;
       shockwaveRef.current.scale.setScalar(pulse);
       const material = shockwaveRef.current.material as THREE.MeshBasicMaterial;
-      material.opacity = 0.2 + (Math.sin(time * 1.2) * 0.5 + 0.5) * 0.2;
+      material.opacity = (0.2 + (Math.sin(time * 1.2) * 0.5 + 0.5) * 0.2) * visible;
     }
   });
 
   return (
-    <group ref={rootRef} position={ACT_FIVE_ORIGIN} scale={0.001}>
-      <PolarFloorGrid />
-      <ambientLight intensity={0.08} color="#24050a" />
-      <group position={[0, -0.4, 0]}>
+    <group ref={rootRef} position={ACT_FIVE_ORIGIN}>
+      <PolarFloorGrid visibility={visible} />
+      <ambientLight intensity={0.08 * visible} color="#24050a" />
+      <group position={[0, -0.55, 0]}>
         <pointLight ref={coreLightRef} color="#ff102e" intensity={3.8} distance={20} decay={1.6} />
-        <pointLight position={[0, 3.8, -3.5]} color="#ff183a" intensity={1.5} distance={16} />
-        <directionalLight position={[-8, -5, 6]} color="#5a0719" intensity={0.45} />
+        <pointLight position={[0, 3.8, -3.5]} color="#ff183a" intensity={1.5 * visible} distance={16} />
+        <directionalLight position={[-8, -5, 6]} color="#5a0719" intensity={0.45 * visible} />
         <mesh ref={coreRef}>
           <icosahedronGeometry args={[1.65, 5]} />
           <primitive object={coreMaterial} attach="material" />
@@ -572,20 +599,20 @@ export default function ActFiveWorld({
         <points geometry={swarm} frustumCulled={false} renderOrder={2}>
           <primitive object={swarmMaterial} attach="material" />
         </points>
-        {[2.4, 3.1, 3.9].map((radius, index) => <RingSystem key={radius} radius={radius} index={index} />)}
+        {[2.4, 3.1, 3.9].map((radius, index) => <RingSystem key={radius} radius={radius} index={index} visibility={visible} />)}
         <mesh ref={shockwaveRef} rotation={[Math.PI / 2, 0, 0]}>
           <torusGeometry args={[2.4, 0.012, 8, 180]} />
-          <meshBasicMaterial color="#ff263f" transparent opacity={0.18} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          <meshBasicMaterial color="#ff263f" transparent opacity={0.18 * visible} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </mesh>
         <points ref={emberRef} geometry={emberField} frustumCulled={false}>
-          <pointsMaterial color="#ff263f" size={0.018} transparent opacity={0.22} sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+          <pointsMaterial color="#ff263f" size={0.018} transparent opacity={0.22 * visible} sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
         </points>
       </group>
 
       {MONOLITHS.map((monolith, index) => (
         <group key={monolith.tag}>
           <Tether position={monolith.position as [number, number, number]} focus={Math.max(0, 1 - Math.abs(continuousIndex - index) * 1.35) * visible} />
-          <Monolith index={index} continuousIndex={continuousIndex} progress={activeIndex === index ? activeCheckpointProgress : 0} />
+          <Monolith index={index} continuousIndex={continuousIndex} progress={activeIndex === index ? activeCheckpointProgress : 0} visibility={visible} />
         </group>
       ))}
     </group>

@@ -160,6 +160,7 @@ export default function CinematicHUD({ visible, scrollProgress = 0 }: { visible:
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [scrollHintOpacity, setScrollHintOpacity] = useState(1);
   const [hasScrolled, setHasScrolled] = useState(false);
+  const scrollHintDismissed = useRef(false);
 
   // Delay scroll hint appearance
   useEffect(() => {
@@ -171,6 +172,8 @@ export default function CinematicHUD({ visible, scrollProgress = 0 }: { visible:
   // Fade hint after first scroll/wheel interaction
   useEffect(() => {
     const onWheel = () => {
+      if (scrollHintDismissed.current) return;
+      scrollHintDismissed.current = true;
       setHasScrolled(true);
       setScrollHintOpacity(0);
     };

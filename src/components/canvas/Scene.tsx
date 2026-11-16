@@ -138,7 +138,9 @@ export default function Scene({
   // Act V is a true location change: retain the stars, but leave the physical desk-world behind.
   const actFiveStrength = smoothstep(0.902, 0.922, scrollProgress) * (1 - smoothstep(0.958, 0.975, scrollProgress));
   const isActFive = actFiveStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
-  const actSixStrength = smoothstep(0.956, 0.965, scrollProgress);
+  // Let the Act V reactor finish its opacity fade before the Contact galaxy
+  // reaches full luminance; the camera is already moving through the exit arc.
+  const actSixStrength = smoothstep(0.975, 0.985, scrollProgress);
   const isActSix = actSixStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
   const isInsideProjectCore = actFourPhase === "inside";
   const isProjectTransit = actFourPhase === "warping" || isInsideProjectCore;

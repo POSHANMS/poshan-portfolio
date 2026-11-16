@@ -594,7 +594,9 @@ function ProjectsChapter({
 }
 
 function JourneyChapter({ presence, progress }: { presence: number; progress: number }) {
-  const intro = smoothstep(0.02, 0.3, progress);
+  // The parent Panel owns the chapter entrance. A second progress-based fade
+  // made the HUD remain dim at the first checkpoint after the card was active.
+  const intro = 1;
   const checkpoint = progress < 0.17 ? 1 : progress < 0.34 ? 2 : progress < 0.51 ? 3 : 4;
   const inSwoop = (progress >= 0.12 && progress < 0.17)
     || (progress >= 0.29 && progress < 0.34)
@@ -604,6 +606,7 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
   return (
     <Panel presence={presence} side="left" className="left-6 top-[6vh] z-[3] w-[min(30rem,calc(100vw-3rem))] md:left-16">
       <div aria-hidden="true" className="pointer-events-none absolute -inset-x-10 -inset-y-8 -z-10 bg-[radial-gradient(ellipse_at_18%_25%,rgba(0,0,0,0.74),rgba(0,0,0,0.32)_55%,transparent_82%)]" />
+      <div className="relative rounded-[4px] border border-[#ff2446]/20 px-4 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.48),inset_0_0_26px_rgba(255,20,55,0.04)] backdrop-blur-[2px]" style={{ background: "rgba(7, 2, 5, 0.64)" }}>
       <div style={{ opacity: intro, transform: `translateY(${(1 - intro) * 12}px)`, willChange: "opacity, transform" }}>
         <Kicker act="ACT V" label="Education And Practice" />
       </div>
@@ -618,6 +621,7 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
         <span>Checkpoint 0{checkpoint} / 04</span>
         <span className="h-px w-16 bg-[#ff1744]/55"><span className="block h-full bg-[#ff4c63] transition-[width] duration-300" style={{ width: `${checkpoint * 25}%` }} /></span>
         <span className={inSwoop ? "text-[#ff7189]" : "text-white/45"}>{inSwoop ? "Orbital transfer" : "Scroll to inspect"}</span>
+      </div>
       </div>
     </Panel>
   );
@@ -815,6 +819,10 @@ export default function CinematicJourney({
   const actFourInterior = actFourPhase === "inside" || actFourPhase === "warping";
   const actFourReturning = actFourPhase === "returning" && scrollProgress < 0.905;
   const actFiveProgress = clamp((scrollProgress - 0.915) / (0.975 - 0.915));
+  const actFiveHudPresence = scrollProgress >= 0.902 && scrollProgress <= 0.958
+    ? 1
+    : Math.max(states.journey.presence, smoothstep(0, 0.05, actFiveProgress))
+      * (1 - smoothstep(0.958, 0.975, scrollProgress));
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
@@ -851,9 +859,7 @@ export default function CinematicJourney({
         onExit={onActFourExit}
       />
       <JourneyChapter
-        presence={actFourInterior || actFourReturning
-          ? 0
-          : states.journey.presence * (1 - smoothstep(0.958, 0.975, scrollProgress))}
+        presence={actFourInterior || actFourReturning ? 0 : actFiveHudPresence}
         progress={actFiveProgress}
       />
       <ContactChapter presence={actFourInterior || actFourReturning ? 0 : states.contact.presence} progress={states.contact.progress} />

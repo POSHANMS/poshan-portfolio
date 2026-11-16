@@ -145,9 +145,14 @@ const ACT_FIVE_CHECKPOINT_STOPS = ACT_FIVE_ORBIT_ANGLES.map((degrees, index) => 
   const target = reactor.add(card).multiplyScalar(0.5);
   // Later orbit stops need a stronger rightward look offset so the wide HTML
   // card remains fully in-frame as the camera sweeps around the reactor.
-  const lookRightOffset = [ -0.27, 1.1, 0.82, 1.1 ][index];
+  const lookRightOffset = [-1.35, -1.9, -1.35, -1.52][index];
   target.addScaledVector(radial, lookRightOffset).addScaledVector(tangent, 2.41);
   target.y += [0, -1.2, 0, 0][index];
+  // Checkpoint 04's orbit puts its card farther toward the right edge. Shift
+  // the look target in camera-screen space so the full card stays in-frame.
+  const viewForward = target.clone().sub(camera).normalize();
+  const screenRight = viewForward.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+  target.addScaledVector(screenRight, [0, 0, 0, 1.8][index]);
   return { camera, target };
 });
 
