@@ -194,7 +194,9 @@ export default function Scene({
               starsOpacity={starsOpacity * (isActFive ? 0.72 : 0.24 + exteriorStrength * 0.76)}
               showConstellations={!isActFive && !isActSix}
               cardContrast={cardContrast}
-              cameraFramed={isActFive}
+              // Keep the shared starfield filling the camera view through the
+              // final contact orbit without increasing its particle count.
+              cameraFramed={isActFive || isActSix}
             />
             {!isActFive && !isActSix && <ShootingStars />}
           </group>

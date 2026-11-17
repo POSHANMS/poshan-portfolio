@@ -5,9 +5,7 @@ import {
   ArrowUpRight,
   GraduationCap,
   Mail,
-  Network,
   Radio,
-  TerminalSquare,
 } from "lucide-react";
 import { PROFILE, PROJECTS, RESUME_SUMMARY, SKILL_GROUPS, STATS } from "@/utils/constants";
 import HoldToWarp from "./HoldToWarp";
@@ -633,44 +631,128 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
 }
 
 function ContactChapter({ presence, progress }: { presence: number; progress: number }) {
+  const [isTransmitting, setIsTransmitting] = useState(false);
+  const transmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pulse = 0.82 + Math.sin(progress * Math.PI * 4) * 0.18;
-  const signal = smoothstep(0.04, 0.28, progress);
-  const titleSignal = smoothstep(0.13, 0.46, progress);
-  const detailsSignal = smoothstep(0.28, 0.62, progress);
+  const signal = smoothstep(0.015, 0.17, progress);
+  const titleSignal = smoothstep(0.14, 0.34, progress);
+  const detailsSignal = smoothstep(0.29, 0.49, progress);
+  const formSignal = smoothstep(0.43, 0.68, progress);
+
+  useEffect(() => () => {
+    if (transmitTimeoutRef.current) clearTimeout(transmitTimeoutRef.current);
+  }, []);
+
+  const handleMessageSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isTransmitting) return;
+    const values = new FormData(event.currentTarget);
+    const subject = String(values.get("subject") ?? "Portfolio enquiry");
+    const body = [
+      `Name: ${String(values.get("name") ?? "")}`,
+      `Email: ${String(values.get("email") ?? "")}`,
+      "",
+      String(values.get("message") ?? ""),
+    ].join("\n");
+    const mailto = `mailto:${PROFILE.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setIsTransmitting(true);
+    transmitTimeoutRef.current = setTimeout(() => {
+      window.location.href = mailto;
+      setIsTransmitting(false);
+      transmitTimeoutRef.current = null;
+    }, 520);
+  };
 
   return (
-    <Panel presence={presence} side="center" className="left-1/2 top-[15vh] w-[min(42rem,calc(100vw-3rem))]">
-      <div
-        className="relative py-8 text-center"
-        style={{ opacity: signal, transform: `translateY(${(1 - signal) * 22}px)`, willChange: "opacity, transform" }}
-      >
-        <div className="mb-5 flex items-center justify-center gap-3">
-          <Kicker act="ACT VI" label="Contact" />
-          <Radio className="h-5 w-5 text-[#ff5a66]" style={{ opacity: pulse }} />
-        </div>
-        <h2
-          className="text-4xl font-black uppercase leading-none text-white md:text-6xl"
-          style={{ opacity: titleSignal, transform: `translate3d(0, ${(1 - titleSignal) * 30}px, 0) scale(${0.96 + titleSignal * 0.04})`, filter: `blur(${(1 - titleSignal) * 7}px)`, willChange: "opacity, transform, filter" }}
+    <Panel presence={presence} side="center" className="left-1/2 top-[4vh] max-h-[91vh] w-[min(72rem,calc(100vw-2rem))] overflow-y-auto px-3 md:top-[7vh]">
+      <div className="relative grid gap-8 py-5 sm:py-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:gap-14">
+        <div className="pointer-events-none absolute inset-y-[5%] left-[1%] -z-10 w-[58%] bg-[radial-gradient(ellipse_at_45%_50%,rgba(255,24,58,0.12),rgba(255,24,58,0.035)_43%,transparent_76%)] blur-2xl" />
+
+        <section
+          className="relative px-2 sm:px-5 lg:py-10"
+          style={{ opacity: signal, transform: `translate3d(${(1 - signal) * -18}px, ${(1 - signal) * 12}px, 0)`, willChange: "opacity, transform" }}
         >
-          Contact Poshan
-        </h2>
-          <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-white/72" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 18}px)`, willChange: "opacity, transform" }}>
-          Full Stack Developer and AI Developer from Karnataka, India.
-        </p>
-          <div className="mx-auto mt-7 grid max-w-xl gap-3 font-mono text-xs" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 24}px)`, willChange: "opacity, transform" }}>
-          <a href={`mailto:${PROFILE.email}`} className="group flex items-center justify-between border border-[rgba(255,40,70,0.35)] bg-[rgba(10,5,8,0.82)] px-4 py-3 text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.85)] backdrop-blur-[12px] transition duration-300 hover:-translate-y-0.5 hover:border-[#ff5a66] hover:shadow-[0_0_18px_rgba(255,40,70,0.22)]">
-            <span className="flex items-center gap-3"><Mail className="h-4 w-4 text-[#ff5a66]" /> {PROFILE.email}</span>
-            <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
-          </a>
-          <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" className="group flex items-center justify-between border border-[rgba(255,40,70,0.35)] bg-[rgba(10,5,8,0.82)] px-4 py-3 text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.85)] backdrop-blur-[12px] transition duration-300 hover:-translate-y-0.5 hover:border-[#ff5a66] hover:shadow-[0_0_18px_rgba(255,40,70,0.22)]">
-            <span className="flex items-center gap-3"><TerminalSquare className="h-4 w-4 text-[#ff5a66]" /> github.com/POSHANMS</span>
-            <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
-          </a>
-          <a href={PROFILE.linkedin} target="_blank" rel="noopener noreferrer" className="group flex items-center justify-between border border-[rgba(255,40,70,0.35)] bg-[rgba(10,5,8,0.82)] px-4 py-3 text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.85)] backdrop-blur-[12px] transition duration-300 hover:-translate-y-0.5 hover:border-[#ff5a66] hover:shadow-[0_0_18px_rgba(255,40,70,0.22)]">
-            <span className="flex items-center gap-3"><Network className="h-4 w-4 text-[#ff5a66]" /> linkedin.com/in/poshanms</span>
-            <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
-          </a>
-        </div>
+          <div className="mb-7 flex items-center gap-3">
+            <Kicker act="ACT VI" label="Open channel" />
+            <Radio className="h-4 w-4 text-[#ff5a66]" style={{ opacity: pulse }} />
+          </div>
+          <h2
+            className="text-4xl font-black uppercase leading-[0.94] tracking-[-0.045em] text-white sm:text-5xl lg:text-6xl"
+            style={{ opacity: titleSignal, transform: `translate3d(0, ${(1 - titleSignal) * 28}px, 0) scale(${0.97 + titleSignal * 0.03})`, filter: `blur(${(1 - titleSignal) * 6}px)`, willChange: "opacity, transform, filter" }}
+          >
+            Contact<br /><span className="text-[#ff3554]">Poshan</span>
+          </h2>
+          <p className="mt-5 max-w-sm text-sm leading-7 text-white/78" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 15}px)`, willChange: "opacity, transform" }}>
+            Full Stack Developer and AI Developer from Karnataka, India. Have a role, idea, or question? Send a signal.
+          </p>
+          <p className="act-six-identity-line" style={{ opacity: detailsSignal }}>POSHAN MS <span>·</span> FULL STACK ENGINEER <span>·</span> KARNATAKA, INDIA</p>
+          <div className="act-six-contact-rail mt-8 max-w-md" style={{ opacity: detailsSignal }} aria-label="Contact channels">
+            <a href={`mailto:${PROFILE.email}`} className="act-six-social-link group">
+              <span className="act-six-social-icon"><Mail aria-hidden="true" /></span>
+              <span className="min-w-0"><span className="act-six-social-label">Email</span><span className="act-six-social-value">{PROFILE.email}</span></span>
+              <ArrowUpRight aria-hidden="true" className="act-six-social-arrow" />
+            </a>
+            <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" className="act-six-social-link group">
+              <span className="act-six-social-icon"><svg className="act-six-brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.17c-3.23.7-3.91-1.37-3.91-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.58-.29-5.3-1.29-5.3-5.74 0-1.27.45-2.3 1.19-3.11-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.05 11.05 0 0 1 5.8 0c2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.11 0 4.46-2.73 5.44-5.33 5.73.42.36.78 1.07.78 2.16v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" /></svg></span>
+              <span className="min-w-0"><span className="act-six-social-label">GitHub</span><span className="act-six-social-value">github.com/POSHANMS</span></span>
+              <ArrowUpRight aria-hidden="true" className="act-six-social-arrow" />
+            </a>
+            <a href={PROFILE.linkedin} target="_blank" rel="noopener noreferrer" className="act-six-social-link group">
+              <span className="act-six-social-icon"><svg className="act-six-brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.447-2.136 2.941v5.665H9.35V9h3.414v1.561h.049c.476-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286ZM5.337 7.433a2.062 2.062 0 1 1 0-4.124 2.062 2.062 0 0 1 0 4.124ZM7.119 20.452H3.555V9h3.564v11.452ZM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.204 0 22.225 0Z" /></svg></span>
+              <span className="min-w-0"><span className="act-six-social-label">LinkedIn</span><span className="act-six-social-value">linkedin.com/in/poshanms</span></span>
+              <ArrowUpRight aria-hidden="true" className="act-six-social-arrow" />
+            </a>
+          </div>
+          <div className="act-six-channel-status mt-7" style={{ opacity: detailsSignal }}><span className="act-six-channel-status-light" />Available for work <span className="act-six-status-divider">/</span> Open to conversation</div>
+        </section>
+
+        <form
+          onSubmit={handleMessageSubmit}
+          aria-hidden={formSignal < 0.78}
+          className="act-six-transmission-card relative p-5 sm:p-7"
+          style={{ opacity: formSignal, transform: `translate3d(0, ${(1 - formSignal) * 24}px, 0) perspective(1100px) rotateY(${(1 - formSignal) * -2.5}deg)`, pointerEvents: formSignal > 0.78 ? "auto" : "none", willChange: "opacity, transform" }}
+        >
+          <div className="act-six-card-sheen pointer-events-none absolute inset-0" aria-hidden="true" />
+          <div className="act-six-card-edge" aria-hidden="true"><span /></div>
+          <div className="relative z-10 mb-6 border-b border-white/12 pb-5">
+            <div className="mb-4 flex items-center justify-between gap-4 font-mono text-[9px] uppercase tracking-[0.2em] text-white/65">
+              <span>TRANSMISSION DESK <span className="mx-2 text-[#ff3554]">/</span> ACT VI</span>
+              <span className="inline-flex items-center gap-2 text-[#ff8d9d]" aria-live="polite">
+                <span className={`h-1.5 w-1.5 rounded-full bg-[#ff3554] ${isTransmitting ? "act-six-signal-active" : "act-six-signal-idle"}`} />
+                {isTransmitting ? "Opening email app" : "Ready to connect"}
+              </span>
+            </div>
+            <h3 className="text-2xl font-semibold tracking-[-0.035em] text-white sm:text-3xl">Send a message</h3>
+            <p className="mt-2 max-w-md text-sm leading-6 text-white/70">Share an opportunity, project, or question. I’d be glad to hear from you.</p>
+          </div>
+          <div className="relative z-10 grid gap-x-5 gap-y-4 sm:grid-cols-2">
+            <label className="act-six-field-label">
+              Your name
+              <input name="name" autoComplete="name" required maxLength={80} className="act-six-glass-input [user-select:text]" placeholder="Your name" />
+            </label>
+            <label className="act-six-field-label">
+              Your email
+              <input name="email" type="email" autoComplete="email" required maxLength={254} className="act-six-glass-input [user-select:text]" placeholder="you@example.com" />
+            </label>
+            <label className="act-six-field-label sm:col-span-2">
+              Subject
+              <input name="subject" required maxLength={120} className="act-six-glass-input [user-select:text]" placeholder="What would you like to discuss?" />
+            </label>
+            <label className="act-six-field-label sm:col-span-2">
+              Message
+              <textarea name="message" required maxLength={2400} rows={3} className="act-six-glass-input min-h-28 [user-select:text] resize-y leading-6" placeholder="Tell me a little about it..." />
+            </label>
+          </div>
+          <div className="relative z-10 mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/12 pt-5">
+            <p className="max-w-[17rem] text-xs leading-5 text-white/65" aria-live="polite">
+              {isTransmitting ? "Opening your email app…" : "Your email app opens with your message ready to review and send."}
+            </p>
+            <button type="submit" disabled={isTransmitting} className={`act-six-transmit-button group inline-flex items-center gap-3 border border-[#ff687e]/75 bg-gradient-to-br from-[#a10d28]/90 to-[#300812]/90 px-5 py-3.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white shadow-[0_10px_30px_rgba(110,5,24,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-[#ffbbc5] hover:shadow-[0_14px_34px_rgba(190,18,48,0.34)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff7a8c] disabled:cursor-wait ${isTransmitting ? "act-six-transmitting" : ""}`}>
+              {isTransmitting ? "Opening email…" : "Continue in email"}
+              <ArrowUpRight className={`h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 ${isTransmitting ? "act-six-send-icon" : ""}`} />
+            </button>
+          </div>
+        </form>
       </div>
     </Panel>
   );

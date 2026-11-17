@@ -8,7 +8,6 @@ import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
 
 const ARM_COUNT = 4;
 const INITIAL_SIMULATION_SECONDS = 18;
-const MAX_SIMULATION_SECONDS = 30;
 
 function clamp(value: number, minimum = 0, maximum = 1) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -41,15 +40,16 @@ const galaxyVertexShader = `
   varying float vCoreEnergy;
 
   void main() {
-    // Differential rotation: material nearest the core advances fastest.
+    // Preserve the original four-arm galaxy silhouette. Its angular phase
+    // advances as one pattern so the arms keep their authored spacing over time.
     float radiusRatio = clamp(aRadius / 5.8, 0.0, 1.0);
-    float angularVelocity = mix(1.34, 0.075, pow(radiusRatio, 0.54));
     float turbulence =
-      sin(aPhase + uTime * 0.33 + aRadius * 3.4) * 0.072 +
-      sin(aPhase * 2.7 - uTime * 0.19 + aRadius * 7.8) * 0.034;
-    float armAngle = aArm * 1.57079632679 + aRadius * 1.24 + aSpread + uTime * angularVelocity + turbulence;
-    float breathing = sin(aPhase * 1.9 + uTime * 0.26 + aRadius * 2.3) * (0.018 + radiusRatio * 0.038);
-    float radius = max(0.015, aRadius + breathing);
+      sin(aPhase + aRadius * 3.4) * 0.072 +
+      sin(aPhase * 2.7 + aRadius * 7.8) * 0.034;
+    float armAngle = aArm * 1.57079632679 + aRadius * 1.24 + aSpread + uTime * 1.34 + turbulence;
+    // Preserve the authored silhouette and gaps: particles orbit in place
+    // instead of breathing radially and slowly turning the galaxy into a disk.
+    float radius = max(0.015, aRadius);
 
     // The compressed Y axis and live depth build an oblique galaxy disk.
     vec3 worldPosition = vec3(
@@ -61,7 +61,10 @@ const galaxyVertexShader = `
     vec4 modelViewPosition = viewMatrix * modelPosition;
 
     vColor = aColor;
-    vAlpha = uReveal * (0.9 + 0.1 * sin(aPhase + uTime * 0.7));
+    // Ignite the dense core first, then reveal the four spiral arms outward.
+    // This only changes particle visibility; their radii and the final silhouette stay fixed.
+    float armIgnition = smoothstep(aRadius * 0.105, aRadius * 0.105 + 0.2, uReveal * 1.35);
+    vAlpha = armIgnition * (0.9 + 0.1 * sin(aPhase + uTime * 0.7));
     vCoreEnergy = 1.0 - smoothstep(0.18, 1.42, aRadius);
     gl_Position = projectionMatrix * modelViewPosition;
     gl_PointSize = aSize * (44.0 / max(5.0, -modelViewPosition.z));
@@ -85,8 +88,8 @@ const galaxyFragmentShader = `
 `;
 
 /**
- * Act VI's galaxy is shader-driven so the core, arms, and dust can move at
- * distinct rates without rebuilding a large particle buffer every frame.
+ * Act VI's galaxy is shader-driven so the authored spiral can rotate
+ * continuously without rebuilding its particle buffer or changing its scale.
  */
 export default function ActSixWorld({
   scrollProgress,
@@ -138,7 +141,7 @@ export default function ActSixWorld({
         size = 0.42 + randomC * 0.78;
         color = whiteGold.clone().lerp(amber, Math.pow(radius / 1.26, 1.4) * 0.62);
       } else if (selector < 0.92) {
-        // The main arms are dense near the centre and broaden gradually into dusty edges.
+        // Restore the dense original four-arm distribution around the core.
         const local = (selector - 0.24) / 0.68;
         radius = 0.42 + Math.pow(local, 0.72) * 5.55;
         const width = 0.025 + radius * 0.045;
@@ -194,22 +197,21 @@ export default function ActSixWorld({
   }), []);
 
   useFrame((_state, delta) => {
-    // Differential rotation is capped once the arms reach their composed pose.
-    // Without this cap, the inner arms eventually shear through every dust lane.
+    // Keep the authored galaxy pattern alive for the full visit. Its particle
+    // coordinates stay fixed in radius; only their orbital phase advances.
     if (reveal > 0.1) {
-      activeTimeRef.current = Math.min(activeTimeRef.current + delta, MAX_SIMULATION_SECONDS);
+      activeTimeRef.current += delta;
     }
     material.uniforms.uTime.value = activeTimeRef.current;
     material.uniforms.uReveal.value = THREE.MathUtils.damp(material.uniforms.uReveal.value, reveal, 4.8, delta);
 
     if (groupRef.current) {
       groupRef.current.visible = material.uniforms.uReveal.value > 0.002;
-      groupRef.current.scale.setScalar(THREE.MathUtils.damp(groupRef.current.scale.x, 1.3 + reveal * 0.14, 4.5, delta));
     }
   });
 
   return (
-    <group ref={groupRef} position={[0.18, 0.1, -7.35]} rotation={[0.11, -0.08, 0.27]} scale={0.001}>
+    <group ref={groupRef} position={[0.18, 0.1, -7.35]} rotation={[0.11, -0.08, 0.27]} scale={1.34}>
       <pointLight color="#ffd07a" intensity={7} distance={12} decay={2} />
       <pointLight position={[-1.3, 0.7, 1.6]} color="#ff7a10" intensity={1.2} distance={9} decay={2} />
       <points geometry={geometry} frustumCulled={false} renderOrder={2}>
