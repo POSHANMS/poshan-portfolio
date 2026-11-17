@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useRef } from "react";
+import React, { Suspense, useMemo, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { CinematicCamera } from "@/animations/scrollCamera";
@@ -26,6 +26,7 @@ import ActFourWorld from "./ActFourWorld";
 import ActFiveWorld from "./ActFiveWorld";
 import ActSixWorld from "./ActSixWorld";
 import type { ActFourPhase } from "@/types/actFour";
+import type { CardContrastUniforms } from "./StarField";
 import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
 
 function smoothstep(edge0: number, edge1: number, value: number) {
@@ -116,6 +117,11 @@ export default function Scene({
   const { deviceTier } = useDeviceSize();
   const isMobile = deviceTier === "mobile";
   const laptopScreenRef = useRef<THREE.Mesh | null>(null);
+  const cardContrast = useMemo<CardContrastUniforms>(() => ({
+    uCardCenter: { value: new THREE.Vector2(0, 0) },
+    uCardHalfSize: { value: new THREE.Vector2(0.22, 0.28) },
+    uCardDim: { value: 0 },
+  }), []);
 
   const showFloor = !isPowerUpActive || (powerUpValues && powerUpValues.floorOpacity > 0.0001);
   const showGlobe = !isPowerUpActive || (powerUpValues && powerUpValues.globeOpacity > 0.0001);
@@ -185,8 +191,10 @@ export default function Scene({
           <group visible={showStars && !isProjectTransit}>
             {!isActFive && !isActSix && <NebulaBackground />}
             <StarField
-              starsOpacity={starsOpacity * (isActFive ? 0.75 : 0.24 + exteriorStrength * 0.76)}
+              starsOpacity={starsOpacity * (isActFive ? 0.72 : 0.24 + exteriorStrength * 0.76)}
               showConstellations={!isActFive && !isActSix}
+              cardContrast={cardContrast}
+              cameraFramed={isActFive}
             />
             {!isActFive && !isActSix && <ShootingStars />}
           </group>
@@ -236,16 +244,21 @@ export default function Scene({
 
           {!isInsideProjectCore && !isActFive && !isActSix && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
           {!isActFive && !isActSix && <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} />}
-          {scrollProgress < ACT_FIVE_TIMING.sceneExit && (
-            <ActFiveWorld
-              scrollProgress={scrollProgress}
-              actFourPhase={actFourPhase}
-              particleCount={deviceTier === "mobile" ? 4_200 : deviceTier === "tablet" ? 8_600 : 14_500}
-            />
-          )}
+          <ActFiveWorld
+            scrollProgress={scrollProgress}
+            actFourPhase={actFourPhase}
+            cardContrast={cardContrast}
+            particleCount={deviceTier === "mobile" ? 4_200 : deviceTier === "tablet" ? 8_600 : 14_500}
+          />
           <ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} />
 
-          <PostProcessing hologramActive={hologramVisible} cosmicActive={isActSix} reactorActive={isActFive} />
+          <PostProcessing
+            hologramActive={hologramVisible}
+            cosmicActive={isActSix}
+            reactorActive={isActFive}
+            scrollProgress={scrollProgress}
+            depthOfFieldEnabled={deviceTier === "desktop"}
+          />
         </Suspense>
       </Canvas>
     </div>

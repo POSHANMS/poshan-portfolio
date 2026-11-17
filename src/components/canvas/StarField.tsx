@@ -101,6 +101,18 @@ const clusters = [
 
 const allNodes = clusters.flatMap(c => c.nodes);
 
+export type CardContrastUniforms = {
+  uCardCenter: { value: THREE.Vector2 };
+  uCardHalfSize: { value: THREE.Vector2 };
+  uCardDim: { value: number };
+};
+
+const NO_CARD_CONTRAST: CardContrastUniforms = {
+  uCardCenter: { value: new THREE.Vector2(0, 0) },
+  uCardHalfSize: { value: new THREE.Vector2(0.22, 0.28) },
+  uCardDim: { value: 0 },
+};
+
 // 2 faint mythological bridges between constellations
 const interConnections: [number, number][] = [
   [3, 10],   // Orion belt -> Big Dipper handle
@@ -118,10 +130,15 @@ function seededRandom(seed: number) {
 export default function StarField({
   starsOpacity = 1,
   showConstellations = true,
+  cardContrast = NO_CARD_CONTRAST,
+  cameraFramed = false,
 }: {
   starsOpacity?: number;
   showConstellations?: boolean;
+  cardContrast?: CardContrastUniforms;
+  cameraFramed?: boolean;
 }) {
+  const fieldRef = useRef<THREE.Group>(null);
   const starsRef = useRef<THREE.Points>(null);
   const heroStarsRef = useRef<THREE.Points>(null);
   const linesRef = useRef<THREE.LineSegments>(null);
@@ -225,51 +242,65 @@ export default function StarField({
 
   const starMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 } },
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, ...cardContrast },
       vertexShader: `
         attribute float aSize;
         attribute float aPhase;
         varying float vAlpha;
+        varying vec2 vScreenUv;
         uniform float uTime;
         void main() {
           float twinkle = 0.5 + 0.5 * sin(uTime * 1.2 + aPhase);
           vAlpha = twinkle;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_Position = projectionMatrix * mv;
+          vec4 clipPosition = projectionMatrix * mv;
+          gl_Position = clipPosition;
+          vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
           gl_PointSize = aSize;
         }
       `,
       fragmentShader: `
         uniform float uOpacity;
         varying float vAlpha;
+        varying vec2 vScreenUv;
+        uniform vec2 uCardCenter;
+        uniform vec2 uCardHalfSize;
+        uniform float uCardDim;
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
           float d = length(uv);
           float core = smoothstep(0.5, 0.0, d);
           float glow = smoothstep(0.5, 0.2, d) * 0.4;
           if (core + glow < 0.01) discard;
-          gl_FragColor = vec4(1.0, 0.75, 0.78, (core + glow) * vAlpha * uOpacity);
+          vec2 cardUv = (vScreenUv - uCardCenter) / max(uCardHalfSize, vec2(0.001));
+          float cardRadius = length(cardUv);
+          float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
+          float contrast = mix(1.0, 0.4, cardMask * uCardDim);
+          gl_FragColor = vec4(1.0, 0.75, 0.78, (core + glow) * vAlpha * uOpacity * contrast);
         }
       `,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
-  }, []);
+  }, [cardContrast]);
 
   const heroStarMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 } },
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, ...cardContrast },
       vertexShader: `
         attribute float aSize;
         attribute float aPhase;
         varying float vAlpha;
+        varying vec2 vScreenUv;
         uniform float uTime;
         void main() {
           float twinkle = 0.6 + 0.4 * sin(uTime * 0.8 + aPhase);
           vAlpha = twinkle;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_Position = projectionMatrix * mv;
+          vec4 clipPosition = projectionMatrix * mv;
+          gl_Position = clipPosition;
+          vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
           float safeDist = max(8.0, -mv.z);
           gl_PointSize = aSize * (60.0 / safeDist);
         }
@@ -277,6 +308,10 @@ export default function StarField({
       fragmentShader: `
         uniform float uOpacity;
         varying float vAlpha;
+        varying vec2 vScreenUv;
+        uniform vec2 uCardCenter;
+        uniform vec2 uCardHalfSize;
+        uniform float uCardDim;
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
           float d = length(uv);
@@ -285,38 +320,53 @@ export default function StarField({
           float ring = smoothstep(0.55, 0.45, d) * smoothstep(0.35, 0.45, d) * 0.3;
           if (core + glow + ring < 0.01) discard;
           vec3 color = mix(vec3(1.0, 0.9, 0.9), vec3(1.0, 0.5, 0.5), glow);
-          gl_FragColor = vec4(color, (core + glow + ring) * vAlpha * 0.85 * uOpacity);
+          vec2 cardUv = (vScreenUv - uCardCenter) / max(uCardHalfSize, vec2(0.001));
+          float cardRadius = length(cardUv);
+          float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
+          float contrast = mix(1.0, 0.4, cardMask * uCardDim);
+          gl_FragColor = vec4(color, (core + glow + ring) * vAlpha * 0.85 * uOpacity * contrast);
         }
       `,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
-  }, []);
+  }, [cardContrast]);
 
   const lineMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 } },
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, ...cardContrast },
       vertexShader: `
         attribute float aOpacity;
         attribute vec3 color;
         varying vec3 vColor;
         varying float vAlpha;
+        varying vec2 vScreenUv;
         uniform float uTime;
         void main() {
           vColor = color;
           float pulse = 0.9 + 0.1 * sin(uTime * 1.5 + position.x * 0.5);
           vAlpha = aOpacity * pulse;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          vec4 clipPosition = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          gl_Position = clipPosition;
+          vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
         }
       `,
       fragmentShader: `
         uniform float uOpacity;
         varying vec3 vColor;
         varying float vAlpha;
+        varying vec2 vScreenUv;
+        uniform vec2 uCardCenter;
+        uniform vec2 uCardHalfSize;
+        uniform float uCardDim;
         void main() {
           vec3 finalColor = vColor * 1.2;
-          float alpha = vAlpha * 0.55 * uOpacity;
+          vec2 cardUv = (vScreenUv - uCardCenter) / max(uCardHalfSize, vec2(0.001));
+          float cardRadius = length(cardUv);
+          float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
+          float contrast = mix(1.0, 0.4, cardMask * uCardDim);
+          float alpha = vAlpha * 0.55 * uOpacity * contrast;
           gl_FragColor = vec4(finalColor, alpha);
         }
       `,
@@ -325,9 +375,9 @@ export default function StarField({
       depthWrite: false,
       vertexColors: false,
     });
-  }, []);
+  }, [cardContrast]);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const t = state.clock.getElapsedTime();
     starMaterial.uniforms.uTime.value = t;
     starMaterial.uniforms.uOpacity.value = starsOpacity;
@@ -338,10 +388,21 @@ export default function StarField({
     if (starsRef.current) starsRef.current.rotation.y = t * 0.0005;
     if (heroStarsRef.current) heroStarsRef.current.rotation.y = t * 0.0005;
     if (linesRef.current) linesRef.current.rotation.y = t * 0.0005;
+    if (fieldRef.current) {
+      if (cameraFramed) {
+        const cameraAnchor = state.camera.position.clone().multiplyScalar(0.88);
+        cameraAnchor.y -= 7;
+        fieldRef.current.position.lerp(cameraAnchor, 1 - Math.exp(-3.5 * delta));
+        fieldRef.current.quaternion.slerp(state.camera.quaternion, 1 - Math.exp(-3.5 * delta));
+      } else {
+        fieldRef.current.position.lerp(new THREE.Vector3(0, 0, 0), 1 - Math.exp(-3.5 * delta));
+        fieldRef.current.quaternion.slerp(new THREE.Quaternion(), 1 - Math.exp(-3.5 * delta));
+      }
+    }
   });
 
   return (
-    <group>
+    <group ref={fieldRef}>
       <points ref={starsRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[positions, 3]} />

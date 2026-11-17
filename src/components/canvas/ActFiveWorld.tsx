@@ -1,10 +1,11 @@
 "use client";
 
 import { Html, RoundedBox } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { ActFourPhase } from "@/types/actFour";
+import type { CardContrastUniforms } from "./StarField";
 import { JOURNEY_MILESTONES } from "@/utils/constants";
 import {
   ACT_FIVE_CARD_POSITIONS,
@@ -119,8 +120,12 @@ const SWARM_VERTEX_SHADER = /* glsl */ `
   attribute float aHeat;
   uniform float uTime;
   uniform float uReveal;
+  uniform vec2 uCardCenter;
+  uniform vec2 uCardHalfSize;
+  uniform float uCardDim;
   varying vec3 vColor;
   varying float vAlpha;
+  varying vec2 vScreenUv;
   void main() {
     vec3 p = position;
     float radius = length(p.xz);
@@ -137,18 +142,28 @@ const SWARM_VERTEX_SHADER = /* glsl */ `
     vColor = mix(ember, hot, smoothstep(0.34, 0.98, aHeat));
     vAlpha = (0.54 + 0.46 * sin(uTime * 1.8 + aPhase)) * uReveal;
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
-    gl_Position = projectionMatrix * mv;
+    vec4 clipPosition = projectionMatrix * mv;
+    gl_Position = clipPosition;
+    vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
     gl_PointSize = min(6.0, aSize * (205.0 / max(22.0, -mv.z)));
   }
 `;
 const SWARM_FRAGMENT_SHADER = /* glsl */ `
   varying vec3 vColor;
   varying float vAlpha;
+  varying vec2 vScreenUv;
+  uniform vec2 uCardCenter;
+  uniform vec2 uCardHalfSize;
+  uniform float uCardDim;
   void main() {
     float d = length(gl_PointCoord - 0.5);
     if (d > 0.5) discard;
     float glow = 1.0 - smoothstep(0.02, 0.5, d);
-    gl_FragColor = vec4(vColor * (0.75 + glow * 0.8), glow * vAlpha);
+    vec2 cardUv = (vScreenUv - uCardCenter) / max(uCardHalfSize, vec2(0.001));
+    float cardRadius = length(cardUv);
+    float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
+    float contrast = mix(1.0, 0.5, cardMask * uCardDim);
+    gl_FragColor = vec4(vColor * (0.75 + glow * 0.8) * contrast, glow * vAlpha * contrast);
   }
 `;
 
@@ -256,37 +271,51 @@ const ACT_FIVE_STARS_VERTEX = /* glsl */ `
   attribute float aPhase;
   uniform float uTime;
   uniform float uStrength;
+  uniform vec2 uCardCenter;
+  uniform vec2 uCardHalfSize;
+  uniform float uCardDim;
   varying float vAlpha;
+  varying vec2 vScreenUv;
   void main() {
     vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_Position = projectionMatrix * viewPosition;
+    vec4 clipPosition = projectionMatrix * viewPosition;
+    gl_Position = clipPosition;
+    vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
     gl_PointSize = min(4.0, aSize * (150.0 / max(18.0, -viewPosition.z)));
     vAlpha = (0.36 + 0.42 * (0.5 + 0.5 * sin(uTime * 0.55 + aPhase))) * uStrength;
   }
 `;
 const ACT_FIVE_STARS_FRAGMENT = /* glsl */ `
   varying float vAlpha;
+  varying vec2 vScreenUv;
+  uniform vec2 uCardCenter;
+  uniform vec2 uCardHalfSize;
+  uniform float uCardDim;
   void main() {
     float d = length(gl_PointCoord - 0.5);
     if (d > 0.5) discard;
     float core = 1.0 - smoothstep(0.0, 0.34, d);
     float halo = 1.0 - smoothstep(0.12, 0.5, d);
-    gl_FragColor = vec4(vec3(0.86, 0.79, 0.78) * (0.8 + core * 0.5), (core * 0.72 + halo * 0.2) * vAlpha);
+    vec2 cardUv = (vScreenUv - uCardCenter) / max(uCardHalfSize, vec2(0.001));
+    float cardRadius = length(cardUv);
+    float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
+    float contrast = mix(1.0, 0.5, cardMask * uCardDim);
+    gl_FragColor = vec4(vec3(0.86, 0.79, 0.78) * (0.8 + core * 0.5) * contrast, (core * 0.72 + halo * 0.2) * vAlpha * contrast);
   }
 `;
 
-function ActFiveStarfield({ strength }: { strength: number }) {
+function ActFiveStarfield({ strength, cardContrast }: { strength: number; cardContrast: CardContrastUniforms }) {
   const points = useRef<THREE.Points>(null);
   const geometry = useMemo(() => makeActFiveStars(), []);
   const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uStrength: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uStrength: { value: 0 }, ...cardContrast },
     vertexShader: ACT_FIVE_STARS_VERTEX,
     fragmentShader: ACT_FIVE_STARS_FRAGMENT,
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     toneMapped: false,
-  }), []);
+  }), [cardContrast]);
   useFrame(({ clock, camera }, delta) => {
     material.uniforms.uTime.value = clock.getElapsedTime();
     material.uniforms.uStrength.value = THREE.MathUtils.damp(material.uniforms.uStrength.value, strength, 5, delta);
@@ -369,18 +398,18 @@ function CoreShader({ strength }: { strength: number }) {
   );
 }
 
-function AccretionSwarm({ geometry, strength }: { geometry: THREE.BufferGeometry; strength: number }) {
+function AccretionSwarm({ geometry, strength, cardContrast }: { geometry: THREE.BufferGeometry; strength: number; cardContrast: CardContrastUniforms }) {
   const pointsRef = useRef<THREE.Points>(null);
   const cloudRef = useRef<THREE.Group>(null);
   const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uReveal: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uReveal: { value: 0 }, ...cardContrast },
     vertexShader: SWARM_VERTEX_SHADER,
     fragmentShader: SWARM_FRAGMENT_SHADER,
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     toneMapped: false,
-  }), []);
+  }), [cardContrast]);
   useFrame(({ clock }, delta) => {
     material.uniforms.uTime.value = clock.getElapsedTime();
     material.uniforms.uReveal.value = THREE.MathUtils.damp(material.uniforms.uReveal.value, strength, 6, delta);
@@ -393,7 +422,7 @@ function AccretionSwarm({ geometry, strength }: { geometry: THREE.BufferGeometry
   );
 }
 
-function Reactor({ strength, swarmGeometry }: { strength: number; swarmGeometry: THREE.BufferGeometry }) {
+function Reactor({ strength, swarmGeometry, cardContrast }: { strength: number; swarmGeometry: THREE.BufferGeometry; cardContrast: CardContrastUniforms }) {
   const assembly = useRef<THREE.Group>(null);
   const light = useRef<THREE.PointLight>(null);
   useFrame(({ clock }) => {
@@ -405,7 +434,7 @@ function Reactor({ strength, swarmGeometry }: { strength: number; swarmGeometry:
       <pointLight ref={light} color="#ff1238" intensity={2.6} distance={15} decay={1.8} />
       <pointLight position={[-2.2, 1.4, 2.5]} color="#a8001e" intensity={0.65 * strength} distance={9} decay={2} />
       <CoreShader strength={strength} />
-      <AccretionSwarm geometry={swarmGeometry} strength={strength} />
+      <AccretionSwarm geometry={swarmGeometry} strength={strength} cardContrast={cardContrast} />
       {[2.35, 3.12, 3.92].map((radius, index) => <ReactorRing key={radius} radius={radius} index={index} strength={strength} />)}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[2.38, 0.012, 8, 180]} />
@@ -452,16 +481,18 @@ function MonolithCard({ index, focus, opacity, progress }: { index: number; focu
         }}
       >
         <div className="act-five-glass-sheen act-five-glass-sheen-active pointer-events-none absolute inset-y-0 left-0" aria-hidden="true" />
-        <header className="relative flex items-center justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.22em] text-white [text-shadow:0_1px_8px_rgba(0,0,0,.9)]">
+        <div className="act-five-holo-scanlines pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div className="act-five-holo-flicker pointer-events-none absolute inset-0" aria-hidden="true" />
+        <header className="relative z-[2] flex items-center justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.22em] text-white [text-shadow:0_1px_8px_rgba(0,0,0,.9)]">
           <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-[#ff1738] shadow-[0_0_12px_#ff2446]" />{card.eyebrow}</span>
           <span className="shrink-0 text-white/90">ACT V // FIELD NOTES</span>
         </header>
-        <h3 className="relative mt-5 max-w-[440px] text-[clamp(22px,2vw,28px)] font-black uppercase leading-[1.05] tracking-[-0.025em] text-white [text-shadow:0_2px_10px_rgba(0,0,0,.92),0_0_22px_rgba(0,0,0,.55)]">{card.title}</h3>
-        <p className="relative mt-4 max-w-[470px] text-[14px] leading-[1.55] text-white [text-shadow:0_1px_8px_rgba(0,0,0,.96)]">{card.body}</p>
-        <ul className="relative mt-4 grid grid-cols-2 gap-2" aria-label={`${card.eyebrow} milestone metrics`}>
+        <h3 className="relative z-[2] mt-5 max-w-[440px] text-[clamp(22px,2vw,28px)] font-black uppercase leading-[1.05] tracking-[-0.025em] text-white [text-shadow:0_2px_10px_rgba(0,0,0,.92),0_0_22px_rgba(0,0,0,.55)]">{card.title}</h3>
+        <p className="relative z-[2] mt-4 max-w-[470px] text-[14px] leading-[1.55] text-white [text-shadow:0_1px_8px_rgba(0,0,0,.96)]">{card.body}</p>
+        <ul className="relative z-[2] mt-4 grid grid-cols-2 gap-2" aria-label={`${card.eyebrow} milestone metrics`}>
           {card.metrics.map((metric) => <li key={metric} className="w-fit max-w-full rounded-sm border border-white/50 bg-[rgba(255,255,255,.12)] px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-white [text-shadow:0_1px_5px_rgba(0,0,0,.9)] shadow-[inset_0_1px_0_rgba(255,255,255,.48),0_2px_8px_rgba(0,0,0,.12)]">{metric}</li>)}
         </ul>
-        <footer className="relative mt-auto border-t border-white/40 pt-3 font-mono text-[9px] uppercase tracking-[0.13em] text-white [text-shadow:0_1px_7px_rgba(0,0,0,.95)]">
+        <footer className="relative z-[2] mt-auto border-t border-white/40 pt-3 font-mono text-[9px] uppercase tracking-[0.13em] text-white [text-shadow:0_1px_7px_rgba(0,0,0,.95)]">
           <div className="mb-2 flex items-center justify-between gap-4">
             <span className="min-w-0 truncate"><b className="mr-2 text-[#ff536a]">SYS.STATUS</b>{card.telemetry}</span>
             <strong className="shrink-0 rounded-sm border border-white/60 bg-[rgba(255,255,255,.14)] px-2 py-1 text-[12px] tracking-[0.18em] text-white shadow-[0_0_12px_rgba(255,23,56,.2)]">0{index + 1} / 04</strong>
@@ -470,6 +501,50 @@ function MonolithCard({ index, focus, opacity, progress }: { index: number; focu
         </footer>
       </article>
     </Html>
+  );
+}
+
+const CARD_RIM_VERTEX = /* glsl */ `
+  varying vec3 vNormalView;
+  varying vec3 vViewDirection;
+  void main() {
+    vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+    vNormalView = normalize(normalMatrix * normal);
+    vViewDirection = normalize(-viewPosition.xyz);
+    gl_Position = projectionMatrix * viewPosition;
+  }
+`;
+const CARD_RIM_FRAGMENT = /* glsl */ `
+  uniform float uFocus;
+  uniform float uOpacity;
+  varying vec3 vNormalView;
+  varying vec3 vViewDirection;
+  void main() {
+    float fresnel = pow(1.0 - abs(dot(normalize(vNormalView), normalize(vViewDirection))), 3.2);
+    float rim = smoothstep(0.16, 0.94, fresnel);
+    gl_FragColor = vec4(1.0, 0.008, 0.035, rim * uOpacity * (0.08 + uFocus * 0.52));
+  }
+`;
+
+function MonolithRim({ focus, opacity }: { focus: number; opacity: number }) {
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: { uFocus: { value: 0 }, uOpacity: { value: 0 } },
+    vertexShader: CARD_RIM_VERTEX,
+    fragmentShader: CARD_RIM_FRAGMENT,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  }), []);
+  useFrame((_, delta) => {
+    material.uniforms.uFocus.value = THREE.MathUtils.damp(material.uniforms.uFocus.value, focus, 6, delta);
+    material.uniforms.uOpacity.value = THREE.MathUtils.damp(material.uniforms.uOpacity.value, opacity, 6, delta);
+  });
+  return (
+    <RoundedBox args={[3.43, 2.18, 0.34]} radius={0.09} smoothness={8} scale={1.006} renderOrder={2}>
+      <primitive object={material} attach="material" />
+    </RoundedBox>
   );
 }
 
@@ -537,6 +612,7 @@ function Monolith({
 
   return (
     <group ref={(node) => { group.current = node; groupRef(node); }} position={position}>
+      <MonolithRim focus={focus} opacity={opacity} />
       <RoundedBox args={[3.4, 2.15, 0.32]} radius={0.09} smoothness={8}>
         <meshPhysicalMaterial color="#f0f4f8" transmission={0.94} roughness={0.12} ior={1.5} thickness={1.5} attenuationColor="#f1dce1" attenuationDistance={3.2} metalness={0.015} clearcoat={1} clearcoatRoughness={0.08} transparent opacity={opacity} depthWrite={focus > 0.2} />
       </RoundedBox>
@@ -593,9 +669,16 @@ function EnergyTether({ cardRef, strength }: { cardRef: React.RefObject<THREE.Gr
   return <primitive object={beam} renderOrder={4} />;
 }
 
-export default function ActFiveWorld({ scrollProgress, actFourPhase, particleCount = PARTICLE_COUNT }: { scrollProgress: number; actFourPhase: ActFourPhase; particleCount?: number }) {
+export default function ActFiveWorld({ scrollProgress, actFourPhase, cardContrast, particleCount = PARTICLE_COUNT }: { scrollProgress: number; actFourPhase: ActFourPhase; cardContrast: CardContrastUniforms; particleCount?: number }) {
+  const { camera } = useThree();
   const cards = useRef<(THREE.Group | null)[]>([null, null, null, null]);
   const swarmGeometry = useMemo(() => makeAccretionDisc(particleCount), [particleCount]);
+  const projectedCenter = useMemo(() => new THREE.Vector3(), []);
+  const projectedEdge = useMemo(() => new THREE.Vector3(), []);
+  const cardWorld = useMemo(() => new THREE.Vector3(), []);
+  const cardRight = useMemo(() => new THREE.Vector3(), []);
+  const cardUp = useMemo(() => new THREE.Vector3(), []);
+  const cardWorldQuaternion = useMemo(() => new THREE.Quaternion(), []);
   const active = actFourPhase !== "inside" && actFourPhase !== "warping";
   const reveal = THREE.MathUtils.smoothstep(scrollProgress, ACT_FIVE_TIMING.revealInStart, ACT_FIVE_TIMING.revealInEnd)
     * (1 - THREE.MathUtils.smoothstep(scrollProgress, ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit));
@@ -634,12 +717,30 @@ export default function ActFiveWorld({ scrollProgress, actFourPhase, particleCou
   }
   const focusStrength = weights[activeIndex] * reveal * (active ? 1 : 0);
 
+  useFrame((_, delta) => {
+    const card = cards.current[activeIndex];
+    if (card && active && reveal > 0.08) {
+      card.getWorldPosition(cardWorld);
+      card.getWorldQuaternion(cardWorldQuaternion);
+      projectedCenter.copy(cardWorld).project(camera);
+      cardRight.set(1, 0, 0).applyQuaternion(cardWorldQuaternion).multiplyScalar(2.02 * card.scale.x);
+      cardUp.set(0, 1, 0).applyQuaternion(cardWorldQuaternion).multiplyScalar(1.28 * card.scale.y);
+      projectedEdge.copy(cardWorld).add(cardRight).project(camera);
+      const halfWidth = Math.abs(projectedEdge.x - projectedCenter.x) + 0.012;
+      projectedEdge.copy(cardWorld).add(cardUp).project(camera);
+      const halfHeight = Math.abs(projectedEdge.y - projectedCenter.y) + 0.018;
+      cardContrast.uCardCenter.value.set(projectedCenter.x * 0.5 + 0.5, projectedCenter.y * 0.5 + 0.5);
+      cardContrast.uCardHalfSize.value.set(halfWidth, halfHeight);
+    }
+    cardContrast.uCardDim.value = THREE.MathUtils.damp(cardContrast.uCardDim.value, active && reveal > 0.08 ? focusStrength : 0, 5.5, delta);
+  });
+
   return (
     <>
-      <ActFiveStarfield strength={reveal * (active ? 1 : 0)} />
+      <ActFiveStarfield strength={reveal * (active ? 1 : 0)} cardContrast={cardContrast} />
       <group position={ACT_FIVE_ORIGIN} visible={active && reveal > 0.001}>
       <PolarGrid strength={reveal * (active ? 1 : 0)} />
-      <Reactor strength={reveal * (active ? 1 : 0)} swarmGeometry={swarmGeometry} />
+      <Reactor strength={reveal * (active ? 1 : 0)} swarmGeometry={swarmGeometry} cardContrast={cardContrast} />
       {CARD_CONTENT.map((_, index) => {
         const focus = weights[index] * (active ? 1 : 0);
         const opacity = reveal * (active ? 0.012 + focus * 0.988 : 0);

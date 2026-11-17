@@ -600,7 +600,9 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
   // The parent Panel owns the chapter entrance. A second progress-based fade
   // made the HUD remain dim at the first checkpoint after the card was active.
   const intro = 1;
-  const checkpoint = progress < 0.17 ? 1 : progress < 0.34 ? 2 : progress < 0.51 ? 3 : 4;
+  // Match ActFiveWorld's active-card midpoint during each orbital transfer so
+  // the HUD counter changes on the same frame as the glass checkpoint card.
+  const checkpoint = progress < 0.145 ? 1 : progress < 0.315 ? 2 : progress < 0.485 ? 3 : 4;
   const inSwoop = (progress >= 0.12 && progress < 0.17)
     || (progress >= 0.29 && progress < 0.34)
     || (progress >= 0.46 && progress < 0.51)

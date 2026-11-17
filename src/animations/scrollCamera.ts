@@ -165,6 +165,9 @@ export function CinematicCamera({
   const cameraRoll = useRef(0);
   const cameraPitch = useRef(0);
   const cameraYaw = useRef(0);
+  const cameraVelocity = useRef(new THREE.Vector3());
+  const targetVelocity = useRef(new THREE.Vector3());
+  const cameraNoise = useRef(new THREE.Vector3());
 
   const clampedProgress = Math.max(0, Math.min(1, scrollProgress));
 
@@ -295,14 +298,46 @@ export function CinematicCamera({
     }
 
     const cameraDamping = actFourPhase === "locked" || actFourPhase === "ready" ? 8.4 : 4.6;
-    currentPos.current.lerp(desiredPosition, 1 - Math.exp(-cameraDamping * delta));
-    currentLookAt.current.lerp(desiredLookAt, 1 - Math.exp(-cameraDamping * delta));
-    currentFov.current = THREE.MathUtils.damp(currentFov.current, desiredFov, cameraDamping, delta);
+    if (actFiveCameraActive) {
+      // A lightly underdamped spring gives the camera mass, a restrained overshoot,
+      // and a short settle at each authored checkpoint without affecting other acts.
+      const step = Math.min(delta, 1 / 30);
+      const omega = 7.2;
+      const dampingRatio = 0.88;
+      cameraVelocity.current.addScaledVector(desiredPosition.clone().sub(currentPos.current).multiplyScalar(omega * omega)
+        .addScaledVector(cameraVelocity.current, -2 * dampingRatio * omega), step);
+      targetVelocity.current.addScaledVector(desiredLookAt.clone().sub(currentLookAt.current).multiplyScalar(omega * omega)
+        .addScaledVector(targetVelocity.current, -2 * dampingRatio * omega), step);
+      currentPos.current.addScaledVector(cameraVelocity.current, step);
+      currentLookAt.current.addScaledVector(targetVelocity.current, step);
+      currentFov.current = THREE.MathUtils.damp(currentFov.current, desiredFov, 6.2, step);
+    } else {
+      currentPos.current.lerp(desiredPosition, 1 - Math.exp(-cameraDamping * delta));
+      currentLookAt.current.lerp(desiredLookAt, 1 - Math.exp(-cameraDamping * delta));
+      currentFov.current = THREE.MathUtils.damp(currentFov.current, desiredFov, cameraDamping, delta);
+      cameraVelocity.current.multiplyScalar(Math.exp(-9 * delta));
+      targetVelocity.current.multiplyScalar(Math.exp(-9 * delta));
+    }
 
     // Subtle handheld-cinema drift while scrolling; very small so the scene stays premium.
     const drift = Math.sin(time * 0.45 + p * Math.PI * 2) * 0.01;
+    const noiseEnvelope = actFiveCameraActive ? 1 : 0;
+    const smoothRigNoise = (frequency: number, phase: number) => {
+      const sample = time * frequency + phase;
+      const cell = Math.floor(sample);
+      const local = sample - cell;
+      const eased = local * local * (3 - 2 * local);
+      const a = Math.sin(cell * 127.1 + phase * 311.7) * 43758.5453;
+      const b = Math.sin((cell + 1) * 127.1 + phase * 311.7) * 43758.5453;
+      return THREE.MathUtils.lerp(a - Math.floor(a) - 0.5, b - Math.floor(b) - 0.5, eased);
+    };
+    cameraNoise.current.set(
+      smoothRigNoise(7.4, 0.31) * 0.0042 * noiseEnvelope,
+      smoothRigNoise(6.1, 1.77) * 0.0032 * noiseEnvelope,
+      smoothRigNoise(8.2, 2.43) * 0.0012 * noiseEnvelope,
+    );
 
-    camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0));
+    camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0)).add(cameraNoise.current);
     camera.lookAt(currentLookAt.current);
     const targetRoll = actFiveCameraActive ? authoredActFiveRoll : 0;
     const targetPitch = actFiveCameraActive ? authoredActFivePitch : 0;

@@ -143,6 +143,38 @@ body {
   animation: actFiveGlassPass 6.5s ease-in-out infinite;
 }
 
+.act-five-holo-scanlines {
+  z-index: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.065) 0,
+    rgba(255, 255, 255, 0.065) 1px,
+    transparent 1px,
+    transparent 5px
+  );
+  opacity: 0.18;
+  mix-blend-mode: soft-light;
+}
+
+.act-five-holo-flicker {
+  z-index: 0;
+  background:
+    linear-gradient(112deg, transparent 0 43%, rgba(255, 29, 58, 0.08) 49%, transparent 56%),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.16), transparent 58%);
+  opacity: 0.14;
+  animation: actFiveHoloSignal 7.2s steps(1, end) infinite;
+}
+
+@keyframes actFiveHoloSignal {
+  0%, 17%, 19%, 48%, 51%, 82%, 100% { opacity: 0.12; }
+  18%, 49%, 83% { opacity: 0.2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .act-five-holo-flicker { animation: none; }
+  .act-five-glass-sheen-active { animation: none; }
+}
+
 /* ═══════ STAGE GRID ═══════
    1760px × 920px absolute, scaled to viewport.
    3 rows:
