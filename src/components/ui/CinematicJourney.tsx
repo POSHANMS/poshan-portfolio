@@ -664,7 +664,7 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
   };
 
   return (
-    <Panel presence={presence} side="center" className="left-1/2 top-[4vh] max-h-[91vh] w-[min(72rem,calc(100vw-2rem))] overflow-y-auto px-3 md:top-[7vh]">
+    <Panel presence={presence} side="center" className="left-1/2 top-[1vh] max-h-[95vh] w-[min(72rem,calc(100vw-2rem))] overflow-y-auto px-3 md:top-[3vh]">
       <div className="relative grid gap-8 py-5 sm:py-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:gap-14">
         <div className="pointer-events-none absolute inset-y-[5%] left-[1%] -z-10 w-[58%] bg-[radial-gradient(ellipse_at_45%_50%,rgba(255,24,58,0.12),rgba(255,24,58,0.035)_43%,transparent_76%)] blur-2xl" />
 
