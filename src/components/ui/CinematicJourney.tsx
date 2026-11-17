@@ -75,9 +75,9 @@ function Panel({
   );
 }
 
-function Kicker({ act, label }: { act: string; label: string }) {
+function Kicker({ act, label, className = "mb-4" }: { act: string; label: string; className?: string }) {
   return (
-    <div className="mb-4 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.28em] text-white/44">
+    <div className={`${className} flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.28em] text-white/44`}>
       <span className="text-[#ff1744]">{act}</span>
       <span className="h-px w-10 bg-[#ff1744]/45" />
       <span>{label}</span>
@@ -613,8 +613,8 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
       <div style={{ opacity: intro, transform: `translateY(${(1 - intro) * 12}px)`, willChange: "opacity, transform" }}>
         <Kicker act="ACT V" label="Education And Practice" />
       </div>
-      <div className="flex items-center gap-4" style={{ opacity: intro, transform: `translateX(${(1 - intro) * -22}px)`, willChange: "opacity, transform" }}>
-        <GraduationCap className="h-8 w-8 shrink-0 text-[#ff6b7f]" />
+      <div className="flex items-start gap-4" style={{ opacity: intro, transform: `translateX(${(1 - intro) * -22}px)`, willChange: "opacity, transform" }}>
+        <GraduationCap className="mt-1 h-8 w-8 shrink-0 text-[#ff6b7f]" />
         <div>
           <h2 className="text-3xl font-black uppercase leading-none text-white md:text-4xl">How The Work Was Built</h2>
           <p className="mt-3 max-w-sm font-mono text-[10px] uppercase tracking-[0.18em] text-white/65">Four milestones orbit the reactor. Scroll to move through the work.</p>
@@ -664,7 +664,7 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
   };
 
   return (
-    <Panel presence={presence} side="center" className="left-1/2 top-[1vh] max-h-[95vh] w-[min(72rem,calc(100vw-2rem))] overflow-y-auto px-3 md:top-[3vh]">
+    <Panel presence={presence} side="center" className="left-1/2 top-[-4vh] max-h-[98vh] w-[min(72rem,calc(100vw-2rem))] overflow-y-auto px-3 md:top-[-4vh]">
       <div className="relative grid gap-8 py-5 sm:py-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:gap-14">
         <div className="pointer-events-none absolute inset-y-[5%] left-[1%] -z-10 w-[58%] bg-[radial-gradient(ellipse_at_45%_50%,rgba(255,24,58,0.12),rgba(255,24,58,0.035)_43%,transparent_76%)] blur-2xl" />
 
@@ -673,7 +673,7 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
           style={{ opacity: signal, transform: `translate3d(${(1 - signal) * -18}px, ${(1 - signal) * 12}px, 0)`, willChange: "opacity, transform" }}
         >
           <div className="mb-7 flex items-center gap-3">
-            <Kicker act="ACT VI" label="Open channel" />
+            <Kicker act="ACT VI" label="Open channel" className="mb-0" />
             <Radio className="h-4 w-4 text-[#ff5a66]" style={{ opacity: pulse }} />
           </div>
           <h2

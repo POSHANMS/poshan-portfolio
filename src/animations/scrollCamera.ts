@@ -5,6 +5,7 @@ import { useRef } from "react";
 import Lenis from "lenis";
 import * as THREE from "three";
 import type { ActFourPhase } from "@/types/actFour";
+import { getActSixCameraPose } from "./actSixChoreography";
 import {
   ACT_FIVE_ENTRY_CAMERA,
   ACT_FIVE_ENTRY_TARGET,
@@ -168,6 +169,7 @@ export function CinematicCamera({
   const cameraVelocity = useRef(new THREE.Vector3());
   const targetVelocity = useRef(new THREE.Vector3());
   const cameraNoise = useRef(new THREE.Vector3());
+  const actSixFlightStartedAt = useRef<number | null>(null);
 
   const clampedProgress = Math.max(0, Math.min(1, scrollProgress));
 
@@ -202,6 +204,8 @@ export function CinematicCamera({
     let authoredActFivePitch = 0;
     let authoredActFiveYaw = 0;
     let actFiveCameraActive = false;
+    let authoredActSixRoll = 0;
+    let actSixCameraActive = false;
 
     // The Act V entry blends out of the existing Act IV camera, then follows
     // keyed Catmull-Rom position and target splines through all four artifacts.
@@ -288,13 +292,28 @@ export function CinematicCamera({
       desiredFov -= 0.55 * settle;
     }
 
-    // Act VI uses a restrained camera orbit. The nebula itself stays fixed.
+    // Act VI is a scroll-triggered camera orbit. The galaxy remains a fixed
+    // composition while the camera sweeps around it into the contact landing.
+    if (p < ACT_FIVE_TIMING.sceneExit || actFourPhase !== "locked") {
+      actSixFlightStartedAt.current = null;
+    }
     if (p >= ACT_FIVE_TIMING.sceneExit && actFourPhase === "locked") {
-      const orbit = time * 0.06;
-      desiredPosition.x += Math.sin(orbit) * 0.28;
-      desiredPosition.y += Math.cos(orbit * 0.82) * 0.12;
-      desiredLookAt.x += Math.sin(orbit * 0.72) * 0.12;
-      desiredLookAt.y += Math.cos(orbit * 0.82) * 0.05;
+      actSixCameraActive = true;
+      if (actSixFlightStartedAt.current === null) actSixFlightStartedAt.current = time;
+      const scrollFlight = THREE.MathUtils.clamp(
+        (p - ACT_FIVE_TIMING.sceneExit) / (1 - ACT_FIVE_TIMING.sceneExit),
+        0,
+        1,
+      );
+      const elapsedFlight = THREE.MathUtils.clamp((time - actSixFlightStartedAt.current) / 3.8, 0, 1);
+      // The camera completes the opening transfer even if a visitor scrolls
+      // quickly through the short Act V-to-VI handoff window.
+      const flightProgress = elapsedFlight < 1 ? Math.min(scrollFlight, elapsedFlight) : scrollFlight;
+      const pose = getActSixCameraPose(flightProgress, time);
+      desiredPosition.copy(pose.position);
+      desiredLookAt.copy(pose.target);
+      desiredFov = pose.fov;
+      authoredActSixRoll = pose.roll;
     }
 
     const cameraDamping = actFourPhase === "locked" || actFourPhase === "ready" ? 8.4 : 4.6;
@@ -339,12 +358,13 @@ export function CinematicCamera({
 
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0)).add(cameraNoise.current);
     camera.lookAt(currentLookAt.current);
-    const targetRoll = actFiveCameraActive ? authoredActFiveRoll : 0;
+    const targetRoll = actFiveCameraActive ? authoredActFiveRoll : actSixCameraActive ? authoredActSixRoll : 0;
     const targetPitch = actFiveCameraActive ? authoredActFivePitch : 0;
     const targetYaw = actFiveCameraActive ? authoredActFiveYaw : 0;
-    cameraRoll.current = THREE.MathUtils.damp(cameraRoll.current, targetRoll, actFiveCameraActive ? 5.5 : 8, delta);
-    cameraPitch.current = THREE.MathUtils.damp(cameraPitch.current, targetPitch, actFiveCameraActive ? 5.2 : 8, delta);
-    cameraYaw.current = THREE.MathUtils.damp(cameraYaw.current, targetYaw, actFiveCameraActive ? 5.2 : 8, delta);
+    const cinematicCameraActive = actFiveCameraActive || actSixCameraActive;
+    cameraRoll.current = THREE.MathUtils.damp(cameraRoll.current, targetRoll, cinematicCameraActive ? 5.5 : 8, delta);
+    cameraPitch.current = THREE.MathUtils.damp(cameraPitch.current, targetPitch, cinematicCameraActive ? 5.2 : 8, delta);
+    cameraYaw.current = THREE.MathUtils.damp(cameraYaw.current, targetYaw, cinematicCameraActive ? 5.2 : 8, delta);
     camera.rotateY(cameraYaw.current);
     camera.rotateX(cameraPitch.current);
     camera.rotateZ(cameraRoll.current);
