@@ -169,7 +169,6 @@ export function CinematicCamera({
   const cameraVelocity = useRef(new THREE.Vector3());
   const targetVelocity = useRef(new THREE.Vector3());
   const cameraNoise = useRef(new THREE.Vector3());
-  const actSixFlightStartedAt = useRef<number | null>(null);
 
   const clampedProgress = Math.max(0, Math.min(1, scrollProgress));
 
@@ -205,6 +204,8 @@ export function CinematicCamera({
     let authoredActFiveYaw = 0;
     let actFiveCameraActive = false;
     let authoredActSixRoll = 0;
+    let authoredActSixPitch = 0;
+    let authoredActSixYaw = 0;
     let actSixCameraActive = false;
 
     // The Act V entry blends out of the existing Act IV camera, then follows
@@ -294,26 +295,35 @@ export function CinematicCamera({
 
     // Act VI is a scroll-triggered camera orbit. The galaxy remains a fixed
     // composition while the camera sweeps around it into the contact landing.
-    if (p < ACT_FIVE_TIMING.sceneExit || actFourPhase !== "locked") {
-      actSixFlightStartedAt.current = null;
-    }
     if (p >= ACT_FIVE_TIMING.sceneExit && actFourPhase === "locked") {
       actSixCameraActive = true;
-      if (actSixFlightStartedAt.current === null) actSixFlightStartedAt.current = time;
       const scrollFlight = THREE.MathUtils.clamp(
         (p - ACT_FIVE_TIMING.sceneExit) / (1 - ACT_FIVE_TIMING.sceneExit),
         0,
         1,
       );
-      const elapsedFlight = THREE.MathUtils.clamp((time - actSixFlightStartedAt.current) / 3.8, 0, 1);
-      // The camera completes the opening transfer even if a visitor scrolls
-      // quickly through the short Act V-to-VI handoff window.
-      const flightProgress = elapsedFlight < 1 ? Math.min(scrollFlight, elapsedFlight) : scrollFlight;
-      const pose = getActSixCameraPose(flightProgress, time);
+      // Scroll is the timeline: no hidden timer can hold or desynchronize the
+      // Act V-to-VI move. Each wheel/touch movement advances the same shot.
+      const pose = getActSixCameraPose(scrollFlight, time);
       desiredPosition.copy(pose.position);
       desiredLookAt.copy(pose.target);
       desiredFov = pose.fov;
       authoredActSixRoll = pose.roll;
+      authoredActSixPitch = pose.pitch;
+      authoredActSixYaw = pose.yaw;
+
+      // A small damped mouse parallax becomes available after the handoff has
+      // landed; it moves the virtual rig without changing the authored galaxy.
+      const parallax = THREE.MathUtils.smoothstep(scrollFlight, 0.58, 0.9);
+      desiredPosition.x += state.pointer.x * 0.16 * parallax;
+      desiredPosition.y += state.pointer.y * 0.1 * parallax;
+      desiredLookAt.x += state.pointer.x * 0.12 * parallax;
+      desiredLookAt.y += state.pointer.y * 0.08 * parallax;
+      // A barely perceptible lens breath keeps the landing alive without
+      // changing galaxy size or particle spacing.
+      // The visitor's final Act VI scroll movement creates a restrained lens
+      // inhale/exhale; no timer runs once the scroll position is held still.
+      desiredFov += Math.sin(scrollFlight * Math.PI * 2.25) * 0.56 * parallax;
     }
 
     const cameraDamping = actFourPhase === "locked" || actFourPhase === "ready" ? 8.4 : 4.6;
@@ -359,8 +369,8 @@ export function CinematicCamera({
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0)).add(cameraNoise.current);
     camera.lookAt(currentLookAt.current);
     const targetRoll = actFiveCameraActive ? authoredActFiveRoll : actSixCameraActive ? authoredActSixRoll : 0;
-    const targetPitch = actFiveCameraActive ? authoredActFivePitch : 0;
-    const targetYaw = actFiveCameraActive ? authoredActFiveYaw : 0;
+    const targetPitch = actFiveCameraActive ? authoredActFivePitch : actSixCameraActive ? authoredActSixPitch : 0;
+    const targetYaw = actFiveCameraActive ? authoredActFiveYaw : actSixCameraActive ? authoredActSixYaw : 0;
     const cinematicCameraActive = actFiveCameraActive || actSixCameraActive;
     cameraRoll.current = THREE.MathUtils.damp(cameraRoll.current, targetRoll, cinematicCameraActive ? 5.5 : 8, delta);
     cameraPitch.current = THREE.MathUtils.damp(cameraPitch.current, targetPitch, cinematicCameraActive ? 5.2 : 8, delta);

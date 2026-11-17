@@ -149,6 +149,8 @@ export default function Scene({
   // Let the Act V reactor finish its opacity fade before the Contact galaxy
   // reaches full luminance; the camera is already moving through the exit arc.
   const actSixStrength = smoothstep(ACT_FIVE_TIMING.sceneExit, ACT_FIVE_TIMING.galaxyFullReveal, scrollProgress);
+  const actSixFlight = THREE.MathUtils.clamp((scrollProgress - ACT_FIVE_TIMING.sceneExit) / (1 - ACT_FIVE_TIMING.sceneExit), 0, 1);
+  const actSixWarpProgress = smoothstep(0.02, 0.12, actSixFlight) * (1 - smoothstep(0.46, 0.62, actSixFlight));
   const isActSix = actSixStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
   const isInsideProjectCore = actFourPhase === "inside";
   const isProjectTransit = actFourPhase === "warping" || isInsideProjectCore;
@@ -197,6 +199,8 @@ export default function Scene({
               // Keep the shared starfield filling the camera view through the
               // final contact orbit without increasing its particle count.
               cameraFramed={isActFive || isActSix}
+              warpProgress={isActSix ? actSixWarpProgress : 0}
+              cameraParallax={isActSix ? 0.24 : 0}
             />
             {!isActFive && !isActSix && <ShootingStars />}
           </group>

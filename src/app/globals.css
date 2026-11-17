@@ -1731,6 +1731,12 @@ canvas {
   border-bottom-color: rgba(255, 112, 135, 0.95);
   background: linear-gradient(110deg, rgba(8, 4, 7, 0.32), rgba(255, 255, 255, 0.055));
   box-shadow: 0 4px 14px -9px rgba(255, 40, 75, 0.72);
+  animation: act-six-focus-spectrum 5.2s ease-in-out infinite;
+}
+
+@keyframes act-six-focus-spectrum {
+  0%, 100% { border-bottom-color: rgba(255, 91, 121, 0.95); box-shadow: 0 4px 15px -9px rgba(255, 40, 75, 0.78); }
+  48% { border-bottom-color: rgba(171, 124, 255, 0.92); box-shadow: 0 4px 17px -8px rgba(133, 83, 255, 0.72); }
 }
 
 .act-six-identity-line {
@@ -1843,11 +1849,97 @@ canvas {
 @media (prefers-reduced-motion: reduce) {
   .act-six-signal-idle,
   .act-six-signal-active,
+  .act-six-glass-input:focus,
   .act-six-transmit-button::before,
   .act-six-card-sheen,
   .act-six-transmitting::after,
-  .act-six-send-icon {
+  .act-six-send-icon,
+  .act-six-success-pulse,
+  .act-six-form-dissolving {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+.act-six-contact-stage {
+  isolation: isolate;
+  border: 1px solid rgba(255, 178, 190, 0.24);
+  background: linear-gradient(132deg, rgba(255, 255, 255, 0.075), transparent 34%, rgba(255, 25, 59, 0.045)), rgba(7, 5, 9, 0.68);
+  -webkit-backdrop-filter: blur(16px) saturate(128%);
+  backdrop-filter: blur(16px) saturate(128%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 24px 80px rgba(0, 0, 0, 0.3);
+}
+.act-six-contact-panel {
+  /* Keep the contact UI above the persistent bottom telemetry ruler. */
+  max-height: calc(100dvh - 3.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(255, 80, 106, 0.48) transparent;
+  scrollbar-width: thin;
+}
+.act-six-contact-stage .act-six-social-link {
+  display: flex;
+  min-width: 0;
+  min-height: 2.55rem;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(255, 130, 150, 0.24);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 0.35rem 0.4rem;
+  color: rgba(255, 255, 255, 0.86);
+}
+.act-six-contact-stage .act-six-social-link:hover,
+.act-six-contact-stage .act-six-social-link:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(255, 121, 143, 0.75);
+  background: rgba(255, 35, 72, 0.09);
+  box-shadow: 0 0 24px rgba(255, 28, 66, 0.12);
+}
+.act-six-contact-stage .act-six-social-icon { width: 1.1rem; height: 1.1rem; }
+.act-six-contact-stage .act-six-social-label {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.88);
+  font: 600 0.58rem/1.2 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.12em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+.act-six-contact-stage .act-six-field-label { font-size: 0.56rem; }
+.act-six-contact-stage .act-six-field-label { gap: 0.25rem; }
+.act-six-contact-stage .act-six-glass-input { padding: 0.42rem 0.62rem; font-size: 0.78rem; }
+.act-six-contact-stage textarea.act-six-glass-input { min-height: 3rem; }
+.act-six-contact-stage .act-six-transmission-card > .relative.z-10.mb-6 { margin-bottom: 0.65rem; padding-bottom: 0.65rem; }
+.act-six-contact-stage .act-six-transmission-card > .relative.z-10.mt-5 { margin-top: 0.7rem; padding-top: 0.7rem; }
+.act-six-contact-stage .act-six-transmit-button { padding: 0.72rem 0.9rem; }
+
+@media (max-height: 760px) {
+  .act-six-contact-stage { gap: 0.4rem; padding: 0.5rem; }
+  .act-six-contact-stage section > .mb-3 { margin-bottom: 0.35rem; }
+  .act-six-contact-stage section > p { margin-top: 0.35rem; }
+  .act-six-contact-stage .act-six-contact-rail { margin-top: 0.35rem; }
+  .act-six-contact-stage .act-six-channel-status { margin-top: 0.35rem; }
+  .act-six-contact-stage .act-six-transmission-card { padding: 0.65rem; }
+  .act-six-contact-stage .act-six-transmission-card > .relative.z-10.mb-6 { margin-bottom: 0.42rem; padding-bottom: 0.42rem; }
+  .act-six-contact-stage .act-six-transmission-card > .relative.z-10.mt-5 { margin-top: 0.45rem; padding-top: 0.45rem; }
+  .act-six-contact-stage .act-six-glass-input { padding: 0.25rem 0.52rem; }
+  .act-six-contact-stage textarea.act-six-glass-input { min-height: 2.25rem; }
+  .act-six-contact-stage .act-six-social-link { min-height: 2.2rem; }
+  .act-six-contact-stage .act-six-transmit-button { padding: 0.58rem 0.78rem; }
+}
+
+.act-six-form-dissolving { animation: act-six-form-signal 1.5s cubic-bezier(0.22, 0.72, 0.18, 1) forwards; pointer-events: none; }
+.act-six-transmission-success {
+  border-color: rgba(255, 129, 151, 0.5);
+  background: linear-gradient(140deg, rgba(40, 10, 18, 0.84), rgba(8, 6, 10, 0.78));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 50px rgba(255, 30, 66, 0.14);
+}
+.act-six-success-pulse { animation: act-six-success-pulse 1.4s ease-in-out infinite; }
+@keyframes act-six-form-signal {
+  0% { opacity: 1; filter: brightness(1); transform: scale(1); }
+  18% { opacity: 1; filter: brightness(1.6); transform: scale(1.012); }
+  100% { opacity: 0; filter: brightness(1.9) blur(5px); transform: scale(0.92) translate3d(0, 8px, 0); }
+}
+@keyframes act-six-success-pulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 45, 80, 0.35)); transform: scale(0.96); }
+  50% { filter: drop-shadow(0 0 18px rgba(255, 45, 80, 0.85)); transform: scale(1.04); }
 }

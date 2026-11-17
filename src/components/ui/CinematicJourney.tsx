@@ -610,15 +610,13 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
     <Panel presence={presence} side="left" className="left-6 top-[6vh] z-[3] w-[min(30rem,calc(100vw-3rem))] md:left-16">
       <div aria-hidden="true" className="pointer-events-none absolute -inset-x-10 -inset-y-8 -z-10 bg-[radial-gradient(ellipse_at_18%_25%,rgba(0,0,0,0.74),rgba(0,0,0,0.32)_55%,transparent_82%)]" />
       <div className="relative rounded-[4px] border border-[#ff2446]/20 px-4 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.48),inset_0_0_26px_rgba(255,20,55,0.04)] backdrop-blur-[2px]" style={{ background: "rgba(7, 2, 5, 0.64)" }}>
-      <div style={{ opacity: intro, transform: `translateY(${(1 - intro) * 12}px)`, willChange: "opacity, transform" }}>
+      <div className="flex items-center gap-2.5" style={{ opacity: intro, transform: `translateY(${(1 - intro) * 12}px)`, willChange: "opacity, transform" }}>
+        <GraduationCap className="h-5 w-5 shrink-0 text-[#ff6b7f]" />
         <Kicker act="ACT V" label="Education And Practice" />
       </div>
-      <div className="flex items-start gap-4" style={{ opacity: intro, transform: `translateX(${(1 - intro) * -22}px)`, willChange: "opacity, transform" }}>
-        <GraduationCap className="mt-1 h-8 w-8 shrink-0 text-[#ff6b7f]" />
-        <div>
-          <h2 className="text-3xl font-black uppercase leading-none text-white md:text-4xl">How The Work Was Built</h2>
-          <p className="mt-3 max-w-sm font-mono text-[10px] uppercase tracking-[0.18em] text-white/65">Four milestones orbit the reactor. Scroll to move through the work.</p>
-        </div>
+      <div style={{ opacity: intro, transform: `translateX(${(1 - intro) * -22}px)`, willChange: "opacity, transform" }}>
+        <h2 className="text-3xl font-black uppercase leading-none text-white md:text-4xl">How The Work Was Built</h2>
+        <p className="mt-3 max-w-sm font-mono text-[10px] uppercase tracking-[0.18em] text-white/65">Four milestones orbit the reactor. Scroll to move through the work.</p>
       </div>
       <div className="mt-6 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[#ff9cab]" style={{ opacity: intro }}>
         <span>Checkpoint 0{checkpoint} / 04</span>
@@ -632,6 +630,7 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
 
 function ContactChapter({ presence, progress }: { presence: number; progress: number }) {
   const [isTransmitting, setIsTransmitting] = useState(false);
+  const [transmissionSent, setTransmissionSent] = useState(false);
   const transmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pulse = 0.82 + Math.sin(progress * Math.PI * 4) * 0.18;
   const signal = smoothstep(0.015, 0.17, progress);
@@ -646,70 +645,77 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
   const handleMessageSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isTransmitting) return;
+    const formBounds = event.currentTarget.getBoundingClientRect();
     const values = new FormData(event.currentTarget);
     const subject = String(values.get("subject") ?? "Portfolio enquiry");
+    const firstName = String(values.get("firstName") ?? "");
+    const lastName = String(values.get("lastName") ?? "");
     const body = [
-      `Name: ${String(values.get("name") ?? "")}`,
+      `Name: ${firstName} ${lastName}`.trim(),
       `Email: ${String(values.get("email") ?? "")}`,
       "",
       String(values.get("message") ?? ""),
     ].join("\n");
     const mailto = `mailto:${PROFILE.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     setIsTransmitting(true);
+    window.dispatchEvent(new CustomEvent("act-six-submit-dissolve", {
+      detail: { left: formBounds.left, top: formBounds.top, width: formBounds.width, height: formBounds.height },
+    }));
+    window.open(mailto, "_blank", "noopener,noreferrer");
     transmitTimeoutRef.current = setTimeout(() => {
-      window.location.href = mailto;
+      setTransmissionSent(true);
       setIsTransmitting(false);
       transmitTimeoutRef.current = null;
-    }, 520);
+    }, 1650);
   };
 
   return (
-    <Panel presence={presence} side="center" className="left-1/2 top-[-4vh] max-h-[98vh] w-[min(72rem,calc(100vw-2rem))] overflow-y-auto px-3 md:top-[-4vh]">
-      <div className="relative grid gap-8 py-5 sm:py-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:gap-14">
-        <div className="pointer-events-none absolute inset-y-[5%] left-[1%] -z-10 w-[58%] bg-[radial-gradient(ellipse_at_45%_50%,rgba(255,24,58,0.12),rgba(255,24,58,0.035)_43%,transparent_76%)] blur-2xl" />
+    <Panel presence={presence} side="left" className="act-six-contact-panel left-4 top-[0.7vh] w-[min(34rem,calc(100vw-2rem))] px-2 sm:left-8 lg:left-[4.2vw]">
+      <div className="act-six-contact-stage relative grid gap-2.5 p-3 sm:gap-3 sm:p-3.5">
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_100%_55%,rgba(255,24,58,0.13),rgba(255,24,58,0.04)_42%,transparent_78%)] blur-xl" />
 
         <section
-          className="relative px-2 sm:px-5 lg:py-10"
+          className="relative"
           style={{ opacity: signal, transform: `translate3d(${(1 - signal) * -18}px, ${(1 - signal) * 12}px, 0)`, willChange: "opacity, transform" }}
         >
-          <div className="mb-7 flex items-center gap-3">
+          <div className="mb-3 flex items-center gap-3">
             <Kicker act="ACT VI" label="Open channel" className="mb-0" />
             <Radio className="h-4 w-4 text-[#ff5a66]" style={{ opacity: pulse }} />
           </div>
           <h2
-            className="text-4xl font-black uppercase leading-[0.94] tracking-[-0.045em] text-white sm:text-5xl lg:text-6xl"
+            className="text-3xl font-black uppercase leading-[0.94] tracking-[-0.045em] text-white sm:text-4xl"
             style={{ opacity: titleSignal, transform: `translate3d(0, ${(1 - titleSignal) * 28}px, 0) scale(${0.97 + titleSignal * 0.03})`, filter: `blur(${(1 - titleSignal) * 6}px)`, willChange: "opacity, transform, filter" }}
           >
             Contact<br /><span className="text-[#ff3554]">Poshan</span>
           </h2>
-          <p className="mt-5 max-w-sm text-sm leading-7 text-white/78" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 15}px)`, willChange: "opacity, transform" }}>
-            Full Stack Developer and AI Developer from Karnataka, India. Have a role, idea, or question? Send a signal.
+          <p className="mt-2 max-w-[34rem] text-xs leading-5 text-white/78" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 15}px)`, willChange: "opacity, transform" }}>
+            Full Stack and AI Developer · Karnataka, India. Open to roles, ideas, and questions.
           </p>
-          <p className="act-six-identity-line" style={{ opacity: detailsSignal }}>POSHAN MS <span>·</span> FULL STACK ENGINEER <span>·</span> KARNATAKA, INDIA</p>
-          <div className="act-six-contact-rail mt-8 max-w-md" style={{ opacity: detailsSignal }} aria-label="Contact channels">
-            <a href={`mailto:${PROFILE.email}`} className="act-six-social-link group">
+          <div className="act-six-contact-rail mt-3 grid grid-cols-3 gap-2" style={{ opacity: detailsSignal }} aria-label="Contact channels">
+            <a href={`mailto:${PROFILE.email}`} aria-label="Email Poshan" className="act-six-social-link group">
               <span className="act-six-social-icon"><Mail aria-hidden="true" /></span>
-              <span className="min-w-0"><span className="act-six-social-label">Email</span><span className="act-six-social-value">{PROFILE.email}</span></span>
-              <ArrowUpRight aria-hidden="true" className="act-six-social-arrow" />
+              <span className="act-six-social-label">Email</span>
             </a>
-            <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" className="act-six-social-link group">
+            <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" aria-label="GitHub profile" className="act-six-social-link group">
               <span className="act-six-social-icon"><svg className="act-six-brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.17c-3.23.7-3.91-1.37-3.91-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.58-.29-5.3-1.29-5.3-5.74 0-1.27.45-2.3 1.19-3.11-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.05 11.05 0 0 1 5.8 0c2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.11 0 4.46-2.73 5.44-5.33 5.73.42.36.78 1.07.78 2.16v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" /></svg></span>
-              <span className="min-w-0"><span className="act-six-social-label">GitHub</span><span className="act-six-social-value">github.com/POSHANMS</span></span>
-              <ArrowUpRight aria-hidden="true" className="act-six-social-arrow" />
+              <span className="act-six-social-label">GitHub</span>
             </a>
-            <a href={PROFILE.linkedin} target="_blank" rel="noopener noreferrer" className="act-six-social-link group">
+            <a href={PROFILE.linkedin} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn profile" className="act-six-social-link group">
               <span className="act-six-social-icon"><svg className="act-six-brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.447-2.136 2.941v5.665H9.35V9h3.414v1.561h.049c.476-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286ZM5.337 7.433a2.062 2.062 0 1 1 0-4.124 2.062 2.062 0 0 1 0 4.124ZM7.119 20.452H3.555V9h3.564v11.452ZM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.204 0 22.225 0Z" /></svg></span>
-              <span className="min-w-0"><span className="act-six-social-label">LinkedIn</span><span className="act-six-social-value">linkedin.com/in/poshanms</span></span>
-              <ArrowUpRight aria-hidden="true" className="act-six-social-arrow" />
+              <span className="act-six-social-label">LinkedIn</span>
             </a>
           </div>
-          <div className="act-six-channel-status mt-7" style={{ opacity: detailsSignal }}><span className="act-six-channel-status-light" />Available for work <span className="act-six-status-divider">/</span> Open to conversation</div>
+          <div className="act-six-channel-status mt-3" style={{ opacity: detailsSignal }}><span className="act-six-channel-status-light" />Available for work <span className="act-six-status-divider">/</span> Open to conversation</div>
         </section>
 
-        <form
+        {transmissionSent ? (
+          <div className="act-six-transmission-card act-six-transmission-success relative grid min-h-52 place-items-center p-6 text-center" role="status" aria-live="polite">
+            <div><Radio className="mx-auto mb-4 h-8 w-8 text-[#ff526b] act-six-success-pulse" /><p className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/60">Act VI / Channel complete</p><h3 className="mt-3 text-3xl font-black uppercase tracking-tight text-white">Transmission Sent.</h3><p className="mt-3 text-sm text-white/65">Email draft opened—review and send to deliver.</p></div>
+          </div>
+        ) : <form
           onSubmit={handleMessageSubmit}
           aria-hidden={formSignal < 0.78}
-          className="act-six-transmission-card relative p-5 sm:p-7"
+          className={`act-six-transmission-card relative p-3.5 sm:p-4 ${isTransmitting ? "act-six-form-dissolving" : ""}`}
           style={{ opacity: formSignal, transform: `translate3d(0, ${(1 - formSignal) * 24}px, 0) perspective(1100px) rotateY(${(1 - formSignal) * -2.5}deg)`, pointerEvents: formSignal > 0.78 ? "auto" : "none", willChange: "opacity, transform" }}
         >
           <div className="act-six-card-sheen pointer-events-none absolute inset-0" aria-hidden="true" />
@@ -719,40 +725,43 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
               <span>TRANSMISSION DESK <span className="mx-2 text-[#ff3554]">/</span> ACT VI</span>
               <span className="inline-flex items-center gap-2 text-[#ff8d9d]" aria-live="polite">
                 <span className={`h-1.5 w-1.5 rounded-full bg-[#ff3554] ${isTransmitting ? "act-six-signal-active" : "act-six-signal-idle"}`} />
-                {isTransmitting ? "Opening email app" : "Ready to connect"}
+                {transmissionSent ? "Transmission sent" : isTransmitting ? "Opening email app" : "Ready to connect"}
               </span>
             </div>
-            <h3 className="text-2xl font-semibold tracking-[-0.035em] text-white sm:text-3xl">Send a message</h3>
-            <p className="mt-2 max-w-md text-sm leading-6 text-white/70">Share an opportunity, project, or question. I’d be glad to hear from you.</p>
+            <h3 className="text-xl font-semibold tracking-[-0.035em] text-white sm:text-2xl">Send a message</h3>
           </div>
-          <div className="relative z-10 grid gap-x-5 gap-y-4 sm:grid-cols-2">
+          <div className="relative z-10 grid gap-x-4 gap-y-2.5 sm:grid-cols-2">
             <label className="act-six-field-label">
-              Your name
-              <input name="name" autoComplete="name" required maxLength={80} className="act-six-glass-input [user-select:text]" placeholder="Your name" />
+              First name
+              <input name="firstName" autoComplete="given-name" required maxLength={60} onFocus={() => window.dispatchEvent(new CustomEvent("act-six-input-focus"))} className="act-six-glass-input [user-select:text]" placeholder="First name" />
+            </label>
+            <label className="act-six-field-label">
+              Last name
+              <input name="lastName" autoComplete="family-name" required maxLength={60} onFocus={() => window.dispatchEvent(new CustomEvent("act-six-input-focus"))} className="act-six-glass-input [user-select:text]" placeholder="Last name" />
             </label>
             <label className="act-six-field-label">
               Your email
-              <input name="email" type="email" autoComplete="email" required maxLength={254} className="act-six-glass-input [user-select:text]" placeholder="you@example.com" />
+              <input name="email" type="email" autoComplete="email" required maxLength={254} onFocus={() => window.dispatchEvent(new CustomEvent("act-six-input-focus"))} className="act-six-glass-input [user-select:text]" placeholder="you@example.com" />
             </label>
-            <label className="act-six-field-label sm:col-span-2">
+            <label className="act-six-field-label">
               Subject
-              <input name="subject" required maxLength={120} className="act-six-glass-input [user-select:text]" placeholder="What would you like to discuss?" />
+              <input name="subject" required maxLength={120} onFocus={() => window.dispatchEvent(new CustomEvent("act-six-input-focus"))} className="act-six-glass-input [user-select:text]" placeholder="What is this about?" />
             </label>
             <label className="act-six-field-label sm:col-span-2">
               Message
-              <textarea name="message" required maxLength={2400} rows={3} className="act-six-glass-input min-h-28 [user-select:text] resize-y leading-6" placeholder="Tell me a little about it..." />
+              <textarea name="message" required maxLength={2400} rows={2} onFocus={() => window.dispatchEvent(new CustomEvent("act-six-input-focus"))} className="act-six-glass-input min-h-20 [user-select:text] resize-y leading-6" placeholder="Tell me a little about it..." />
             </label>
           </div>
           <div className="relative z-10 mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/12 pt-5">
             <p className="max-w-[17rem] text-xs leading-5 text-white/65" aria-live="polite">
-              {isTransmitting ? "Opening your email app…" : "Your email app opens with your message ready to review and send."}
+              {isTransmitting ? "Opening your email app…" : "Opens an email draft for you to review and send."}
             </p>
             <button type="submit" disabled={isTransmitting} className={`act-six-transmit-button group inline-flex items-center gap-3 border border-[#ff687e]/75 bg-gradient-to-br from-[#a10d28]/90 to-[#300812]/90 px-5 py-3.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white shadow-[0_10px_30px_rgba(110,5,24,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-[#ffbbc5] hover:shadow-[0_14px_34px_rgba(190,18,48,0.34)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff7a8c] disabled:cursor-wait ${isTransmitting ? "act-six-transmitting" : ""}`}>
               {isTransmitting ? "Opening email…" : "Continue in email"}
               <ArrowUpRight className={`h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 ${isTransmitting ? "act-six-send-icon" : ""}`} />
             </button>
           </div>
-        </form>
+        </form>}
       </div>
     </Panel>
   );

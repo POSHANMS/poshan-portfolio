@@ -6,9 +6,9 @@ export const ACT_FIVE_TIMING = {
   revealInEnd: 0.922,
   cameraIntroStart: 0.89,
   cameraStart: 0.915,
-  cameraExitStart: 0.958,
-  sceneExit: 0.975,
-  galaxyFullReveal: 0.985,
+  cameraExitStart: 0.92,
+  sceneExit: 0.94,
+  galaxyFullReveal: 0.98,
   localCheckpointStops: [0, 0.17, 0.34, 0.51, 0.68] as const,
   localTransferStarts: [0, 0.12, 0.29, 0.46, 0.63] as const,
 } as const;

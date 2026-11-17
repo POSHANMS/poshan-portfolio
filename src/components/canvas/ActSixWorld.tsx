@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { DeviceTier } from "@/hooks/useDeviceSize";
 import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
@@ -34,10 +34,31 @@ const galaxyVertexShader = `
 
   uniform float uTime;
   uniform float uReveal;
+  uniform float uFocusStrength;
+  uniform float uFocusRadius;
 
   varying vec3 vColor;
   varying float vAlpha;
   varying float vCoreEnergy;
+  varying float vFocusShock;
+  varying float vDustNoise;
+
+  float hash31(vec3 p) {
+    p = fract(p * 0.1031);
+    p += dot(p, p.yzx + 33.33);
+    return fract((p.x + p.y) * p.z);
+  }
+
+  float noise3(vec3 p) {
+    vec3 cell = floor(p);
+    vec3 local = fract(p);
+    local = local * local * (3.0 - 2.0 * local);
+    float a = mix(hash31(cell), hash31(cell + vec3(1.0, 0.0, 0.0)), local.x);
+    float b = mix(hash31(cell + vec3(0.0, 1.0, 0.0)), hash31(cell + vec3(1.0, 1.0, 0.0)), local.x);
+    float c = mix(hash31(cell + vec3(0.0, 0.0, 1.0)), hash31(cell + vec3(1.0, 0.0, 1.0)), local.x);
+    float d = mix(hash31(cell + vec3(0.0, 1.0, 1.0)), hash31(cell + vec3(1.0, 1.0, 1.0)), local.x);
+    return mix(mix(a, b, local.y), mix(c, d, local.y), local.z);
+  }
 
   void main() {
     // Preserve the original four-arm galaxy silhouette. Its angular phase
@@ -46,7 +67,7 @@ const galaxyVertexShader = `
     float turbulence =
       sin(aPhase + aRadius * 3.4) * 0.072 +
       sin(aPhase * 2.7 + aRadius * 7.8) * 0.034;
-    float armAngle = aArm * 1.57079632679 + aRadius * 1.24 + aSpread + uTime * 1.34 + turbulence;
+    float armAngle = aArm * 1.57079632679 + aRadius * 1.24 + aSpread + uTime * 0.28 + turbulence;
     // Preserve the authored silhouette and gaps: particles orbit in place
     // instead of breathing radially and slowly turning the galaxy into a disk.
     float radius = max(0.015, aRadius);
@@ -60,11 +81,18 @@ const galaxyVertexShader = `
     vec4 modelPosition = modelMatrix * vec4(worldPosition, 1.0);
     vec4 modelViewPosition = viewMatrix * modelPosition;
 
-    vColor = aColor;
+    // Softly carve gas lanes into the arms, with slow temporal drift so the
+    // dust feels volumetric while every particle remains on its fixed orbit.
+    vDustNoise = noise3(worldPosition * vec3(2.2, 4.8, 3.5) + vec3(0.0, uTime * 0.035, 0.0));
+    vec3 nebulaBlue = vec3(0.11, 0.25, 0.62);
+    vec3 nebulaViolet = vec3(0.34, 0.14, 0.56);
+    float outerDust = smoothstep(0.28, 0.94, radiusRatio);
+    vColor = mix(aColor, mix(nebulaViolet, nebulaBlue, smoothstep(0.3, 0.82, vDustNoise)), outerDust * 0.52);
+    vFocusShock = exp(-abs(aRadius - uFocusRadius) * 5.0) * uFocusStrength;
     // Ignite the dense core first, then reveal the four spiral arms outward.
     // This only changes particle visibility; their radii and the final silhouette stay fixed.
     float armIgnition = smoothstep(aRadius * 0.105, aRadius * 0.105 + 0.2, uReveal * 1.35);
-    vAlpha = armIgnition * (0.9 + 0.1 * sin(aPhase + uTime * 0.7));
+    vAlpha = armIgnition * (0.66 + vDustNoise * 0.48) * (0.94 + 0.06 * sin(aPhase + uTime * 0.7));
     vCoreEnergy = 1.0 - smoothstep(0.18, 1.42, aRadius);
     gl_Position = projectionMatrix * modelViewPosition;
     gl_PointSize = aSize * (44.0 / max(5.0, -modelViewPosition.z));
@@ -75,15 +103,47 @@ const galaxyFragmentShader = `
   varying vec3 vColor;
   varying float vAlpha;
   varying float vCoreEnergy;
+  varying float vFocusShock;
+  varying float vDustNoise;
 
   void main() {
     vec2 point = gl_PointCoord - 0.5;
     float distanceToCenter = length(point);
     float particle = smoothstep(0.5, 0.06, distanceToCenter);
     float halo = smoothstep(0.55, 0.14, distanceToCenter) * 0.26;
-    float alpha = (particle + halo) * vAlpha * (0.36 + vCoreEnergy * 0.20);
+    float laneDensity = smoothstep(0.12, 0.88, vDustNoise);
+    float alpha = (particle + halo) * vAlpha * (0.27 + vCoreEnergy * 0.25) * (0.7 + laneDensity * 0.36);
     if (alpha < 0.012) discard;
-    gl_FragColor = vec4(vColor * (1.16 + halo * 0.9 + vCoreEnergy * 1.55), alpha);
+    vec3 focusColor = vec3(1.0, 0.77, 0.45);
+    gl_FragColor = vec4(mix(vColor * (1.16 + halo * 0.9 + vCoreEnergy * 1.55), focusColor * 2.0, vFocusShock * 0.86), alpha + vFocusShock * 0.38);
+  }
+`;
+
+const dissolveVertexShader = `
+  attribute float aSeed;
+  uniform float uTime;
+  uniform float uProgress;
+  uniform vec3 uCore;
+  varying float vFade;
+  void main() {
+    float eased = 1.0 - pow(1.0 - uProgress, 3.2);
+    float spiralAngle = aSeed * 37.0 + uTime * (3.0 + eased * 5.0);
+    vec3 orbit = vec3(sin(spiralAngle), cos(aSeed * 23.0 + uTime * 4.1), sin(aSeed * 51.0 + uTime * 3.4)) * (0.08 + eased * 0.62) * (1.0 - eased);
+    vec3 p = mix(position, uCore, eased) + orbit * (1.0 - eased);
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    gl_Position = projectionMatrix * mv;
+    gl_PointSize = (1.3 + aSeed * 2.4) * (36.0 / max(4.0, -mv.z));
+    vFade = 1.0 - smoothstep(0.76, 1.0, uProgress);
+  }
+`;
+
+const dissolveFragmentShader = `
+  varying float vFade;
+  void main() {
+    float d = length(gl_PointCoord - 0.5);
+    float alpha = (1.0 - smoothstep(0.16, 0.5, d)) * vFade;
+    if (alpha < 0.015) discard;
+    gl_FragColor = vec4(1.0, 0.47 + (1.0 - d) * 0.26, 0.13, alpha);
   }
 `;
 
@@ -99,12 +159,36 @@ export default function ActSixWorld({
   deviceTier: DeviceTier;
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const dissolveRef = useRef<THREE.Points>(null);
+  const focusStartedAt = useRef<number | null>(null);
+  const submitStartedAt = useRef<number | null>(null);
+  const submitRequested = useRef(false);
+  const dissolveScreenRect = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+  const galaxyParallax = useRef(new THREE.Vector2());
   // Start from a wound, asymmetric pose instead of the raw four-arm cross.
   const activeTimeRef = useRef(INITIAL_SIMULATION_SECONDS);
   const reveal = smoothstep(ACT_FIVE_TIMING.sceneExit, ACT_FIVE_TIMING.galaxyFullReveal, scrollProgress);
   // Geometry is static on the CPU. Lower tiers keep the same field shape while
   // the GPU shader supplies all of the motion, bloom, and atmosphere.
-  const particleCount = deviceTier === "mobile" ? 20000 : deviceTier === "tablet" ? 34000 : 46000;
+  const particleCount = deviceTier === "mobile" ? 20000 : deviceTier === "tablet" ? 34000 : 96000;
+
+  useEffect(() => {
+    const onFocus = () => { focusStartedAt.current = null; };
+    const onSubmit = (event: Event) => {
+      const detail = (event as CustomEvent<{ left?: number; top?: number; width?: number; height?: number }>).detail;
+      dissolveScreenRect.current = detail && detail.width && detail.height
+        ? { left: detail.left ?? 0, top: detail.top ?? 0, width: detail.width, height: detail.height }
+        : null;
+      submitRequested.current = true;
+      submitStartedAt.current = null;
+    };
+    window.addEventListener("act-six-input-focus", onFocus);
+    window.addEventListener("act-six-submit-dissolve", onSubmit);
+    return () => {
+      window.removeEventListener("act-six-input-focus", onFocus);
+      window.removeEventListener("act-six-submit-dissolve", onSubmit);
+    };
+  }, []);
 
   const geometry = useMemo(() => {
     const positions = new Float32Array(particleCount * 3);
@@ -118,9 +202,9 @@ export default function ActSixWorld({
 
     const whiteGold = new THREE.Color("#fff2b7");
     const amber = new THREE.Color("#ff9f1c");
-    const orange = new THREE.Color("#e85d04");
-    const copper = new THREE.Color("#7a2608");
-    const umber = new THREE.Color("#2b0c02");
+    const orange = new THREE.Color("#e87655");
+    const copper = new THREE.Color("#a359a5");
+    const umber = new THREE.Color("#26345c");
 
     for (let index = 0; index < particleCount; index += 1) {
       const randomA = random(index, 17);
@@ -150,13 +234,13 @@ export default function ActSixWorld({
         const falloff = clamp((radius - 0.6) / 5.6);
         color = amber.clone()
           .lerp(orange, Math.pow(falloff, 0.74) * 0.78)
-          .lerp(copper, Math.pow(falloff, 2.2) * 0.76);
+          .lerp(copper, Math.pow(falloff, 2.2) * 0.82);
       } else {
         // A faint uneven dust envelope keeps the outer disk from ending abruptly.
         radius = 3.2 + Math.pow(randomA, 0.68) * 2.75;
         height = (randomB - 0.5) * (0.46 + radius * 0.12);
         size = 0.08 + randomC * 0.14;
-        color = copper.clone().lerp(umber, randomA * 0.7);
+        color = new THREE.Color("#815fba").lerp(umber, randomA * 0.7);
       }
 
       positions[i3] = 0;
@@ -186,7 +270,7 @@ export default function ActSixWorld({
   }, [particleCount]);
 
   const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uReveal: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uReveal: { value: 0 }, uFocusStrength: { value: 0 }, uFocusRadius: { value: 0 } },
     vertexShader: galaxyVertexShader,
     fragmentShader: galaxyFragmentShader,
     vertexColors: false,
@@ -196,14 +280,108 @@ export default function ActSixWorld({
     toneMapped: false,
   }), []);
 
-  useFrame((_state, delta) => {
+  const dissolveGeometry = useMemo(() => {
+    const count = deviceTier === "mobile" ? 520 : 1080;
+    const positions = new Float32Array(count * 3);
+    const seeds = new Float32Array(count);
+    for (let index = 0; index < count; index += 1) {
+      const seed = random(index, 907);
+      // Populate a glass-panel silhouette with quiet horizontal form rows.
+      const row = index % 9;
+      const inRow = index % 3 === 0;
+      positions[index * 3] = (random(index, 911) - 0.5) * 3.45;
+      positions[index * 3 + 1] = inRow ? 1.78 - row * 0.42 : (random(index, 919) - 0.5) * 3.85;
+      positions[index * 3 + 2] = (random(index, 929) - 0.5) * 0.035;
+      seeds[index] = seed;
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
+    return geometry;
+  }, [deviceTier]);
+
+  const dissolveMaterial = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uProgress: { value: 0 }, uCore: { value: new THREE.Vector3() } },
+    vertexShader: dissolveVertexShader,
+    fragmentShader: dissolveFragmentShader,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+  }), []);
+
+  useFrame((state, delta) => {
     // Keep the authored galaxy pattern alive for the full visit. Its particle
     // coordinates stay fixed in radius; only their orbital phase advances.
     if (reveal > 0.1) {
       activeTimeRef.current += delta;
+      galaxyParallax.current.x = THREE.MathUtils.damp(galaxyParallax.current.x, state.pointer.x, 1.9, delta);
+      galaxyParallax.current.y = THREE.MathUtils.damp(galaxyParallax.current.y, state.pointer.y, 1.9, delta);
+      if (groupRef.current) {
+        groupRef.current.rotation.y += delta * 0.025;
+        groupRef.current.position.x = 0.18 + galaxyParallax.current.x * 0.22;
+        groupRef.current.position.y = 0.1 + galaxyParallax.current.y * 0.14;
+      }
     }
     material.uniforms.uTime.value = activeTimeRef.current;
     material.uniforms.uReveal.value = THREE.MathUtils.damp(material.uniforms.uReveal.value, reveal, 4.8, delta);
+    if (focusStartedAt.current === null && document.activeElement?.closest?.(".act-six-contact-stage")) {
+      focusStartedAt.current = state.clock.getElapsedTime();
+    }
+    const elapsed = state.clock.getElapsedTime();
+    const focusElapsed = focusStartedAt.current === null ? 99 : elapsed - focusStartedAt.current;
+    const focusPulse = Math.exp(-focusElapsed * 0.62);
+    material.uniforms.uFocusStrength.value = focusPulse;
+    material.uniforms.uFocusRadius.value = Math.max(0, focusElapsed) * 3.4;
+
+    if (submitRequested.current && submitStartedAt.current === null) {
+      submitStartedAt.current = elapsed;
+    }
+    const submitted = submitStartedAt.current !== null;
+    const dissolveProgress = submitted ? clamp((elapsed - submitStartedAt.current!) / 1.55) : 0;
+    dissolveMaterial.uniforms.uTime.value = elapsed;
+    dissolveMaterial.uniforms.uProgress.value = dissolveProgress;
+    if (dissolveRef.current) {
+      const camera = state.camera;
+      const forward = new THREE.Vector3();
+      const right = new THREE.Vector3();
+      const up = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      right.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+      up.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+      const cameraDistance = 5.6;
+      const cameraFov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 45;
+      const halfViewHeight = Math.tan(THREE.MathUtils.degToRad(cameraFov * 0.5)) * cameraDistance;
+      const aspect = state.size.width / Math.max(1, state.size.height);
+      const panelRect = dissolveScreenRect.current;
+      const panelCenterX = panelRect ? ((panelRect.left + panelRect.width * 0.5) / state.size.width) * 2 - 1 : -0.44;
+      const panelCenterY = panelRect ? 1 - ((panelRect.top + panelRect.height * 0.5) / state.size.height) * 2 : 0.012;
+      const panelWorldPosition = camera.position.clone()
+        .addScaledVector(forward, cameraDistance)
+        .addScaledVector(right, panelCenterX * halfViewHeight * aspect)
+        .addScaledVector(up, panelCenterY * halfViewHeight);
+      if (groupRef.current) {
+        // The dissolve plane is nested under the transformed galaxy group, so
+        // convert the camera-space panel pose into that parent's local frame.
+        groupRef.current.updateWorldMatrix(true, false);
+        groupRef.current.worldToLocal(panelWorldPosition);
+        const galaxyWorldQuaternion = groupRef.current.getWorldQuaternion(new THREE.Quaternion());
+        dissolveRef.current.quaternion.copy(galaxyWorldQuaternion.invert().multiply(camera.quaternion));
+        if (panelRect) {
+          const parentScale = groupRef.current.scale.x || 1;
+          const widthWorld = (panelRect.width / state.size.width) * 2 * halfViewHeight * aspect;
+          const heightWorld = (panelRect.height / state.size.height) * 2 * halfViewHeight;
+          dissolveRef.current.scale.set(widthWorld / (3.45 * parentScale), heightWorld / (3.85 * parentScale), 1 / parentScale);
+        }
+      }
+      dissolveRef.current.position.copy(panelWorldPosition);
+      dissolveRef.current.visible = submitRequested.current && submitted && dissolveProgress < 1;
+      dissolveRef.current.updateMatrixWorld();
+      if (groupRef.current) {
+        const coreWorld = groupRef.current.localToWorld(new THREE.Vector3());
+        dissolveMaterial.uniforms.uCore.value.copy(dissolveRef.current.worldToLocal(coreWorld));
+      }
+    }
 
     if (groupRef.current) {
       groupRef.current.visible = material.uniforms.uReveal.value > 0.002;
@@ -211,11 +389,14 @@ export default function ActSixWorld({
   });
 
   return (
-    <group ref={groupRef} position={[0.18, 0.1, -7.35]} rotation={[0.11, -0.08, 0.27]} scale={1.34}>
+    <group ref={groupRef} position={[0.18, 0.1, -7.35]} rotation={[0.11, -0.08, 0.27]} scale={1.68}>
       <pointLight color="#ffd07a" intensity={7} distance={12} decay={2} />
       <pointLight position={[-1.3, 0.7, 1.6]} color="#ff7a10" intensity={1.2} distance={9} decay={2} />
       <points geometry={geometry} frustumCulled={false} renderOrder={2}>
         <primitive object={material} attach="material" />
+      </points>
+      <points ref={dissolveRef} geometry={dissolveGeometry} frustumCulled={false} visible={false} renderOrder={20}>
+        <primitive object={dissolveMaterial} attach="material" />
       </points>
     </group>
   );

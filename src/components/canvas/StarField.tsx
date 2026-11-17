@@ -132,11 +132,15 @@ export default function StarField({
   showConstellations = true,
   cardContrast = NO_CARD_CONTRAST,
   cameraFramed = false,
+  warpProgress = 0,
+  cameraParallax = 0,
 }: {
   starsOpacity?: number;
   showConstellations?: boolean;
   cardContrast?: CardContrastUniforms;
   cameraFramed?: boolean;
+  warpProgress?: number;
+  cameraParallax?: number;
 }) {
   const fieldRef = useRef<THREE.Group>(null);
   const starsRef = useRef<THREE.Points>(null);
@@ -242,35 +246,51 @@ export default function StarField({
 
   const starMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, ...cardContrast },
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, uWarp: { value: 0 }, ...cardContrast },
       vertexShader: `
         attribute float aSize;
         attribute float aPhase;
         varying float vAlpha;
         varying vec2 vScreenUv;
+        varying vec2 vWarpDirection;
         uniform float uTime;
+        uniform float uWarp;
         void main() {
           float twinkle = 0.5 + 0.5 * sin(uTime * 1.2 + aPhase);
           vAlpha = twinkle;
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          // Push each star toward the lens on the view-space Z axis during the
+          // scroll-authored jump; the fragment shader stretches its bright core
+          // along the projected flight direction to form a brief warp trail.
+          vec3 warpPosition = position;
+          warpPosition.z += uWarp * 7.5;
+          vec4 mv = modelViewMatrix * vec4(warpPosition, 1.0);
           vec4 clipPosition = projectionMatrix * mv;
+          vWarpDirection = normalize(clipPosition.xy + vec2(0.0001));
+          clipPosition.xy += vWarpDirection * uWarp * 0.16 * clipPosition.w;
           gl_Position = clipPosition;
           vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
-          gl_PointSize = aSize;
+          gl_PointSize = aSize * (1.0 + uWarp * 3.5);
         }
       `,
       fragmentShader: `
         uniform float uOpacity;
         varying float vAlpha;
         varying vec2 vScreenUv;
+        varying vec2 vWarpDirection;
         uniform vec2 uCardCenter;
         uniform vec2 uCardHalfSize;
         uniform float uCardDim;
+        uniform float uWarp;
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
           float d = length(uv);
-          float core = smoothstep(0.5, 0.0, d);
-          float glow = smoothstep(0.5, 0.2, d) * 0.4;
+          vec2 direction = normalize(vWarpDirection + vec2(0.0001));
+          vec2 perpendicular = vec2(-direction.y, direction.x);
+          float along = dot(uv, direction);
+          float across = abs(dot(uv, perpendicular));
+          float trail = (1.0 - smoothstep(0.012, 0.075, across)) * smoothstep(-0.5, 0.12, along);
+          float core = mix(smoothstep(0.5, 0.0, d), trail, uWarp);
+          float glow = mix(smoothstep(0.5, 0.2, d) * 0.4, trail * 0.3, uWarp);
           if (core + glow < 0.01) discard;
           vec2 cardUv = (vScreenUv - uCardCenter) / max(uCardHalfSize, vec2(0.001));
           float cardRadius = length(cardUv);
@@ -381,6 +401,7 @@ export default function StarField({
     const t = state.clock.getElapsedTime();
     starMaterial.uniforms.uTime.value = t;
     starMaterial.uniforms.uOpacity.value = starsOpacity;
+    starMaterial.uniforms.uWarp.value = warpProgress;
     heroStarMaterial.uniforms.uTime.value = t;
     heroStarMaterial.uniforms.uOpacity.value = starsOpacity;
     lineMaterial.uniforms.uTime.value = t;
@@ -392,6 +413,12 @@ export default function StarField({
       if (cameraFramed) {
         const cameraAnchor = state.camera.position.clone().multiplyScalar(0.88);
         cameraAnchor.y -= 7;
+        if (cameraParallax > 0) {
+          const cameraRight = new THREE.Vector3().setFromMatrixColumn(state.camera.matrixWorld, 0).normalize();
+          const cameraUp = new THREE.Vector3().setFromMatrixColumn(state.camera.matrixWorld, 1).normalize();
+          cameraAnchor.addScaledVector(cameraRight, state.pointer.x * cameraParallax);
+          cameraAnchor.addScaledVector(cameraUp, state.pointer.y * cameraParallax);
+        }
         fieldRef.current.position.lerp(cameraAnchor, 1 - Math.exp(-3.5 * delta));
         fieldRef.current.quaternion.slerp(state.camera.quaternion, 1 - Math.exp(-3.5 * delta));
       } else {

@@ -2,27 +2,29 @@ import * as THREE from "three";
 
 const CAMERA_POSITIONS = [
   new THREE.Vector3(0, 0.55, 10.2),
-  new THREE.Vector3(4.2, 3.35, 4.4),
-  new THREE.Vector3(10.7, 1.25, -2.8),
-  new THREE.Vector3(10.7, -0.4, -13.8),
-  new THREE.Vector3(2.4, 0.55, -23.4),
+  new THREE.Vector3(-0.6, 1.2, 1.4),
+  new THREE.Vector3(3.1, 3.8, -2.1),
+  new THREE.Vector3(5.4, 1.1, -12.6),
+  new THREE.Vector3(4.2, 0.4, -22.4),
 ];
 
 const CAMERA_TARGETS = [
   new THREE.Vector3(0, 0.15, -7.4),
-  new THREE.Vector3(0.45, 0.2, -7.35),
-  new THREE.Vector3(0.25, -0.1, -7.35),
-  new THREE.Vector3(-0.3, -0.15, -7.35),
-  new THREE.Vector3(0.05, 0.08, -7.35),
+  new THREE.Vector3(0.1, 0.2, -7.35),
+  new THREE.Vector3(0.7, -0.1, -7.35),
+  new THREE.Vector3(-0.2, -0.15, -7.35),
+  // Keep the galaxy to frame-right so the left third remains a quiet UI stage.
+  new THREE.Vector3(6.5, 0.08, -7.35),
 ];
 
 const POSITION_CURVE = new THREE.CatmullRomCurve3(CAMERA_POSITIONS, false, "centripetal", 0.45);
 const TARGET_CURVE = new THREE.CatmullRomCurve3(CAMERA_TARGETS, false, "centripetal", 0.45);
 const LENS_KEYS = [
-  { at: 0, fov: 51.5 },
-  { at: 0.16, fov: 60 },
-  { at: 0.4, fov: 40 },
-  { at: 0.68, fov: 50 },
+  { at: 0, fov: 51 },
+  { at: 0.12, fov: 88 },
+  { at: 0.32, fov: 64 },
+  { at: 0.58, fov: 48 },
+  { at: 0.82, fov: 42 },
   { at: 1, fov: 44 },
 ] as const;
 
@@ -47,15 +49,26 @@ function lensAt(progress: number) {
 export function getActSixCameraPose(progress: number, elapsedTime: number) {
   const t = THREE.MathUtils.clamp(progress, 0, 1);
   const settled = smoothstep01((t - 0.82) / 0.18);
-  const bank = Math.sin(t * Math.PI * 2.1) * 0.105 * (1 - settled * 0.72);
+  // A scroll-authored full barrel roll peaks as the lens rushes through the
+  // reactor plane, then banks upright into the settled contact composition.
+  const rollEnvelope = smoothstep01(t / 0.16) * (1 - smoothstep01((t - 0.52) / 0.3));
+  const bank = Math.PI * 2 * smoothstep01(t / 0.68) + Math.sin(t * Math.PI * 2.1) * 0.12 * (1 - settled);
+  const breakoutBank = Math.sin(Math.PI * smoothstep01((t - 0.3) / 0.7));
+  const pitch = breakoutBank * 0.15 + Math.sin(t * Math.PI * 2) * 0.035 * rollEnvelope;
+  const yaw = Math.sin(t * Math.PI * 2.3) * 0.13 * rollEnvelope;
   const idleDrift = Math.sin(elapsedTime * 0.095) * 0.035 * settled;
   const position = POSITION_CURVE.getPointAt(t);
   position.x += idleDrift;
+  // Short forward rush through the galaxy's near plane, restrained to keep the
+  // move legible and avoid clipping the particle core.
+  position.z += -3.4 * Math.sin(Math.PI * Math.min(1, t / 0.46)) * (1 - smoothstep01((t - 0.34) / 0.16));
 
   return {
     position,
     target: TARGET_CURVE.getPointAt(t),
     fov: lensAt(t),
     roll: bank,
+    pitch,
+    yaw,
   };
 }

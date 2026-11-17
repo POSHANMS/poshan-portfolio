@@ -3,6 +3,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Lenis from "lenis";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { start3DPowerUpSequence, PowerUpStage, PowerUpStageValues } from "@/animations/powerUpSequence";
 import { startWormholeSequence, WormholeValues, WormholePhase } from "@/animations/wormholeLaptop";
 import Loader from "@/components/ui/Loader";
@@ -15,6 +17,8 @@ const Scene = dynamic(() => import("@/components/canvas/Scene"), {
   ssr: false,
   loading: () => null,
 });
+
+gsap.registerPlugin(ScrollTrigger);
 
 const DEFAULT_WORMHOLE_VALUES: WormholeValues = {
   gravitationStrength: 0,
@@ -66,22 +70,23 @@ export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const hero = heroRef.current;
-      if (!hero) return;
-      // The sticky region maps the long track into one continuous camera path.
-      const scrollTrack = hero.offsetHeight - window.innerHeight;
-      if (scrollTrack <= 0) return;
-      const heroTop = hero.getBoundingClientRect().top + window.scrollY;
-      const scrolled = Math.max(0, window.scrollY - heroTop);
-      const nextProgress = Math.min(1, scrolled / scrollTrack);
-      document.documentElement.dataset.storyProgress = nextProgress.toFixed(4);
-      setScrollProgress(nextProgress);
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll(); // seed on mount
-    return () => window.removeEventListener("scroll", handleScroll);
+    const hero = heroRef.current;
+    if (!hero) return;
+    // ScrollTrigger maps the pinned portfolio track to one deterministic
+    // camera timeline, including the Act V → Act VI warp and roll.
+    const trigger = ScrollTrigger.create({
+      trigger: hero,
+      start: "top top",
+      end: "bottom bottom",
+      onUpdate: (self) => {
+        const nextProgress = self.progress;
+        document.documentElement.dataset.storyProgress = nextProgress.toFixed(4);
+        setScrollProgress(nextProgress);
+      },
+    });
+    ScrollTrigger.refresh();
+    setScrollProgress(trigger.progress);
+    return () => trigger.kill();
   }, []);
 
   useEffect(() => {
@@ -100,6 +105,8 @@ export default function Home() {
       touchMultiplier: 1.08,
     });
     lenisRef.current = lenis;
+    const syncScrollTrigger = () => ScrollTrigger.update();
+    lenis.on("scroll", syncScrollTrigger);
 
     const onActFourScrollLock = (event: Event) => {
       const locked = (event as CustomEvent<{ locked?: boolean }>).detail?.locked;
@@ -118,6 +125,7 @@ export default function Home() {
     return () => {
       cancelAnimationFrame(rafId);
       window.removeEventListener("act-four-scroll-lock", onActFourScrollLock);
+      lenis.off("scroll", syncScrollTrigger);
       lenis.destroy();
       lenisRef.current = null;
     };
