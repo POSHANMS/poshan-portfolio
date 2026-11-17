@@ -42,6 +42,7 @@ const galaxyVertexShader = `
   varying float vCoreEnergy;
   varying float vFocusShock;
   varying float vDustNoise;
+  varying float vOuterDust;
 
   float hash31(vec3 p) {
     p = fract(p * 0.1031);
@@ -84,10 +85,20 @@ const galaxyVertexShader = `
     // Softly carve gas lanes into the arms, with slow temporal drift so the
     // dust feels volumetric while every particle remains on its fixed orbit.
     vDustNoise = noise3(worldPosition * vec3(2.2, 4.8, 3.5) + vec3(0.0, uTime * 0.035, 0.0));
-    vec3 nebulaBlue = vec3(0.11, 0.25, 0.62);
-    vec3 nebulaViolet = vec3(0.34, 0.14, 0.56);
-    float outerDust = smoothstep(0.28, 0.94, radiusRatio);
-    vColor = mix(aColor, mix(nebulaViolet, nebulaBlue, smoothstep(0.3, 0.82, vDustNoise)), outerDust * 0.52);
+    // Keep the nucleus warm, then let irregular blue-violet dust lanes take
+    // over farther out. Noise breaks up the color bands into nebular wisps.
+    vec3 nebulaBlue = vec3(0.2, 0.58, 1.0);
+    vec3 nebulaIce = vec3(0.48, 0.78, 1.0);
+    vec3 nebulaIndigo = vec3(0.16, 0.12, 0.58);
+    vec3 nebulaViolet = vec3(0.55, 0.2, 0.9);
+    vec3 outerPalette = mix(nebulaIndigo, nebulaBlue, smoothstep(0.22, 0.76, vDustNoise));
+    outerPalette = mix(outerPalette, nebulaViolet, smoothstep(0.62, 0.9, noise3(worldPosition * 5.4 + vec3(uTime * 0.02))));
+    outerPalette = mix(outerPalette, nebulaIce, smoothstep(0.78, 0.96, vDustNoise) * 0.58);
+    float outerDust = smoothstep(0.2, 0.78, radiusRatio);
+    vOuterDust = outerDust;
+    float warmKnot = smoothstep(0.76, 0.94, vDustNoise) * (1.0 - smoothstep(0.34, 0.7, radiusRatio));
+    vColor = mix(aColor, outerPalette, outerDust * 0.86);
+    vColor = mix(vColor, vec3(1.0, 0.31, 0.12), warmKnot * 0.38);
     vFocusShock = exp(-abs(aRadius - uFocusRadius) * 5.0) * uFocusStrength;
     // Ignite the dense core first, then reveal the four spiral arms outward.
     // This only changes particle visibility; their radii and the final silhouette stay fixed.
@@ -105,6 +116,7 @@ const galaxyFragmentShader = `
   varying float vCoreEnergy;
   varying float vFocusShock;
   varying float vDustNoise;
+  varying float vOuterDust;
 
   void main() {
     vec2 point = gl_PointCoord - 0.5;
@@ -115,7 +127,7 @@ const galaxyFragmentShader = `
     float alpha = (particle + halo) * vAlpha * (0.27 + vCoreEnergy * 0.25) * (0.7 + laneDensity * 0.36);
     if (alpha < 0.012) discard;
     vec3 focusColor = vec3(1.0, 0.77, 0.45);
-    gl_FragColor = vec4(mix(vColor * (1.16 + halo * 0.9 + vCoreEnergy * 1.55), focusColor * 2.0, vFocusShock * 0.86), alpha + vFocusShock * 0.38);
+    gl_FragColor = vec4(mix(vColor * (1.16 + halo * 0.9 + vCoreEnergy * 1.55) * (1.0 + vOuterDust * 0.28), focusColor * 2.0, vFocusShock * 0.86), alpha + vFocusShock * 0.38);
   }
 `;
 
@@ -160,6 +172,7 @@ export default function ActSixWorld({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const dissolveRef = useRef<THREE.Points>(null);
+  const focusRingRef = useRef<THREE.Mesh>(null);
   const focusStartedAt = useRef<number | null>(null);
   const submitStartedAt = useRef<number | null>(null);
   const submitRequested = useRef(false);
@@ -205,6 +218,9 @@ export default function ActSixWorld({
     const orange = new THREE.Color("#e87655");
     const copper = new THREE.Color("#a359a5");
     const umber = new THREE.Color("#26345c");
+    const indigo = new THREE.Color("#30226f");
+    const nebulaBlue = new THREE.Color("#4388e8");
+    const violet = new THREE.Color("#8b55c9");
 
     for (let index = 0; index < particleCount; index += 1) {
       const randomA = random(index, 17);
@@ -233,14 +249,23 @@ export default function ActSixWorld({
         size = 0.12 + randomC * 0.32 + (1 - radius / 6) * 0.28;
         const falloff = clamp((radius - 0.6) / 5.6);
         color = amber.clone()
-          .lerp(orange, Math.pow(falloff, 0.74) * 0.78)
-          .lerp(copper, Math.pow(falloff, 2.2) * 0.82);
+          .lerp(orange, Math.pow(falloff, 0.74) * 0.72)
+          .lerp(copper, Math.pow(falloff, 2.2) * 0.52);
+        // A minority of the outer-arm dust carries cool reflected nebula light;
+        // warm star-forming knots remain scattered through the same spiral arms.
+        if (radius > 2.1 && random(index, 313) > 0.34) {
+          const coolDust = indigo.clone().lerp(nebulaBlue, random(index, 337) * 0.72)
+            .lerp(violet, random(index, 359) * 0.46);
+          color.lerp(coolDust, smoothstep(2.1, 5.85, radius) * (0.48 + random(index, 373) * 0.3));
+        }
       } else {
         // A faint uneven dust envelope keeps the outer disk from ending abruptly.
         radius = 3.2 + Math.pow(randomA, 0.68) * 2.75;
         height = (randomB - 0.5) * (0.46 + radius * 0.12);
         size = 0.08 + randomC * 0.14;
-        color = new THREE.Color("#815fba").lerp(umber, randomA * 0.7);
+        color = new THREE.Color("#815fba").lerp(umber, randomA * 0.4)
+          .lerp(nebulaBlue, 0.24 + randomC * 0.25)
+          .lerp(violet, randomB * 0.24);
       }
 
       positions[i3] = 0;
@@ -310,6 +335,17 @@ export default function ActSixWorld({
     toneMapped: false,
   }), []);
 
+  const focusRingGeometry = useMemo(() => new THREE.TorusGeometry(1, 0.012, 6, 112), []);
+  const focusRingMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: "#dcecff",
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    toneMapped: false,
+  }), []);
+
   useFrame((state, delta) => {
     // Keep the authored galaxy pattern alive for the full visit. Its particle
     // coordinates stay fixed in radius; only their orbital phase advances.
@@ -330,9 +366,18 @@ export default function ActSixWorld({
     }
     const elapsed = state.clock.getElapsedTime();
     const focusElapsed = focusStartedAt.current === null ? 99 : elapsed - focusStartedAt.current;
-    const focusPulse = Math.exp(-focusElapsed * 0.62);
+    const focusPulse = Math.exp(-focusElapsed * 0.58);
     material.uniforms.uFocusStrength.value = focusPulse;
-    material.uniforms.uFocusRadius.value = Math.max(0, focusElapsed) * 3.4;
+    material.uniforms.uFocusRadius.value = Math.max(0, focusElapsed) * 3.6;
+    if (focusRingRef.current) {
+      const ringVisible = focusStartedAt.current !== null && focusElapsed < 1.9 && reveal > 0.7;
+      const ringRadius = 0.16 + Math.max(0, focusElapsed) * 3.15;
+      focusRingRef.current.visible = ringVisible;
+      focusRingRef.current.scale.set(ringRadius, ringRadius * 0.49, 1);
+      focusRingMaterial.opacity = ringVisible
+        ? 0.62 * Math.exp(-focusElapsed * 0.72) * smoothstep(0.015, 0.09, focusElapsed)
+        : 0;
+    }
 
     if (submitRequested.current && submitStartedAt.current === null) {
       submitStartedAt.current = elapsed;
@@ -398,6 +443,7 @@ export default function ActSixWorld({
       <points ref={dissolveRef} geometry={dissolveGeometry} frustumCulled={false} visible={false} renderOrder={20}>
         <primitive object={dissolveMaterial} attach="material" />
       </points>
+      <mesh ref={focusRingRef} geometry={focusRingGeometry} material={focusRingMaterial} position={[0, 0, 0.015]} visible={false} renderOrder={10} />
     </group>
   );
 }

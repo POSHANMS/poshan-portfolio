@@ -51,11 +51,13 @@ function Panel({
   presence,
   side = "left",
   className = "",
+  verticallyCentered = false,
 }: {
   children: React.ReactNode;
   presence: number;
   side?: "left" | "right" | "center";
   className?: string;
+  verticallyCentered?: boolean;
 }) {
   const x = side === "left" ? -34 : side === "right" ? 34 : 0;
   const baseX = side === "center" ? "-50%" : "0px";
@@ -65,7 +67,10 @@ function Panel({
       className={`pointer-events-auto absolute ${className}`}
       style={{
         opacity: presence,
-        transform: `translate3d(calc(${baseX} + ${(1 - presence) * x * 0.7}px), ${(1 - presence) * 12}px, 0)`,
+        transform: verticallyCentered
+          ? `translate3d(calc(${baseX} + ${(1 - presence) * x * 0.7}px), calc(-50% - 12px + ${(1 - presence) * 12}px), 0)`
+          : `translate3d(calc(${baseX} + ${(1 - presence) * x * 0.7}px), ${(1 - presence) * 12}px, 0)`,
+        scale: verticallyCentered ? 0.94 : undefined,
         filter: "none",
         willChange: "opacity, transform, filter",
       }}
@@ -670,7 +675,7 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
   };
 
   return (
-    <Panel presence={presence} side="left" className="act-six-contact-panel left-4 top-[0.7vh] w-[min(34rem,calc(100vw-2rem))] px-2 sm:left-8 lg:left-[4.2vw]">
+    <Panel presence={presence} side="left" verticallyCentered className="act-six-contact-panel left-4 top-1/2 w-[min(34rem,calc(100vw-2rem))] px-2 sm:left-8 lg:left-[4.2vw]">
       <div className="act-six-contact-stage relative grid gap-2.5 p-3 sm:gap-3 sm:p-3.5">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_100%_55%,rgba(255,24,58,0.13),rgba(255,24,58,0.04)_42%,transparent_78%)] blur-xl" />
 
