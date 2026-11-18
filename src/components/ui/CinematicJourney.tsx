@@ -22,7 +22,7 @@ const chapters: { id: ChapterId; act: string; label: string; range: [number, num
   { id: "journey", act: "ACT V", label: "Education", range: [0.89, 0.99], holdUntilEnd: true },
   // Let the galaxy finish its camera-led reveal before Contact arrives, keeping
   // the form from covering the opening shot of the nebula.
-  { id: "contact", act: "ACT VI", label: "Contact", range: [ACT_FIVE_TIMING.galaxyFullReveal, 1.0], persistAtEnd: true },
+  { id: "contact", act: "ACT VI", label: "Contact", range: [ACT_FIVE_TIMING.contactRevealStart, 1.0], persistAtEnd: true },
 ];
 
 function clamp(value: number, min = 0, max = 1) {
@@ -692,8 +692,8 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
   };
 
   return (
-    <Panel presence={presence} side="left" verticallyCentered className="act-six-contact-panel left-4 top-1/2 w-[min(64rem,calc(61vw-1.5rem))] sm:left-8 lg:left-[4.2vw]">
-      <div className="act-six-contact-stage relative grid gap-5 p-5 sm:gap-7 sm:p-7 lg:grid-cols-[0.82fr_1.18fr] lg:gap-9 lg:p-9">
+    <Panel presence={presence} side="left" verticallyCentered className="act-six-contact-panel left-4 top-1/2 sm:left-8 lg:left-[4.2vw]">
+      <div className="act-six-contact-stage relative grid gap-5 p-5">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_100%_55%,rgba(255,24,58,0.13),rgba(255,24,58,0.04)_42%,transparent_78%)] blur-xl" />
 
         <section
@@ -753,9 +753,9 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
                 {transmissionSent ? "Transmission sent" : isTransmitting ? "Sending securely" : "Ready to connect"}
               </span>
             </div>
-            <h3 className="text-2xl font-semibold tracking-[-0.035em] text-white sm:text-3xl">Send a message</h3>
+            <h3 className="act-six-compose-title">Send a message</h3>
           </div>
-          <div className="relative z-10 grid gap-x-4 gap-y-3 sm:grid-cols-2">
+          <div className="relative z-10 grid gap-x-5 gap-y-4 sm:grid-cols-2">
             <label className="sr-only" aria-hidden="true">Leave this field blank<input name="website" tabIndex={-1} autoComplete="off" /></label>
             <label className="act-six-field-label">
               First name
@@ -765,11 +765,11 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
               Last name
               <input name="lastName" autoComplete="family-name" required maxLength={60} onFocus={() => window.dispatchEvent(new CustomEvent("act-six-input-focus"))} className="act-six-glass-input [user-select:text]" placeholder="Last name" />
             </label>
-            <label className="act-six-field-label">
+            <label className="act-six-field-label sm:col-span-2">
               Your email
               <input name="email" type="email" autoComplete="email" required maxLength={254} onFocus={() => window.dispatchEvent(new CustomEvent("act-six-input-focus"))} className="act-six-glass-input [user-select:text]" placeholder="you@example.com" />
             </label>
-            <label className="act-six-field-label">
+            <label className="act-six-field-label sm:col-span-2">
               Subject
               <input name="subject" required maxLength={120} onFocus={() => window.dispatchEvent(new CustomEvent("act-six-input-focus"))} className="act-six-glass-input [user-select:text]" placeholder="What is this about?" />
             </label>
@@ -782,7 +782,7 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
             <p className="max-w-[17rem] text-xs leading-5 text-white/65" aria-live="polite">
               {transmissionError ? <span className="text-[#ff9bab]" role="alert">{transmissionError}</span> : isTransmitting ? "Sending securely…" : "Your message is sent securely without opening an email app."}
             </p>
-            <button type="submit" disabled={isTransmitting} className={`act-six-transmit-button group inline-flex items-center gap-3 border border-[#ff687e]/75 bg-gradient-to-br from-[#a10d28]/90 to-[#300812]/90 px-5 py-3.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white shadow-[0_10px_30px_rgba(110,5,24,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-[#ffbbc5] hover:shadow-[0_14px_34px_rgba(190,18,48,0.34)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff7a8c] disabled:cursor-wait ${isTransmitting ? "act-six-transmitting" : ""}`}>
+            <button type="submit" disabled={isTransmitting} className={`act-six-transmit-button group inline-flex items-center gap-3 border border-[#ff687e]/75 bg-gradient-to-br from-[#a10d28]/90 to-[#300812]/90 px-5 py-3.5 font-sans text-[12px] font-semibold tracking-[0.045em] text-white shadow-[0_10px_30px_rgba(110,5,24,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-[#ffbbc5] hover:shadow-[0_14px_34px_rgba(190,18,48,0.34)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff7a8c] disabled:cursor-wait ${isTransmitting ? "act-six-transmitting" : ""}`}>
               {isTransmitting ? "Sending…" : "Transmit message"}
               <ArrowUpRight className={`h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 ${isTransmitting ? "act-six-send-icon" : ""}`} />
             </button>

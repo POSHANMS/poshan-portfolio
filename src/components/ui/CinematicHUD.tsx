@@ -8,20 +8,12 @@ import React, { useEffect, useRef, useState } from "react";
  * A full-screen, non-blocking cinematic overlay that fades in
  * after the 3D scene reveals. Contains:
  *
- *  ① FILM-STRIP RULER — bottom center  (footage counter)
- *  ② TIMECODE SIDEBAR — left edge      (frame counter)
- *  ③ CORNER BRACKETS  — all 4 corners  (viewfinder frame)
- *  ④ SCROLL HINT      — bottom center above ruler
- *  ⑤ STATUS BADGE     — bottom right   (REC indicator)
+ *  ① TIMECODE SIDEBAR — left edge      (frame counter)
+ *  ② CORNER BRACKETS  — all 4 corners  (viewfinder frame)
+ *  ③ SCROLL HINT      — bottom center before first scroll
+ *  ④ STATUS BADGE     — bottom right   (REC indicator)
  * ─────────────────────────────────────────────────────────
  */
-
-const RULER_TICKS = 41; // total tick slots visible
-const CENTER = Math.floor(RULER_TICKS / 2);
-
-function useAnimatedOffset(scrollProgress: number) {
-  return scrollProgress * 12;
-}
 
 function useTimecode() {
   const [tc, setTc] = useState("00:00:00:00");
@@ -45,62 +37,6 @@ function useTimecode() {
   }, []);
 
   return tc;
-}
-
-function FilmRuler({ offset }: { offset: number }) {
-  const ticks = Array.from({ length: RULER_TICKS });
-
-  return (
-    <div className="relative flex items-end justify-center gap-0" style={{ width: "min(680px, 90vw)", height: 40 }}>
-      {ticks.map((_, i) => {
-        const pos = (i - offset + RULER_TICKS) % RULER_TICKS;
-        // Label every 5 ticks
-        const isMajor = Math.round(pos) % 5 === 0;
-        const isCenter = i === CENTER;
-        const labelValue = Math.round((i - CENTER - offset) * 2.5);
-
-        return (
-          <div key={i} className="flex flex-col items-center" style={{ flex: "1 0 0" }}>
-            {/* Label on major ticks */}
-            {isMajor && (
-              <span
-                className="font-mono text-[7px] text-white/25 mb-0.5 select-none"
-                style={{ letterSpacing: "0.05em" }}
-              >
-                {labelValue > 0 ? `+${labelValue}` : labelValue}
-              </span>
-            )}
-            {!isMajor && <span className="mb-0.5" style={{ height: 10 }} />}
-
-            {/* Tick mark */}
-            <div
-              style={{
-                width: isCenter ? 2 : 1,
-                height: isMajor ? (isCenter ? 22 : 16) : 9,
-                background: isCenter
-                  ? "#ff1744"
-                  : isMajor
-                  ? "rgba(255,255,255,0.45)"
-                  : "rgba(255,255,255,0.15)",
-                boxShadow: isCenter ? "0 0 6px rgba(255,23,68,0.8)" : undefined,
-                borderRadius: 1,
-              }}
-            />
-          </div>
-        );
-      })}
-
-      {/* Center playhead triangle */}
-      <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none"
-        style={{ zIndex: 10 }}
-      >
-        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-          <path d="M5 0L10 8H0L5 0Z" fill="#ff1744" fillOpacity="0.9" />
-        </svg>
-      </div>
-    </div>
-  );
 }
 
 function CornerBracket({ position }: { position: "tl" | "tr" | "bl" | "br" }) {
@@ -155,7 +91,6 @@ const sceneLabels = [
 ];
 
 export default function CinematicHUD({ visible, scrollProgress = 0 }: { visible: boolean; scrollProgress?: number }) {
-  const offset = useAnimatedOffset(scrollProgress);
   const timecode = useTimecode();
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [scrollHintOpacity, setScrollHintOpacity] = useState(1);
@@ -241,17 +176,9 @@ export default function CinematicHUD({ visible, scrollProgress = 0 }: { visible:
         </svg>
       </div>
 
-      {/* ─── BOTTOM CENTER: SCROLL HINT + FILM RULER ─── */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-
-        {/* Scroll hint */}
-        <div
-          className="flex flex-col items-center gap-2 transition-all duration-700"
-          style={{
-            opacity: showScrollHint && !hasScrolled && scrollProgress < 0.08 ? scrollHintOpacity : 0,
-            transform: showScrollHint ? "translateY(0)" : "translateY(8px)",
-          }}
-        >
+      {/* ─── BOTTOM CENTER: FIRST-ENTRY SCROLL HINT ─── */}
+      {showScrollHint && !hasScrolled && scrollProgress < 0.08 && (
+        <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 transition-all duration-700" style={{ opacity: scrollHintOpacity }}>
           <span className="font-mono text-[9px] uppercase tracking-[0.5em] text-white/35 select-none">
             DRAG · SCROLL TO EXPLORE
           </span>
@@ -271,35 +198,7 @@ export default function CinematicHUD({ visible, scrollProgress = 0 }: { visible:
             ))}
           </div>
         </div>
-
-        {/* Film ruler with BZ labels */}
-        <div className="flex flex-col items-center gap-1">
-          {/* BZ label row */}
-          <div
-            className="flex justify-between font-mono text-[7px] text-white/20 select-none"
-            style={{ width: "min(680px, 90vw)" }}
-          >
-            <span>-100 BZ</span>
-            <span>-75</span>
-            <span>-50</span>
-            <span>-25</span>
-            <span style={{ color: "rgba(255,23,68,0.5)" }}>± 0</span>
-            <span>+25</span>
-            <span>+50</span>
-            <span>+75</span>
-            <span>+100 BZ</span>
-          </div>
-
-          {/* Animated tick ruler */}
-          <FilmRuler offset={offset} />
-
-          {/* Bottom line */}
-          <div
-            className="bg-white/10"
-            style={{ width: "min(680px, 90vw)", height: 1 }}
-          />
-        </div>
-      </div>
+      )}
 
       {/* ─── BOTTOM RIGHT: REC STATUS ─────────────────── */}
       <div

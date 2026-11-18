@@ -71,12 +71,13 @@ const galaxyVertexShader = `
     float eddy = noise3(vec3(aPhase * 1.7, aRadius * 2.4, uTime * 0.12)) - 0.5;
     // Differential rotation: the inner bulge turns faster while the outer
     // arms drift more slowly, without changing the authored orbit radii.
-    // Keep the galaxy silhouette fixed. Particles stream locally along their
-    // authored arm lanes with a bounded phase oscillation instead of rotating
-    // the whole structure or accumulating enough shear to erase the gaps.
-    float orbitRate = mix(0.42, 0.2, smoothstep(0.65, 1.7, aRadius));
-    float stream = sin(uTime * orbitRate + aPhase) * (0.115 + radiusRatio * 0.055);
-    float armAngle = aArm * 1.57079632679 + aRadius * 0.78 + aSpread + stream + turbulence + eddy * 0.028;
+    // Advect each particle around its authored orbit. The inner lanes move
+    // faster than the outer dust, but the fixed radius preserves the spiral's
+    // silhouette and the clockwise phase never transforms the galaxy group.
+    float orbitRate = mix(0.072, 0.024, smoothstep(0.35, 5.8, aRadius));
+    float orbitPhase = -uTime * orbitRate;
+    float stream = sin(uTime * (orbitRate * 0.72) + aPhase) * (0.045 + radiusRatio * 0.018);
+    float armAngle = aArm * 1.57079632679 + aRadius * 0.78 + aSpread + orbitPhase + stream + turbulence + eddy * 0.028;
     // Preserve the authored silhouette and gaps: particles orbit in place
     // instead of breathing radially and slowly turning the galaxy into a disk.
     float radius = max(0.015, aRadius);
@@ -188,14 +189,18 @@ const nebulaCloudFragmentShader = `
     float radius = length(p);
     float angle = atan(p.y, p.x);
     float safeRadius = max(radius, 0.035);
-    float time = uTime * (0.032 + uLayer * 0.016);
+    float time = uTime * (0.052 + uLayer * 0.018);
     float fieldNoise = fbm(p * (4.1 + uLayer * 0.8) + vec2(time, -time * 0.62));
     float cloudNoise = fbm(p * (8.3 + uLayer * 1.4) - vec2(time * 0.8, time * 0.34));
     float sceneRadius = safeRadius * 5.95;
     float spiralFlow = sin(time * 0.9 + sceneRadius * 0.78 + fieldNoise * 2.0) * 0.07;
     // Match the four gas lanes to the particle arms, then let the noise field
     // roughen their edges so they read as dusty spiral branches rather than rings.
-    float spiral = angle - sceneRadius * 0.78 + spiralFlow + (fieldNoise - 0.5) * 0.72
+    // Clockwise angular advection moves the gas lanes around a stationary
+    // center; radius is unchanged, so the nebula does not expand or spin as a mesh.
+    float orbitRadius = safeRadius * 5.8;
+    float nebulaOrbit = uTime * mix(0.072, 0.024, smoothstep(0.35, 5.8, orbitRadius));
+    float spiral = angle + nebulaOrbit - sceneRadius * 0.78 + spiralFlow + (fieldNoise - 0.5) * 0.72
       + (cloudNoise - 0.5) * 0.28 + uLayer * 0.12;
 
     // Broad gas lanes carry the grand spiral; secondary wisps and turbulent

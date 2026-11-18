@@ -1939,7 +1939,7 @@ canvas {
 .act-six-contact-stage .act-six-social-label {
   overflow: hidden;
   color: rgba(255, 255, 255, 0.88);
-  font: 600 0.58rem/1.2 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font: 600 0.58rem/1.2 var(--font-jetbrains-mono), monospace;
   letter-spacing: 0.12em;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -1987,10 +1987,14 @@ canvas {
 /* One continuous contact console keeps the contact details and message form
    readable while leaving the galaxy visible through the right-hand glass. */
 .act-six-contact-panel {
-  width: min(64rem, calc(61vw - 1.5rem));
+  container-type: inline-size;
+  width: min(58rem, calc(92vw - 2rem));
   max-height: min(82dvh, 48rem);
 }
 .act-six-contact-stage {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  padding: 1.25rem;
   max-height: min(82dvh, 48rem);
   overflow: auto;
   overscroll-behavior: contain;
@@ -2007,9 +2011,12 @@ canvas {
     inset 0 -1px 0 rgba(255, 74, 103, 0.15),
     0 34px 90px rgba(0, 0, 0, 0.48),
     0 0 56px rgba(162, 178, 255, 0.065);
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 92, 117, 0.58) rgba(255, 255, 255, 0.04);
 }
-.act-six-contact-stage::-webkit-scrollbar { display: none; }
+.act-six-contact-stage::-webkit-scrollbar { width: 5px; }
+.act-six-contact-stage::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); }
+.act-six-contact-stage::-webkit-scrollbar-thumb { border-radius: 5px; background: rgba(255, 92, 117, 0.58); }
 .act-six-contact-stage::before {
   position: absolute;
   z-index: 3;
@@ -2067,14 +2074,60 @@ canvas {
   margin-top: 1.25rem;
   padding-top: 1.1rem;
 }
-.act-six-contact-stage .act-six-field-label { font-size: 0.66rem; gap: 0.55rem; }
-.act-six-contact-stage .act-six-glass-input { padding: 0.88rem 0.78rem; font-size: 0.96rem; }
-.act-six-contact-stage textarea.act-six-glass-input { min-height: 5.2rem; }
+.act-six-contact-stage .act-six-field-label {
+  gap: 0.52rem;
+  color: rgba(255, 241, 243, 0.84);
+  font-family: var(--font-inter), Inter, ui-sans-serif, sans-serif;
+  font-size: 0.73rem;
+  font-weight: 550;
+  letter-spacing: 0.075em;
+}
+.act-six-contact-stage .act-six-glass-input { padding: 0.88rem 0.82rem; font-size: 1rem; }
+.act-six-contact-stage textarea.act-six-glass-input { min-height: 6.2rem; }
+.act-six-contact-stage .act-six-transmit-button { font-family: var(--font-inter), Inter, ui-sans-serif, sans-serif; }
+.act-six-contact-stage .act-six-transmission-card h3 { font-family: var(--font-inter), Inter, ui-sans-serif, sans-serif; }
+.act-six-contact-stage .act-six-compose-title {
+  position: relative;
+  margin: 0;
+  padding-left: 0.9rem;
+  color: #fff;
+  font-size: clamp(2rem, 2.6vw, 2.55rem);
+  font-weight: 750;
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+  text-shadow: 0 0 26px rgba(255, 235, 240, 0.13);
+}
+.act-six-contact-stage .act-six-compose-title::before {
+  position: absolute;
+  top: 0.13em;
+  bottom: 0.12em;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(255, 226, 233, 0.9), #ff3558 55%, rgba(255, 53, 88, 0.18));
+  box-shadow: 0 0 13px rgba(255, 50, 82, 0.72);
+  content: "";
+}
+.act-six-contact-stage .act-six-contact-rail { margin-top: 1.4rem; gap: 0.55rem; }
+.act-six-contact-stage .act-six-social-link { min-height: 3.8rem; }
+.act-six-contact-stage .act-six-social-label { font-size: 0.68rem; }
+.act-six-contact-stage .act-six-social-value { font-size: clamp(0.76rem, 0.9vw, 0.88rem); }
+.act-six-contact-stage .act-six-email-link .act-six-social-value { font-size: clamp(0.7rem, 0.8vw, 0.78rem); }
 .act-six-contact-stage .act-six-transmit-button { padding: 0.9rem 1.15rem; }
 
 @media (max-width: 1023px) {
-  .act-six-contact-panel { width: min(58rem, calc(100vw - 3rem)); }
+  .act-six-contact-panel { width: min(58rem, calc(92vw - 2rem)); }
   .act-six-contact-stage { max-height: 82dvh; }
+}
+@media (min-width: 1024px) {
+  .act-six-contact-panel { width: clamp(57rem, calc(36vw + 34rem), 66rem); }
+}
+@container (min-width: 56rem) {
+  .act-six-contact-stage {
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    gap: clamp(1.75rem, 2.4vw, 2.75rem);
+    padding: clamp(1.8rem, 2.35vw, 2.5rem);
+  }
 }
 @media (max-width: 767px) {
   .act-six-contact-panel { left: 1rem; width: calc(100vw - 2rem); max-height: 82dvh; }
@@ -2084,5 +2137,14 @@ canvas {
   .act-six-contact-stage .act-six-transmission-card > .relative.z-10.mb-6 { margin-bottom: 0.9rem; }
   .act-six-contact-stage .act-six-transmission-card > .relative.z-10.mt-5 { margin-top: 0.9rem; }
   .act-six-contact-stage .act-six-glass-input { padding: 0.72rem 0.65rem; }
+  .act-six-contact-stage textarea.act-six-glass-input { min-height: 4.4rem; }
+}
+
+@media (max-height: 760px) and (min-width: 768px) {
+  .act-six-contact-stage { padding: 1.4rem; gap: 1.3rem; }
+  .act-six-contact-stage .act-six-transmission-card > .relative.z-10.mb-6 { margin-bottom: 0.8rem; padding-bottom: 0.7rem; }
+  .act-six-contact-stage .act-six-transmission-card > .relative.z-10.mt-5 { margin-top: 0.8rem; padding-top: 0.7rem; }
+  .act-six-contact-stage .act-six-contact-rail { margin-top: 0.8rem; gap: 0.35rem; }
+  .act-six-contact-stage .act-six-social-link { min-height: 3rem; }
   .act-six-contact-stage textarea.act-six-glass-input { min-height: 4.4rem; }
 }
