@@ -113,12 +113,6 @@ const NO_CARD_CONTRAST: CardContrastUniforms = {
   uCardDim: { value: 0 },
 };
 
-// 2 faint mythological bridges between constellations
-const interConnections: [number, number][] = [
-  [3, 10],   // Orion belt -> Big Dipper handle
-  [14, 22],  // Cassiopeia -> Cygnus wing
-];
-
 function seededRandom(seed: number) {
   let s = seed;
   return () => {
@@ -129,7 +123,7 @@ function seededRandom(seed: number) {
 
 export default function StarField({
   starsOpacity = 1,
-  showConstellations = true,
+  showHeroStars = true,
   cardContrast = NO_CARD_CONTRAST,
   cameraFramed = false,
   warpProgress = 0,
@@ -137,7 +131,7 @@ export default function StarField({
   handoffProgress = 0,
 }: {
   starsOpacity?: number;
-  showConstellations?: boolean;
+  showHeroStars?: boolean;
   cardContrast?: CardContrastUniforms;
   cameraFramed?: boolean;
   warpProgress?: number;
@@ -147,7 +141,6 @@ export default function StarField({
   const fieldRef = useRef<THREE.Group>(null);
   const starsRef = useRef<THREE.Points>(null);
   const heroStarsRef = useRef<THREE.Points>(null);
-  const linesRef = useRef<THREE.LineSegments>(null);
 
   const { positions, colors, sizes, phases } = useMemo(() => {
     const rand = seededRandom(42);
@@ -187,43 +180,6 @@ export default function StarField({
     }
 
     return { positions: pos, colors: col, sizes: sz, phases: ph };
-  }, []);
-
-  // Build constellation line geometry
-  const lineGeometry = useMemo(() => {
-    const linePos: number[] = [];
-    const lineColors: number[] = [];
-    const lineOpacities: number[] = [];
-
-    clusters.forEach(cluster => {
-      cluster.connections.forEach(([a, b], connIdx) => {
-        const p1 = cluster.nodes[a];
-        const p2 = cluster.nodes[b];
-        linePos.push(...p1, ...p2);
-        const isMain = connIdx < cluster.connections.length - 1;
-        const brightness = isMain ? 1.0 : 0.55;
-        lineColors.push(1.0 * brightness, 0.18 * brightness, 0.22 * brightness);
-        lineColors.push(1.0 * brightness, 0.18 * brightness, 0.22 * brightness);
-        lineOpacities.push(isMain ? 1.0 : 0.45);
-        lineOpacities.push(isMain ? 1.0 : 0.45);
-      });
-    });
-
-    interConnections.forEach(([a, b]) => {
-      const p1 = allNodes[a];
-      const p2 = allNodes[b];
-      linePos.push(...p1, ...p2);
-      lineColors.push(0.8, 0.12, 0.15);
-      lineColors.push(0.8, 0.12, 0.15);
-      lineOpacities.push(0.3);
-      lineOpacities.push(0.3);
-    });
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(linePos, 3));
-    geo.setAttribute("color", new THREE.Float32BufferAttribute(lineColors, 3));
-    geo.setAttribute("aOpacity", new THREE.Float32BufferAttribute(lineOpacities, 1));
-    return geo;
   }, []);
 
   const { heroPositions, heroColors, heroSizes, heroPhases } = useMemo(() => {
@@ -366,50 +322,6 @@ export default function StarField({
     });
   }, [cardContrast]);
 
-  const lineMaterial = useMemo(() => {
-    return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, ...cardContrast },
-      vertexShader: `
-        attribute float aOpacity;
-        attribute vec3 color;
-        varying vec3 vColor;
-        varying float vAlpha;
-        varying vec2 vScreenUv;
-        uniform float uTime;
-        void main() {
-          vColor = color;
-          float pulse = 0.9 + 0.1 * sin(uTime * 1.5 + position.x * 0.5);
-          vAlpha = aOpacity * pulse;
-          vec4 clipPosition = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          gl_Position = clipPosition;
-          vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
-        }
-      `,
-      fragmentShader: `
-        uniform float uOpacity;
-        varying vec3 vColor;
-        varying float vAlpha;
-        varying vec2 vScreenUv;
-        uniform vec2 uCardCenter;
-        uniform vec2 uCardHalfSize;
-        uniform float uCardDim;
-        void main() {
-          vec3 finalColor = vColor * 1.2;
-          vec2 cardUv = (vScreenUv - uCardCenter) / max(uCardHalfSize, vec2(0.001));
-          float cardRadius = length(cardUv);
-          float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
-          float contrast = mix(1.0, 0.4, cardMask * uCardDim);
-          float alpha = vAlpha * 0.55 * uOpacity * contrast;
-          gl_FragColor = vec4(finalColor, alpha);
-        }
-      `,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      vertexColors: false,
-    });
-  }, [cardContrast]);
-
   useFrame((state, delta) => {
     const t = state.clock.getElapsedTime();
     starMaterial.uniforms.uTime.value = t;
@@ -419,11 +331,8 @@ export default function StarField({
     heroStarMaterial.uniforms.uTime.value = t;
     heroStarMaterial.uniforms.uOpacity.value = starsOpacity;
     heroStarMaterial.uniforms.uHandoff.value = handoffProgress;
-    lineMaterial.uniforms.uTime.value = t;
-    lineMaterial.uniforms.uOpacity.value = starsOpacity;
     if (starsRef.current) starsRef.current.rotation.y = t * 0.0005;
     if (heroStarsRef.current) heroStarsRef.current.rotation.y = t * 0.0005;
-    if (linesRef.current) linesRef.current.rotation.y = t * 0.0005;
     if (fieldRef.current) {
       if (cameraFramed) {
         const cameraAnchor = state.camera.position.clone().multiplyScalar(0.88);
@@ -455,13 +364,7 @@ export default function StarField({
         <primitive object={starMaterial} attach="material" />
       </points>
 
-      {showConstellations && (
-        <lineSegments ref={linesRef} geometry={lineGeometry}>
-          <primitive object={lineMaterial} attach="material" />
-        </lineSegments>
-      )}
-
-      {showConstellations && (
+      {showHeroStars && (
         <points ref={heroStarsRef}>
           <bufferGeometry>
             <bufferAttribute attach="attributes-position" args={[heroPositions, 3]} />

@@ -200,7 +200,7 @@ export default function Scene({
             {!isActFive && !isActSix && <NebulaBackground />}
             <StarField
               starsOpacity={starsOpacity * (isActFive ? 1 : 0.24 + exteriorStrength * 0.76)}
-              showConstellations={!isActFive && !isActSix}
+              showHeroStars={!isActFive && !isActSix}
               cardContrast={cardContrast}
               // Keep the shared starfield filling the camera view through the
               // final contact orbit without increasing its particle count.
