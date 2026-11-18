@@ -8,6 +8,17 @@ import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
 
 const ARM_COUNT = 4;
 const INITIAL_SIMULATION_SECONDS = 18;
+const GALAXY_RADIUS = 5.95;
+const GALAXY_ASPECT_Y = 0.49;
+const GALAXY_SPIRAL_TIGHTNESS = 0.78;
+const GALAXY_BASE_SPEED = 0.105;
+const GALAXY_WIDTH = GALAXY_RADIUS * 2;
+const GALAXY_HEIGHT = GALAXY_WIDTH * GALAXY_ASPECT_Y;
+
+type SharedGalaxyMotion = {
+  uTime: THREE.IUniform<number>;
+  uBaseSpeed: THREE.IUniform<number>;
+};
 
 function clamp(value: number, minimum = 0, maximum = 1) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -33,6 +44,7 @@ const galaxyVertexShader = `
   attribute vec3 aColor;
 
   uniform float uTime;
+  uniform float uBaseSpeed;
   uniform float uReveal;
   uniform float uFocusStrength;
   uniform float uFocusRadius;
@@ -74,7 +86,7 @@ const galaxyVertexShader = `
     // Advect each particle around its authored orbit. The inner lanes move
     // faster than the outer dust, but the fixed radius preserves the spiral's
     // silhouette and the clockwise phase never transforms the galaxy group.
-    float orbitRate = mix(0.072, 0.024, smoothstep(0.35, 5.8, aRadius));
+    float orbitRate = uBaseSpeed / sqrt(max(aRadius, 0.0) + 0.2);
     float orbitPhase = -uTime * orbitRate;
     float stream = sin(uTime * (orbitRate * 0.72) + aPhase) * (0.045 + radiusRatio * 0.018);
     float armAngle = aArm * 1.57079632679 + aRadius * 0.78 + aSpread + orbitPhase + stream + turbulence + eddy * 0.028;
@@ -88,6 +100,7 @@ const galaxyVertexShader = `
       sin(armAngle) * radius * 0.49,
       aHeight + sin(armAngle * 2.0 + aPhase + uTime * 0.17) * (0.035 + radiusRatio * 0.09)
         + eddy * (0.018 + radiusRatio * 0.025)
+        + sin(radius * 4.0 - uTime * 1.5 + armAngle) * 0.08 * radius
     );
     vec4 modelPosition = modelMatrix * vec4(worldPosition, 1.0);
     vec4 modelViewPosition = viewMatrix * modelPosition;
@@ -116,7 +129,7 @@ const galaxyVertexShader = `
     vAlpha = armIgnition * (0.66 + vDustNoise * 0.48) * (0.82 + 0.18 * sin(aPhase + uTime * 0.7));
     vCoreEnergy = 1.0 - smoothstep(0.18, 1.42, aRadius);
     gl_Position = projectionMatrix * modelViewPosition;
-    gl_PointSize = aSize * (44.0 / max(5.0, -modelViewPosition.z));
+    gl_PointSize = clamp(aSize * (44.0 / max(5.0, -modelViewPosition.z)), 1.0, 6.0);
   }
 `;
 
@@ -151,6 +164,7 @@ const nebulaCloudVertexShader = `
 
 const nebulaCloudFragmentShader = `
   uniform float uTime;
+  uniform float uBaseSpeed;
   uniform float uLayer;
   uniform float uReveal;
   varying vec2 vUv;
@@ -184,23 +198,22 @@ const nebulaCloudFragmentShader = `
   }
 
   void main() {
-    vec2 p = (vUv - 0.5) * 2.0;
-    p.x *= 1.55;
-    float radius = length(p);
-    float angle = atan(p.y, p.x);
+    // Map gas coordinates into the exact ellipse used by the particle arms.
+    vec2 diskPoint = (vUv - 0.5) * vec2(${GALAXY_WIDTH.toFixed(3)}, ${GALAXY_HEIGHT.toFixed(3)});
+    vec2 spiralMetric = vec2(diskPoint.x, diskPoint.y / ${GALAXY_ASPECT_Y.toFixed(2)});
+    float radius = length(spiralMetric);
+    float angle = atan(spiralMetric.y, spiralMetric.x);
     float safeRadius = max(radius, 0.035);
     float time = uTime * (0.052 + uLayer * 0.018);
-    float fieldNoise = fbm(p * (4.1 + uLayer * 0.8) + vec2(time, -time * 0.62));
-    float cloudNoise = fbm(p * (8.3 + uLayer * 1.4) - vec2(time * 0.8, time * 0.34));
-    float sceneRadius = safeRadius * 5.95;
-    float spiralFlow = sin(time * 0.9 + sceneRadius * 0.78 + fieldNoise * 2.0) * 0.07;
-    // Match the four gas lanes to the particle arms, then let the noise field
-    // roughen their edges so they read as dusty spiral branches rather than rings.
-    // Clockwise angular advection moves the gas lanes around a stationary
-    // center; radius is unchanged, so the nebula does not expand or spin as a mesh.
-    float orbitRadius = safeRadius * 5.8;
-    float nebulaOrbit = uTime * mix(0.072, 0.024, smoothstep(0.35, 5.8, orbitRadius));
-    float spiral = angle + nebulaOrbit - sceneRadius * 0.78 + spiralFlow + (fieldNoise - 0.5) * 0.72
+    float orbitRate = uBaseSpeed / sqrt(safeRadius + 0.2);
+    float advectedAngle = angle + uTime * orbitRate;
+    vec2 advectedPoint = vec2(cos(advectedAngle), sin(advectedAngle)) * safeRadius;
+    float fieldNoise = fbm(advectedPoint * (1.45 + uLayer * 0.22) + vec2(time, -time * 0.62));
+    float cloudNoise = fbm(advectedPoint * (2.8 + uLayer * 0.42) - vec2(time * 0.8, time * 0.34));
+    float spiralFlow = sin(time * 0.9 + safeRadius * ${GALAXY_SPIRAL_TIGHTNESS.toFixed(2)} + fieldNoise * 2.0) * 0.07;
+    // Four gas lanes share the particle arm count, tightness, orbital direction,
+    // and Keplerian differential rate. Noise roughens the matching structure.
+    float spiral = advectedAngle - safeRadius * ${GALAXY_SPIRAL_TIGHTNESS.toFixed(2)} + spiralFlow + (fieldNoise - 0.5) * 0.72
       + (cloudNoise - 0.5) * 0.28 + uLayer * 0.12;
 
     // Broad gas lanes carry the grand spiral; secondary wisps and turbulent
@@ -208,19 +221,22 @@ const nebulaCloudFragmentShader = `
     float broadArms = pow(max(cos(spiral * 4.0), 0.0), 2.7);
     float fineArms = pow(max(cos(spiral * 4.0 + 0.08), 0.0), 6.4);
     float secondaryWisps = pow(max(cos(spiral * 8.0 + 0.7), 0.0), 8.0);
-    float radialFade = 1.0 - smoothstep(0.74, 1.13, radius);
-    float innerGlow = exp(-radius * 3.4);
+    float normalizedRadius = safeRadius / ${GALAXY_RADIUS.toFixed(2)};
+    float radialFade = 1.0 - smoothstep(0.79, 1.08, normalizedRadius);
+    float innerGlow = exp(-safeRadius * 0.92);
     float starFormingKnots = smoothstep(0.58, 0.86, cloudNoise) * fineArms;
     float dustLane = pow(max(cos(spiral * 4.0 - 0.52), 0.0), 13.0)
-      * smoothstep(0.18, 0.44, radius) * radialFade;
+      * smoothstep(0.16, 0.38, normalizedRadius) * radialFade;
 
     vec3 indigo = vec3(0.075, 0.105, 0.30);
     vec3 blue = vec3(0.12, 0.33, 0.68);
     vec3 violet = vec3(0.29, 0.13, 0.43);
     vec3 amber = vec3(0.72, 0.31, 0.09);
     vec3 gold = vec3(1.0, 0.73, 0.34);
+    vec3 crimson = vec3(0.42, 0.035, 0.14);
     vec3 outerGas = mix(indigo, blue, smoothstep(0.28, 0.74, fieldNoise));
     outerGas = mix(outerGas, violet, smoothstep(0.58, 0.86, cloudNoise) * 0.62);
+    outerGas = mix(outerGas, crimson, smoothstep(0.74, 0.91, cloudNoise) * smoothstep(0.5, 0.9, normalizedRadius) * 0.42);
     vec3 gasColor = mix(outerGas, mix(amber, gold, fieldNoise), innerGlow * 0.82);
     gasColor = mix(gasColor, vec3(0.012, 0.016, 0.034), dustLane * 0.78);
 
@@ -236,9 +252,9 @@ const nebulaCloudFragmentShader = `
   }
 `;
 
-function NebulaCloudLayers({ reveal }: { reveal: number }) {
+function NebulaCloudLayers({ reveal, motion }: { reveal: number; motion: SharedGalaxyMotion }) {
   const farLayer = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uLayer: { value: 0 }, uReveal: { value: 0 } },
+    uniforms: { uTime: motion.uTime, uBaseSpeed: motion.uBaseSpeed, uLayer: { value: 0 }, uReveal: { value: 0 } },
     vertexShader: nebulaCloudVertexShader,
     fragmentShader: nebulaCloudFragmentShader,
     transparent: true,
@@ -246,9 +262,9 @@ function NebulaCloudLayers({ reveal }: { reveal: number }) {
     blending: THREE.NormalBlending,
     side: THREE.DoubleSide,
     toneMapped: false,
-  }), []);
+  }), [motion]);
   const nearLayer = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uLayer: { value: 1 }, uReveal: { value: 0 } },
+    uniforms: { uTime: motion.uTime, uBaseSpeed: motion.uBaseSpeed, uLayer: { value: 1 }, uReveal: { value: 0 } },
     vertexShader: nebulaCloudVertexShader,
     fragmentShader: nebulaCloudFragmentShader,
     transparent: true,
@@ -256,26 +272,67 @@ function NebulaCloudLayers({ reveal }: { reveal: number }) {
     blending: THREE.NormalBlending,
     side: THREE.DoubleSide,
     toneMapped: false,
-  }), []);
+  }), [motion]);
 
-  useFrame(({ clock }, delta) => {
-    farLayer.uniforms.uTime.value = clock.elapsedTime;
-    nearLayer.uniforms.uTime.value = clock.elapsedTime;
+  useFrame((_, delta) => {
     farLayer.uniforms.uReveal.value = THREE.MathUtils.damp(farLayer.uniforms.uReveal.value, reveal, 4.2, delta);
     nearLayer.uniforms.uReveal.value = THREE.MathUtils.damp(nearLayer.uniforms.uReveal.value, reveal, 3.2, delta);
   });
 
   return (
     <>
-      <mesh position={[0, 0, -0.58]} scale={[1.03, 1.03, 1]} renderOrder={1}>
-        <planeGeometry args={[11.9, 7.35, 1, 1]} />
+      <mesh position={[0, 0, -0.16]} renderOrder={1}>
+        <planeGeometry args={[GALAXY_WIDTH, GALAXY_HEIGHT, 1, 1]} />
         <primitive object={farLayer} attach="material" />
       </mesh>
-      <mesh position={[0, 0, -0.4]} scale={[0.96, 0.96, 1]} renderOrder={1}>
-        <planeGeometry args={[11.9, 7.35, 1, 1]} />
+      <mesh position={[0, 0, -0.08]} renderOrder={1}>
+        <planeGeometry args={[GALAXY_WIDTH, GALAXY_HEIGHT, 1, 1]} />
         <primitive object={nearLayer} attach="material" />
       </mesh>
     </>
+  );
+}
+
+const coreFlareFragmentShader = `
+  uniform float uTime;
+  uniform float uReveal;
+  varying vec2 vUv;
+  void main() {
+    vec2 p = (vUv - 0.5) * 2.0;
+    float breath = 0.88 + 0.12 * sin(uTime * 1.35);
+    // Keep the anamorphic highlight localized to the core; a long, flat streak
+    // reads as a line drawn across the entire galaxy instead of a lens flare.
+    float streak = exp(-p.x * p.x * 18.0) * exp(-p.y * p.y * 54.0);
+    float aura = exp(-length(vec2(p.x * 1.15, p.y * 1.75)) * 5.2);
+    float flare = streak * 0.38 + aura * 0.16;
+    vec3 blue = vec3(0.36, 0.62, 1.0);
+    vec3 gold = vec3(1.0, 0.78, 0.42);
+    vec3 color = mix(blue, gold, 1.0 - smoothstep(0.05, 0.92, abs(p.x)));
+    gl_FragColor = vec4(color * (1.08 + breath * 0.28), flare * breath * uReveal);
+  }
+`;
+
+function AnamorphicCoreFlare({ reveal }: { reveal: number }) {
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uReveal: { value: 0 } },
+    vertexShader: nebulaCloudVertexShader,
+    fragmentShader: coreFlareFragmentShader,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+  }), []);
+
+  useFrame(({ clock }, delta) => {
+    material.uniforms.uTime.value = clock.elapsedTime;
+    material.uniforms.uReveal.value = THREE.MathUtils.damp(material.uniforms.uReveal.value, reveal, 4.8, delta);
+  });
+
+  return (
+    <mesh position={[0, 0, 0.045]} renderOrder={4}>
+      <planeGeometry args={[GALAXY_WIDTH * 0.92, 0.16, 1, 1]} />
+      <primitive object={material} attach="material" />
+    </mesh>
   );
 }
 
@@ -318,15 +375,21 @@ export default function ActSixWorld({
   scrollProgress: number;
   deviceTier: DeviceTier;
 }) {
-  const groupRef = useRef<THREE.Group>(null);
+  const galaxySystemGroup = useRef<THREE.Group>(null);
   const dissolveRef = useRef<THREE.Points>(null);
   const focusRingRef = useRef<THREE.Mesh>(null);
+  const submitShockwaveRef = useRef<THREE.Mesh>(null);
   const focusStartedAt = useRef<number | null>(null);
   const submitStartedAt = useRef<number | null>(null);
+  const submitShockwaveStartedAt = useRef<number | null>(null);
   const submitRequested = useRef(false);
   const dissolveScreenRect = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
   // Start from a wound, asymmetric pose instead of the raw four-arm cross.
   const activeTimeRef = useRef(INITIAL_SIMULATION_SECONDS);
+  const motion = useMemo<SharedGalaxyMotion>(() => ({
+    uTime: { value: INITIAL_SIMULATION_SECONDS },
+    uBaseSpeed: { value: GALAXY_BASE_SPEED },
+  }), []);
   // Keep Act VI out of every Act V checkpoint. The shared stars carry the
   // handoff; the galaxy and gas then ignite after Act V has fully faded.
   const reveal = smoothstep(ACT_FIVE_TIMING.sceneExit, ACT_FIVE_TIMING.galaxyFullReveal, scrollProgress);
@@ -343,6 +406,7 @@ export default function ActSixWorld({
         : null;
       submitRequested.current = true;
       submitStartedAt.current = null;
+      submitShockwaveStartedAt.current = null;
     };
     window.addEventListener("act-six-input-focus", onFocus);
     window.addEventListener("act-six-submit-dissolve", onSubmit);
@@ -444,7 +508,7 @@ export default function ActSixWorld({
   }, [particleCount]);
 
   const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uReveal: { value: 0 }, uFocusStrength: { value: 0 }, uFocusRadius: { value: 0 } },
+    uniforms: { uTime: motion.uTime, uBaseSpeed: motion.uBaseSpeed, uReveal: { value: 0 }, uFocusStrength: { value: 0 }, uFocusRadius: { value: 0 } },
     vertexShader: galaxyVertexShader,
     fragmentShader: galaxyFragmentShader,
     vertexColors: false,
@@ -452,7 +516,7 @@ export default function ActSixWorld({
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     toneMapped: false,
-  }), []);
+  }), [motion]);
 
   const dissolveGeometry = useMemo(() => {
     const count = deviceTier === "mobile" ? 520 : 1080;
@@ -494,6 +558,15 @@ export default function ActSixWorld({
     depthTest: false,
     toneMapped: false,
   }), []);
+  const submitShockwaveMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: "#dcecff",
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    toneMapped: false,
+  }), []);
 
   useFrame((state, delta) => {
     // Keep the authored galaxy pattern alive for the full visit. Its particle
@@ -503,7 +576,7 @@ export default function ActSixWorld({
       // Lock the galaxy's authored camera composition; particles and gas move
       // internally, while the galaxy itself never rotates or drifts on screen.
     }
-    material.uniforms.uTime.value = activeTimeRef.current;
+    motion.uTime.value = activeTimeRef.current;
     material.uniforms.uReveal.value = THREE.MathUtils.damp(material.uniforms.uReveal.value, reveal, 4.8, delta);
     if (focusStartedAt.current === null && document.activeElement?.closest?.(".act-six-contact-stage")) {
       focusStartedAt.current = state.clock.getElapsedTime();
@@ -525,11 +598,20 @@ export default function ActSixWorld({
 
     if (submitRequested.current && submitStartedAt.current === null) {
       submitStartedAt.current = elapsed;
+      submitShockwaveStartedAt.current = elapsed;
     }
     const submitted = submitStartedAt.current !== null;
     const dissolveProgress = submitted ? clamp((elapsed - submitStartedAt.current!) / 1.55) : 0;
     dissolveMaterial.uniforms.uTime.value = elapsed;
     dissolveMaterial.uniforms.uProgress.value = dissolveProgress;
+    if (submitShockwaveRef.current) {
+      const shockElapsed = submitShockwaveStartedAt.current === null ? 99 : elapsed - submitShockwaveStartedAt.current;
+      const shockVisible = submitRequested.current && shockElapsed < 1.35 && reveal > 0.7;
+      const shockRadius = 0.16 + Math.max(0, shockElapsed) * 1.85;
+      submitShockwaveRef.current.visible = shockVisible;
+      submitShockwaveRef.current.scale.set(shockRadius, shockRadius * GALAXY_ASPECT_Y, 1);
+      submitShockwaveMaterial.opacity = shockVisible ? 0.78 * Math.exp(-shockElapsed * 1.7) : 0;
+    }
     if (dissolveRef.current) {
       const camera = state.camera;
       const forward = new THREE.Vector3();
@@ -549,15 +631,15 @@ export default function ActSixWorld({
         .addScaledVector(forward, cameraDistance)
         .addScaledVector(right, panelCenterX * halfViewHeight * aspect)
         .addScaledVector(up, panelCenterY * halfViewHeight);
-      if (groupRef.current) {
+      if (galaxySystemGroup.current) {
         // The dissolve plane is nested under the transformed galaxy group, so
         // convert the camera-space panel pose into that parent's local frame.
-        groupRef.current.updateWorldMatrix(true, false);
-        groupRef.current.worldToLocal(panelWorldPosition);
-        const galaxyWorldQuaternion = groupRef.current.getWorldQuaternion(new THREE.Quaternion());
+        galaxySystemGroup.current.updateWorldMatrix(true, false);
+        galaxySystemGroup.current.worldToLocal(panelWorldPosition);
+        const galaxyWorldQuaternion = galaxySystemGroup.current.getWorldQuaternion(new THREE.Quaternion());
         dissolveRef.current.quaternion.copy(galaxyWorldQuaternion.invert().multiply(camera.quaternion));
         if (panelRect) {
-          const parentScale = groupRef.current.scale.x || 1;
+          const parentScale = galaxySystemGroup.current.scale.x || 1;
           const widthWorld = (panelRect.width / state.size.width) * 2 * halfViewHeight * aspect;
           const heightWorld = (panelRect.height / state.size.height) * 2 * halfViewHeight;
           dissolveRef.current.scale.set(widthWorld / (3.45 * parentScale), heightWorld / (3.85 * parentScale), 1 / parentScale);
@@ -566,29 +648,31 @@ export default function ActSixWorld({
       dissolveRef.current.position.copy(panelWorldPosition);
       dissolveRef.current.visible = submitRequested.current && submitted && dissolveProgress < 1;
       dissolveRef.current.updateMatrixWorld();
-      if (groupRef.current) {
-        const coreWorld = groupRef.current.localToWorld(new THREE.Vector3());
+      if (galaxySystemGroup.current) {
+        const coreWorld = galaxySystemGroup.current.localToWorld(new THREE.Vector3());
         dissolveMaterial.uniforms.uCore.value.copy(dissolveRef.current.worldToLocal(coreWorld));
       }
     }
 
-    if (groupRef.current) {
-      groupRef.current.visible = material.uniforms.uReveal.value > 0.002;
+    if (galaxySystemGroup.current) {
+      galaxySystemGroup.current.visible = material.uniforms.uReveal.value > 0.002;
     }
   });
 
   return (
-    <group ref={groupRef} position={[1.25, 0.1, -7.35]} rotation={[0.11, -0.08, 0.27]} scale={1.68}>
+    <group ref={galaxySystemGroup} name="galaxySystemGroup" position={[1.25, 0.1, -7.35]} rotation={[0.11, -0.08, 0.27]} scale={1.68}>
       <pointLight color="#ffd07a" intensity={7} distance={12} decay={2} />
       <pointLight position={[-1.3, 0.7, 1.6]} color="#ff7a10" intensity={1.2} distance={9} decay={2} />
-      <NebulaCloudLayers reveal={reveal} />
+      <NebulaCloudLayers reveal={reveal} motion={motion} />
       <points geometry={geometry} frustumCulled={false} renderOrder={2}>
         <primitive object={material} attach="material" />
       </points>
+      <AnamorphicCoreFlare reveal={reveal} />
       <points ref={dissolveRef} geometry={dissolveGeometry} frustumCulled={false} visible={false} renderOrder={20}>
         <primitive object={dissolveMaterial} attach="material" />
       </points>
       <mesh ref={focusRingRef} geometry={focusRingGeometry} material={focusRingMaterial} position={[0, 0, 0.015]} visible={false} renderOrder={10} />
+      <mesh ref={submitShockwaveRef} geometry={focusRingGeometry} material={submitShockwaveMaterial} position={[0, 0, 0.035]} visible={false} renderOrder={11} />
     </group>
   );
 }

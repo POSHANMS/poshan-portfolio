@@ -2148,3 +2148,186 @@ canvas {
   .act-six-contact-stage .act-six-social-link { min-height: 3rem; }
   .act-six-contact-stage textarea.act-six-glass-input { min-height: 4.4rem; }
 }
+
+/* Act VI: independent left HUD and right transmission desk leave the galaxy clear. */
+.act-six-contact-panel {
+  width: 100vw;
+  height: 100dvh;
+  max-height: none;
+  overflow: visible;
+  pointer-events: none;
+}
+.act-six-contact-stage {
+  display: grid;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: center;
+  column-gap: clamp(0.65rem, 1.15vw, 1.4rem);
+  padding: clamp(5rem, 8vh, 7rem) clamp(1.5rem, 4vw, 5rem);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.act-six-contact-stage::before { display: none; }
+.act-six-scene-glow {
+  z-index: -1;
+  background:
+    radial-gradient(ellipse at 53% 50%, rgba(77, 111, 224, 0.045), transparent 34%),
+    radial-gradient(ellipse at 73% 55%, rgba(255, 174, 65, 0.045), transparent 30%);
+}
+.act-six-contact-stage > .act-six-contact-identity {
+  grid-column: 1 / span 3;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.act-six-contact-identity h2 { font-size: clamp(3rem, 4.7vw, 5.15rem); }
+.act-six-contact-stage .act-six-contact-rail {
+  gap: 0.3rem;
+  margin-top: clamp(1rem, 3vh, 2rem);
+}
+.act-six-contact-stage .act-six-social-link {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) 1rem;
+  min-height: 3rem;
+  justify-content: initial;
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+  border: 0;
+  border-bottom: 1px solid rgba(226, 231, 255, 0.14);
+  border-radius: 0;
+  background: transparent;
+}
+.act-six-contact-stage .act-six-social-link:hover,
+.act-six-contact-stage .act-six-social-link:focus-visible {
+  transform: translateX(3px);
+  border-bottom-color: rgba(255, 131, 151, 0.5);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.045), transparent 78%);
+  box-shadow: none;
+}
+.act-six-contact-stage .act-six-social-icon { width: 1.5rem; height: 1.5rem; }
+.act-six-contact-stage .act-six-social-icon svg { width: 1.2rem; height: 1.2rem; }
+.act-six-contact-stage .act-six-social-label { font-size: 0.6rem; }
+.act-six-contact-stage .act-six-social-value { font-size: clamp(0.68rem, 0.78vw, 0.82rem); }
+.act-six-contact-stage .act-six-email-link .act-six-social-value { font-size: clamp(0.63rem, 0.7vw, 0.74rem); }
+.act-six-contact-stage .act-six-channel-status { margin-top: 1rem; font-size: 0.56rem; }
+
+.act-six-contact-stage > .act-six-contact-form {
+  grid-column: 8 / span 5;
+  justify-self: end;
+  width: min(100%, 560px);
+  max-height: min(88dvh, 900px);
+  padding: clamp(1.25rem, 1.8vw, 1.8rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(224, 231, 255, 0.3);
+  border-radius: 8px;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+  background:
+    linear-gradient(126deg, rgba(255, 255, 255, 0.09), transparent 26% 64%, rgba(118, 147, 255, 0.055)),
+    linear-gradient(140deg, rgba(19, 16, 24, 0.86), rgba(8, 9, 16, 0.77) 58%, rgba(24, 14, 20, 0.82));
+  -webkit-backdrop-filter: blur(24px) saturate(138%);
+  backdrop-filter: blur(24px) saturate(138%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 1px 0 0 rgba(201, 214, 255, 0.13),
+    inset 0 -1px 0 rgba(255, 82, 112, 0.18),
+    0 28px 76px rgba(0, 0, 0, 0.38),
+    0 0 44px rgba(143, 162, 255, 0.07);
+  transform-style: preserve-3d;
+  transition: border-color 320ms ease, box-shadow 320ms ease;
+}
+.act-six-contact-stage > .act-six-contact-form:not(.act-six-transmission-success)::before {
+  display: block;
+  inset: 4px -5px -6px 4px;
+  border: 1px solid rgba(209, 218, 255, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(99, 109, 139, 0.23), rgba(10, 8, 13, 0.48));
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+.act-six-contact-stage > .act-six-contact-form:not(.act-six-transmission-success)::after {
+  display: block;
+  inset: 0;
+  border-radius: 8px;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+.act-six-contact-stage .act-six-contact-form:hover {
+  border-color: rgba(235, 239, 255, 0.48);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 30px 82px rgba(0, 0, 0, 0.46), 0 0 50px rgba(177, 188, 255, 0.09);
+}
+.act-six-contact-stage .act-six-contact-form > .relative.z-10.mb-6 {
+  margin-bottom: 1.15rem;
+  padding-bottom: 1.05rem;
+}
+.act-six-contact-stage .act-six-contact-form > .relative.z-10.mb-6 .mb-4 { margin-bottom: 0.8rem; }
+.act-six-contact-stage .act-six-compose-title {
+  padding-left: 0.75rem;
+  font-size: clamp(1.75rem, 2.25vw, 2.2rem);
+  font-family: var(--font-inter), Inter, ui-sans-serif, sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+}
+.act-six-contact-stage .act-six-field-label {
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.98);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.095em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+}
+.act-six-contact-stage .act-six-glass-input {
+  min-height: 3.1rem;
+  padding: 0.78rem 0.5rem;
+  border-radius: 0;
+  background: rgba(4, 5, 10, 0.22);
+  border-bottom-color: rgba(255, 255, 255, 0.42);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 550;
+}
+.act-six-contact-stage .act-six-glass-input::placeholder { color: rgba(255, 255, 255, 0.78); }
+.act-six-contact-stage textarea.act-six-glass-input { min-height: 7rem; padding-top: 0.8rem; }
+.act-six-contact-stage .relative.z-10.grid { row-gap: 1rem; }
+.act-six-contact-stage .act-six-contact-form > .relative.z-10.mt-5 {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+}
+.act-six-contact-stage .act-six-contact-form > .relative.z-10.mt-5 p { max-width: 10.5rem; font-size: 0.69rem; line-height: 1.35; }
+.act-six-contact-stage .act-six-transmit-button { min-height: 2.85rem; padding: 0.72rem 0.9rem; }
+.act-six-contact-stage .act-six-transmission-success { min-height: 19rem; }
+
+@media (max-width: 1099px) {
+  .act-six-contact-stage {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    justify-items: center;
+    row-gap: 1.6rem;
+    padding: 5rem 1.5rem 4rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .act-six-contact-stage > .act-six-contact-identity,
+  .act-six-contact-stage > .act-six-contact-form { grid-column: 1; width: min(100%, 520px); justify-self: center; }
+  .act-six-contact-stage > .act-six-contact-identity { padding: 1rem 0 0; }
+  .act-six-contact-identity h2 { font-size: clamp(2.8rem, 8vw, 4.1rem); }
+  .act-six-contact-stage .act-six-contact-rail { margin-top: 0.9rem; }
+  .act-six-contact-stage .act-six-social-link { min-height: 2.7rem; }
+  .act-six-contact-stage .act-six-channel-status { margin-top: 0.8rem; }
+  .act-six-contact-stage > .act-six-contact-form { max-height: none; }
+}
+@media (max-height: 760px) and (min-width: 1100px) {
+  .act-six-contact-stage { padding-top: 4rem; padding-bottom: 3.5rem; }
+  .act-six-contact-stage .act-six-contact-rail { margin-top: 0.7rem; }
+  .act-six-contact-stage .act-six-social-link { min-height: 2.55rem; }
+  .act-six-contact-stage > .act-six-contact-form { max-height: 88dvh; padding: 1rem; }
+  .act-six-contact-stage .act-six-contact-form > .relative.z-10.mb-6 { margin-bottom: 0.8rem; padding-bottom: 0.75rem; }
+  .act-six-contact-stage .act-six-glass-input { min-height: 2.8rem; padding-block: 0.65rem; }
+  .act-six-contact-stage textarea.act-six-glass-input { min-height: 5rem; }
+}

@@ -145,7 +145,9 @@ export default function PostProcessing({ hologramActive, cosmicActive, reactorAc
     const progressVelocity = Math.abs(scrollProgress - previousProgress.current) / Math.max(safeDelta, 1 / 240);
     previousProgress.current = scrollProgress;
     const actFive = reactorActive ? 1 : 0;
-    const transfer = THREE.MathUtils.smoothstep(progressVelocity, 0.025, 0.32) * actFive;
+    const actSix = cosmicActive ? 1 : 0;
+    const opticalWindow = actFive || actSix ? 1 : 0;
+    const transfer = THREE.MathUtils.smoothstep(progressVelocity, 0.025, 0.32) * opticalWindow;
     transitionEnergy.current = THREE.MathUtils.damp(transitionEnergy.current, transfer, 5.5, safeDelta);
 
     if (bokehPassRef.current) {
@@ -160,9 +162,11 @@ export default function PostProcessing({ hologramActive, cosmicActive, reactorAc
       bokehPassRef.current.enabled = depthOfFieldEnabled && reactorActive === true;
     }
     if (lensPassRef.current) {
-      lensPassRef.current.uniforms.uChromatic.value = actFive * (0.00018 + transitionEnergy.current * 0.00115);
-      lensPassRef.current.uniforms.uVignette.value = actFive * 0.18;
-      lensPassRef.current.enabled = reactorActive === true;
+      lensPassRef.current.uniforms.uChromatic.value = actFive
+        ? 0.00018 + transitionEnergy.current * 0.00115
+        : actSix ? transitionEnergy.current * 0.00135 : 0;
+      lensPassRef.current.uniforms.uVignette.value = actFive * 0.18 + actSix * transitionEnergy.current * 0.08;
+      lensPassRef.current.enabled = reactorActive === true || cosmicActive === true;
     }
 
     if (bloomPassRef.current) {

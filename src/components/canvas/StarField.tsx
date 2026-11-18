@@ -134,6 +134,7 @@ export default function StarField({
   cameraFramed = false,
   warpProgress = 0,
   cameraParallax = 0,
+  handoffProgress = 0,
 }: {
   starsOpacity?: number;
   showConstellations?: boolean;
@@ -141,6 +142,7 @@ export default function StarField({
   cameraFramed?: boolean;
   warpProgress?: number;
   cameraParallax?: number;
+  handoffProgress?: number;
 }) {
   const fieldRef = useRef<THREE.Group>(null);
   const starsRef = useRef<THREE.Points>(null);
@@ -246,7 +248,7 @@ export default function StarField({
 
   const starMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, uWarp: { value: 0 }, ...cardContrast },
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, uWarp: { value: 0 }, uHandoff: { value: 0 }, ...cardContrast },
       vertexShader: `
         attribute float aSize;
         attribute float aPhase;
@@ -269,7 +271,8 @@ export default function StarField({
           clipPosition.xy += vWarpDirection * uWarp * 0.16 * clipPosition.w;
           gl_Position = clipPosition;
           vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
-          gl_PointSize = aSize * (1.0 + uWarp * 3.5);
+          float authoredPointSize = aSize * (1.0 + uWarp * 3.5);
+          gl_PointSize = authoredPointSize;
         }
       `,
       fragmentShader: `
@@ -281,6 +284,7 @@ export default function StarField({
         uniform vec2 uCardHalfSize;
         uniform float uCardDim;
         uniform float uWarp;
+        uniform float uHandoff;
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
           float d = length(uv);
@@ -296,7 +300,13 @@ export default function StarField({
           float cardRadius = length(cardUv);
           float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
           float contrast = mix(1.0, 0.4, cardMask * uCardDim);
-          gl_FragColor = vec4(1.0, 0.75, 0.78, (core + glow) * vAlpha * uOpacity * contrast);
+          vec3 crimson = vec3(1.0, 0.08, 0.18);
+          vec3 amber = vec3(1.0, 0.56, 0.16);
+          vec3 starlight = vec3(0.72, 0.84, 1.0);
+          vec3 transferColor = mix(crimson, amber, smoothstep(0.0, 0.52, uHandoff));
+          transferColor = mix(transferColor, starlight, smoothstep(0.48, 1.0, uHandoff));
+          vec3 starColor = mix(vec3(1.0, 0.75, 0.78), transferColor, uHandoff);
+          gl_FragColor = vec4(starColor, (core + glow) * vAlpha * uOpacity * contrast);
         }
       `,
       transparent: true,
@@ -307,7 +317,7 @@ export default function StarField({
 
   const heroStarMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, ...cardContrast },
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, uHandoff: { value: 0 }, ...cardContrast },
       vertexShader: `
         attribute float aSize;
         attribute float aPhase;
@@ -332,6 +342,7 @@ export default function StarField({
         uniform vec2 uCardCenter;
         uniform vec2 uCardHalfSize;
         uniform float uCardDim;
+        uniform float uHandoff;
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
           float d = length(uv);
@@ -344,6 +355,8 @@ export default function StarField({
           float cardRadius = length(cardUv);
           float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
           float contrast = mix(1.0, 0.4, cardMask * uCardDim);
+          vec3 transferColor = mix(vec3(1.0, 0.06, 0.14), vec3(0.7, 0.84, 1.0), smoothstep(0.08, 0.92, uHandoff));
+          color = mix(color, transferColor, uHandoff * 0.88);
           gl_FragColor = vec4(color, (core + glow + ring) * vAlpha * 0.85 * uOpacity * contrast);
         }
       `,
@@ -402,8 +415,10 @@ export default function StarField({
     starMaterial.uniforms.uTime.value = t;
     starMaterial.uniforms.uOpacity.value = starsOpacity;
     starMaterial.uniforms.uWarp.value = warpProgress;
+    starMaterial.uniforms.uHandoff.value = handoffProgress;
     heroStarMaterial.uniforms.uTime.value = t;
     heroStarMaterial.uniforms.uOpacity.value = starsOpacity;
+    heroStarMaterial.uniforms.uHandoff.value = handoffProgress;
     lineMaterial.uniforms.uTime.value = t;
     lineMaterial.uniforms.uOpacity.value = starsOpacity;
     if (starsRef.current) starsRef.current.rotation.y = t * 0.0005;

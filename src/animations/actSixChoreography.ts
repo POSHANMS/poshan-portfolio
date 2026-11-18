@@ -1,13 +1,16 @@
 import * as THREE from "three";
 
 const CAMERA_POSITIONS = [
+  // The first pose exactly matches Act V's exit, preserving the shared shot.
   new THREE.Vector3(0, 0.55, 10.2),
-  new THREE.Vector3(10.4, 2.0, 5.5),
-  new THREE.Vector3(16.4, 1.0, -7.35),
-  new THREE.Vector3(10.0, 0.2, -22.0),
-  new THREE.Vector3(-10.0, 0.6, -22.0),
-  new THREE.Vector3(-14.0, 0.4, -7.35),
-  // Land in front-left after a broad, smooth orbit around the fixed galaxy.
+  // Rise above the disk before dropping into a low orbital sweep.
+  new THREE.Vector3(2.5, 12.0, 5.8),
+  new THREE.Vector3(13.0, 4.0, -1.0),
+  new THREE.Vector3(15.0, 0.0, -12.0),
+  new THREE.Vector3(2.0, 0.25, -24.0),
+  new THREE.Vector3(-12.0, 1.0, -19.0),
+  new THREE.Vector3(-11.0, 0.0, -3.0),
+  // Land in front-left while the galaxy core holds in the open middle stage.
   new THREE.Vector3(-4.2, 0.4, 9.6),
 ];
 
@@ -18,19 +21,22 @@ const CAMERA_TARGETS = [
   new THREE.Vector3(1.25, 0.1, -7.35),
   new THREE.Vector3(1.25, 0.1, -7.35),
   new THREE.Vector3(1.25, 0.1, -7.35),
-  // Aim left of the galaxy on the final approach so it lands frame-right.
-  new THREE.Vector3(-3.4, 0.08, -7.35),
+  new THREE.Vector3(1.25, 0.1, -7.35),
+  // A small target offset puts the core into the unobstructed central column.
+  new THREE.Vector3(-0.2, 0.08, -7.35),
 ];
 
 const POSITION_CURVE = new THREE.CatmullRomCurve3(CAMERA_POSITIONS, false, "centripetal", 0.45);
 const TARGET_CURVE = new THREE.CatmullRomCurve3(CAMERA_TARGETS, false, "centripetal", 0.45);
 const LENS_KEYS = [
-  { at: 0, fov: 51 },
-  { at: 0.14, fov: 66 },
-  { at: 0.34, fov: 58 },
-  { at: 0.58, fov: 48 },
-  { at: 0.82, fov: 43 },
-  { at: 1, fov: 44 },
+  { at: 0, fov: 45 },
+  { at: 0.12, fov: 67 },
+  { at: 0.2, fov: 80 },
+  { at: 0.37, fov: 61 },
+  { at: 0.58, fov: 49 },
+  { at: 0.8, fov: 43 },
+  { at: 0.94, fov: 41 },
+  { at: 1, fov: 40 },
 ] as const;
 
 function smoothstep01(value: number) {
@@ -54,18 +60,15 @@ function lensAt(progress: number) {
 export function getActSixCameraPose(progress: number, elapsedTime: number) {
   const t = THREE.MathUtils.clamp(progress, 0, 1);
   const settled = smoothstep01((t - 0.82) / 0.18);
-  // The camera makes one broad orbital pass; only a restrained bank and pitch
-  // sell weight through the turn. It never barrel-rolls or cuts through the core.
-  const turnEnvelope = Math.sin(Math.PI * smoothstep01(t / 0.88));
-  const bank = 0.16 * turnEnvelope + Math.sin(t * Math.PI * 2) * 0.025 * (1 - settled);
-  const pitch = 0.09 * Math.sin(Math.PI * smoothstep01((t - 0.08) / 0.82));
-  const yaw = 0.08 * Math.sin(Math.PI * smoothstep01((t - 0.12) / 0.78));
+  // One controlled 12-degree Dutch bank gives the orbit cinematic weight,
+  // then eases level as the viewer reaches the contact composition.
+  const turnEnvelope = Math.sin(Math.PI * smoothstep01(t / 0.96));
+  const bank = 0.21 * turnEnvelope + Math.sin(t * Math.PI * 2) * 0.018 * (1 - settled);
+  const pitch = 0.12 * Math.sin(Math.PI * smoothstep01((t - 0.04) / 0.9));
+  const yaw = 0.075 * Math.sin(Math.PI * smoothstep01((t - 0.1) / 0.82));
   const idleDrift = Math.sin(elapsedTime * 0.095) * 0.035 * settled;
   const position = POSITION_CURVE.getPointAt(t);
   position.x += idleDrift;
-  // A shallow dolly creates parallax without carrying the lens through the disk.
-  const inwardDolly = Math.sin(Math.PI * t) * 1.15 * (1 - settled);
-  position.addScaledVector(position.clone().sub(new THREE.Vector3(1.25, 0.1, -7.35)).normalize(), -inwardDolly);
 
   return {
     position,

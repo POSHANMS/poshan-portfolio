@@ -153,6 +153,10 @@ export default function Scene({
   const actSixStrength = smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress);
   const actSixFlight = THREE.MathUtils.clamp((scrollProgress - ACT_FIVE_TIMING.sceneExit) / (1 - ACT_FIVE_TIMING.sceneExit), 0, 1);
   const actSixWarpProgress = smoothstep(0.02, 0.12, actSixFlight) * (1 - smoothstep(0.46, 0.62, actSixFlight));
+  const handoffProgress = Math.max(
+    smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress),
+    actSixWarpProgress,
+  );
   const isActSix = actSixStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
   const isInsideProjectCore = actFourPhase === "inside";
   const isProjectTransit = actFourPhase === "warping" || isInsideProjectCore;
@@ -203,6 +207,7 @@ export default function Scene({
               cameraFramed={isActFive || isActSix}
               warpProgress={isActSix ? actSixWarpProgress : 0}
               cameraParallax={isActSix ? 0.24 : 0}
+              handoffProgress={handoffProgress}
             />
             {!isActFive && !isActSix && <ShootingStars />}
           </group>

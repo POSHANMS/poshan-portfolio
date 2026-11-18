@@ -638,6 +638,7 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
   const [transmissionSent, setTransmissionSent] = useState(false);
   const [transmissionError, setTransmissionError] = useState<string | null>(null);
   const [emailCopied, setEmailCopied] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const transmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transmitAbortRef = useRef<AbortController | null>(null);
   const pulse = 0.82 + Math.sin(progress * Math.PI * 4) * 0.18;
@@ -691,10 +692,24 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
     }
   };
 
+  const handleStagePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "touch" || !formRef.current) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const normalizedX = (event.clientX - bounds.left) / Math.max(bounds.width, 1) * 2 - 1;
+    const normalizedY = (event.clientY - bounds.top) / Math.max(bounds.height, 1) * 2 - 1;
+    formRef.current.style.setProperty("--act-six-tilt-x", `${-normalizedY * 1.5}deg`);
+    formRef.current.style.setProperty("--act-six-tilt-y", `${normalizedX * 1.5}deg`);
+  };
+
+  const resetStagePointer = () => {
+    formRef.current?.style.setProperty("--act-six-tilt-x", "0deg");
+    formRef.current?.style.setProperty("--act-six-tilt-y", "0deg");
+  };
+
   return (
-    <Panel presence={presence} side="left" verticallyCentered className="act-six-contact-panel left-4 top-1/2 sm:left-8 lg:left-[4.2vw]">
-      <div className="act-six-contact-stage relative grid gap-5 p-5">
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_100%_55%,rgba(255,24,58,0.13),rgba(255,24,58,0.04)_42%,transparent_78%)] blur-xl" />
+    <Panel presence={presence} side="left" className="act-six-contact-panel inset-0">
+      <div className="act-six-contact-stage relative grid" onPointerMove={handleStagePointerMove} onPointerLeave={resetStagePointer}>
+        <div className="act-six-scene-glow pointer-events-none absolute inset-0" aria-hidden="true" />
 
         <section
           className="act-six-contact-identity relative flex flex-col justify-center"
@@ -734,14 +749,15 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
         </section>
 
         {transmissionSent ? (
-          <div className="act-six-transmission-card act-six-transmission-success relative grid min-h-52 place-items-center p-6 text-center" role="status" aria-live="polite">
+          <div className="act-six-transmission-card act-six-contact-form act-six-transmission-success relative grid min-h-52 place-items-center p-6 text-center" role="status" aria-live="polite">
             <div><Radio className="mx-auto mb-4 h-8 w-8 text-[#ff526b] act-six-success-pulse" /><p className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/60">Act VI / Channel complete</p><h3 className="mt-3 text-3xl font-black uppercase tracking-tight text-white">Transmission Sent.</h3><p className="mt-3 text-sm text-white/65">Your message is on its way. Thank you for reaching out.</p></div>
           </div>
         ) : <form
+          ref={formRef}
           onSubmit={handleMessageSubmit}
           aria-hidden={formSignal < 0.78}
-          className={`act-six-transmission-card relative p-0 ${isTransmitting ? "act-six-form-dissolving" : ""}`}
-          style={{ opacity: formSignal, transform: `translate3d(0, ${(1 - formSignal) * 24}px, 0) perspective(1100px) rotateY(${(1 - formSignal) * -2.5}deg)`, pointerEvents: formSignal > 0.78 ? "auto" : "none", willChange: "opacity, transform" }}
+          className={`act-six-transmission-card act-six-contact-form relative p-0 ${isTransmitting ? "act-six-form-dissolving" : ""}`}
+          style={{ opacity: formSignal, transform: `translate3d(0, ${(1 - formSignal) * 24}px, 0) perspective(1200px) rotateY(${(1 - formSignal) * -2.5}deg) rotateX(var(--act-six-tilt-x, 0deg)) rotateY(var(--act-six-tilt-y, 0deg))`, pointerEvents: formSignal > 0.78 ? "auto" : "none", willChange: "opacity, transform" }}
         >
           <div className="act-six-card-sheen pointer-events-none absolute inset-0" aria-hidden="true" />
           <div className="act-six-card-edge" aria-hidden="true"><span /></div>
@@ -753,9 +769,9 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
                 {transmissionSent ? "Transmission sent" : isTransmitting ? "Sending securely" : "Ready to connect"}
               </span>
             </div>
-            <h3 className="act-six-compose-title">Send a message</h3>
+            <h3 className="act-six-compose-title">SEND A MESSAGE</h3>
           </div>
-          <div className="relative z-10 grid gap-x-5 gap-y-4 sm:grid-cols-2">
+          <div className="relative z-10 grid gap-x-5 gap-y-3 sm:grid-cols-2">
             <label className="sr-only" aria-hidden="true">Leave this field blank<input name="website" tabIndex={-1} autoComplete="off" /></label>
             <label className="act-six-field-label">
               First name

@@ -120,6 +120,7 @@ const SWARM_VERTEX_SHADER = /* glsl */ `
   attribute float aHeat;
   uniform float uTime;
   uniform float uReveal;
+  uniform float uExitProgress;
   uniform vec2 uCardCenter;
   uniform vec2 uCardHalfSize;
   uniform float uCardDim;
@@ -132,6 +133,14 @@ const SWARM_VERTEX_SHADER = /* glsl */ `
     float angle = uTime * aSpeed * (0.48 + 1.8 / (radius + 1.1));
     float c = cos(angle), s = sin(angle);
     p.xz = mat2(c, -s, s, c) * p.xz;
+    // Implode the accretion swarm with a cubic ease, then release the
+    // compressed energy outward into the Act VI warp handoff.
+    float implosion = pow(clamp(uExitProgress, 0.0, 1.0), 3.0);
+    float collapse = smoothstep(0.0, 0.82, uExitProgress);
+    float burst = smoothstep(0.72, 1.0, uExitProgress);
+    vec2 outward = normalize(p.xz + vec2(0.0001));
+    p.xz *= 1.0 - collapse * 0.96 * implosion;
+    p.xz += outward * burst * 3.8;
     p.y *= 0.86;
     p.y += sin(uTime * 0.72 + aPhase + radius * 0.6) * 0.11;
     p.x += sin(uTime * 0.31 + aPhase * 1.7 + p.z) * 0.045;
@@ -139,8 +148,12 @@ const SWARM_VERTEX_SHADER = /* glsl */ `
     p.xz *= 1.0 + sin(uTime * 0.38 + aPhase) * 0.022;
     vec3 ember = vec3(0.22, 0.001, 0.012);
     vec3 hot = vec3(1.0, 0.018, 0.085);
-    vColor = mix(ember, hot, smoothstep(0.34, 0.98, aHeat));
-    vAlpha = (0.54 + 0.46 * sin(uTime * 1.8 + aPhase)) * uReveal;
+    vec3 amber = vec3(1.0, 0.42, 0.075);
+    vec3 starlight = vec3(0.64, 0.79, 1.0);
+    vec3 reactorColor = mix(ember, hot, smoothstep(0.34, 0.98, aHeat));
+    vec3 transferColor = mix(amber, starlight, smoothstep(0.42, 1.0, uExitProgress));
+    vColor = mix(reactorColor, transferColor, smoothstep(0.0, 0.24, uExitProgress));
+    vAlpha = (0.54 + 0.46 * sin(uTime * 1.8 + aPhase)) * uReveal * (1.0 - burst * 0.18);
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     vec4 clipPosition = projectionMatrix * mv;
     gl_Position = clipPosition;
@@ -398,11 +411,11 @@ function CoreShader({ strength }: { strength: number }) {
   );
 }
 
-function AccretionSwarm({ geometry, strength, cardContrast }: { geometry: THREE.BufferGeometry; strength: number; cardContrast: CardContrastUniforms }) {
+function AccretionSwarm({ geometry, strength, exitProgress, cardContrast }: { geometry: THREE.BufferGeometry; strength: number; exitProgress: number; cardContrast: CardContrastUniforms }) {
   const pointsRef = useRef<THREE.Points>(null);
   const cloudRef = useRef<THREE.Group>(null);
   const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uReveal: { value: 0 }, ...cardContrast },
+    uniforms: { uTime: { value: 0 }, uReveal: { value: 0 }, uExitProgress: { value: 0 }, ...cardContrast },
     vertexShader: SWARM_VERTEX_SHADER,
     fragmentShader: SWARM_FRAGMENT_SHADER,
     transparent: true,
@@ -413,6 +426,7 @@ function AccretionSwarm({ geometry, strength, cardContrast }: { geometry: THREE.
   useFrame(({ clock }, delta) => {
     material.uniforms.uTime.value = clock.getElapsedTime();
     material.uniforms.uReveal.value = THREE.MathUtils.damp(material.uniforms.uReveal.value, strength, 6, delta);
+    material.uniforms.uExitProgress.value = THREE.MathUtils.damp(material.uniforms.uExitProgress.value, exitProgress, 7.5, delta);
     if (pointsRef.current) pointsRef.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.07) * 0.06;
   });
   return (
@@ -422,7 +436,7 @@ function AccretionSwarm({ geometry, strength, cardContrast }: { geometry: THREE.
   );
 }
 
-function Reactor({ strength, swarmGeometry, cardContrast }: { strength: number; swarmGeometry: THREE.BufferGeometry; cardContrast: CardContrastUniforms }) {
+function Reactor({ strength, exitProgress, swarmGeometry, cardContrast }: { strength: number; exitProgress: number; swarmGeometry: THREE.BufferGeometry; cardContrast: CardContrastUniforms }) {
   const assembly = useRef<THREE.Group>(null);
   const light = useRef<THREE.PointLight>(null);
   useFrame(({ clock }) => {
@@ -434,7 +448,7 @@ function Reactor({ strength, swarmGeometry, cardContrast }: { strength: number; 
       <pointLight ref={light} color="#ff1238" intensity={2.6} distance={15} decay={1.8} />
       <pointLight position={[-2.2, 1.4, 2.5]} color="#a8001e" intensity={0.65 * strength} distance={9} decay={2} />
       <CoreShader strength={strength} />
-      <AccretionSwarm geometry={swarmGeometry} strength={strength} cardContrast={cardContrast} />
+      <AccretionSwarm geometry={swarmGeometry} strength={strength} exitProgress={exitProgress} cardContrast={cardContrast} />
       {[2.35, 3.12, 3.92].map((radius, index) => <ReactorRing key={radius} radius={radius} index={index} strength={strength} />)}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[2.38, 0.012, 8, 180]} />
@@ -683,6 +697,7 @@ export default function ActFiveWorld({ scrollProgress, actFourPhase, cardContras
   const reveal = THREE.MathUtils.smoothstep(scrollProgress, ACT_FIVE_TIMING.revealInStart, ACT_FIVE_TIMING.revealInEnd)
     * (1 - THREE.MathUtils.smoothstep(scrollProgress, ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit));
   const local = clamp01((scrollProgress - ACT_FIVE_TIMING.cameraStart) / (ACT_FIVE_TIMING.sceneExit - ACT_FIVE_TIMING.cameraStart));
+  const exitProgress = THREE.MathUtils.smoothstep(local, 0.68, 1.0);
   const transferStarts = [0.12, 0.29, 0.46];
   const checkpointEnds = [0.17, 0.34, 0.51];
   const weights: number[] = [0, 0, 0, 0];
@@ -740,7 +755,7 @@ export default function ActFiveWorld({ scrollProgress, actFourPhase, cardContras
       <ActFiveStarfield strength={reveal * (active ? 1 : 0)} cardContrast={cardContrast} />
       <group position={ACT_FIVE_ORIGIN} visible={active && reveal > 0.001}>
       <PolarGrid strength={reveal * (active ? 1 : 0)} />
-      <Reactor strength={reveal * (active ? 1 : 0)} swarmGeometry={swarmGeometry} cardContrast={cardContrast} />
+      <Reactor strength={reveal * (active ? 1 : 0)} exitProgress={exitProgress} swarmGeometry={swarmGeometry} cardContrast={cardContrast} />
       {CARD_CONTENT.map((_, index) => {
         const focus = weights[index] * (active ? 1 : 0);
         const opacity = reveal * (active ? 0.012 + focus * 0.988 : 0);
