@@ -1903,6 +1903,9 @@ canvas {
   .act-six-transmitting::after,
   .act-six-send-icon,
   .act-six-success-pulse,
+  .act-six-success-arrive,
+  .act-six-success-ring,
+  .act-six-success-overlay,
   .act-six-form-dissolving {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -1968,12 +1971,59 @@ canvas {
 }
 
 .act-six-form-dissolving { animation: act-six-form-signal 1.5s cubic-bezier(0.22, 0.72, 0.18, 1) forwards; pointer-events: none; }
-.act-six-transmission-success {
-  border-color: rgba(255, 129, 151, 0.5);
-  background: linear-gradient(140deg, rgba(40, 10, 18, 0.84), rgba(8, 6, 10, 0.78));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 50px rgba(255, 30, 66, 0.14);
-}
 .act-six-success-pulse { animation: act-six-success-pulse 1.4s ease-in-out infinite; }
+.act-six-success-arrive { animation: act-six-success-arrive 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.act-six-success-emblem { position: relative; display: grid; width: 4.5rem; height: 4.5rem; margin: 0 auto 0.8rem; place-items: center; }
+.act-six-success-ring { position: absolute; inset: 0.25rem; border: 1px solid rgba(255, 90, 119, 0.7); border-radius: 50%; animation: act-six-success-ring 2.2s ease-out infinite; }
+.act-six-success-ring-b { animation-delay: 1.1s; }
+.act-six-success-emblem svg { position: relative; z-index: 1; filter: drop-shadow(0 0 12px rgba(255, 45, 80, 0.75)); }
+.act-six-form-sent { overflow: hidden !important; }
+.act-six-form-sent > .relative.z-10 { visibility: hidden; }
+.act-six-success-overlay {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: clamp(1.25rem, 1.8vw, 1.8rem);
+  background: radial-gradient(ellipse at 50% 58%, rgba(255, 43, 77, 0.075), transparent 52%), linear-gradient(140deg, rgba(15, 12, 20, 0.24), rgba(7, 8, 14, 0.18));
+  -webkit-backdrop-filter: blur(7px) saturate(122%);
+  backdrop-filter: blur(7px) saturate(122%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  animation: act-six-success-glass-in 480ms ease-out both;
+}
+.act-six-success-header,
+.act-six-success-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.78);
+}
+.act-six-success-header { padding-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.2); text-shadow: 0 1px 10px rgba(0, 0, 0, 0.95); }
+.act-six-success-delivered { display: inline-flex; align-items: center; gap: 0.55rem; color: #ff91a2; }
+.act-six-success-delivered > span { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: #ff3554; box-shadow: 0 0 12px rgba(255, 53, 84, 0.8); }
+.act-six-success-content { display: grid; align-content: center; justify-items: center; padding: 1rem 0; text-align: center; }
+.act-six-success-title { margin-top: 0.65rem; padding: 0; font-size: clamp(1.8rem, 2.35vw, 2.3rem); text-shadow: 0 2px 18px rgba(0, 0, 0, 0.95), 0 0 28px rgba(255, 50, 83, 0.23); }
+.act-six-success-copy { max-width: 28rem; margin-top: 0.8rem; color: rgba(255, 255, 255, 0.94); font-size: 0.92rem; line-height: 1.65; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.96); }
+.act-six-success-footer { width: 100%; margin-top: 1.25rem; padding-top: 0.9rem; border-top: 1px solid rgba(255, 255, 255, 0.18); color: rgba(255, 255, 255, 0.72); font-size: 0.54rem; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9); }
+.act-six-success-footer strong { color: #ff9aaa; font-weight: 700; }
+@keyframes act-six-success-arrive {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); filter: blur(5px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes act-six-success-glass-in {
+  from { opacity: 0; backdrop-filter: blur(2px) saturate(100%); }
+  to { opacity: 1; backdrop-filter: blur(7px) saturate(122%); }
+}
+@keyframes act-six-success-ring {
+  0% { opacity: 0.85; transform: scale(0.68); }
+  100% { opacity: 0; transform: scale(1.55); }
+}
 @keyframes act-six-form-signal {
   0% { opacity: 1; filter: brightness(1); transform: scale(1); }
   18% { opacity: 1; filter: brightness(1.6); transform: scale(1.012); }
@@ -2217,6 +2267,28 @@ canvas {
 .act-six-contact-stage .act-six-social-value { font-size: clamp(0.68rem, 0.78vw, 0.82rem); }
 .act-six-contact-stage .act-six-email-link .act-six-social-value { font-size: clamp(0.63rem, 0.7vw, 0.74rem); }
 .act-six-contact-stage .act-six-channel-status { margin-top: 1rem; font-size: 0.56rem; }
+.act-six-resume-action { margin-top: clamp(0.8rem, 2vh, 1.2rem); }
+.act-six-resume-button {
+  display: flex;
+  width: 100%;
+  min-height: 3.45rem;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid rgba(255, 94, 121, 0.72);
+  padding: 0.8rem 1rem;
+  background: linear-gradient(105deg, rgba(150, 13, 42, 0.38), rgba(14, 10, 18, 0.42));
+  color: rgba(255, 255, 255, 0.94);
+  font-family: var(--font-inter), Inter, ui-sans-serif, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  font-style: normal;
+  text-align: left;
+  text-transform: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 22px rgba(255, 42, 83, 0.1);
+}
+.act-six-resume-button svg { width: 1.15rem; height: 1.15rem; color: #ff7489; }
+.act-six-resume-button:disabled { cursor: not-allowed; opacity: 0.88; }
 
 .act-six-contact-stage > .act-six-contact-form {
   grid-column: 8 / span 5;
@@ -2302,6 +2374,47 @@ canvas {
 .act-six-contact-stage .act-six-contact-form > .relative.z-10.mt-5 p { max-width: 10.5rem; font-size: 0.69rem; line-height: 1.35; }
 .act-six-contact-stage .act-six-transmit-button { min-height: 2.85rem; padding: 0.72rem 0.9rem; }
 .act-six-contact-stage .act-six-transmission-success { min-height: 19rem; }
+
+/* The delivery receipt replaces the desk contents inside the same 3D glass
+   chassis. Keep the chassis, but clear its dense desk tint so the galaxy can
+   be seen through the receipt just as it is through the live contact desk. */
+.act-six-contact-stage > .act-six-contact-form.act-six-form-sent {
+  overflow: hidden !important;
+  border-color: rgba(231, 237, 255, 0.48);
+  background:
+    radial-gradient(ellipse at 50% 56%, rgba(255, 52, 83, 0.11), transparent 53%),
+    linear-gradient(132deg, rgba(255, 255, 255, 0.075), rgba(16, 17, 27, 0.19) 48%, rgba(11, 12, 20, 0.23));
+  -webkit-backdrop-filter: blur(6px) saturate(126%);
+  backdrop-filter: blur(6px) saturate(126%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    inset 1px 0 0 rgba(197, 211, 255, 0.18),
+    inset 0 -1px 0 rgba(255, 91, 116, 0.22),
+    0 24px 70px rgba(0, 0, 0, 0.18),
+    0 0 42px rgba(174, 188, 255, 0.1);
+}
+.act-six-contact-stage > .act-six-contact-form.act-six-form-sent::before {
+  inset: 4px -5px -6px 4px;
+  border-color: rgba(225, 232, 255, 0.28);
+  background: linear-gradient(145deg, rgba(205, 216, 255, 0.09), rgba(12, 13, 21, 0.1));
+}
+.act-six-contact-stage > .act-six-contact-form.act-six-form-sent::after {
+  opacity: 0.58;
+}
+.act-six-contact-stage > .act-six-contact-form.act-six-form-sent .act-six-card-sheen {
+  opacity: 0.2;
+  animation: none;
+}
+.act-six-contact-stage > .act-six-contact-form.act-six-form-sent .act-six-card-edge {
+  opacity: 0.65;
+}
+.act-six-contact-stage > .act-six-contact-form.act-six-form-sent .act-six-success-overlay {
+  background:
+    radial-gradient(ellipse at 50% 58%, rgba(255, 43, 77, 0.06), transparent 52%),
+    linear-gradient(140deg, rgba(15, 12, 20, 0.12), rgba(7, 8, 14, 0.1));
+  -webkit-backdrop-filter: blur(3px) saturate(118%);
+  backdrop-filter: blur(3px) saturate(118%);
+}
 
 @media (max-width: 1099px) {
   .act-six-contact-stage {

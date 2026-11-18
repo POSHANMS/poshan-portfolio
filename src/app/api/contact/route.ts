@@ -53,12 +53,28 @@ export async function POST(request: Request) {
       cache: "no-store",
       signal: AbortSignal.timeout(12_000),
     });
-    const result = await providerResponse.json() as { success?: boolean; message?: string };
+    const responseText = await providerResponse.text();
+    let result: { success?: boolean; message?: string; body?: { message?: string } };
+    try {
+      result = JSON.parse(responseText) as typeof result;
+    } catch {
+      console.error("[contact] Web3Forms returned a non-JSON response", {
+        status: providerResponse.status,
+        contentType: providerResponse.headers.get("content-type") ?? "unknown",
+        responsePreview: responseText.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240),
+      });
+      return Response.json({ error: "The message service returned an unexpected response. Please try again shortly." }, { status: 502 });
+    }
     if (!providerResponse.ok || !result.success) {
+      console.error("[contact] Web3Forms rejected the submission", {
+        status: providerResponse.status,
+        providerMessage: result.message ?? result.body?.message ?? "No provider message",
+      });
       return Response.json({ error: "The message service could not accept your message. Please try again shortly." }, { status: 502 });
     }
     return Response.json({ ok: true });
-  } catch {
+  } catch (error) {
+    console.error("[contact] Web3Forms request failed", error instanceof Error ? error.message : "Unknown request error");
     return Response.json({ error: "The message service could not be reached. Please try again shortly." }, { status: 502 });
   }
 }

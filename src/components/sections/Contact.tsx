@@ -2,6 +2,7 @@
 
 import SectionShell from "./SectionShell";
 import { PROFILE } from "@/utils/constants";
+import { sendContactMessage } from "@/lib/contactDelivery";
 import { useState } from "react";
 
 export default function Contact() {
@@ -13,13 +14,14 @@ export default function Contact() {
     setSubmissionStatus("Sending securely…");
     const form = event.currentTarget;
     try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(new FormData(form).entries())),
+      const values = new FormData(form);
+      await sendContactMessage({
+        firstName: String(values.get("firstName") ?? ""),
+        email: String(values.get("email") ?? ""),
+        subject: String(values.get("subject") ?? ""),
+        message: String(values.get("message") ?? ""),
+        website: String(values.get("website") ?? ""),
       });
-      const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error || "The message could not be sent. Please try again.");
       setSubmissionStatus("Message sent. Thank you for reaching out.");
       form.reset();
     } catch (error) {

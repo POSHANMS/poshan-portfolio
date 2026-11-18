@@ -3,11 +3,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
+  Download,
   GraduationCap,
   Mail,
   Radio,
 } from "lucide-react";
 import { PROFILE, PROJECTS, RESUME_SUMMARY, SKILL_GROUPS, STATS } from "@/utils/constants";
+import { sendContactMessage } from "@/lib/contactDelivery";
 import HoldToWarp from "./HoldToWarp";
 import type { ActFourPhase } from "@/types/actFour";
 import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
@@ -667,14 +669,14 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
     }));
 
     try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(values.entries())),
-        signal: controller.signal,
-      });
-      const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error || "The message could not be sent. Please try again.");
+      await sendContactMessage({
+        firstName: String(values.get("firstName") ?? ""),
+        lastName: String(values.get("lastName") ?? ""),
+        email: String(values.get("email") ?? ""),
+        subject: String(values.get("subject") ?? ""),
+        message: String(values.get("message") ?? ""),
+        website: String(values.get("website") ?? ""),
+      }, controller.signal);
       await new Promise<void>((resolve) => {
         transmitTimeoutRef.current = setTimeout(() => {
           transmitTimeoutRef.current = null;
@@ -683,6 +685,10 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
       });
       setTransmissionSent(true);
       form.reset();
+      transmitTimeoutRef.current = setTimeout(() => {
+        transmitTimeoutRef.current = null;
+        setTransmissionSent(false);
+      }, 3200);
     } catch (error) {
       if (controller.signal.aborted) return;
       setTransmissionError(error instanceof Error ? error.message : "The message could not be sent. Please try again.");
@@ -745,18 +751,21 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
               <ArrowUpRight className="act-six-social-arrow" aria-hidden="true" />
             </a>
           </div>
+          <div className="act-six-resume-action" style={{ opacity: detailsSignal }}>
+            <button type="button" className="act-six-resume-button" disabled aria-label="Resume">
+              <Download aria-hidden="true" />
+              <span>Resume</span>
+            </button>
+          </div>
           <div className="act-six-channel-status mt-5" style={{ opacity: detailsSignal }}><span className="act-six-channel-status-light" />Available for work <span className="act-six-status-divider">/</span> Open to conversation</div>
         </section>
 
-        {transmissionSent ? (
-          <div className="act-six-transmission-card act-six-contact-form act-six-transmission-success relative grid min-h-52 place-items-center p-6 text-center" role="status" aria-live="polite">
-            <div><Radio className="mx-auto mb-4 h-8 w-8 text-[#ff526b] act-six-success-pulse" /><p className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/60">Act VI / Channel complete</p><h3 className="mt-3 text-3xl font-black uppercase tracking-tight text-white">Transmission Sent.</h3><p className="mt-3 text-sm text-white/65">Your message is on its way. Thank you for reaching out.</p></div>
-          </div>
-        ) : <form
+        <form
           ref={formRef}
           onSubmit={handleMessageSubmit}
           aria-hidden={formSignal < 0.78}
-          className={`act-six-transmission-card act-six-contact-form relative p-0 ${isTransmitting ? "act-six-form-dissolving" : ""}`}
+          aria-busy={isTransmitting}
+          className={`act-six-transmission-card act-six-contact-form relative p-0 ${isTransmitting ? "act-six-form-dissolving" : ""} ${transmissionSent ? "act-six-form-sent" : ""}`}
           style={{ opacity: formSignal, transform: `translate3d(0, ${(1 - formSignal) * 24}px, 0) perspective(1200px) rotateY(${(1 - formSignal) * -2.5}deg) rotateX(var(--act-six-tilt-x, 0deg)) rotateY(var(--act-six-tilt-y, 0deg))`, pointerEvents: formSignal > 0.78 ? "auto" : "none", willChange: "opacity, transform" }}
         >
           <div className="act-six-card-sheen pointer-events-none absolute inset-0" aria-hidden="true" />
@@ -803,7 +812,26 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
               <ArrowUpRight className={`h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 ${isTransmitting ? "act-six-send-icon" : ""}`} />
             </button>
           </div>
-        </form>}
+          {transmissionSent && (
+            <div className="act-six-success-overlay" role="status" aria-live="polite">
+              <div className="act-six-success-header">
+                <span>TRANSMISSION DESK <span className="mx-2 text-[#ff526b]">/</span> ACT VI</span>
+                <span className="act-six-success-delivered"><span />DELIVERED</span>
+              </div>
+              <div className="act-six-success-content act-six-success-arrive">
+                <div className="act-six-success-emblem" aria-hidden="true">
+                  <span className="act-six-success-ring act-six-success-ring-a" />
+                  <span className="act-six-success-ring act-six-success-ring-b" />
+                  <Radio className="h-8 w-8 text-[#ff7187] act-six-success-pulse" />
+                </div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/70">Act VI / Signal delivered</p>
+                <h3 className="act-six-compose-title act-six-success-title">TRANSMISSION SENT.</h3>
+                <p className="act-six-success-copy">Your message is on its way. The desk will reopen for another transmission in a moment.</p>
+                <div className="act-six-success-footer"><span>CHANNEL STATUS</span><strong>READY FOR NEXT SIGNAL</strong></div>
+              </div>
+            </div>
+          )}
+        </form>
       </div>
     </Panel>
   );
