@@ -89,7 +89,7 @@ const SOCIALS = [
   },
   {
     icon: FileText,
-    href: "mailto:siddeshwaraprasanna5@gmail.com",
+    href: "#contact",
     label: "Email",
     color: C.white,
   },

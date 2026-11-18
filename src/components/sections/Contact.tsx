@@ -2,8 +2,31 @@
 
 import SectionShell from "./SectionShell";
 import { PROFILE } from "@/utils/constants";
+import { useState } from "react";
 
 export default function Contact() {
+  const [emailCopied, setEmailCopied] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmissionStatus("Sending securely…");
+    const form = event.currentTarget;
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(new FormData(form).entries())),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "The message could not be sent. Please try again.");
+      setSubmissionStatus("Message sent. Thank you for reaching out.");
+      form.reset();
+    } catch (error) {
+      setSubmissionStatus(error instanceof Error ? error.message : "The message could not be sent. Please try again.");
+    }
+  };
+
   return (
     <SectionShell id="contact" eyebrow="// CONTACT" title="Start A Signal">
       <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
@@ -12,27 +35,35 @@ export default function Contact() {
             I am available for work and freelance projects. Reach out for full-stack web apps, API work, dashboards, real-time features, deployment, and polished interactive interfaces.
           </p>
           <div className="mt-8 space-y-3 font-mono text-sm">
-            <a className="block text-[var(--electric-blue)]" href={`mailto:${PROFILE.email}`}>{PROFILE.email}</a>
+            <button type="button" onClick={() => { void navigator.clipboard.writeText(PROFILE.email).then(() => setEmailCopied(true)).catch(() => setEmailCopied(false)); }} className="block text-left text-[var(--electric-blue)]" aria-label="Copy email address">
+              {emailCopied ? "Email copied" : PROFILE.email}
+            </button>
             <a className="block text-white/70 hover:text-white" href={PROFILE.github} target="_blank" rel="noreferrer">github.com/POSHANMS</a>
             <a className="block text-white/70 hover:text-white" href={PROFILE.linkedin} target="_blank" rel="noreferrer">linkedin.com/in/poshanms/</a>
           </div>
         </div>
-        <form className="grid gap-4 border border-white/10 bg-[rgba(5,5,8,0.72)] p-7 backdrop-blur-xl">
+        <form onSubmit={handleSubmit} className="grid gap-4 border border-white/10 bg-[rgba(5,5,8,0.72)] p-7 backdrop-blur-xl">
+          <label className="sr-only" aria-hidden="true">Leave this field blank<input name="website" tabIndex={-1} autoComplete="off" /></label>
           <label className="grid gap-2 font-mono text-xs uppercase tracking-[0.22em] text-white/45">
             Name
-            <input className="border border-white/10 bg-white/[0.035] px-4 py-3 font-sans text-sm normal-case tracking-normal text-white outline-none focus:border-[var(--electric-blue)]" aria-label="Name" />
+            <input name="firstName" required maxLength={60} autoComplete="name" className="border border-white/10 bg-white/[0.035] px-4 py-3 font-sans text-sm normal-case tracking-normal text-white outline-none focus:border-[var(--electric-blue)]" aria-label="Name" />
           </label>
           <label className="grid gap-2 font-mono text-xs uppercase tracking-[0.22em] text-white/45">
             Email
-            <input className="border border-white/10 bg-white/[0.035] px-4 py-3 font-sans text-sm normal-case tracking-normal text-white outline-none focus:border-[var(--electric-blue)]" aria-label="Email" type="email" />
+            <input name="email" required maxLength={254} autoComplete="email" className="border border-white/10 bg-white/[0.035] px-4 py-3 font-sans text-sm normal-case tracking-normal text-white outline-none focus:border-[var(--electric-blue)]" aria-label="Email" type="email" />
+          </label>
+          <label className="grid gap-2 font-mono text-xs uppercase tracking-[0.22em] text-white/45">
+            Subject
+            <input name="subject" required maxLength={120} className="border border-white/10 bg-white/[0.035] px-4 py-3 font-sans text-sm normal-case tracking-normal text-white outline-none focus:border-[var(--electric-blue)]" aria-label="Subject" />
           </label>
           <label className="grid gap-2 font-mono text-xs uppercase tracking-[0.22em] text-white/45">
             Message
-            <textarea className="min-h-36 border border-white/10 bg-white/[0.035] px-4 py-3 font-sans text-sm normal-case tracking-normal text-white outline-none focus:border-[var(--electric-blue)]" aria-label="Message" />
+            <textarea name="message" required maxLength={2400} className="min-h-36 border border-white/10 bg-white/[0.035] px-4 py-3 font-sans text-sm normal-case tracking-normal text-white outline-none focus:border-[var(--electric-blue)]" aria-label="Message" />
           </label>
-          <a href={`mailto:${PROFILE.email}`} className="inline-flex justify-center border border-[var(--electric-blue)] px-5 py-3 font-mono text-xs uppercase tracking-[0.22em] text-[var(--electric-blue)] transition hover:bg-[var(--electric-blue)] hover:text-[#050508]">
-            Send Email ↗
-          </a>
+          <p className="text-sm text-white/65" role="status" aria-live="polite">{submissionStatus}</p>
+          <button type="submit" className="inline-flex justify-center border border-[var(--electric-blue)] px-5 py-3 font-mono text-xs uppercase tracking-[0.22em] text-[var(--electric-blue)] transition hover:bg-[var(--electric-blue)] hover:text-[#050508]">
+            Send Message ↗
+          </button>
         </form>
       </div>
     </SectionShell>

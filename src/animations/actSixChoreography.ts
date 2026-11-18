@@ -13,8 +13,9 @@ const CAMERA_TARGETS = [
   new THREE.Vector3(0.1, 0.2, -7.35),
   new THREE.Vector3(0.7, -0.1, -7.35),
   new THREE.Vector3(-0.2, -0.15, -7.35),
-  // Keep the galaxy to frame-right so the left third remains a quiet UI stage.
-  new THREE.Vector3(6.5, 0.08, -7.35),
+  // Aim left of the galaxy so it lands on frame-right and leaves a quiet
+  // stage for the contact interface on frame-left.
+  new THREE.Vector3(-3.4, 0.08, -7.35),
 ];
 
 const POSITION_CURVE = new THREE.CatmullRomCurve3(CAMERA_POSITIONS, false, "centripetal", 0.45);

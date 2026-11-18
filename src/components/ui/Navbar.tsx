@@ -27,7 +27,7 @@ export default function Navbar() {
         {/* Action Button */}
         <div className="flex items-center space-x-4" style={{ animation: "navItemSlideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards" }}>
           <a
-            href="mailto:siddeshwaraprasanna5@gmail.com"
+            href="#contact"
             className="group flex items-center space-x-1.5 rounded-full border border-[var(--electric-blue)] bg-transparent px-5 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-white shadow-[0_0_16px_rgba(255,23,68,0.2)] transition-all duration-300 hover:border-[var(--hot-pink)] hover:bg-white/[0.02] hover:text-[var(--hot-pink)] hover:shadow-[0_0_18px_rgba(204,17,51,0.24)] md:text-xs"
           >
             <span>LET&apos;S CONNECT</span>

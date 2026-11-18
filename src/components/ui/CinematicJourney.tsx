@@ -636,7 +636,10 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
 function ContactChapter({ presence, progress }: { presence: number; progress: number }) {
   const [isTransmitting, setIsTransmitting] = useState(false);
   const [transmissionSent, setTransmissionSent] = useState(false);
+  const [transmissionError, setTransmissionError] = useState<string | null>(null);
+  const [emailCopied, setEmailCopied] = useState(false);
   const transmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transmitAbortRef = useRef<AbortController | null>(null);
   const pulse = 0.82 + Math.sin(progress * Math.PI * 4) * 0.18;
   const signal = smoothstep(0.015, 0.17, progress);
   const titleSignal = smoothstep(0.14, 0.34, progress);
@@ -645,38 +648,52 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
 
   useEffect(() => () => {
     if (transmitTimeoutRef.current) clearTimeout(transmitTimeoutRef.current);
+    transmitAbortRef.current?.abort();
   }, []);
 
-  const handleMessageSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleMessageSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isTransmitting) return;
     const formBounds = event.currentTarget.getBoundingClientRect();
-    const values = new FormData(event.currentTarget);
-    const subject = String(values.get("subject") ?? "Portfolio enquiry");
-    const firstName = String(values.get("firstName") ?? "");
-    const lastName = String(values.get("lastName") ?? "");
-    const body = [
-      `Name: ${firstName} ${lastName}`.trim(),
-      `Email: ${String(values.get("email") ?? "")}`,
-      "",
-      String(values.get("message") ?? ""),
-    ].join("\n");
-    const mailto = `mailto:${PROFILE.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    const controller = new AbortController();
+    transmitAbortRef.current = controller;
+    setTransmissionError(null);
     setIsTransmitting(true);
     window.dispatchEvent(new CustomEvent("act-six-submit-dissolve", {
       detail: { left: formBounds.left, top: formBounds.top, width: formBounds.width, height: formBounds.height },
     }));
-    window.open(mailto, "_blank", "noopener,noreferrer");
-    transmitTimeoutRef.current = setTimeout(() => {
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(values.entries())),
+        signal: controller.signal,
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "The message could not be sent. Please try again.");
+      await new Promise<void>((resolve) => {
+        transmitTimeoutRef.current = setTimeout(() => {
+          transmitTimeoutRef.current = null;
+          resolve();
+        }, 1450);
+      });
       setTransmissionSent(true);
-      setIsTransmitting(false);
-      transmitTimeoutRef.current = null;
-    }, 1650);
+      form.reset();
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setTransmissionError(error instanceof Error ? error.message : "The message could not be sent. Please try again.");
+    } finally {
+      if (!controller.signal.aborted) setIsTransmitting(false);
+      transmitAbortRef.current = null;
+    }
   };
 
   return (
     <Panel presence={presence} side="left" verticallyCentered className="act-six-contact-panel left-4 top-1/2 w-[min(34rem,calc(100vw-2rem))] px-2 sm:left-8 lg:left-[4.2vw]">
-      <div className="act-six-contact-stage relative grid gap-2.5 p-3 sm:gap-3 sm:p-3.5">
+      <div className="act-six-contact-stage relative grid gap-3 p-0 sm:gap-4">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_100%_55%,rgba(255,24,58,0.13),rgba(255,24,58,0.04)_42%,transparent_78%)] blur-xl" />
 
         <section
@@ -697,10 +714,10 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
             Full Stack and AI Developer · Karnataka, India. Open to roles, ideas, and questions.
           </p>
           <div className="act-six-contact-rail mt-3 grid grid-cols-3 gap-2" style={{ opacity: detailsSignal }} aria-label="Contact channels">
-            <a href={`mailto:${PROFILE.email}`} aria-label="Email Poshan" className="act-six-social-link group">
+            <button type="button" onClick={() => { void navigator.clipboard.writeText(PROFILE.email).then(() => setEmailCopied(true)).catch(() => setEmailCopied(false)); }} aria-label="Copy Poshan’s email address" className="act-six-social-link group">
               <span className="act-six-social-icon"><Mail aria-hidden="true" /></span>
-              <span className="act-six-social-label">Email</span>
-            </a>
+              <span className="act-six-social-label">{emailCopied ? "Copied" : "Email"}</span>
+            </button>
             <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" aria-label="GitHub profile" className="act-six-social-link group">
               <span className="act-six-social-icon"><svg className="act-six-brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.17c-3.23.7-3.91-1.37-3.91-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.58-.29-5.3-1.29-5.3-5.74 0-1.27.45-2.3 1.19-3.11-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.05 11.05 0 0 1 5.8 0c2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.11 0 4.46-2.73 5.44-5.33 5.73.42.36.78 1.07.78 2.16v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" /></svg></span>
               <span className="act-six-social-label">GitHub</span>
@@ -715,12 +732,12 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
 
         {transmissionSent ? (
           <div className="act-six-transmission-card act-six-transmission-success relative grid min-h-52 place-items-center p-6 text-center" role="status" aria-live="polite">
-            <div><Radio className="mx-auto mb-4 h-8 w-8 text-[#ff526b] act-six-success-pulse" /><p className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/60">Act VI / Channel complete</p><h3 className="mt-3 text-3xl font-black uppercase tracking-tight text-white">Transmission Sent.</h3><p className="mt-3 text-sm text-white/65">Email draft opened—review and send to deliver.</p></div>
+            <div><Radio className="mx-auto mb-4 h-8 w-8 text-[#ff526b] act-six-success-pulse" /><p className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/60">Act VI / Channel complete</p><h3 className="mt-3 text-3xl font-black uppercase tracking-tight text-white">Transmission Sent.</h3><p className="mt-3 text-sm text-white/65">Your message is on its way. Thank you for reaching out.</p></div>
           </div>
         ) : <form
           onSubmit={handleMessageSubmit}
           aria-hidden={formSignal < 0.78}
-          className={`act-six-transmission-card relative p-3.5 sm:p-4 ${isTransmitting ? "act-six-form-dissolving" : ""}`}
+          className={`act-six-transmission-card relative p-4 sm:p-5 ${isTransmitting ? "act-six-form-dissolving" : ""}`}
           style={{ opacity: formSignal, transform: `translate3d(0, ${(1 - formSignal) * 24}px, 0) perspective(1100px) rotateY(${(1 - formSignal) * -2.5}deg)`, pointerEvents: formSignal > 0.78 ? "auto" : "none", willChange: "opacity, transform" }}
         >
           <div className="act-six-card-sheen pointer-events-none absolute inset-0" aria-hidden="true" />
@@ -730,12 +747,13 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
               <span>TRANSMISSION DESK <span className="mx-2 text-[#ff3554]">/</span> ACT VI</span>
               <span className="inline-flex items-center gap-2 text-[#ff8d9d]" aria-live="polite">
                 <span className={`h-1.5 w-1.5 rounded-full bg-[#ff3554] ${isTransmitting ? "act-six-signal-active" : "act-six-signal-idle"}`} />
-                {transmissionSent ? "Transmission sent" : isTransmitting ? "Opening email app" : "Ready to connect"}
+                {transmissionSent ? "Transmission sent" : isTransmitting ? "Sending securely" : "Ready to connect"}
               </span>
             </div>
             <h3 className="text-xl font-semibold tracking-[-0.035em] text-white sm:text-2xl">Send a message</h3>
           </div>
-          <div className="relative z-10 grid gap-x-4 gap-y-2.5 sm:grid-cols-2">
+          <div className="relative z-10 grid gap-x-4 gap-y-3 sm:grid-cols-2">
+            <label className="sr-only" aria-hidden="true">Leave this field blank<input name="website" tabIndex={-1} autoComplete="off" /></label>
             <label className="act-six-field-label">
               First name
               <input name="firstName" autoComplete="given-name" required maxLength={60} onFocus={() => window.dispatchEvent(new CustomEvent("act-six-input-focus"))} className="act-six-glass-input [user-select:text]" placeholder="First name" />
@@ -759,10 +777,10 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
           </div>
           <div className="relative z-10 mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/12 pt-5">
             <p className="max-w-[17rem] text-xs leading-5 text-white/65" aria-live="polite">
-              {isTransmitting ? "Opening your email app…" : "Opens an email draft for you to review and send."}
+              {transmissionError ? <span className="text-[#ff9bab]" role="alert">{transmissionError}</span> : isTransmitting ? "Sending securely…" : "Your message is sent securely without opening an email app."}
             </p>
             <button type="submit" disabled={isTransmitting} className={`act-six-transmit-button group inline-flex items-center gap-3 border border-[#ff687e]/75 bg-gradient-to-br from-[#a10d28]/90 to-[#300812]/90 px-5 py-3.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white shadow-[0_10px_30px_rgba(110,5,24,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-[#ffbbc5] hover:shadow-[0_14px_34px_rgba(190,18,48,0.34)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff7a8c] disabled:cursor-wait ${isTransmitting ? "act-six-transmitting" : ""}`}>
-              {isTransmitting ? "Opening email…" : "Continue in email"}
+              {isTransmitting ? "Sending…" : "Transmit message"}
               <ArrowUpRight className={`h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 ${isTransmitting ? "act-six-send-icon" : ""}`} />
             </button>
           </div>

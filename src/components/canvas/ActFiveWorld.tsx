@@ -469,11 +469,11 @@ function MonolithCard({ index, focus, opacity, progress }: { index: number; focu
       <article
         className="relative flex h-[344px] w-[min(544px,82vw)] flex-col overflow-hidden rounded-[5px] border px-7 py-5 text-left text-white"
         style={{
-          backgroundColor: "rgba(226,234,244,.23)",
-          backgroundImage: "linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(118deg,rgba(255,255,255,.24) 0%,transparent 34%,rgba(255,255,255,.09) 49%,transparent 66%),linear-gradient(135deg,rgba(255,255,255,.18),rgba(230,238,248,.055) 52%,rgba(255,255,255,.12))",
+          backgroundColor: "rgba(31,25,30,.78)",
+          backgroundImage: "linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px),linear-gradient(118deg,rgba(255,255,255,.16) 0%,transparent 34%,rgba(255,255,255,.065) 49%,transparent 66%),linear-gradient(135deg,rgba(255,255,255,.1),rgba(230,238,248,.025) 52%,rgba(255,255,255,.08))",
           backgroundSize: "26px 26px,26px 26px,100% 100%,100% 100%",
-          backdropFilter: "blur(9px) saturate(135%)",
-          WebkitBackdropFilter: "blur(9px) saturate(135%)",
+          backdropFilter: "blur(14px) saturate(125%)",
+          WebkitBackdropFilter: "blur(14px) saturate(125%)",
           opacity,
           borderColor: `rgba(255,255,255,${0.54 + focus * 0.34})`,
           boxShadow: `0 30px 82px rgba(0,0,0,.42),inset 0 0 0 1px rgba(255,255,255,.16),inset 0 1px 0 rgba(255,255,255,.82),inset 0 -1px 0 rgba(255,255,255,.12),0 0 ${14 + focus * 32}px rgba(255,24,56,${0.08 + focus * 0.23})`,

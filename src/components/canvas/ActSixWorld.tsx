@@ -66,9 +66,17 @@ const galaxyVertexShader = `
     // advances as one pattern so the arms keep their authored spacing over time.
     float radiusRatio = clamp(aRadius / 5.8, 0.0, 1.0);
     float turbulence =
-      sin(aPhase + aRadius * 3.4) * 0.072 +
-      sin(aPhase * 2.7 + aRadius * 7.8) * 0.034;
-    float armAngle = aArm * 1.57079632679 + aRadius * 1.24 + aSpread + uTime * 0.28 + turbulence;
+      sin(aPhase + aRadius * 3.4 + uTime * 0.11) * 0.052 +
+      sin(aPhase * 2.7 + aRadius * 7.8 - uTime * 0.073) * 0.026;
+    float eddy = noise3(vec3(aPhase * 1.7, aRadius * 2.4, uTime * 0.12)) - 0.5;
+    // Differential rotation: the inner bulge turns faster while the outer
+    // arms drift more slowly, without changing the authored orbit radii.
+    // Keep the galaxy silhouette fixed. Particles stream locally along their
+    // authored arm lanes with a bounded phase oscillation instead of rotating
+    // the whole structure or accumulating enough shear to erase the gaps.
+    float orbitRate = mix(0.42, 0.2, smoothstep(0.65, 1.7, aRadius));
+    float stream = sin(uTime * orbitRate + aPhase) * (0.045 + radiusRatio * 0.025);
+    float armAngle = aArm * 1.57079632679 + aRadius * 1.24 + aSpread + stream + turbulence + eddy * 0.028;
     // Preserve the authored silhouette and gaps: particles orbit in place
     // instead of breathing radially and slowly turning the galaxy into a disk.
     float radius = max(0.015, aRadius);
@@ -78,6 +86,7 @@ const galaxyVertexShader = `
       cos(armAngle) * radius,
       sin(armAngle) * radius * 0.49,
       aHeight + sin(armAngle * 2.0 + aPhase + uTime * 0.17) * (0.035 + radiusRatio * 0.09)
+        + eddy * (0.018 + radiusRatio * 0.025)
     );
     vec4 modelPosition = modelMatrix * vec4(worldPosition, 1.0);
     vec4 modelViewPosition = viewMatrix * modelPosition;
@@ -124,12 +133,139 @@ const galaxyFragmentShader = `
     float particle = smoothstep(0.5, 0.06, distanceToCenter);
     float halo = smoothstep(0.55, 0.14, distanceToCenter) * 0.26;
     float laneDensity = smoothstep(0.12, 0.88, vDustNoise);
-    float alpha = (particle + halo) * vAlpha * (0.27 + vCoreEnergy * 0.25) * (0.7 + laneDensity * 0.36);
+    float alpha = (particle + halo) * vAlpha * (0.27 + vCoreEnergy * 0.16) * (0.7 + laneDensity * 0.36);
     if (alpha < 0.012) discard;
     vec3 focusColor = vec3(1.0, 0.77, 0.45);
-    gl_FragColor = vec4(mix(vColor * (1.16 + halo * 0.9 + vCoreEnergy * 1.55) * (1.0 + vOuterDust * 0.28), focusColor * 2.0, vFocusShock * 0.86), alpha + vFocusShock * 0.38);
+    gl_FragColor = vec4(mix(vColor * (1.12 + halo * 0.6 + vCoreEnergy * 0.86) * (1.0 + vOuterDust * 0.28), focusColor * 1.38, vFocusShock * 0.72), alpha + vFocusShock * 0.28);
   }
 `;
+
+const nebulaCloudVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const nebulaCloudFragmentShader = `
+  uniform float uTime;
+  uniform float uLayer;
+  varying vec2 vUv;
+
+  float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+
+  float noise21(vec2 p) {
+    vec2 cell = floor(p);
+    vec2 local = fract(p);
+    local = local * local * (3.0 - 2.0 * local);
+    float a = hash21(cell);
+    float b = hash21(cell + vec2(1.0, 0.0));
+    float c = hash21(cell + vec2(0.0, 1.0));
+    float d = hash21(cell + vec2(1.0, 1.0));
+    return mix(mix(a, b, local.x), mix(c, d, local.x), local.y);
+  }
+
+  float fbm(vec2 p) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    for (int octave = 0; octave < 4; octave++) {
+      value += noise21(p) * amplitude;
+      p = p * 2.03 + vec2(13.1, 7.7);
+      amplitude *= 0.5;
+    }
+    return value;
+  }
+
+  void main() {
+    vec2 p = (vUv - 0.5) * 2.0;
+    p.x *= 1.55;
+    float radius = length(p);
+    float angle = atan(p.y, p.x);
+    float safeRadius = max(radius, 0.035);
+    float time = uTime * (0.018 + uLayer * 0.008);
+    float fieldNoise = fbm(p * (4.1 + uLayer * 0.8) + vec2(time, -time * 0.62));
+    float cloudNoise = fbm(p * (8.3 + uLayer * 1.4) - vec2(time * 0.8, time * 0.34));
+    float sceneRadius = safeRadius * 5.95;
+    float spiralFlow = sin(time * 0.72 + sceneRadius * 1.4 + fieldNoise * 2.0) * 0.035;
+    // Match the gas lanes to the four particle arms (angle = arm + radius*1.24)
+    // so the volumetric dust reads as one coherent galaxy, not a second ring set.
+    float spiral = angle - sceneRadius * 1.24 + spiralFlow + uLayer * 0.12;
+
+    // Broad gas lanes carry the grand spiral; secondary wisps and turbulent
+    // knots break their edges so the result reads as a nebula, not a ring mesh.
+    float broadArms = pow(max(cos(spiral * 4.0), 0.0), 2.1);
+    float fineArms = pow(max(cos(spiral * 4.0 + 0.08), 0.0), 7.0);
+    float secondaryWisps = pow(max(cos(spiral * 8.0 + 0.7), 0.0), 9.0);
+    float radialFade = 1.0 - smoothstep(0.74, 1.13, radius);
+    float innerGlow = exp(-radius * 3.4);
+    float starFormingKnots = smoothstep(0.58, 0.86, cloudNoise) * fineArms;
+    float dustLane = pow(max(cos(spiral * 4.0 - 0.52), 0.0), 13.0)
+      * smoothstep(0.18, 0.44, radius) * radialFade;
+
+    vec3 indigo = vec3(0.075, 0.105, 0.30);
+    vec3 blue = vec3(0.12, 0.33, 0.68);
+    vec3 violet = vec3(0.29, 0.13, 0.43);
+    vec3 amber = vec3(0.72, 0.31, 0.09);
+    vec3 gold = vec3(1.0, 0.73, 0.34);
+    vec3 outerGas = mix(indigo, blue, smoothstep(0.28, 0.74, fieldNoise));
+    outerGas = mix(outerGas, violet, smoothstep(0.58, 0.86, cloudNoise) * 0.62);
+    vec3 gasColor = mix(outerGas, mix(amber, gold, fieldNoise), innerGlow * 0.82);
+    gasColor = mix(gasColor, vec3(0.012, 0.016, 0.034), dustLane * 0.78);
+
+    float armVolume = radialFade * (0.25 * broadArms + 0.32 * fineArms + 0.12 * secondaryWisps);
+    float turbulentHaze = radialFade * fieldNoise * 0.19;
+    float knotGlow = starFormingKnots * radialFade * 0.16;
+    float alpha = clamp((armVolume * (0.58 + fieldNoise * 0.72) + turbulentHaze + knotGlow + innerGlow * 0.1 + dustLane * 0.06) * (uLayer == 0.0 ? 0.88 : 0.66), 0.0, 0.42);
+    if (alpha < 0.006) discard;
+    gl_FragColor = vec4(gasColor, alpha);
+  }
+`;
+
+function NebulaCloudLayers() {
+  const farLayer = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uLayer: { value: 0 } },
+    vertexShader: nebulaCloudVertexShader,
+    fragmentShader: nebulaCloudFragmentShader,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  }), []);
+  const nearLayer = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uLayer: { value: 1 } },
+    vertexShader: nebulaCloudVertexShader,
+    fragmentShader: nebulaCloudFragmentShader,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  }), []);
+
+  useFrame(({ clock }) => {
+    farLayer.uniforms.uTime.value = clock.elapsedTime;
+    nearLayer.uniforms.uTime.value = clock.elapsedTime;
+  });
+
+  return (
+    <>
+      <mesh position={[0, 0, -0.58]} scale={[1.03, 1.03, 1]} renderOrder={1}>
+        <planeGeometry args={[11.9, 7.35, 1, 1]} />
+        <primitive object={farLayer} attach="material" />
+      </mesh>
+      <mesh position={[0, 0, -0.4]} scale={[0.96, 0.96, 1]} renderOrder={1}>
+        <planeGeometry args={[11.9, 7.35, 1, 1]} />
+        <primitive object={nearLayer} attach="material" />
+      </mesh>
+    </>
+  );
+}
 
 const dissolveVertexShader = `
   attribute float aSeed;
@@ -160,8 +296,8 @@ const dissolveFragmentShader = `
 `;
 
 /**
- * Act VI's galaxy is shader-driven so the authored spiral can rotate
- * continuously without rebuilding its particle buffer or changing its scale.
+ * Act VI's spiral stays at one authored angle while gas and particles stream
+ * within the arms, preserving the same galaxy silhouette throughout Contact.
  */
 export default function ActSixWorld({
   scrollProgress,
@@ -177,10 +313,11 @@ export default function ActSixWorld({
   const submitStartedAt = useRef<number | null>(null);
   const submitRequested = useRef(false);
   const dissolveScreenRect = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
-  const galaxyParallax = useRef(new THREE.Vector2());
   // Start from a wound, asymmetric pose instead of the raw four-arm cross.
   const activeTimeRef = useRef(INITIAL_SIMULATION_SECONDS);
-  const reveal = smoothstep(ACT_FIVE_TIMING.sceneExit, ACT_FIVE_TIMING.galaxyFullReveal, scrollProgress);
+  // Start the galaxy during Act V's final fade so the shared starfield and
+  // warm core cover the environment handoff without a black gap.
+  const reveal = smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress);
   // Geometry is static on the CPU. Lower tiers keep the same field shape while
   // the GPU shader supplies all of the motion, bloom, and atmosphere.
   const particleCount = deviceTier === "mobile" ? 20000 : deviceTier === "tablet" ? 34000 : 96000;
@@ -351,13 +488,8 @@ export default function ActSixWorld({
     // coordinates stay fixed in radius; only their orbital phase advances.
     if (reveal > 0.1) {
       activeTimeRef.current += delta;
-      galaxyParallax.current.x = THREE.MathUtils.damp(galaxyParallax.current.x, state.pointer.x, 1.9, delta);
-      galaxyParallax.current.y = THREE.MathUtils.damp(galaxyParallax.current.y, state.pointer.y, 1.9, delta);
-      if (groupRef.current) {
-        groupRef.current.rotation.y += delta * 0.025;
-        groupRef.current.position.x = 0.18 + galaxyParallax.current.x * 0.22;
-        groupRef.current.position.y = 0.1 + galaxyParallax.current.y * 0.14;
-      }
+      // Lock the galaxy's authored camera composition; particles and gas move
+      // internally, while the galaxy itself never rotates or drifts on screen.
     }
     material.uniforms.uTime.value = activeTimeRef.current;
     material.uniforms.uReveal.value = THREE.MathUtils.damp(material.uniforms.uReveal.value, reveal, 4.8, delta);
@@ -437,6 +569,7 @@ export default function ActSixWorld({
     <group ref={groupRef} position={[0.18, 0.1, -7.35]} rotation={[0.11, -0.08, 0.27]} scale={1.68}>
       <pointLight color="#ffd07a" intensity={7} distance={12} decay={2} />
       <pointLight position={[-1.3, 0.7, 1.6]} color="#ff7a10" intensity={1.2} distance={9} decay={2} />
+      <NebulaCloudLayers />
       <points geometry={geometry} frustumCulled={false} renderOrder={2}>
         <primitive object={material} attach="material" />
       </points>

@@ -148,7 +148,9 @@ export default function Scene({
   const isActFive = actFiveStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
   // Let the Act V reactor finish its opacity fade before the Contact galaxy
   // reaches full luminance; the camera is already moving through the exit arc.
-  const actSixStrength = smoothstep(ACT_FIVE_TIMING.sceneExit, ACT_FIVE_TIMING.galaxyFullReveal, scrollProgress);
+  // Crossfade the galaxy into the final Act V fade instead of waiting for the
+  // reactor to disappear first; this keeps stars and light present at handoff.
+  const actSixStrength = smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress);
   const actSixFlight = THREE.MathUtils.clamp((scrollProgress - ACT_FIVE_TIMING.sceneExit) / (1 - ACT_FIVE_TIMING.sceneExit), 0, 1);
   const actSixWarpProgress = smoothstep(0.02, 0.12, actSixFlight) * (1 - smoothstep(0.46, 0.62, actSixFlight));
   const isActSix = actSixStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";

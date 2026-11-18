@@ -1641,31 +1641,30 @@ canvas {
   isolation: isolate;
   transform-style: preserve-3d;
   overflow: visible;
-  border: 1px solid rgba(235, 229, 255, 0.3);
-  border-radius: 12px;
+  border: 1px solid rgba(235, 238, 255, 0.24);
+  border-radius: 18px;
   background:
-    linear-gradient(128deg, rgba(255, 255, 255, 0.095), transparent 25% 72%, rgba(255, 31, 67, 0.07)),
-    linear-gradient(112deg, rgba(16, 10, 13, 0.61), rgba(19, 10, 14, 0.48) 52%, rgba(8, 6, 9, 0.59));
-  -webkit-backdrop-filter: blur(14px) saturate(142%);
-  backdrop-filter: blur(14px) saturate(142%);
+    linear-gradient(128deg, rgba(255, 255, 255, 0.075), transparent 28% 70%, rgba(255, 31, 67, 0.045)),
+    linear-gradient(112deg, rgba(12, 8, 13, 0.84), rgba(15, 10, 16, 0.8) 52%, rgba(7, 7, 11, 0.86));
+  -webkit-backdrop-filter: blur(28px) saturate(125%);
+  backdrop-filter: blur(28px) saturate(125%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 1px 0 0 rgba(255, 255, 255, 0.13),
-    inset 0 -1px 0 rgba(255, 52, 83, 0.18),
-    0 1px 0 rgba(255, 225, 229, 0.28),
-    0 24px 58px rgba(0, 0, 0, 0.38),
-    0 36px 0 -29px rgba(85, 11, 25, 0.72),
-    0 0 46px rgba(255, 30, 66, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.27),
+    inset 1px 0 0 rgba(225, 235, 255, 0.13),
+    inset 0 -1px 0 rgba(255, 52, 83, 0.16),
+    0 1px 0 rgba(255, 225, 229, 0.2),
+    0 30px 76px rgba(0, 0, 0, 0.43),
+    0 0 40px rgba(172, 186, 255, 0.04);
   transition: border-color 360ms ease, box-shadow 360ms ease, background-color 360ms ease;
 }
 
 .act-six-transmission-card::before {
   position: absolute;
   z-index: -1;
-  inset: 7px -7px -8px 7px;
-  border: 1px solid rgba(255, 150, 166, 0.2);
+  inset: 4px -4px -5px 4px;
+  border: 1px solid rgba(229, 226, 255, 0.19);
   border-radius: inherit;
-  background: linear-gradient(140deg, rgba(41, 21, 27, 0.64), rgba(8, 6, 9, 0.82));
+  background: linear-gradient(140deg, rgba(54, 45, 65, 0.32), rgba(8, 7, 12, 0.56));
   content: "";
   transform: translateZ(-16px);
 }
@@ -1684,7 +1683,8 @@ canvas {
     rgba(255, 255, 255, 0.66));
   content: "";
   pointer-events: none;
-  opacity: 0.52;
+  background-size: 180% 180%;
+  opacity: 0.42;
   transform: translateZ(1px);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -1693,8 +1693,8 @@ canvas {
 }
 
 @keyframes act-six-iridescent-rim {
-  from { background-position: 0% 50%; opacity: 0.42; }
-  to { background-position: 100% 50%; opacity: 0.68; }
+  from { background-position: 0% 50%; opacity: 0.34; }
+  to { background-position: 100% 50%; opacity: 0.54; }
 }
 
 .act-six-transmission-card:hover {
@@ -1726,7 +1726,7 @@ canvas {
 
 .act-six-field-label {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.62rem;
   color: rgba(255, 235, 238, 0.78);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.61rem;
@@ -1737,28 +1737,41 @@ canvas {
 }
 
 .act-six-glass-input {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
   width: 100%;
   min-width: 0;
   border: 0;
-  border-bottom: 1px solid rgba(255, 222, 227, 0.28);
-  border-radius: 0;
-  background: linear-gradient(110deg, rgba(0, 0, 0, 0.18), rgba(255, 255, 255, 0.035));
-  padding: 0.78rem 0.85rem;
+  border-bottom: 1px solid rgba(235, 226, 239, 0.25);
+  border-radius: 2px;
+  background: linear-gradient(110deg, rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.028));
+  padding: 0.82rem 0.72rem;
   color: #fff;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
+  font-weight: 450;
   letter-spacing: 0;
   outline: none;
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.025);
-  transition: border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  transition: border-color 220ms ease, background 220ms ease, box-shadow 220ms ease, transform 220ms ease;
 }
 
-.act-six-glass-input::placeholder { color: rgba(255, 255, 255, 0.54); }
+.act-six-glass-input::placeholder { color: rgba(255, 255, 255, 0.48); opacity: 1; }
 .act-six-glass-input:focus {
   border-bottom-color: rgba(255, 112, 135, 0.95);
-  background: linear-gradient(110deg, rgba(8, 4, 7, 0.32), rgba(255, 255, 255, 0.055));
-  box-shadow: 0 4px 14px -9px rgba(255, 40, 75, 0.72);
+  background: linear-gradient(110deg, rgba(8, 4, 7, 0.16), rgba(255, 255, 255, 0.045));
+  box-shadow: 0 7px 18px -11px rgba(255, 40, 75, 0.72);
+  transform: translateY(-1px);
   animation: act-six-focus-spectrum 5.2s ease-in-out infinite;
+}
+
+.act-six-glass-input:-webkit-autofill,
+.act-six-glass-input:-webkit-autofill:hover,
+.act-six-glass-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff;
+  -webkit-box-shadow: 0 0 0 1000px rgba(15, 10, 15, 0.94) inset;
+  transition: background-color 9999s ease-out;
 }
 
 @keyframes act-six-focus-spectrum {
@@ -1797,8 +1810,16 @@ canvas {
   min-height: 3.2rem;
   padding: 0.4rem 0.3rem;
   border-bottom: 1px solid rgba(255, 228, 232, 0.12);
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  width: 100%;
   color: #fff;
+  font: inherit;
   text-decoration: none;
+  text-align: left;
+  cursor: pointer;
   transition: color 220ms ease, transform 220ms ease, border-color 220ms ease;
 }
 
@@ -1890,21 +1911,11 @@ canvas {
 
 .act-six-contact-stage {
   isolation: isolate;
-  border: 1px solid rgba(222, 220, 246, 0.23);
-  border-radius: 10px;
-  background: linear-gradient(132deg, rgba(255, 255, 255, 0.075), transparent 34%, rgba(255, 25, 59, 0.045)), rgba(7, 5, 9, 0.68);
-  -webkit-backdrop-filter: blur(16px) saturate(128%);
-  backdrop-filter: blur(16px) saturate(128%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 28px rgba(177, 164, 255, 0.045), 0 24px 80px rgba(0, 0, 0, 0.3);
+  background: radial-gradient(ellipse at 0% 48%, rgba(255, 25, 59, 0.08), transparent 58%);
 }
 .act-six-contact-panel {
-  /* Preserve a clear top and bottom margin around the panel and HUD ruler. */
-  max-height: calc(100dvh - 4.5rem);
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  scrollbar-color: rgba(255, 80, 106, 0.48) transparent;
-  scrollbar-width: thin;
+  max-height: calc(100dvh - 6rem);
+  overflow: visible;
 }
 .act-six-contact-stage .act-six-social-link {
   display: flex;
@@ -1934,15 +1945,15 @@ canvas {
   text-transform: uppercase;
 }
 .act-six-contact-stage .act-six-field-label { font-size: 0.56rem; }
-.act-six-contact-stage .act-six-field-label { gap: 0.25rem; }
-.act-six-contact-stage .act-six-glass-input { padding: 0.42rem 0.62rem; font-size: 0.78rem; }
-.act-six-contact-stage textarea.act-six-glass-input { min-height: 3rem; }
-.act-six-contact-stage .act-six-transmission-card > .relative.z-10.mb-6 { margin-bottom: 0.65rem; padding-bottom: 0.65rem; }
-.act-six-contact-stage .act-six-transmission-card > .relative.z-10.mt-5 { margin-top: 0.7rem; padding-top: 0.7rem; }
+.act-six-contact-stage .act-six-field-label { gap: 0.38rem; }
+.act-six-contact-stage .act-six-glass-input { padding: 0.72rem 0.78rem; font-size: 0.84rem; }
+.act-six-contact-stage textarea.act-six-glass-input { min-height: 3.4rem; }
+.act-six-contact-stage .act-six-transmission-card > .relative.z-10.mb-6 { margin-bottom: 0.9rem; padding-bottom: 0.82rem; }
+.act-six-contact-stage .act-six-transmission-card > .relative.z-10.mt-5 { margin-top: 0.9rem; padding-top: 0.85rem; }
 .act-six-contact-stage .act-six-transmit-button { padding: 0.72rem 0.9rem; }
 
 @media (max-height: 760px) {
-  .act-six-contact-stage { gap: 0.4rem; padding: 0.5rem; }
+  .act-six-contact-stage { gap: 0.45rem; }
   .act-six-contact-stage section > .mb-3 { margin-bottom: 0.35rem; }
   .act-six-contact-stage section > p { margin-top: 0.35rem; }
   .act-six-contact-stage .act-six-contact-rail { margin-top: 0.35rem; }

@@ -27,7 +27,7 @@ const socials = [
   },
   {
     name: "Mail",
-    href: "mailto:siddeshwaraprasanna5@gmail.com",
+    href: "#contact",
     icon: <Mail className="h-[18px] w-[18px]" />,
   },
   {
