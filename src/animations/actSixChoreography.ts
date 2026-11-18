@@ -5,7 +5,9 @@ const CAMERA_POSITIONS = [
   new THREE.Vector3(-0.6, 1.2, 1.4),
   new THREE.Vector3(3.1, 3.8, -2.1),
   new THREE.Vector3(5.4, 1.1, -12.6),
-  new THREE.Vector3(4.2, 0.4, -22.4),
+  // Settle in front-left of the galaxy, looking through the fixed spiral so
+  // its core lands on frame-right after the orbital camera move.
+  new THREE.Vector3(-4.2, 0.4, 9.6),
 ];
 
 const CAMERA_TARGETS = [

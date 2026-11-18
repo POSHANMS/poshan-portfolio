@@ -20,9 +20,9 @@ const chapters: { id: ChapterId; act: string; label: string; range: [number, num
   { id: "skills", act: "ACT III", label: "Skills", range: [0.55, 0.82] },
   { id: "projects", act: "ACT IV", label: "Projects", range: [0.825, 0.9] },
   { id: "journey", act: "ACT V", label: "Education", range: [0.91, 0.958], holdUntilEnd: true },
-  // Contact begins as the Act V reactor and field-notes HUD finish their fade,
-  // so the two scenes never stack at full strength during the handoff.
-  { id: "contact", act: "ACT VI", label: "Contact", range: [ACT_FIVE_TIMING.sceneExit, 1.0], persistAtEnd: true },
+  // Let the galaxy finish its camera-led reveal before Contact arrives, keeping
+  // the form from covering the opening shot of the nebula.
+  { id: "contact", act: "ACT VI", label: "Contact", range: [ACT_FIVE_TIMING.galaxyFullReveal, 1.0], persistAtEnd: true },
 ];
 
 function clamp(value: number, min = 0, max = 1) {
