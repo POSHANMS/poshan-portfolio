@@ -12,6 +12,7 @@ export default function HoldToWarp({
   tapToComplete = false,
   compact = false,
   className = "",
+  onProgress,
 }: {
   onComplete: () => void;
   label?: string;
@@ -20,6 +21,7 @@ export default function HoldToWarp({
   tapToComplete?: boolean;
   compact?: boolean;
   className?: string;
+  onProgress?: (progress: number) => void;
 }) {
   const [progress, setProgress] = useState(0);
   const activePointer = useRef<number | null>(null);
@@ -31,7 +33,8 @@ export default function HoldToWarp({
     if (frame.current) cancelAnimationFrame(frame.current);
     frame.current = null;
     setProgress(0);
-  }, []);
+    onProgress?.(0);
+  }, [onProgress]);
 
   const beginCharging = useCallback((pointerId?: number) => {
     if (activePointer.current !== null) return;
@@ -42,6 +45,7 @@ export default function HoldToWarp({
       if (activePointer.current === null) return;
       const next = Math.min(1, (time - startedAt.current) / HOLD_DURATION);
       setProgress(next);
+      onProgress?.(next);
       if (next >= 1) {
         activePointer.current = null;
         frame.current = null;
@@ -52,7 +56,7 @@ export default function HoldToWarp({
     };
 
     frame.current = requestAnimationFrame(charge);
-  }, [onComplete]);
+  }, [onComplete, onProgress]);
 
   const beginPointerCharging = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);

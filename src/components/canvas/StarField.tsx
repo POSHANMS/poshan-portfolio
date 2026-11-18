@@ -228,7 +228,7 @@ export default function StarField({
           gl_Position = clipPosition;
           vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
           float authoredPointSize = aSize * (1.0 + uWarp * 3.5);
-          gl_PointSize = authoredPointSize;
+          gl_PointSize = min(authoredPointSize, 6.0);
         }
       `,
       fragmentShader: `
@@ -288,7 +288,7 @@ export default function StarField({
           gl_Position = clipPosition;
           vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
           float safeDist = max(8.0, -mv.z);
-          gl_PointSize = aSize * (60.0 / safeDist);
+          gl_PointSize = min(aSize * (60.0 / safeDist), 6.0);
         }
       `,
       fragmentShader: `

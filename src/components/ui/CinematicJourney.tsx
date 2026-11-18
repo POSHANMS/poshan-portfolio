@@ -92,45 +92,6 @@ function Kicker({ act, label, className = "mb-4" }: { act: string; label: string
   );
 }
 
-function WarpStarfield({ phase }: { phase: ActFourPhase }) {
-  const streaks = useMemo(() => Array.from({ length: 132 }, (_, index) => {
-    const seed = Math.sin((index + 1) * 91.731) * 43758.5453;
-    const value = seed - Math.floor(seed);
-    const second = Math.sin((index + 1) * 33.417) * 24634.6345;
-    const length = 44 + ((second - Math.floor(second)) * 170);
-    return {
-      id: index,
-      angle: value * 360,
-      distance: 520 + value * 960,
-      length,
-      delay: -(value * 0.85),
-      duration: 0.46 + ((index % 7) * 0.055),
-      white: index % 5 === 0,
-    };
-  }), []);
-
-  if (phase !== "warping" && phase !== "returning") return null;
-
-  return (
-    <div className={`act-four-warp-field absolute inset-0 z-30 overflow-hidden ${phase === "returning" ? "act-four-warp-field-return" : ""}`} aria-hidden="true">
-      <div className="act-four-warp-veil absolute inset-0" />
-      {streaks.map((streak) => (
-        <span
-          key={streak.id}
-          className={`act-four-warp-streak ${streak.white ? "act-four-warp-streak-white" : ""}`}
-          style={{
-            "--warp-angle": `${streak.angle}deg`,
-            "--warp-distance": `${streak.distance}px`,
-            "--warp-length": `${streak.length}px`,
-            "--warp-delay": `${streak.delay}s`,
-            "--warp-duration": `${streak.duration}s`,
-          } as React.CSSProperties}
-        />
-      ))}
-    </div>
-  );
-}
-
 function HeroChapter({ presence }: { presence: number }) {
   const [entered, setEntered] = useState(false);
   const [typedTitle, setTypedTitle] = useState("");
@@ -496,29 +457,33 @@ function ProjectsChapter({
   presence,
   phase,
   projectIndex,
-  exitArmed,
   onWarp,
   onExit,
+  onCharge,
 }: {
   presence: number;
   phase: ActFourPhase;
   projectIndex: number;
-  exitArmed: boolean;
   onWarp: () => void;
   onExit: () => void;
+  onCharge: (progress: number) => void;
 }) {
   const project = PROJECTS[projectIndex];
 
   if (phase === "ready") {
     return (
-      <Panel presence={presence} side="center" className="left-1/2 top-[calc(50%-4.5rem)]">
-        <div className="grid justify-items-center gap-4 text-center">
+      <Panel presence={presence} side="left" className="left-6 top-[16vh] w-[min(29rem,calc(100vw-3rem))] md:left-16">
+        <div className="relative grid gap-5 border border-[#ff627c]/38 bg-[linear-gradient(120deg,rgba(12,4,10,0.84),rgba(4,6,12,0.68))] p-6 shadow-[0_24px_78px_rgba(0,0,0,0.4),inset_0_0_34px_rgba(255,30,70,0.05)] backdrop-blur-xl">
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-[#ff4668] to-transparent shadow-[0_0_18px_#ff2448]" />
           <div>
             <Kicker act="ACT IV" label="Core Orbit" />
-            <h2 className="text-3xl font-black uppercase leading-none text-white md:text-5xl">Project<br />Launch</h2>
-            <p className="mx-auto mt-3 max-w-xs text-xs leading-6 text-white/65">Hold to fly through the rotating globe and enter the project world.</p>
+            <h2 className="max-w-[10ch] text-4xl font-black uppercase leading-[0.92] tracking-[-0.035em] text-white md:text-5xl">Project Launch</h2>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-white/75">Hold to breach the crimson core and enter the project vault.</p>
           </div>
-          <HoldToWarp onComplete={onWarp} />
+          <div className="flex items-center gap-5 border-t border-white/10 pt-4">
+            <HoldToWarp onComplete={onWarp} onProgress={onCharge} compact />
+            <p className="max-w-[15rem] font-mono text-[9px] uppercase leading-5 tracking-[0.16em] text-white/48">Charge the field, then cross into five project telemetry stations.</p>
+          </div>
         </div>
       </Panel>
     );
@@ -534,19 +499,22 @@ function ProjectsChapter({
     );
   }
 
-  if (phase === "inside") {
+  if (phase === "inside" || phase === "returning") {
+    const finalProject = projectIndex === PROJECTS.length - 1;
     return (
-      <Panel presence={presence} side="left" className="bottom-[11vh] left-6 z-50 w-[min(30rem,calc(100vw-3rem))] md:left-16">
-        <div className="border-l-2 border-[#ff6b7f] bg-black/35 pl-5 pr-4 py-3 backdrop-blur-sm">
-          <div className="flex items-center justify-between gap-6 font-mono text-[10px] uppercase tracking-[0.22em] text-[#ff9cab]">
+      <>
+      <Panel presence={presence} side="left" className="left-4 top-[8vh] z-50 w-[min(28rem,calc(40vw-2rem))] max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto md:left-12">
+        <div className="relative overflow-hidden border border-[#ff6680]/40 bg-[linear-gradient(120deg,rgba(17,5,12,0.88),rgba(5,7,13,0.74))] p-4 shadow-[0_20px_72px_rgba(0,0,0,0.42),inset_0_0_32px_rgba(255,34,72,0.05)] backdrop-blur-xl md:p-5">
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-[#ff4668] to-transparent shadow-[0_0_18px_#ff2448]" />
+          <div className="flex items-center justify-between gap-3 font-mono text-[9px] uppercase tracking-[0.2em] text-[#ff9cab] md:text-[10px]">
             <span>Act IV / Core Orbit</span>
             <span>{String(projectIndex + 1).padStart(2, "0")} / {String(PROJECTS.length).padStart(2, "0")}</span>
           </div>
-          <h2 className="mt-2 text-2xl font-black uppercase leading-none text-white md:text-4xl">{project.name}</h2>
-          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#ffb5c0]">{project.subtitle}</p>
-          <p className="mt-3 max-w-xl text-xs leading-6 text-white/72">{project.description}</p>
+          <h2 className="mt-3 max-w-full break-words text-[clamp(1.55rem,2.5vw,2.8rem)] font-black uppercase leading-[0.98] tracking-[-0.035em] text-white">{project.name}</h2>
+          <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-[#ffb5c0] md:text-[10px]">{project.subtitle}</p>
+          <p className="mt-3 max-w-xl text-[11px] leading-[1.65] text-white/78 md:text-xs">{project.description}</p>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {project.stack.slice(0, 6).map((item) => <span key={item} className="border border-[#ff6b7f]/35 bg-[#ff1744]/10 px-2 py-1 font-mono text-[9px] text-white/84">{item}</span>)}
+            {project.stack.map((item) => <span key={item} className="border border-[#ff6b7f]/35 bg-[#ff1744]/10 px-2 py-1 font-mono text-[8px] text-white/88 md:text-[9px]">{item}</span>)}
           </div>
           <div className="mt-4 flex flex-wrap gap-2" style={{ pointerEvents: "auto" }}>
             <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()} className="pointer-events-auto relative z-[60] border border-[#ff5a66]/65 bg-[#260008]/85 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white shadow-[0_0_16px_rgba(255,23,68,0.16)] transition hover:-translate-y-0.5 hover:border-white hover:bg-[#5b0017]/90">
@@ -558,10 +526,10 @@ function ProjectsChapter({
               </a>
             )}
           </div>
-          <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.18em] text-white/42">
-            {exitArmed ? "Final project secured. Recall vector ready." : projectIndex === PROJECTS.length - 1 ? "Scroll once to prepare your return." : "Continue scrolling to orbit the next project"}
+          <p className="mt-3 font-mono text-[8px] uppercase tracking-[0.16em] text-white/52 md:text-[9px]">
+            {finalProject ? "Scroll forward to launch toward Act V" : "Scroll to advance through the project corridor"}
           </p>
-          {exitArmed && (
+          {finalProject && (
             <button
               type="button"
               onPointerDown={(event) => {
@@ -574,8 +542,8 @@ function ProjectsChapter({
                 event.stopPropagation();
                 onExit();
               }}
-              className="group relative z-50 mt-5 flex w-full cursor-pointer select-none items-center justify-between overflow-hidden border border-[#ff9cab]/75 bg-[#260008]/88 px-4 py-3 text-left shadow-[0_0_34px_rgba(255,23,68,0.25)] backdrop-blur-xl transition duration-300 [&>span]:pointer-events-none hover:border-white hover:bg-[#5b0017]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              aria-label="Return to the portfolio surface"
+              className="group relative z-50 mt-4 flex w-full cursor-pointer select-none items-center justify-between overflow-hidden border border-[#ff9cab]/75 bg-[#260008]/88 px-4 py-3 text-left shadow-[0_0_34px_rgba(255,23,68,0.25)] backdrop-blur-xl transition duration-300 [&>span]:pointer-events-none hover:border-white hover:bg-[#5b0017]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              aria-label="Launch forward from the Act IV vault"
             >
               <span className="absolute inset-y-0 left-0 w-1 bg-[#ff1744] shadow-[0_0_18px_rgba(255,23,68,0.9)]" />
               <span className="absolute inset-0 translate-x-[-105%] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.22),transparent)] transition duration-700 group-hover:translate-x-[105%]" />
@@ -583,7 +551,7 @@ function ProjectsChapter({
                 <span className="grid h-9 w-9 place-items-center rounded-full border border-[#ffb5c0]/70 bg-[#ff1744]/15 font-mono text-base text-white shadow-[0_0_18px_rgba(255,23,68,0.45)]">↗</span>
                 <span>
                   <span className="block font-mono text-[9px] uppercase tracking-[0.26em] text-[#ffb5c0]">Recall sequence</span>
-                  <span className="mt-1 block text-sm font-black uppercase tracking-normal text-white">Return to surface</span>
+                  <span className="mt-1 block text-sm font-black uppercase tracking-normal text-white">Launch / Exit Vault</span>
                 </span>
               </span>
               <span className="pointer-events-none relative font-mono text-[10px] uppercase tracking-[0.18em] text-[#ffd9df]">Launch</span>
@@ -591,6 +559,14 @@ function ProjectsChapter({
           )}
         </div>
       </Panel>
+      <button
+        type="button"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }}
+        className="pointer-events-auto absolute right-6 top-6 z-[60] border border-white/30 bg-black/45 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/85 backdrop-blur-lg transition hover:border-[#ff7388] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        aria-label="Exit the Act IV vault"
+      >[ ESC // EXIT VAULT ]</button>
+      </>
     );
   }
 
@@ -842,17 +818,17 @@ export default function CinematicJourney({
   visible,
   actFourPhase = "locked",
   actFourProjectIndex = 0,
-  actFourExitArmed = false,
   onActFourWarp,
   onActFourExit,
+  onActFourChargeChange,
 }: {
   scrollProgress: number;
   visible: boolean;
   actFourPhase?: ActFourPhase;
   actFourProjectIndex?: number;
-  actFourExitArmed?: boolean;
   onActFourWarp: () => void;
   onActFourExit: () => void;
+  onActFourChargeChange: (progress: number) => void;
 }) {
   const [hoveredCube, setHoveredCube] = useState<CubeModuleId | null>(null);
   const [cubeTargets, setCubeTargets] = useState<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
@@ -982,7 +958,7 @@ export default function CinematicJourney({
 
   if (!visible) return null;
 
-  const actFourInterior = actFourPhase === "inside" || actFourPhase === "warping";
+  const actFourInterior = actFourPhase === "inside" || actFourPhase === "warping" || actFourPhase === "returning";
   const actFourReturning = actFourPhase === "returning" && scrollProgress < 0.905;
   const actFiveProgress = clamp((scrollProgress - ACT_FIVE_TIMING.cameraStart) / (ACT_FIVE_TIMING.sceneExit - ACT_FIVE_TIMING.cameraStart));
   const actFiveHudPresence = scrollProgress >= ACT_FIVE_TIMING.revealInStart && scrollProgress <= ACT_FIVE_TIMING.cameraExitStart
@@ -992,7 +968,6 @@ export default function CinematicJourney({
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
-      <WarpStarfield phase={actFourPhase} />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,transparent_0%,transparent_53%,rgba(0,0,0,0.28)_100%)]" />
       <HeroChapter presence={states.hero.presence} />
       <EnterLaptopCue scrollProgress={scrollProgress} />
@@ -1017,12 +992,12 @@ export default function CinematicJourney({
         }}
       />
       <ProjectsChapter
-        presence={actFourPhase === "warping" || actFourPhase === "inside" ? 1 : states.projects.presence}
+        presence={actFourInterior ? 1 : states.projects.presence}
         phase={actFourPhase}
         projectIndex={actFourProjectIndex}
-        exitArmed={actFourExitArmed}
         onWarp={onActFourWarp}
         onExit={onActFourExit}
+        onCharge={onActFourChargeChange}
       />
       <JourneyChapter
         presence={actFourInterior || actFourReturning ? 0 : actFiveHudPresence}

@@ -62,6 +62,7 @@ export default function Home() {
 
   const [scrollProgress, setScrollProgress] = useState(0);
   const actFour = useActFourSequence(scrollProgress);
+  const warpCharge = useRef(0);
   const lenisRef = useRef<Lenis | null>(null);
 
   // Scroll progress — derived from window.scrollY through the cinematic hero track.
@@ -196,6 +197,7 @@ export default function Home() {
               lensDistortion={wormholeValues.lensDistortion}
               actFourPhase={actFour.phase}
               actFourProjectIndex={actFour.projectIndex}
+              warpCharge={warpCharge}
             />
           </div>
 
@@ -220,9 +222,9 @@ export default function Home() {
             visible={storyVisible}
             actFourPhase={actFour.phase}
             actFourProjectIndex={actFour.projectIndex}
-            actFourExitArmed={actFour.exitArmed}
             onActFourWarp={actFour.beginWarp}
             onActFourExit={actFour.exitProjectWorld}
+            onActFourChargeChange={(progress) => { warpCharge.current = progress; }}
           />
           <CinematicHUD
             visible={storyVisible}

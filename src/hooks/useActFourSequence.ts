@@ -3,18 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ActFourPhase } from "@/types/actFour";
 import { PROJECTS } from "@/utils/constants";
+import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
 
 const ACT_FOUR_ENTRY = 0.825;
 const ACT_FOUR_EXIT = 0.905;
 const PROJECT_COUNT = PROJECTS.length;
 const WHEEL_THRESHOLD = 124;
 const PROJECT_ADVANCE_LOCK_MS = 1450;
-const ACT_FOUR_RETURN_TARGET = 0.916;
+const ACT_FOUR_RETURN_TARGET = ACT_FIVE_TIMING.cameraStart;
 
 export function useActFourSequence(scrollProgress: number) {
   const [phase, setPhase] = useState<ActFourPhase>("locked");
   const [projectIndex, setProjectIndex] = useState(0);
-  const [exitArmed, setExitArmed] = useState(false);
   const warpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const returnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nextAdvanceAt = useRef(0);
@@ -45,12 +45,27 @@ export function useActFourSequence(scrollProgress: number) {
       clearWarpTimer();
       clearReturnTimer();
       setProjectIndex(0);
-      setExitArmed(false);
       lockedScrollY.current = window.scrollY;
       warpTimer.current = setTimeout(() => setPhase("inside"), 1420);
       return "warping";
     });
   }, [clearReturnTimer, clearWarpTimer]);
+
+  const exitProjectWorld = useCallback(() => {
+    if (phase !== "inside") return;
+    setPhase("returning");
+    clearReturnTimer();
+    returnTimer.current = setTimeout(() => {
+      const track = document.querySelector<HTMLElement>("[data-cinematic-track]");
+      if (track) {
+        const travel = Math.max(0, track.offsetHeight - window.innerHeight);
+        window.scrollTo({ top: track.offsetTop + travel * ACT_FOUR_RETURN_TARGET, behavior: "auto" });
+      }
+      projectIndexRef.current = 0;
+      setProjectIndex(0);
+      setPhase("locked");
+    }, 1420);
+  }, [clearReturnTimer, phase]);
 
   useEffect(() => {
     const outsideActFour = scrollProgress < ACT_FOUR_ENTRY || scrollProgress >= ACT_FOUR_EXIT;
@@ -65,21 +80,21 @@ export function useActFourSequence(scrollProgress: number) {
       clearWarpTimer();
       clearReturnTimer();
       lockedScrollY.current = null;
-      if (exitArmed) setExitArmed(false);
       if (projectIndex !== 0) setProjectIndex(0);
       if (phase !== "locked") setPhase("locked");
       return;
     }
 
     if (phase === "locked") setPhase("ready");
-  }, [clearReturnTimer, clearWarpTimer, exitArmed, phase, projectIndex, scrollProgress]);
+  }, [clearReturnTimer, clearWarpTimer, phase, projectIndex, scrollProgress]);
 
   useEffect(() => () => {
     clearWarpTimer();
     clearReturnTimer();
   }, [clearReturnTimer, clearWarpTimer]);
 
-  const projectWorldLocked = phase === "warping" || phase === "inside";
+  const projectWorldLocked = phase === "warping" || phase === "inside" || phase === "returning";
+  const lockMode = phase === "returning" ? "returning" : projectWorldLocked ? "locked" : "free";
 
   useEffect(() => {
     if (!projectWorldLocked) return;
@@ -92,19 +107,20 @@ export function useActFourSequence(scrollProgress: number) {
     document.body.style.overflow = "hidden";
     window.dispatchEvent(new CustomEvent("act-four-scroll-lock", { detail: { locked: true } }));
     let frame = 0;
-    const holdDocumentPosition = () => {
-      if (Math.abs(window.scrollY - origin) > 0.5) window.scrollTo(0, origin);
+    if (phase !== "returning") {
+      const holdDocumentPosition = () => {
+        if (Math.abs(window.scrollY - origin) > 0.5) window.scrollTo(0, origin);
+        frame = requestAnimationFrame(holdDocumentPosition);
+      };
       frame = requestAnimationFrame(holdDocumentPosition);
-    };
-
-    frame = requestAnimationFrame(holdDocumentPosition);
+    }
     return () => {
       cancelAnimationFrame(frame);
       document.documentElement.style.overflow = htmlOverflow;
       document.body.style.overflow = bodyOverflow;
       window.dispatchEvent(new CustomEvent("act-four-scroll-lock", { detail: { locked: false } }));
     };
-  }, [projectWorldLocked]);
+  }, [lockMode, projectWorldLocked]);
 
   useEffect(() => {
     if (phase === "warping") {
@@ -137,7 +153,6 @@ export function useActFourSequence(scrollProgress: number) {
         event.preventDefault();
         nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
         projectIndexRef.current = currentIndex - 1;
-        setExitArmed(false);
         setProjectIndex(currentIndex - 1);
         return;
       }
@@ -146,16 +161,14 @@ export function useActFourSequence(scrollProgress: number) {
         event.preventDefault();
         nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
         projectIndexRef.current = currentIndex + 1;
-        setExitArmed(false);
         setProjectIndex(currentIndex + 1);
         return;
       }
 
       if (direction > 0 && currentIndex === PROJECT_COUNT - 1) {
-        // The final plate stays on screen. Leaving the core is a deliberate action.
         event.preventDefault();
         nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
-        setExitArmed(true);
+        exitProjectWorld();
       } else {
         event.preventDefault();
       }
@@ -163,21 +176,19 @@ export function useActFourSequence(scrollProgress: number) {
 
     window.addEventListener("wheel", onWheel, { passive: false, capture: true });
     return () => window.removeEventListener("wheel", onWheel, { capture: true });
-  }, [phase]);
+  }, [exitProjectWorld, phase]);
 
-  const exitProjectWorld = useCallback(() => {
-    if (phase !== "inside" || !exitArmed) return;
-    lockedScrollY.current = null;
-    setExitArmed(false);
-    setPhase("returning");
-    clearReturnTimer();
-    returnTimer.current = setTimeout(() => {
-      const track = document.querySelector<HTMLElement>("[data-cinematic-track]");
-      if (!track) return;
-      const travel = Math.max(0, track.offsetHeight - window.innerHeight);
-      window.scrollTo({ top: track.offsetTop + travel * ACT_FOUR_RETURN_TARGET, behavior: "auto" });
-    }, 920);
-  }, [clearReturnTimer, exitArmed, phase]);
+  useEffect(() => {
+    if (phase !== "inside") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        exitProjectWorld();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [exitProjectWorld, phase]);
 
-  return { phase, beginWarp, projectIndex, exitArmed, exitProjectWorld };
+  return { phase, beginWarp, projectIndex, exitProjectWorld };
 }

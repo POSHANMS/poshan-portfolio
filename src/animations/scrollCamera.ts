@@ -13,6 +13,7 @@ import {
   ACT_FIVE_TIMING,
   createActFiveCameraCurves,
 } from "./actFiveChoreography";
+import { ACT_FOUR_CORE_POSITION, ACT_FOUR_EXIT_CAMERA_PATH, ACT_FOUR_EXIT_TARGET_PATH, getActFourProjectPose } from "./actFourChoreography";
 
 const sceneCoordinates = [
   {
@@ -153,10 +154,14 @@ export function CinematicCamera({
   scrollProgress,
   lensDistortion = 0,
   actFourPhase = "locked",
+  actFourProjectIndex = 0,
+  warpCharge,
 }: {
   scrollProgress: number;
   lensDistortion?: number;
   actFourPhase?: ActFourPhase;
+  actFourProjectIndex?: number;
+  warpCharge?: React.RefObject<number>;
 }) {
   const currentPos = useRef(new THREE.Vector3(0.5, 0.5, 8));
   const currentLookAt = useRef(new THREE.Vector3(0.8, 0, -1));
@@ -169,11 +174,45 @@ export function CinematicCamera({
   const cameraVelocity = useRef(new THREE.Vector3());
   const targetVelocity = useRef(new THREE.Vector3());
   const cameraNoise = useRef(new THREE.Vector3());
+  const phaseRef = useRef(actFourPhase);
+  const phaseStartedAt = useRef(0);
+  const warpStartPosition = useRef(new THREE.Vector3(2.25, 1.4, 4.25));
+  const warpStartTarget = useRef(ACT_FOUR_CORE_POSITION.clone());
+  const returnPositionCurve = useRef<THREE.CatmullRomCurve3 | null>(null);
+  const returnTargetCurve = useRef<THREE.CatmullRomCurve3 | null>(null);
+  const projectMotion = useRef(0);
 
   const clampedProgress = Math.max(0, Math.min(1, scrollProgress));
 
   useFrame((state, delta) => {
     const camera = state.camera as THREE.PerspectiveCamera;
+    const time = state.clock.getElapsedTime();
+    if (phaseRef.current !== actFourPhase) {
+      phaseRef.current = actFourPhase;
+      phaseStartedAt.current = time;
+      if (actFourPhase === "warping") {
+        warpStartPosition.current.copy(currentPos.current);
+        warpStartTarget.current.copy(currentLookAt.current);
+      }
+      if (actFourPhase === "returning") {
+        const forward = currentLookAt.current.clone().sub(currentPos.current).normalize();
+        const outerWall = ACT_FOUR_CORE_POSITION.clone().add(new THREE.Vector3(0, 0, -38));
+        returnPositionCurve.current = new THREE.CatmullRomCurve3([
+          currentPos.current.clone(),
+          currentPos.current.clone().addScaledVector(forward, 8),
+          outerWall.clone().add(new THREE.Vector3(0, 0, -5)),
+          outerWall,
+          ACT_FIVE_ENTRY_CAMERA.clone(),
+        ], false, "centripetal");
+        returnTargetCurve.current = new THREE.CatmullRomCurve3([
+          currentLookAt.current.clone(),
+          currentLookAt.current.clone().addScaledVector(forward, 10),
+          outerWall.clone().add(new THREE.Vector3(0, 0, -9)),
+          new THREE.Vector3(4.5, 2.5, -43),
+          ACT_FIVE_ENTRY_TARGET.clone(),
+        ], false, "centripetal");
+      }
+    }
     smoothProgress.current = THREE.MathUtils.damp(smoothProgress.current, clampedProgress, 7.2, delta);
     const p = smoothProgress.current;
 
@@ -210,7 +249,7 @@ export function CinematicCamera({
 
     // The Act V entry blends out of the existing Act IV camera, then follows
     // keyed Catmull-Rom position and target splines through all four artifacts.
-    const insideProjectWorld = actFourPhase === "inside" || actFourPhase === "warping";
+    const insideProjectWorld = actFourPhase === "inside" || actFourPhase === "warping" || actFourPhase === "ready" || actFourPhase === "returning";
     if (p >= ACT_FIVE_TIMING.cameraIntroStart && p < ACT_FIVE_TIMING.sceneExit && !insideProjectWorld) {
       actFiveCameraActive = true;
       if (p < ACT_FIVE_TIMING.cameraStart) {
@@ -260,25 +299,39 @@ export function CinematicCamera({
     }
 
     const isWarping = actFourPhase === "warping";
-    warpProgress.current = THREE.MathUtils.damp(warpProgress.current, isWarping ? 1 : 0, isWarping ? 3.2 : 5.6, delta);
-
-    if (isWarping) {
-      const origin = new THREE.Vector3(2.25, 1.4, 4.25);
-      const destination = new THREE.Vector3(4.5, 2.5, -7.25);
-      desiredPosition.lerpVectors(origin, destination, warpProgress.current);
-      desiredLookAt.lerpVectors(new THREE.Vector3(4.5, 2.5, -8), new THREE.Vector3(4.5, 2.5, -12), warpProgress.current);
-      desiredFov = 46 + Math.sin(warpProgress.current * Math.PI) * 38;
+    const charge = actFourPhase === "ready" ? THREE.MathUtils.clamp(warpCharge?.current ?? 0, 0, 1) : 0;
+    if (actFourPhase === "ready" && charge > 0) {
+      const pullback = desiredPosition.clone().sub(desiredLookAt).normalize();
+      desiredPosition.addScaledVector(pullback, charge * 1.15);
+      desiredFov = 45 + charge * 30;
+    } else if (isWarping) {
+      const flight = THREE.MathUtils.clamp((time - phaseStartedAt.current) / 1.42, 0, 1);
+      const eased = THREE.MathUtils.smoothstep(flight, 0, 1);
+      const target = getActFourProjectPose(0);
+      desiredPosition.lerpVectors(warpStartPosition.current, target.camera, eased);
+      desiredLookAt.lerpVectors(warpStartTarget.current, target.target, eased);
+      const fovRamp = 45 + 30 * THREE.MathUtils.smoothstep(flight, 0, 0.76);
+      desiredFov = flight < 0.76 ? fovRamp : THREE.MathUtils.lerp(75, 48, THREE.MathUtils.smoothstep(flight, 0.76, 1));
+      authoredActFiveRoll = Math.sin(flight * Math.PI) * 0.1;
     } else if (actFourPhase === "inside") {
-      desiredPosition.set(4.5, 2.5, -6.85);
-      desiredLookAt.set(4.5, 2.5, -12.4);
+      projectMotion.current = THREE.MathUtils.damp(projectMotion.current, actFourProjectIndex, 4.4, delta);
+      const pose = getActFourProjectPose(projectMotion.current);
+      desiredPosition.copy(pose.camera);
+      desiredLookAt.copy(pose.target);
       desiredFov = 48;
-    } else if (actFourPhase === "returning" && p < 0.905) {
-      desiredPosition.set(2.9, 1.85, 4.7);
-      desiredLookAt.set(0.9, 0.35, -3.4);
-      desiredFov = 51;
+      const motion = Math.min(1, Math.abs(projectMotion.current - actFourProjectIndex));
+      authoredActFiveRoll = Math.sin(time * 0.62) * 0.008 + motion * 0.045;
+    } else if (actFourPhase === "returning") {
+      const flight = THREE.MathUtils.clamp((time - phaseStartedAt.current) / 1.42, 0, 1);
+      const eased = THREE.MathUtils.smoothstep(flight, 0, 1);
+      const positionCurve = returnPositionCurve.current ?? ACT_FOUR_EXIT_CAMERA_PATH;
+      const targetCurve = returnTargetCurve.current ?? ACT_FOUR_EXIT_TARGET_PATH;
+      desiredPosition.copy(positionCurve.getPointAt(eased));
+      desiredLookAt.copy(targetCurve.getPointAt(eased));
+      desiredFov = THREE.MathUtils.lerp(48, 50, eased) + Math.sin(flight * Math.PI) * 5;
+      authoredActFiveRoll = Math.sin(flight * Math.PI) * 0.12;
     }
 
-    const time = state.clock.getElapsedTime();
     // Act I breathes before the first scroll: a small authored arc from the
     // lower/front angle toward the right. It fades before the first scroll
     // keyframe, leaving every real scene transition under scroll control.
@@ -350,7 +403,7 @@ export function CinematicCamera({
 
     // Subtle handheld-cinema drift while scrolling; very small so the scene stays premium.
     const drift = Math.sin(time * 0.45 + p * Math.PI * 2) * 0.01;
-    const noiseEnvelope = actFiveCameraActive ? 1 : 0;
+    const noiseEnvelope = actFiveCameraActive ? 1 : charge > 0 ? charge : isWarping ? 0.7 : 0;
     const smoothRigNoise = (frequency: number, phase: number) => {
       const sample = time * frequency + phase;
       const cell = Math.floor(sample);
@@ -361,17 +414,18 @@ export function CinematicCamera({
       return THREE.MathUtils.lerp(a - Math.floor(a) - 0.5, b - Math.floor(b) - 0.5, eased);
     };
     cameraNoise.current.set(
-      smoothRigNoise(7.4, 0.31) * 0.0042 * noiseEnvelope,
-      smoothRigNoise(6.1, 1.77) * 0.0032 * noiseEnvelope,
-      smoothRigNoise(8.2, 2.43) * 0.0012 * noiseEnvelope,
+      smoothRigNoise(noiseEnvelope > 0 ? 20 : 7.4, 0.31) * (charge > 0 || isWarping ? 0.016 : 0.0042) * noiseEnvelope,
+      smoothRigNoise(noiseEnvelope > 0 ? 17 : 6.1, 1.77) * (charge > 0 || isWarping ? 0.012 : 0.0032) * noiseEnvelope,
+      smoothRigNoise(noiseEnvelope > 0 ? 22 : 8.2, 2.43) * (charge > 0 || isWarping ? 0.004 : 0.0012) * noiseEnvelope,
     );
 
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0)).add(cameraNoise.current);
     camera.lookAt(currentLookAt.current);
-    const targetRoll = actFiveCameraActive ? authoredActFiveRoll : actSixCameraActive ? authoredActSixRoll : 0;
-    const targetPitch = actFiveCameraActive ? authoredActFivePitch : actSixCameraActive ? authoredActSixPitch : 0;
-    const targetYaw = actFiveCameraActive ? authoredActFiveYaw : actSixCameraActive ? authoredActSixYaw : 0;
-    const cinematicCameraActive = actFiveCameraActive || actSixCameraActive;
+    const actFourCameraActive = actFourPhase === "warping" || actFourPhase === "inside" || actFourPhase === "returning";
+    const targetRoll = actFiveCameraActive || actFourCameraActive ? authoredActFiveRoll : actSixCameraActive ? authoredActSixRoll : 0;
+    const targetPitch = actFiveCameraActive || actFourCameraActive ? authoredActFivePitch : actSixCameraActive ? authoredActSixPitch : 0;
+    const targetYaw = actFiveCameraActive || actFourCameraActive ? authoredActFiveYaw : actSixCameraActive ? authoredActSixYaw : 0;
+    const cinematicCameraActive = actFiveCameraActive || actSixCameraActive || actFourCameraActive;
     cameraRoll.current = THREE.MathUtils.damp(cameraRoll.current, targetRoll, cinematicCameraActive ? 5.5 : 8, delta);
     cameraPitch.current = THREE.MathUtils.damp(cameraPitch.current, targetPitch, cinematicCameraActive ? 5.2 : 8, delta);
     cameraYaw.current = THREE.MathUtils.damp(cameraYaw.current, targetYaw, cinematicCameraActive ? 5.2 : 8, delta);

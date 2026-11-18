@@ -44,6 +44,7 @@ interface SceneProps {
   lensDistortion?: number;
   actFourPhase?: ActFourPhase;
   actFourProjectIndex?: number;
+  warpCharge?: React.RefObject<number>;
 }
 
 function SceneLights({
@@ -113,6 +114,7 @@ export default function Scene({
   lensDistortion = 0,
   actFourPhase = "locked",
   actFourProjectIndex = 0,
+  warpCharge,
 }: SceneProps) {
   const { deviceTier } = useDeviceSize();
   const isMobile = deviceTier === "mobile";
@@ -181,7 +183,7 @@ export default function Scene({
           far: 300,
         }}
       >
-        <CinematicCamera scrollProgress={scrollProgress} lensDistortion={lensDistortion} actFourPhase={actFourPhase} />
+        <CinematicCamera scrollProgress={scrollProgress} lensDistortion={lensDistortion} actFourPhase={actFourPhase} actFourProjectIndex={actFourProjectIndex} warpCharge={warpCharge} />
 
         <color attach="background" args={["#000000"]} />
         {isActFive && <fogExp2 attach="fog" args={["#040103", 0.026]} />}
@@ -196,7 +198,7 @@ export default function Scene({
 
         <Suspense fallback={null}>
           {/* Warp owns the starfield during transit so the streaks read as speed, not background noise. */}
-          <group visible={showStars && !isProjectTransit}>
+          <group visible={showStars && !isInsideProjectCore}>
             {!isActFive && !isActSix && <NebulaBackground />}
             <StarField
               starsOpacity={starsOpacity * (isActFive ? 1 : 0.24 + exteriorStrength * 0.76)}
@@ -256,7 +258,7 @@ export default function Scene({
           </group>
 
           {!isInsideProjectCore && !isActFive && !isActSix && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
-          {!isActFive && !isActSix && <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} />}
+          {!isActFive && !isActSix && <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} warpCharge={warpCharge ?? { current: 0 }} />}
           <ActFiveWorld
             scrollProgress={scrollProgress}
             actFourPhase={actFourPhase}
