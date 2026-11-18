@@ -2,14 +2,14 @@ import * as THREE from "three";
 
 /** Shared Act V composition and timing used by the camera, scene, and cards. */
 export const ACT_FIVE_TIMING = {
-  revealInStart: 0.902,
-  revealInEnd: 0.922,
+  revealInStart: 0.89,
+  revealInEnd: 0.908,
   cameraIntroStart: 0.89,
-  cameraStart: 0.915,
-  cameraExitStart: 0.92,
-  sceneExit: 0.94,
-  galaxyFullReveal: 0.98,
-  localCheckpointStops: [0, 0.17, 0.34, 0.51, 0.68] as const,
+  cameraStart: 0.905,
+  cameraExitStart: 0.957,
+  sceneExit: 0.97,
+  galaxyFullReveal: 0.99,
+  localCheckpointStops: [0, 0.17, 0.34, 0.51, 0.8] as const,
   localTransferStarts: [0, 0.12, 0.29, 0.46, 0.63] as const,
 } as const;
 
@@ -58,7 +58,7 @@ export const ACT_FIVE_EXIT_CAMERA = ACT_FIVE_ORIGIN.clone().add(new THREE.Vector
 export const ACT_FIVE_EXIT_TARGET = ACT_FIVE_ORIGIN.clone().add(new THREE.Vector3(0, 0.15, -2.25));
 export const ACT_FIVE_ENTRY_CAMERA = ACT_FIVE_CHECKPOINT_STOPS[0].camera.clone().add(new THREE.Vector3(-2.2, 1.2, 1.4));
 export const ACT_FIVE_ENTRY_TARGET = ACT_FIVE_CHECKPOINT_STOPS[0].target.clone();
-export const ACT_FIVE_LOCAL_KEY_T = [0, 0.12, 0.17, 0.29, 0.34, 0.46, 0.51, 0.63, 0.68, 1] as const;
+export const ACT_FIVE_LOCAL_KEY_T = [0, 0.12, 0.17, 0.29, 0.34, 0.46, 0.51, 0.63, 0.8, 1] as const;
 
 export function createActFiveCameraCurves() {
   const positions = [

@@ -1983,3 +1983,106 @@ canvas {
   0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 45, 80, 0.35)); transform: scale(0.96); }
   50% { filter: drop-shadow(0 0 18px rgba(255, 45, 80, 0.85)); transform: scale(1.04); }
 }
+
+/* One continuous contact console keeps the contact details and message form
+   readable while leaving the galaxy visible through the right-hand glass. */
+.act-six-contact-panel {
+  width: min(64rem, calc(61vw - 1.5rem));
+  max-height: min(82dvh, 48rem);
+}
+.act-six-contact-stage {
+  max-height: min(82dvh, 48rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(226, 231, 255, 0.32);
+  border-radius: 22px;
+  background:
+    linear-gradient(112deg, rgba(255, 255, 255, 0.055), transparent 35%, rgba(255, 62, 93, 0.035)),
+    linear-gradient(135deg, rgba(12, 9, 15, 0.76), rgba(12, 9, 16, 0.65) 56%, rgba(7, 8, 14, 0.72));
+  -webkit-backdrop-filter: blur(17px) saturate(132%);
+  backdrop-filter: blur(17px) saturate(132%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 1px 0 0 rgba(190, 204, 255, 0.12),
+    inset 0 -1px 0 rgba(255, 74, 103, 0.15),
+    0 34px 90px rgba(0, 0, 0, 0.48),
+    0 0 56px rgba(162, 178, 255, 0.065);
+  scrollbar-width: none;
+}
+.act-six-contact-stage::-webkit-scrollbar { display: none; }
+.act-six-contact-stage::before {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(125deg, rgba(255, 255, 255, 0.72), rgba(144, 171, 255, 0.22) 30%, rgba(255, 68, 101, 0.34) 68%, rgba(255, 255, 255, 0.55));
+  content: "";
+  pointer-events: none;
+  opacity: 0.55;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.act-six-contact-identity {
+  min-width: 0;
+  padding-right: clamp(0rem, 1.6vw, 1.5rem);
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+}
+.act-six-contact-identity h2 { font-size: clamp(3.4rem, 5vw, 5.1rem); }
+.act-six-contact-stage .act-six-contact-rail { gap: 0.35rem; }
+.act-six-contact-stage .act-six-social-link {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 1.15rem;
+  min-height: 3.55rem;
+  justify-content: initial;
+  gap: 0.7rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+}
+.act-six-contact-stage .act-six-social-icon { width: 1.7rem; height: 1.7rem; }
+.act-six-contact-stage .act-six-social-icon svg { width: 1.35rem; height: 1.35rem; }
+.act-six-contact-stage .act-six-social-label { font-size: 0.61rem; }
+.act-six-contact-stage .act-six-social-value { font-size: clamp(0.7rem, 0.86vw, 0.84rem); }
+.act-six-contact-stage .act-six-email-link .act-six-social-value { font-size: 0.7rem; overflow-wrap: normal; white-space: nowrap; }
+.act-six-contact-stage .act-six-channel-status { font-size: 0.62rem; }
+.act-six-contact-stage .act-six-transmission-card:not(.act-six-transmission-success) {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  overflow: visible;
+}
+.act-six-contact-stage .act-six-transmission-card:not(.act-six-transmission-success)::before,
+.act-six-contact-stage .act-six-transmission-card:not(.act-six-transmission-success)::after { display: none; }
+.act-six-contact-stage .act-six-transmission-card > .relative.z-10.mb-6 {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+}
+.act-six-contact-stage .act-six-transmission-card > .relative.z-10.mt-5 {
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+}
+.act-six-contact-stage .act-six-field-label { font-size: 0.66rem; gap: 0.55rem; }
+.act-six-contact-stage .act-six-glass-input { padding: 0.88rem 0.78rem; font-size: 0.96rem; }
+.act-six-contact-stage textarea.act-six-glass-input { min-height: 5.2rem; }
+.act-six-contact-stage .act-six-transmit-button { padding: 0.9rem 1.15rem; }
+
+@media (max-width: 1023px) {
+  .act-six-contact-panel { width: min(58rem, calc(100vw - 3rem)); }
+  .act-six-contact-stage { max-height: 82dvh; }
+}
+@media (max-width: 767px) {
+  .act-six-contact-panel { left: 1rem; width: calc(100vw - 2rem); max-height: 82dvh; }
+  .act-six-contact-stage { max-height: 82dvh; padding: 1.25rem; gap: 1.4rem; }
+  .act-six-contact-identity { padding-right: 0; border-right: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.14); padding-bottom: 1.25rem; }
+  .act-six-contact-identity h2 { font-size: clamp(3rem, 14vw, 4.2rem); }
+  .act-six-contact-stage .act-six-transmission-card > .relative.z-10.mb-6 { margin-bottom: 0.9rem; }
+  .act-six-contact-stage .act-six-transmission-card > .relative.z-10.mt-5 { margin-top: 0.9rem; }
+  .act-six-contact-stage .act-six-glass-input { padding: 0.72rem 0.65rem; }
+  .act-six-contact-stage textarea.act-six-glass-input { min-height: 4.4rem; }
+}

@@ -19,7 +19,7 @@ const chapters: { id: ChapterId; act: string; label: string; range: [number, num
   { id: "laptop", act: "ACT II", label: "About", range: [0.18, 0.54] },
   { id: "skills", act: "ACT III", label: "Skills", range: [0.55, 0.82] },
   { id: "projects", act: "ACT IV", label: "Projects", range: [0.825, 0.9] },
-  { id: "journey", act: "ACT V", label: "Education", range: [0.91, 0.958], holdUntilEnd: true },
+  { id: "journey", act: "ACT V", label: "Education", range: [0.89, 0.99], holdUntilEnd: true },
   // Let the galaxy finish its camera-led reveal before Contact arrives, keeping
   // the form from covering the opening shot of the nebula.
   { id: "contact", act: "ACT VI", label: "Contact", range: [ACT_FIVE_TIMING.galaxyFullReveal, 1.0], persistAtEnd: true },
@@ -609,7 +609,7 @@ function JourneyChapter({ presence, progress }: { presence: number; progress: nu
   const inSwoop = (progress >= 0.12 && progress < 0.17)
     || (progress >= 0.29 && progress < 0.34)
     || (progress >= 0.46 && progress < 0.51)
-    || (progress >= 0.63 && progress < 0.68);
+    || (progress >= 0.8 && progress < 1);
 
   return (
     <Panel presence={presence} side="left" className="left-6 top-[6vh] z-[3] w-[min(30rem,calc(100vw-3rem))] md:left-16">
@@ -692,42 +692,45 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
   };
 
   return (
-    <Panel presence={presence} side="left" verticallyCentered className="act-six-contact-panel left-4 top-1/2 w-[min(34rem,calc(100vw-2rem))] px-2 sm:left-8 lg:left-[4.2vw]">
-      <div className="act-six-contact-stage relative grid gap-3 p-0 sm:gap-4">
+    <Panel presence={presence} side="left" verticallyCentered className="act-six-contact-panel left-4 top-1/2 w-[min(64rem,calc(61vw-1.5rem))] sm:left-8 lg:left-[4.2vw]">
+      <div className="act-six-contact-stage relative grid gap-5 p-5 sm:gap-7 sm:p-7 lg:grid-cols-[0.82fr_1.18fr] lg:gap-9 lg:p-9">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_100%_55%,rgba(255,24,58,0.13),rgba(255,24,58,0.04)_42%,transparent_78%)] blur-xl" />
 
         <section
-          className="relative"
+          className="act-six-contact-identity relative flex flex-col justify-center"
           style={{ opacity: signal, transform: `translate3d(${(1 - signal) * -18}px, ${(1 - signal) * 12}px, 0)`, willChange: "opacity, transform" }}
         >
-          <div className="mb-3 flex items-center gap-3">
+          <div className="mb-5 flex items-center gap-3">
             <Kicker act="ACT VI" label="Open channel" className="mb-0" />
             <Radio className="h-4 w-4 text-[#ff5a66]" style={{ opacity: pulse }} />
           </div>
           <h2
-            className="text-3xl font-black uppercase leading-[0.94] tracking-[-0.045em] text-white sm:text-4xl"
+            className="text-5xl font-black uppercase leading-[0.9] tracking-[-0.055em] text-white sm:text-6xl"
             style={{ opacity: titleSignal, transform: `translate3d(0, ${(1 - titleSignal) * 28}px, 0) scale(${0.97 + titleSignal * 0.03})`, filter: `blur(${(1 - titleSignal) * 6}px)`, willChange: "opacity, transform, filter" }}
           >
             Contact<br /><span className="text-[#ff3554]">Poshan</span>
           </h2>
-          <p className="mt-2 max-w-[34rem] text-xs leading-5 text-white/78" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 15}px)`, willChange: "opacity, transform" }}>
+          <p className="mt-5 max-w-[34rem] text-sm leading-6 text-white/80 sm:text-base sm:leading-7" style={{ opacity: detailsSignal, transform: `translateY(${(1 - detailsSignal) * 15}px)`, willChange: "opacity, transform" }}>
             Full Stack and AI Developer · Karnataka, India. Open to roles, ideas, and questions.
           </p>
-          <div className="act-six-contact-rail mt-3 grid grid-cols-3 gap-2" style={{ opacity: detailsSignal }} aria-label="Contact channels">
-            <button type="button" onClick={() => { void navigator.clipboard.writeText(PROFILE.email).then(() => setEmailCopied(true)).catch(() => setEmailCopied(false)); }} aria-label="Copy Poshan’s email address" className="act-six-social-link group">
+          <div className="act-six-contact-rail mt-6 grid gap-2" style={{ opacity: detailsSignal }} aria-label="Contact channels">
+            <button type="button" onClick={() => { void navigator.clipboard.writeText(PROFILE.email).then(() => setEmailCopied(true)).catch(() => setEmailCopied(false)); }} aria-label="Copy Poshan’s email address" className="act-six-social-link act-six-email-link group">
               <span className="act-six-social-icon"><Mail aria-hidden="true" /></span>
-              <span className="act-six-social-label">{emailCopied ? "Copied" : "Email"}</span>
+              <span><span className="act-six-social-label">{emailCopied ? "Email copied" : "Email"}</span><span className="act-six-social-value">{PROFILE.email}</span></span>
+              <ArrowUpRight className="act-six-social-arrow" aria-hidden="true" />
             </button>
             <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" aria-label="GitHub profile" className="act-six-social-link group">
               <span className="act-six-social-icon"><svg className="act-six-brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.17c-3.23.7-3.91-1.37-3.91-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.58-.29-5.3-1.29-5.3-5.74 0-1.27.45-2.3 1.19-3.11-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.05 11.05 0 0 1 5.8 0c2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.11 0 4.46-2.73 5.44-5.33 5.73.42.36.78 1.07.78 2.16v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" /></svg></span>
-              <span className="act-six-social-label">GitHub</span>
+              <span><span className="act-six-social-label">GitHub</span><span className="act-six-social-value">github.com/POSHANMS</span></span>
+              <ArrowUpRight className="act-six-social-arrow" aria-hidden="true" />
             </a>
             <a href={PROFILE.linkedin} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn profile" className="act-six-social-link group">
               <span className="act-six-social-icon"><svg className="act-six-brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.447-2.136 2.941v5.665H9.35V9h3.414v1.561h.049c.476-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286ZM5.337 7.433a2.062 2.062 0 1 1 0-4.124 2.062 2.062 0 0 1 0 4.124ZM7.119 20.452H3.555V9h3.564v11.452ZM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.204 0 22.225 0Z" /></svg></span>
-              <span className="act-six-social-label">LinkedIn</span>
+              <span><span className="act-six-social-label">LinkedIn</span><span className="act-six-social-value">linkedin.com/in/poshanms</span></span>
+              <ArrowUpRight className="act-six-social-arrow" aria-hidden="true" />
             </a>
           </div>
-          <div className="act-six-channel-status mt-3" style={{ opacity: detailsSignal }}><span className="act-six-channel-status-light" />Available for work <span className="act-six-status-divider">/</span> Open to conversation</div>
+          <div className="act-six-channel-status mt-5" style={{ opacity: detailsSignal }}><span className="act-six-channel-status-light" />Available for work <span className="act-six-status-divider">/</span> Open to conversation</div>
         </section>
 
         {transmissionSent ? (
@@ -737,7 +740,7 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
         ) : <form
           onSubmit={handleMessageSubmit}
           aria-hidden={formSignal < 0.78}
-          className={`act-six-transmission-card relative p-4 sm:p-5 ${isTransmitting ? "act-six-form-dissolving" : ""}`}
+          className={`act-six-transmission-card relative p-0 ${isTransmitting ? "act-six-form-dissolving" : ""}`}
           style={{ opacity: formSignal, transform: `translate3d(0, ${(1 - formSignal) * 24}px, 0) perspective(1100px) rotateY(${(1 - formSignal) * -2.5}deg)`, pointerEvents: formSignal > 0.78 ? "auto" : "none", willChange: "opacity, transform" }}
         >
           <div className="act-six-card-sheen pointer-events-none absolute inset-0" aria-hidden="true" />
@@ -750,7 +753,7 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
                 {transmissionSent ? "Transmission sent" : isTransmitting ? "Sending securely" : "Ready to connect"}
               </span>
             </div>
-            <h3 className="text-xl font-semibold tracking-[-0.035em] text-white sm:text-2xl">Send a message</h3>
+            <h3 className="text-2xl font-semibold tracking-[-0.035em] text-white sm:text-3xl">Send a message</h3>
           </div>
           <div className="relative z-10 grid gap-x-4 gap-y-3 sm:grid-cols-2">
             <label className="sr-only" aria-hidden="true">Leave this field blank<input name="website" tabIndex={-1} autoComplete="off" /></label>

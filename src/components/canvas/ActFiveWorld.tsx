@@ -162,7 +162,7 @@ const SWARM_FRAGMENT_SHADER = /* glsl */ `
     vec2 cardUv = (vScreenUv - uCardCenter) / max(uCardHalfSize, vec2(0.001));
     float cardRadius = length(cardUv);
     float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
-    float contrast = mix(1.0, 0.5, cardMask * uCardDim);
+    float contrast = mix(1.0, 0.78, cardMask * uCardDim);
     gl_FragColor = vec4(vColor * (0.75 + glow * 0.8) * contrast, glow * vAlpha * contrast);
   }
 `;
@@ -299,7 +299,7 @@ const ACT_FIVE_STARS_FRAGMENT = /* glsl */ `
     vec2 cardUv = (vScreenUv - uCardCenter) / max(uCardHalfSize, vec2(0.001));
     float cardRadius = length(cardUv);
     float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
-    float contrast = mix(1.0, 0.5, cardMask * uCardDim);
+    float contrast = mix(1.0, 0.78, cardMask * uCardDim);
     gl_FragColor = vec4(vec3(0.86, 0.79, 0.78) * (0.8 + core * 0.5) * contrast, (core * 0.72 + halo * 0.2) * vAlpha * contrast);
   }
 `;

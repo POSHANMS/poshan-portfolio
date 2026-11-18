@@ -195,7 +195,7 @@ export default function Scene({
           <group visible={showStars && !isProjectTransit}>
             {!isActFive && !isActSix && <NebulaBackground />}
             <StarField
-              starsOpacity={starsOpacity * (isActFive ? 0.72 : 0.24 + exteriorStrength * 0.76)}
+              starsOpacity={starsOpacity * (isActFive ? 1 : 0.24 + exteriorStrength * 0.76)}
               showConstellations={!isActFive && !isActSix}
               cardContrast={cardContrast}
               // Keep the shared starfield filling the camera view through the

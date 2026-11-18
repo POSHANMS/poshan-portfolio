@@ -249,7 +249,7 @@ export function CinematicCamera({
             desiredPosition.y += travel * (index % 2 === 0 ? 0.28 : -0.22);
           }
         }
-        const exitBlend = THREE.MathUtils.smoothstep(progress, 0.68, 1.0);
+        const exitBlend = THREE.MathUtils.smoothstep(progress, 0.8, 1.0);
         bank += Math.sin(exitBlend * Math.PI) * 0.18;
         authoredActFivePitch += Math.sin(exitBlend * Math.PI) * -0.055;
         authoredActFiveYaw += Math.sin(exitBlend * Math.PI) * 0.06;
