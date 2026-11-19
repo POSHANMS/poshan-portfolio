@@ -208,8 +208,6 @@ function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projec
   const active = phase === "act4_warp_in" || phase === "act4_vault" || phase === "act4_warp_out";
   const phaseStartedAt = useRef(performance.now());
   const previousPhase = useRef(phase);
-  const previousProjectIndex = useRef(projectIndex);
-  const projectFlightStartedAt = useRef(performance.now());
   const reveal = useRef(0);
   const geometry = useMemo(buildMicroGrid, []);
   const color = useMemo(() => new THREE.Color(PROJECT_ACCENTS[projectIndex] ?? PROJECT_ACCENTS[0]), [projectIndex]);
@@ -305,7 +303,7 @@ function DataEmbers({ phase, projectIndex }: { phase: ActFourPhase; projectIndex
   }), [projectIndex]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const curl = useMemo(() => new THREE.Vector3(), []);
-  const noiseFields = useMemo(() => [101, 211, 307].map((seed) => new SimplexNoise(seededRandom(seed))), []);
+  const noiseFields = useMemo(() => [101, 211, 307].map((seed) => new SimplexNoise({ random: seededRandom(seed) })), []);
   const active = phase === "act4_vault" || phase === "act4_warp_out" || phase === "act4_warp_in";
   useFrame(({ clock }, delta) => {
     if (!instances.current || !material.current) return;

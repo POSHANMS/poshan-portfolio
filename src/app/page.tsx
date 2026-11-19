@@ -61,8 +61,8 @@ export default function Home() {
   const [wormholeValues, setWormholeValues] = useState<WormholeValues>(DEFAULT_WORMHOLE_VALUES);
 
   const [scrollProgress, setScrollProgress] = useState(0);
-  const actFour = useActFourSequence(scrollProgress);
   const warpCharge = useRef(0);
+  const actFour = useActFourSequence(scrollProgress, warpCharge);
   const lenisRef = useRef<Lenis | null>(null);
 
   // Scroll progress — derived from window.scrollY through the cinematic hero track.

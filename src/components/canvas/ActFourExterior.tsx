@@ -110,28 +110,30 @@ const diskFragment = `
     float theta=atan(p.y,p.x);
     float orbit=1.0/sqrt(max(r,0.16));
     float timeAngle=uTime*uSwirlSpeed*(0.2+0.12*orbit);
-    vec2 polar=vec2(theta*1.55-timeAngle, r*10.5);
-    float broad=fbm(polar*0.82+vec2(-uTime*0.08,uTime*0.035));
-    float fine=fbm(polar*2.3+vec2(uTime*0.11,-uTime*0.07));
-    float warpedRadius=r+(broad-0.5)*0.055+(fine-0.5)*0.022;
+    vec2 polar=vec2(theta*1.7-r*2.6-timeAngle*0.35, r*7.0);
+    float broad=fbm(polar*0.76+vec2(-uTime*0.055,uTime*0.025));
+    float fine=fbm(polar*1.75+vec2(uTime*0.075,-uTime*0.045));
+    float armPhase=theta*3.0-r*17.0-timeAngle*0.5+(broad-0.5)*2.8;
+    float arm=pow(max(0.0,0.5+0.5*cos(armPhase)),3.0);
+    float cloudField=broad*0.58+fine*0.27+arm*0.3;
+    float cloud=smoothstep(0.31,0.67,cloudField);
     float inner=uInnerRatio;
     float outerFade=1.0-smoothstep(0.30,0.48,r);
     float innerFade=smoothstep(inner-0.035,inner+0.055,r);
-    float laneCenter=mix(inner+0.06,0.77,broad);
-    float band=exp(-pow((warpedRadius-laneCenter)*10.0,2.0));
-    float filaments=0.42+0.58*pow(max(0.0,0.5+0.5*sin(theta*5.0-r*30.0+broad*9.0+uTime*(0.38+orbit*0.22))),2.0);
-    float gas=(0.28+band*0.78)*mix(0.68,1.0,filaments)*(0.56+fine*0.7);
-    float innerHeat=1.0-smoothstep(inner+0.045,inner+0.24,r);
-    vec3 whiteGold=vec3(1.0,0.91,0.70);
-    vec3 amber=vec3(1.0,0.31,0.065);
-    vec3 crimson=vec3(0.34,0.018,0.055);
-    vec3 color=mix(amber,crimson,smoothstep(0.34,0.9,r));
-    color=mix(color,whiteGold,innerHeat*0.88);
+    float filaments=0.48+0.52*pow(max(0.0,0.5+0.5*sin(armPhase*2.0+broad*8.0+uTime*(0.26+orbit*0.14))),2.0);
+    float gas=(0.08+cloud*0.72+arm*0.18)*mix(0.72,1.0,filaments)*(0.7+fine*0.5);
+    float innerHeat=1.0-smoothstep(inner+0.025,inner+0.105,r);
+    vec3 whiteGold=vec3(1.0,0.91,0.72);
+    vec3 amber=vec3(1.0,0.28,0.035);
+    vec3 deepCrimson=vec3(0.2,0.008,0.024);
+    vec3 color=mix(deepCrimson,amber,smoothstep(0.26,0.78,cloud+arm*0.22));
+    color=mix(color,vec3(1.0,0.58,0.2),smoothstep(0.55,0.9,gas)*0.48);
+    color=mix(color,whiteGold,innerHeat*0.48);
     float doppler=0.78+0.35*smoothstep(0.0,0.8,-p.x);
     float chargeHeat=1.0+uCharge*0.65;
-    float alpha=gas*innerFade*outerFade*uOpacity*doppler*(0.25+uCharge*0.08);
+    float alpha=gas*innerFade*outerFade*uOpacity*doppler*(0.62+uCharge*0.08);
     if(alpha<0.012) discard;
-    gl_FragColor=vec4(color*chargeHeat*(0.7+gas*0.85),alpha);
+    gl_FragColor=vec4(color*chargeHeat*(0.24+gas*0.24),alpha);
   }
 `;
 
@@ -213,10 +215,9 @@ export function AccretionPlasmaDisk({
     material.current.uniforms.uSwirlSpeed.value = THREE.MathUtils.damp(material.current.uniforms.uSwirlSpeed.value, 1 + liveCharge * 5, 4, delta);
   });
   return (
-    // The parent Event Horizon supplies the requested 12.5° pitch. A full
-    // quarter turn converts the XY plane into a physical XZ accretion disk;
-    // together they leave the disk visibly canted instead of cancelling flat.
-    <group rotation={[Math.PI * 0.5, 0, 0]} visible={active}>
+    // The XY disk faces the scene camera; the parent applies the diagonal
+    // 0.34 / -0.36 rad cant so its broad gaseous face remains readable.
+    <group visible={active}>
       <mesh frustumCulled={false}>
         <planeGeometry args={[outerRadius * 2, outerRadius * 2]} />
         <shaderMaterial ref={material} vertexShader={diskVertex} fragmentShader={diskFragment} uniforms={uniforms} transparent blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
@@ -266,9 +267,9 @@ function PhotonSparks({ innerRadius, outerRadius, charge, active }: { innerRadiu
   );
 }
 
-function LensingHalo({ charge, coreRadius = 2.1 }: { charge: ChargeSource; coreRadius?: number }) {
+function LensingHalo({ charge, coreRadius = 2.1, showArcs = true }: { charge: ChargeSource; coreRadius?: number; showArcs?: boolean }) {
   const material = useRef<THREE.ShaderMaterial>(null);
-  const arcGeometry = useMemo(() => [
+  const arcGeometry = useMemo(() => showArcs ? [
     { rx: coreRadius * 1.16, ry: coreRadius * 1.58, z: -coreRadius * 0.12, tube: Math.max(0.018, coreRadius * 0.018) },
     { rx: coreRadius * 1.34, ry: coreRadius * 1.86, z: coreRadius * 0.06, tube: Math.max(0.012, coreRadius * 0.009) },
   ].map(({ rx, ry, z, tube }) => {
@@ -278,7 +279,7 @@ function LensingHalo({ charge, coreRadius = 2.1 }: { charge: ChargeSource; coreR
     });
     const path = new THREE.CatmullRomCurve3(points, true, "centripetal");
     return new THREE.TubeGeometry(path, 256, tube, 8, true);
-  }), [coreRadius]);
+  }) : [], [coreRadius, showArcs]);
   useFrame(({ clock }) => {
     if (!material.current) return;
     material.current.uniforms.uTime.value = clock.getElapsedTime();
@@ -388,13 +389,12 @@ export default function ActFourExterior({ phase, warpCharge }: { phase: ActFourP
   if (!active) return null;
   return (
     <group position={ACT_FOUR_CORE_POSITION}>
-      <group ref={core} rotation={[0.22, 0, -0.14]}>
-        <LensingHalo charge={charge} />
+      <group ref={core} rotation={[0.34, 0, -0.36]}>
+        <LensingHalo charge={charge} showArcs={false} />
         <pointLight color="#ff254c" intensity={2.8} distance={36} decay={2} />
         <pointLight position={[0, 0.2, 2.2]} color="#ffbd7a" intensity={2.4} distance={22} decay={2} />
         <EventHorizon radius={2.1} charge={charge} />
-        <AccretionPlasmaDisk innerRadius={2.34} outerRadius={8.8} charge={charge} />
-        {[0, 1, 2].map((index) => <ContainmentRing key={index} index={index} charge={charge} />)}
+        <AccretionPlasmaDisk innerRadius={2.34} outerRadius={10.2} charge={charge} />
         <AnamorphicFlare charge={charge} />
       </group>
       <LensDust charge={charge} active />

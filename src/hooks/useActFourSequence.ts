@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MutableRefObject } from "react";
 import type { ActFourPhase } from "@/types/actFour";
 import { PROJECTS } from "@/utils/constants";
 import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
@@ -26,13 +27,14 @@ function setTrackProgress(progress: number) {
   window.scrollTo({ top, behavior: "auto" });
 }
 
-export function useActFourSequence(scrollProgress: number) {
+export function useActFourSequence(scrollProgress: number, warpCharge: MutableRefObject<number>) {
   const [phase, setPhase] = useState<ActFourPhase>("act3");
   const [projectIndex, setProjectIndex] = useState(0);
   const [hasCompletedAct4Vault, setHasCompletedAct4Vault] = useState(false);
   const phaseRef = useRef<ActFourPhase>("act3");
   const warpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const actFiveHandoffPending = useRef(false);
   const nextAdvanceAt = useRef(0);
   const lockedScrollY = useRef<number | null>(null);
   const projectIndexRef = useRef(0);
@@ -40,9 +42,16 @@ export function useActFourSequence(scrollProgress: number) {
   scrollProgressRef.current = scrollProgress;
 
   const transitionTo = useCallback((next: ActFourPhase) => {
+    if (next === "act4_exterior") {
+      // Returning from Act III, V, or VI always restores a ready-to-warp gate.
+      // Completion remains latched separately so it only unlocks the downward exit.
+      warpCharge.current = 0;
+      projectIndexRef.current = 0;
+      setProjectIndex(0);
+    }
     phaseRef.current = next;
     setPhase(next);
-  }, []);
+  }, [warpCharge]);
 
   const clearWarpTimer = useCallback(() => {
     if (warpTimer.current) clearTimeout(warpTimer.current);
@@ -74,8 +83,14 @@ export function useActFourSequence(scrollProgress: number) {
         projectIndexRef.current = 0;
         setProjectIndex(0);
         lockedScrollY.current = null;
+        actFiveHandoffPending.current = true;
         transitionTo("act5");
-        requestAnimationFrame(() => setTrackProgress(ACT_FOUR_RETURN_TARGET));
+        requestAnimationFrame(() => {
+          setTrackProgress(ACT_FOUR_RETURN_TARGET);
+          requestAnimationFrame(() => {
+            actFiveHandoffPending.current = false;
+          });
+        });
       }, EXIT_FLIGHT_MS);
     }, EXIT_FADE_MS);
   }, [clearExitTimer, transitionTo]);
@@ -84,9 +99,8 @@ export function useActFourSequence(scrollProgress: number) {
     if (!TRANSITION_PHASES.has(phase)) {
       // The phase changes just before the controlled scroll is corrected to the
       // Act V entry key. Hold the committed handoff through that one-frame gap.
-      if (phase === "act5" && hasCompletedAct4Vault) return;
+      if (phase === "act5" && hasCompletedAct4Vault && actFiveHandoffPending.current) return;
       if (scrollProgress < ACT_FOUR_ENTRY) {
-        setHasCompletedAct4Vault(false);
         projectIndexRef.current = 0;
         if (projectIndex !== 0) setProjectIndex(0);
         if (phase !== "act3") transitionTo("act3");
