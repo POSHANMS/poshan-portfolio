@@ -693,7 +693,7 @@ export default function ActFiveWorld({ scrollProgress, actFourPhase, cardContras
   const cardRight = useMemo(() => new THREE.Vector3(), []);
   const cardUp = useMemo(() => new THREE.Vector3(), []);
   const cardWorldQuaternion = useMemo(() => new THREE.Quaternion(), []);
-  const active = actFourPhase !== "inside" && actFourPhase !== "warping";
+  const active = actFourPhase === "act5";
   const reveal = THREE.MathUtils.smoothstep(scrollProgress, ACT_FIVE_TIMING.revealInStart, ACT_FIVE_TIMING.revealInEnd)
     * (1 - THREE.MathUtils.smoothstep(scrollProgress, ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit));
   const local = clamp01((scrollProgress - ACT_FIVE_TIMING.cameraStart) / (ACT_FIVE_TIMING.sceneExit - ACT_FIVE_TIMING.cameraStart));

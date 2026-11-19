@@ -114,7 +114,14 @@ export default function Home() {
       if (locked) lenis.stop();
       else lenis.start();
     };
+    const onActFourSetScroll = (event: Event) => {
+      const top = (event as CustomEvent<{ top?: number }>).detail?.top;
+      if (typeof top !== "number" || !Number.isFinite(top)) return;
+      lenis.scrollTo(top, { immediate: true });
+      ScrollTrigger.update();
+    };
     window.addEventListener("act-four-scroll-lock", onActFourScrollLock);
+    window.addEventListener("act-four-set-scroll", onActFourSetScroll);
 
     let rafId = 0;
     const raf = (time: number) => {
@@ -126,6 +133,7 @@ export default function Home() {
     return () => {
       cancelAnimationFrame(rafId);
       window.removeEventListener("act-four-scroll-lock", onActFourScrollLock);
+      window.removeEventListener("act-four-set-scroll", onActFourSetScroll);
       lenis.off("scroll", syncScrollTrigger);
       lenis.destroy();
       lenisRef.current = null;
@@ -225,6 +233,7 @@ export default function Home() {
             onActFourWarp={actFour.beginWarp}
             onActFourExit={actFour.exitProjectWorld}
             onActFourChargeChange={(progress) => { warpCharge.current = progress; }}
+            onActFourSelectProject={actFour.selectProject}
           />
           <CinematicHUD
             visible={storyVisible}

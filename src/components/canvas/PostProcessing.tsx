@@ -10,11 +10,15 @@ import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import * as THREE from "three";
 import { ACT_FIVE_CARD_POSITIONS, ACT_FIVE_ORIGIN, ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
+import { ACT_FOUR_PROJECT_STATIONS } from "@/animations/actFourChoreography";
 
 export interface PostProcessingProps {
   hologramActive?: boolean;
   cosmicActive?: boolean;
   reactorActive?: boolean;
+  actFourActive?: boolean;
+  actFourWarping?: boolean;
+  actFourProjectIndex?: number;
   scrollProgress?: number;
   depthOfFieldEnabled?: boolean;
 }
@@ -86,13 +90,14 @@ function actFiveFocusPoint(progress: number) {
   return point;
 }
 
-export default function PostProcessing({ hologramActive, cosmicActive, reactorActive, scrollProgress = 0, depthOfFieldEnabled = true }: PostProcessingProps) {
+export default function PostProcessing({ hologramActive, cosmicActive, reactorActive, actFourActive = false, actFourWarping = false, actFourProjectIndex = 0, scrollProgress = 0, depthOfFieldEnabled = true }: PostProcessingProps) {
   const { gl, scene, camera, size } = useThree();
   const bloomPassRef = useRef<UnrealBloomPass | null>(null);
   const bokehPassRef = useRef<BokehPass | null>(null);
   const lensPassRef = useRef<ShaderPass | null>(null);
   const previousProgress = useRef(scrollProgress);
   const transitionEnergy = useRef(0);
+  const actFourWarpEnergy = useRef(0);
 
   const bloomStrength = useRef(DEFAULT_STRENGTH);
   const bloomRadius = useRef(DEFAULT_RADIUS);
@@ -149,30 +154,34 @@ export default function PostProcessing({ hologramActive, cosmicActive, reactorAc
     const opticalWindow = actFive || actSix ? 1 : 0;
     const transfer = THREE.MathUtils.smoothstep(progressVelocity, 0.025, 0.32) * opticalWindow;
     transitionEnergy.current = THREE.MathUtils.damp(transitionEnergy.current, transfer, 5.5, safeDelta);
+    actFourWarpEnergy.current = THREE.MathUtils.damp(actFourWarpEnergy.current, actFourWarping ? 1 : 0, actFourWarping ? 7.5 : 4.5, safeDelta);
 
     if (bokehPassRef.current) {
       const focalPoint = actFiveFocusPoint(scrollProgress);
+      const actFourTarget = ACT_FOUR_PROJECT_STATIONS[THREE.MathUtils.clamp(Math.round(actFourProjectIndex), 0, ACT_FOUR_PROJECT_STATIONS.length - 1)].clone();
+      if (actFourActive) focalPoint.copy(actFourTarget);
       const forward = new THREE.Vector3();
       camera.getWorldDirection(forward);
       const focalDepth = Math.max(0.25, focalPoint.sub(camera.position).dot(forward));
       const bokehUniforms = bokehPassRef.current.materialBokeh.uniforms;
       bokehUniforms.focus.value = focalDepth;
-      bokehUniforms.aperture.value = depthOfFieldEnabled ? ACT_FIVE_BOKEH_APERTURE * actFive : 0;
-      bokehUniforms.maxblur.value = depthOfFieldEnabled ? 0.004 : 0;
-      bokehPassRef.current.enabled = depthOfFieldEnabled && reactorActive === true;
+      const focusWeight = actFourActive ? 0.72 : actFive;
+      bokehUniforms.aperture.value = depthOfFieldEnabled ? ACT_FIVE_BOKEH_APERTURE * focusWeight : 0;
+      bokehUniforms.maxblur.value = depthOfFieldEnabled ? (actFourActive ? 0.0032 : 0.004) : 0;
+      bokehPassRef.current.enabled = depthOfFieldEnabled && (reactorActive === true || actFourActive);
     }
     if (lensPassRef.current) {
       lensPassRef.current.uniforms.uChromatic.value = actFive
         ? 0.00018 + transitionEnergy.current * 0.00115
-        : actSix ? transitionEnergy.current * 0.00135 : 0;
-      lensPassRef.current.uniforms.uVignette.value = actFive * 0.18 + actSix * transitionEnergy.current * 0.08;
-      lensPassRef.current.enabled = reactorActive === true || cosmicActive === true;
+        : actSix ? transitionEnergy.current * 0.00135 : actFourWarpEnergy.current * 0.0024 + (actFourActive ? 0.00012 : 0);
+      lensPassRef.current.uniforms.uVignette.value = actFive * 0.18 + actSix * transitionEnergy.current * 0.08 + (actFourActive ? 0.11 : 0) + actFourWarpEnergy.current * 0.08;
+      lensPassRef.current.enabled = reactorActive === true || cosmicActive === true || actFourActive || actFourWarping;
     }
 
     if (bloomPassRef.current) {
-      const targetStrength = cosmicActive ? COSMIC_STRENGTH : reactorActive ? REACTOR_STRENGTH : hologramActive ? HOLOGRAM_STRENGTH : DEFAULT_STRENGTH;
-      const targetRadius = cosmicActive ? COSMIC_RADIUS : reactorActive ? REACTOR_RADIUS : hologramActive ? HOLOGRAM_RADIUS : DEFAULT_RADIUS;
-      const targetThreshold = cosmicActive ? COSMIC_THRESHOLD : reactorActive ? REACTOR_THRESHOLD : hologramActive ? HOLOGRAM_THRESHOLD : DEFAULT_THRESHOLD;
+      const targetStrength = cosmicActive ? COSMIC_STRENGTH : reactorActive || actFourActive ? REACTOR_STRENGTH : hologramActive ? HOLOGRAM_STRENGTH : DEFAULT_STRENGTH;
+      const targetRadius = cosmicActive ? COSMIC_RADIUS : reactorActive || actFourActive ? REACTOR_RADIUS : hologramActive ? HOLOGRAM_RADIUS : DEFAULT_RADIUS;
+      const targetThreshold = cosmicActive ? COSMIC_THRESHOLD : reactorActive || actFourActive ? REACTOR_THRESHOLD : hologramActive ? HOLOGRAM_THRESHOLD : DEFAULT_THRESHOLD;
 
       bloomStrength.current = THREE.MathUtils.lerp(
         bloomStrength.current,

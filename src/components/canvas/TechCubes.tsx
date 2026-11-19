@@ -65,14 +65,14 @@ function VaultBeacon({ strength }: { strength: number }) {
   );
 }
 
-export default function TechCubes({ cubesOpacity = 1, scrollProgress = 0, actFourPhase = "locked" }: { cubesOpacity?: number; scrollProgress?: number; actFourPhase?: ActFourPhase }) {
+export default function TechCubes({ cubesOpacity = 1, scrollProgress = 0, actFourPhase = "act3" }: { cubesOpacity?: number; scrollProgress?: number; actFourPhase?: ActFourPhase }) {
   const cubeRefs = useRef<THREE.Group[]>([]);
   const hoverFieldFrame = useRef(0);
   const { viewport } = useThree();
   const laptopX = Math.max(0.8, viewport.width * 0.08);
   const vaultStrength = smoothstep(0.55, 0.625, scrollProgress) * (1 - smoothstep(0.805, 0.85, scrollProgress));
   const exitStrength = smoothstep(0.805, 0.87, scrollProgress);
-  const actFourHidden = actFourPhase === "ready" || actFourPhase === "warping" || actFourPhase === "inside";
+  const actFourHidden = actFourPhase === "act4_exterior" || actFourPhase === "act4_warp_in" || actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out";
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();

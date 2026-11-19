@@ -7,107 +7,197 @@ import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
 
 const ACT_FOUR_ENTRY = 0.825;
 const ACT_FOUR_EXIT = 0.905;
+const ACT_FOUR_GATE_ANCHOR = 0.875;
 const PROJECT_COUNT = PROJECTS.length;
 const WHEEL_THRESHOLD = 124;
-const PROJECT_ADVANCE_LOCK_MS = 1450;
-const ACT_FOUR_RETURN_TARGET = ACT_FIVE_TIMING.cameraStart;
+const PROJECT_ADVANCE_LOCK_MS = 950;
+const WARP_DURATION_MS = 2200;
+const EXIT_FADE_MS = 220;
+const EXIT_FLIGHT_MS = 900;
+const ACT_FOUR_RETURN_TARGET = ACT_FIVE_TIMING.cameraStart + 0.002;
+const TRANSITION_PHASES = new Set<ActFourPhase>(["act4_warp_in", "act4_vault", "act4_warp_out"]);
+
+function setTrackProgress(progress: number) {
+  const track = document.querySelector<HTMLElement>("[data-cinematic-track]");
+  if (!track) return;
+  const travel = Math.max(0, track.offsetHeight - window.innerHeight);
+  const top = track.offsetTop + travel * progress;
+  window.dispatchEvent(new CustomEvent("act-four-set-scroll", { detail: { top } }));
+  window.scrollTo({ top, behavior: "auto" });
+}
 
 export function useActFourSequence(scrollProgress: number) {
-  const [phase, setPhase] = useState<ActFourPhase>("locked");
+  const [phase, setPhase] = useState<ActFourPhase>("act3");
   const [projectIndex, setProjectIndex] = useState(0);
+  const [hasCompletedAct4Vault, setHasCompletedAct4Vault] = useState(false);
+  const phaseRef = useRef<ActFourPhase>("act3");
   const warpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const returnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nextAdvanceAt = useRef(0);
   const lockedScrollY = useRef<number | null>(null);
   const projectIndexRef = useRef(0);
+  const scrollProgressRef = useRef(scrollProgress);
+  scrollProgressRef.current = scrollProgress;
 
-  useEffect(() => {
-    projectIndexRef.current = projectIndex;
-  }, [projectIndex]);
-
-  const clearWarpTimer = useCallback(() => {
-    if (warpTimer.current) {
-      clearTimeout(warpTimer.current);
-      warpTimer.current = null;
-    }
+  const transitionTo = useCallback((next: ActFourPhase) => {
+    phaseRef.current = next;
+    setPhase(next);
   }, []);
 
-  const clearReturnTimer = useCallback(() => {
-    if (returnTimer.current) {
-      clearTimeout(returnTimer.current);
-      returnTimer.current = null;
-    }
+  const clearWarpTimer = useCallback(() => {
+    if (warpTimer.current) clearTimeout(warpTimer.current);
+    warpTimer.current = null;
+  }, []);
+  const clearExitTimer = useCallback(() => {
+    if (exitTimer.current) clearTimeout(exitTimer.current);
+    exitTimer.current = null;
   }, []);
 
   const beginWarp = useCallback(() => {
-    setPhase((current) => {
-      if (current !== "ready") return current;
-      clearWarpTimer();
-      clearReturnTimer();
-      setProjectIndex(0);
-      lockedScrollY.current = window.scrollY;
-      warpTimer.current = setTimeout(() => setPhase("inside"), 1420);
-      return "warping";
-    });
-  }, [clearReturnTimer, clearWarpTimer]);
+    if (phaseRef.current !== "act4_exterior") return;
+    clearWarpTimer();
+    clearExitTimer();
+    projectIndexRef.current = 0;
+    setProjectIndex(0);
+    lockedScrollY.current = window.scrollY;
+    transitionTo("act4_warp_in");
+    warpTimer.current = setTimeout(() => transitionTo("act4_vault"), WARP_DURATION_MS);
+  }, [clearExitTimer, clearWarpTimer, transitionTo]);
 
   const exitProjectWorld = useCallback(() => {
-    if (phase !== "inside") return;
-    setPhase("returning");
-    clearReturnTimer();
-    returnTimer.current = setTimeout(() => {
-      const track = document.querySelector<HTMLElement>("[data-cinematic-track]");
-      if (track) {
-        const travel = Math.max(0, track.offsetHeight - window.innerHeight);
-        window.scrollTo({ top: track.offsetTop + travel * ACT_FOUR_RETURN_TARGET, behavior: "auto" });
-      }
-      projectIndexRef.current = 0;
-      setProjectIndex(0);
-      setPhase("locked");
-    }, 1420);
-  }, [clearReturnTimer, phase]);
+    if (phaseRef.current !== "act4_vault") return;
+    clearExitTimer();
+    transitionTo("act4_warp_out");
+    exitTimer.current = setTimeout(() => {
+      setHasCompletedAct4Vault(true);
+      exitTimer.current = setTimeout(() => {
+        projectIndexRef.current = 0;
+        setProjectIndex(0);
+        lockedScrollY.current = null;
+        transitionTo("act5");
+        requestAnimationFrame(() => setTrackProgress(ACT_FOUR_RETURN_TARGET));
+      }, EXIT_FLIGHT_MS);
+    }, EXIT_FADE_MS);
+  }, [clearExitTimer, transitionTo]);
 
   useEffect(() => {
-    const outsideActFour = scrollProgress < ACT_FOUR_ENTRY || scrollProgress >= ACT_FOUR_EXIT;
-
-    // Once the globe has been entered, its sequence owns navigation. It must
-    // never be cancelled by residual Lenis momentum crossing an outer range.
-    if (phase === "warping" || phase === "inside") return;
-
-    if (phase === "returning" && scrollProgress < ACT_FOUR_EXIT) return;
-
-    if (outsideActFour) {
-      clearWarpTimer();
-      clearReturnTimer();
-      lockedScrollY.current = null;
-      if (projectIndex !== 0) setProjectIndex(0);
-      if (phase !== "locked") setPhase("locked");
-      return;
+    if (!TRANSITION_PHASES.has(phase)) {
+      // The phase changes just before the controlled scroll is corrected to the
+      // Act V entry key. Hold the committed handoff through that one-frame gap.
+      if (phase === "act5" && hasCompletedAct4Vault) return;
+      if (scrollProgress < ACT_FOUR_ENTRY) {
+        setHasCompletedAct4Vault(false);
+        projectIndexRef.current = 0;
+        if (projectIndex !== 0) setProjectIndex(0);
+        if (phase !== "act3") transitionTo("act3");
+      } else if (scrollProgress < ACT_FOUR_EXIT || hasCompletedAct4Vault) {
+        if (phase !== "act4_exterior" && scrollProgress < ACT_FOUR_EXIT) transitionTo("act4_exterior");
+        else if (scrollProgress >= ACT_FOUR_EXIT) {
+          const next = scrollProgress < ACT_FIVE_TIMING.sceneExit ? "act5" : "act6";
+          if (phase !== next) transitionTo(next);
+        }
+      } else {
+        // Catch End/PageDown and large wheel bursts before Act V can render over
+        // an uncompleted gate. The approved Act V checkpoint reset is untouched.
+        setTrackProgress(ACT_FOUR_GATE_ANCHOR);
+        transitionTo("act4_exterior");
+        window.dispatchEvent(new CustomEvent("act-four-gate-pulse", { detail: { at: performance.now() } }));
+      }
     }
-
-    if (phase === "locked") setPhase("ready");
-  }, [clearReturnTimer, clearWarpTimer, phase, projectIndex, scrollProgress]);
+  }, [hasCompletedAct4Vault, phase, projectIndex, scrollProgress, transitionTo]);
 
   useEffect(() => () => {
     clearWarpTimer();
-    clearReturnTimer();
-  }, [clearReturnTimer, clearWarpTimer]);
-
-  const projectWorldLocked = phase === "warping" || phase === "inside" || phase === "returning";
-  const lockMode = phase === "returning" ? "returning" : projectWorldLocked ? "locked" : "free";
+    clearExitTimer();
+  }, [clearExitTimer, clearWarpTimer]);
 
   useEffect(() => {
-    if (!projectWorldLocked) return;
+    let lastPulseAt = 0;
+    let touchStartY: number | null = null;
+    const getTrackProgressAt = (scrollY: number) => {
+      const track = document.querySelector<HTMLElement>("[data-cinematic-track]");
+      if (!track) return scrollProgressRef.current;
+      const travel = Math.max(1, track.offsetHeight - window.innerHeight);
+      return (scrollY - track.offsetTop) / travel;
+    };
+    const landOnGate = () => {
+      setTrackProgress(ACT_FOUR_GATE_ANCHOR);
+      transitionTo("act4_exterior");
+      window.dispatchEvent(new CustomEvent("act-four-gate-pulse", { detail: { at: performance.now() } }));
+    };
+    const emitResistance = () => {
+      const now = performance.now();
+      if (now - lastPulseAt < 350) return;
+      lastPulseAt = now;
+      window.dispatchEvent(new CustomEvent("act-four-gate-pulse", { detail: { at: now } }));
+    };
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY <= 0 || hasCompletedAct4Vault) return;
+      if (phaseRef.current !== "act4_exterior" && phaseRef.current !== "act3") return;
+      const current = Math.max(scrollProgressRef.current, getTrackProgressAt(window.scrollY));
+      const projected = getTrackProgressAt(window.scrollY + event.deltaY);
+      if (current < ACT_FOUR_ENTRY && projected < ACT_FOUR_ENTRY) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (current < ACT_FOUR_ENTRY) landOnGate();
+      else emitResistance();
+    };
+    const onTouchStart = (event: TouchEvent) => { touchStartY = event.touches[0]?.clientY ?? null; };
+    const onTouchMove = (event: TouchEvent) => {
+      const currentY = event.touches[0]?.clientY;
+      if (phaseRef.current !== "act4_exterior" && phaseRef.current !== "act3") { touchStartY = currentY ?? touchStartY; return; }
+      if (touchStartY !== null && currentY !== undefined && currentY < touchStartY && !hasCompletedAct4Vault) {
+        const current = Math.max(scrollProgressRef.current, getTrackProgressAt(window.scrollY));
+        const projected = getTrackProgressAt(window.scrollY + touchStartY - currentY);
+        if (current >= ACT_FOUR_ENTRY || projected >= ACT_FOUR_ENTRY) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (current < ACT_FOUR_ENTRY) landOnGate();
+          else emitResistance();
+        }
+      }
+      touchStartY = currentY ?? touchStartY;
+    };
+    const onTouchEnd = () => { touchStartY = null; };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!["ArrowDown", "PageDown", "End"].includes(event.key) || hasCompletedAct4Vault) return;
+      if (phaseRef.current !== "act4_exterior" && phaseRef.current !== "act3") return;
+      const current = Math.max(scrollProgressRef.current, getTrackProgressAt(window.scrollY));
+      const distance = event.key === "ArrowDown" ? 48 : event.key === "PageDown" ? window.innerHeight * 0.88 : Number.POSITIVE_INFINITY;
+      if (current < ACT_FOUR_ENTRY && getTrackProgressAt(window.scrollY + distance) < ACT_FOUR_ENTRY) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (current < ACT_FOUR_ENTRY) landOnGate();
+      else emitResistance();
+    };
+    window.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    window.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
+    window.addEventListener("touchmove", onTouchMove, { capture: true, passive: false });
+    window.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
+    window.addEventListener("touchcancel", onTouchEnd, { capture: true, passive: true });
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => {
+      window.removeEventListener("wheel", onWheel, { capture: true });
+      window.removeEventListener("touchstart", onTouchStart, { capture: true });
+      window.removeEventListener("touchmove", onTouchMove, { capture: true });
+      window.removeEventListener("touchend", onTouchEnd, { capture: true });
+      window.removeEventListener("touchcancel", onTouchEnd, { capture: true });
+      window.removeEventListener("keydown", onKeyDown, { capture: true });
+    };
+  }, [hasCompletedAct4Vault, transitionTo]);
 
+  const projectWorldLocked = TRANSITION_PHASES.has(phase);
+  useEffect(() => {
+    if (!projectWorldLocked) return;
     if (lockedScrollY.current === null) lockedScrollY.current = window.scrollY;
     const origin = lockedScrollY.current;
-    const htmlOverflow = document.documentElement.style.overflow;
-    const bodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
     window.dispatchEvent(new CustomEvent("act-four-scroll-lock", { detail: { locked: true } }));
     let frame = 0;
-    if (phase !== "returning") {
+    if (phase !== "act4_warp_out") {
       const holdDocumentPosition = () => {
         if (Math.abs(window.scrollY - origin) > 0.5) window.scrollTo(0, origin);
         frame = requestAnimationFrame(holdDocumentPosition);
@@ -116,79 +206,78 @@ export function useActFourSequence(scrollProgress: number) {
     }
     return () => {
       cancelAnimationFrame(frame);
-      document.documentElement.style.overflow = htmlOverflow;
-      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
       window.dispatchEvent(new CustomEvent("act-four-scroll-lock", { detail: { locked: false } }));
     };
-  }, [lockMode, projectWorldLocked]);
+  }, [phase, projectWorldLocked]);
 
   useEffect(() => {
-    if (phase === "warping") {
-      const blockWarpScroll = (event: WheelEvent) => event.preventDefault();
-      window.addEventListener("wheel", blockWarpScroll, { passive: false, capture: true });
-      return () => window.removeEventListener("wheel", blockWarpScroll, { capture: true });
-    }
-
-    if (phase !== "inside") return;
-
+    if (phase !== "act4_warp_in" && phase !== "act4_vault") return;
     let wheelCarry = 0;
+    let touchStartY: number | null = null;
     const onWheel = (event: WheelEvent) => {
       wheelCarry += event.deltaY;
-      if (Math.abs(wheelCarry) < WHEEL_THRESHOLD) {
-        event.preventDefault();
-        return;
-      }
-
+      if (Math.abs(wheelCarry) < WHEEL_THRESHOLD) { event.preventDefault(); return; }
       const direction = Math.sign(wheelCarry);
       wheelCarry = 0;
-
-      if (performance.now() < nextAdvanceAt.current) {
-        event.preventDefault();
-        return;
+      if (phase !== "act4_vault" || performance.now() < nextAdvanceAt.current) { event.preventDefault(); return; }
+      const current = projectIndexRef.current;
+      if (direction < 0 && current > 0) {
+        event.preventDefault(); nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
+        projectIndexRef.current = current - 1; setProjectIndex(current - 1); return;
       }
-
-      const currentIndex = projectIndexRef.current;
-
-      if (direction < 0 && currentIndex > 0) {
-        event.preventDefault();
-        nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
-        projectIndexRef.current = currentIndex - 1;
-        setProjectIndex(currentIndex - 1);
-        return;
+      if (direction > 0 && current < PROJECT_COUNT - 1) {
+        event.preventDefault(); nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
+        projectIndexRef.current = current + 1; setProjectIndex(current + 1); return;
       }
-
-      if (direction > 0 && currentIndex < PROJECT_COUNT - 1) {
-        event.preventDefault();
-        nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
-        projectIndexRef.current = currentIndex + 1;
-        setProjectIndex(currentIndex + 1);
-        return;
-      }
-
-      if (direction > 0 && currentIndex === PROJECT_COUNT - 1) {
-        event.preventDefault();
-        nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
-        exitProjectWorld();
-      } else {
-        event.preventDefault();
-      }
+      if (direction > 0 && current === PROJECT_COUNT - 1) {
+        event.preventDefault(); nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS; exitProjectWorld();
+      } else event.preventDefault();
     };
-
+    const onTouchStart = (event: TouchEvent) => { touchStartY = event.touches[0]?.clientY ?? null; };
+    const onTouchMove = (event: TouchEvent) => { if (phase === "act4_vault") event.preventDefault(); };
+    const onTouchEnd = (event: TouchEvent) => {
+      if (phase !== "act4_vault" || touchStartY === null) return;
+      const endY = event.changedTouches[0]?.clientY;
+      if (endY === undefined) return;
+      const distance = touchStartY - endY;
+      touchStartY = null;
+      if (Math.abs(distance) < 36 || performance.now() < nextAdvanceAt.current) return;
+      const current = projectIndexRef.current;
+      const direction = distance > 0 ? 1 : -1;
+      if (direction < 0 && current > 0) { projectIndexRef.current = current - 1; setProjectIndex(current - 1); }
+      else if (direction > 0 && current < PROJECT_COUNT - 1) { projectIndexRef.current = current + 1; setProjectIndex(current + 1); }
+      else if (direction > 0 && current === PROJECT_COUNT - 1) exitProjectWorld();
+      nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
+    };
     window.addEventListener("wheel", onWheel, { passive: false, capture: true });
-    return () => window.removeEventListener("wheel", onWheel, { capture: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener("wheel", onWheel, { capture: true });
+      window.removeEventListener("touchstart", onTouchStart, { capture: true });
+      window.removeEventListener("touchmove", onTouchMove, { capture: true });
+      window.removeEventListener("touchend", onTouchEnd, { capture: true });
+    };
   }, [exitProjectWorld, phase]);
 
   useEffect(() => {
-    if (phase !== "inside") return;
+    if (phase !== "act4_vault") return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        exitProjectWorld();
-      }
+      if (event.key === "Escape") { event.preventDefault(); exitProjectWorld(); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [exitProjectWorld, phase]);
 
-  return { phase, beginWarp, projectIndex, exitProjectWorld };
+  const selectProject = useCallback((index: number) => {
+    if (phaseRef.current !== "act4_vault" || !Number.isFinite(index)) return;
+    const next = Math.max(0, Math.min(PROJECT_COUNT - 1, Math.round(index)));
+    projectIndexRef.current = next;
+    setProjectIndex(next);
+  }, []);
+
+  return { phase, beginWarp, projectIndex, exitProjectWorld, selectProject, hasCompletedAct4Vault };
 }

@@ -45,7 +45,7 @@ export default function FloatingLaptop({
   wormholeValues,
   wormholeActive = false,
   laptopScreenRef,
-  actFourPhase = "locked",
+  actFourPhase = "act3",
 }: FloatingLaptopProps) {
   const { scene } = useGLTF("/models/laptop-baked.glb");
 
@@ -467,9 +467,9 @@ export default function FloatingLaptop({
       // The project entry owns the laptop only while it is in frame. Once the
       // core returns, the laptop comes back before Act V instead of vanishing.
       const actFourApproach = smoothstep(0.80, 0.852, scrollProgress) * (1 - smoothstep(0.93, 0.955, scrollProgress));
-      const actFourSeal = actFourPhase === "returning"
+      const actFourSeal = actFourPhase === "act4_warp_out"
         ? 0
-        : Math.max(actFourApproach, actFourPhase === "warping" || actFourPhase === "inside" ? 1 : 0);
+        : Math.max(actFourApproach, actFourPhase === "act4_warp_in" || actFourPhase === "act4_vault" ? 1 : 0);
       const finalPullback = smoothstep(0.82, 1, scrollProgress);
 
       const targetX = laptopX - portal * 0.1 - inside * 0.5 + pullback * 0.34 + skills * 7.8 + actFourSeal * 0.5 + finalPullback * 0.08;

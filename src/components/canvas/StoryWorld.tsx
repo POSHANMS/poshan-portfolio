@@ -575,7 +575,7 @@ function TransmissionSignal({ scrollProgress }: { scrollProgress: number }) {
   );
 }
 
-export default function StoryWorld({ scrollProgress, actFourPhase = "locked" }: { scrollProgress: number; actFourPhase?: ActFourPhase }) {
+export default function StoryWorld({ scrollProgress, actFourPhase = "act3" }: { scrollProgress: number; actFourPhase?: ActFourPhase }) {
   return (
     <group>
       <StarWarpTunnel scrollProgress={scrollProgress} />
@@ -583,8 +583,8 @@ export default function StoryWorld({ scrollProgress, actFourPhase = "locked" }: 
       <LaptopPortal scrollProgress={scrollProgress} />
       <InteriorWorld scrollProgress={scrollProgress} />
       <SkillConstellation scrollProgress={scrollProgress} />
-      {actFourPhase === "locked" && <ProjectBeacons scrollProgress={scrollProgress} />}
-      {actFourPhase === "locked" && <TransmissionSignal scrollProgress={scrollProgress} />}
+      {actFourPhase === "act3" && <ProjectBeacons scrollProgress={scrollProgress} />}
+      {actFourPhase === "act3" && <TransmissionSignal scrollProgress={scrollProgress} />}
     </group>
   );
 }

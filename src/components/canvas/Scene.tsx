@@ -112,7 +112,7 @@ export default function Scene({
   wormholeValues,
   wormholeActive = false,
   lensDistortion = 0,
-  actFourPhase = "locked",
+  actFourPhase = "act3",
   actFourProjectIndex = 0,
   warpCharge,
 }: SceneProps) {
@@ -147,7 +147,9 @@ export default function Scene({
   // Act V is a true location change: retain the stars, but leave the physical desk-world behind.
   const actFiveStrength = smoothstep(ACT_FIVE_TIMING.revealInStart, ACT_FIVE_TIMING.revealInEnd, scrollProgress)
     * (1 - smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress));
-  const isActFive = actFiveStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
+  const actFourOwnsScene = actFourPhase === "act4_exterior" || actFourPhase === "act4_warp_in" || actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out";
+  const actFourExteriorActive = actFourPhase === "act4_exterior";
+  const isActFive = actFourPhase === "act5" && actFiveStrength > 0.001;
   // Let the Act V reactor finish its opacity fade before the Contact galaxy
   // reaches full luminance; the camera is already moving through the exit arc.
   // Crossfade the galaxy into the final Act V fade instead of waiting for the
@@ -159,9 +161,9 @@ export default function Scene({
     smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress),
     actSixWarpProgress,
   );
-  const isActSix = actSixStrength > 0.02 && actFourPhase !== "inside" && actFourPhase !== "warping";
-  const isInsideProjectCore = actFourPhase === "inside";
-  const isProjectTransit = actFourPhase === "warping" || isInsideProjectCore;
+  const isActSix = actFourPhase === "act6" && actSixStrength > 0.001;
+  const isInsideProjectCore = actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out";
+  const showActFourStarfield = actFourPhase === "act4_exterior";
 
   return (
     <div className="fixed inset-0 z-0 h-full w-full" style={{ background: "#000000" }}>
@@ -187,6 +189,7 @@ export default function Scene({
 
         <color attach="background" args={["#000000"]} />
         {isActFive && <fogExp2 attach="fog" args={["#040103", 0.026]} />}
+        {isInsideProjectCore && <fogExp2 attach="fog" args={["#0d1e2b", 0.0038]} />}
 
         <SceneLights
           powerUpValues={powerUpValues}
@@ -198,11 +201,11 @@ export default function Scene({
 
         <Suspense fallback={null}>
           {/* Warp owns the starfield during transit so the streaks read as speed, not background noise. */}
-          <group visible={showStars && !isInsideProjectCore}>
-            {!isActFive && !isActSix && <NebulaBackground />}
+          <group visible={showStars && (!actFourOwnsScene || showActFourStarfield) && !isInsideProjectCore}>
+            {!isActFive && !isActSix && !actFourOwnsScene && <NebulaBackground />}
             <StarField
-              starsOpacity={starsOpacity * (isActFive ? 1 : 0.24 + exteriorStrength * 0.76)}
-              showHeroStars={!isActFive && !isActSix}
+              starsOpacity={starsOpacity * (isActFive || showActFourStarfield ? 1 : 0.24 + exteriorStrength * 0.76)}
+              showHeroStars={!isActFive && !isActSix && !actFourOwnsScene}
               cardContrast={cardContrast}
               // Keep the shared starfield filling the camera view through the
               // final contact orbit without increasing its particle count.
@@ -211,18 +214,18 @@ export default function Scene({
               cameraParallax={isActSix ? 0.24 : 0}
               handoffProgress={handoffProgress}
             />
-            {!isActFive && !isActSix && <ShootingStars />}
+            {!isActFive && !isActSix && !actFourOwnsScene && <ShootingStars />}
           </group>
 
-          <group visible={showGlobe && !isActFive && !isActSix}>
-            <DeepSpaceGlobe scrollProgress={scrollProgress} globeOpacity={globeOpacity * exteriorStrength * (isInsideProjectCore ? 0 : 1)} />
+          <group visible={showGlobe && !isActFive && !isActSix && !actFourOwnsScene}>
+            <DeepSpaceGlobe scrollProgress={scrollProgress} globeOpacity={globeOpacity * exteriorStrength * (isInsideProjectCore || actFourExteriorActive ? 0 : 1)} />
           </group>
 
-          {!isInsideProjectCore && !isActFive && !isActSix && <VolumetricRays />}
-          {!isInsideProjectCore && !isActFive && !isActSix && <MagneticParticles />}
-          {!isInsideProjectCore && !isActFive && !isActSix && <FloatingHexParticles />}
+          {!actFourOwnsScene && !isActFive && !isActSix && <VolumetricRays />}
+          {!actFourOwnsScene && !isActFive && !isActSix && <MagneticParticles />}
+          {!actFourOwnsScene && !isActFive && !isActSix && <FloatingHexParticles />}
 
-          <group visible={showCubes && !isActFive && !isActSix}>
+          <group visible={showCubes && !actFourOwnsScene && !isActFive && !isActSix}>
             <TechCubes cubesOpacity={cubesOpacity} scrollProgress={scrollProgress} actFourPhase={actFourPhase} />
           </group>
 
@@ -234,7 +237,7 @@ export default function Scene({
             />
           )}
 
-          <group visible={!!showLaptop && !isActFive && !isActSix}>
+          <group visible={!!showLaptop && !actFourOwnsScene && !isActFive && !isActSix}>
             <FloatingLaptop
               powerUpStage={powerUpStage}
               laptopOpacity={laptopOpacity}
@@ -252,25 +255,28 @@ export default function Scene({
             />
           </group>
 
-          <group visible={showFloor && !isInsideProjectCore && !isActFive && !isActSix}>
+          <group visible={showFloor && !actFourOwnsScene && !isActFive && !isActSix}>
             <NeonGrid floorOpacity={floorOpacity} />
             <FloorRings />
           </group>
 
-          {!isInsideProjectCore && !isActFive && !isActSix && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
-          {!isActFive && !isActSix && <ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} warpCharge={warpCharge ?? { current: 0 }} />}
+          {!actFourOwnsScene && !isActFive && !isActSix && <StoryWorld scrollProgress={scrollProgress} actFourPhase={actFourPhase} />}
+          <group visible={actFourOwnsScene}><ActFourWorld phase={actFourPhase} projectIndex={actFourProjectIndex} warpCharge={warpCharge ?? { current: 0 }} /></group>
           <ActFiveWorld
             scrollProgress={scrollProgress}
             actFourPhase={actFourPhase}
             cardContrast={cardContrast}
             particleCount={deviceTier === "mobile" ? 4_200 : deviceTier === "tablet" ? 8_600 : 14_500}
           />
-          <ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} />
+          <group visible={isActSix}><ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} /></group>
 
           <PostProcessing
             hologramActive={hologramVisible}
             cosmicActive={isActSix}
             reactorActive={isActFive}
+            actFourActive={actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out"}
+            actFourWarping={actFourPhase === "act4_warp_in" || actFourPhase === "act4_warp_out"}
+            actFourProjectIndex={actFourProjectIndex}
             scrollProgress={scrollProgress}
             depthOfFieldEnabled={deviceTier === "desktop"}
           />

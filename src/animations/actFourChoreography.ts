@@ -1,42 +1,44 @@
 import * as THREE from "three";
-import { ACT_FIVE_ENTRY_CAMERA, ACT_FIVE_ENTRY_TARGET } from "./actFiveChoreography";
 import { PROJECTS } from "@/utils/constants";
 
 export const ACT_FOUR_CORE_POSITION = new THREE.Vector3(4.5, 2.5, -8);
+export const ACT_FOUR_SINGULARITY_POSITION = new THREE.Vector3(2.4, 1.2, -95);
 export const ACT_FOUR_CARD_SIZE = new THREE.Vector2(5.5, 3.35);
 
-export const ACT_FOUR_PROJECT_STATIONS = PROJECTS.map((_, index) => new THREE.Vector3(
-  ACT_FOUR_CORE_POSITION.x + Math.sin(index * 0.58) * 0.82,
-  ACT_FOUR_CORE_POSITION.y + Math.sin(index * 0.72) * 0.26,
-  ACT_FOUR_CORE_POSITION.z - 5.15 - index * 6.25,
-));
+/** Five real project sculptures occupy the same navigable Z corridor. */
+export const ACT_FOUR_PROJECT_STATIONS = [
+  new THREE.Vector3(2.6, -0.3, 0),
+  new THREE.Vector3(3.2, -0.1, -16),
+  new THREE.Vector3(2.2, -0.4, -32),
+  new THREE.Vector3(3.0, -0.2, -48),
+  new THREE.Vector3(2.5, -0.3, -64),
+].slice(0, PROJECTS.length);
 
+// Stations are approached from their positive-Z side, so each step travels
+// forward down the corridor and the final singularity remains ahead at -95.
+const CAMERA_OFFSET = new THREE.Vector3(-1.65, 0.1, 8.4);
 export const ACT_FOUR_CAMERA_PATH = new THREE.CatmullRomCurve3(
-  ACT_FOUR_PROJECT_STATIONS.map((station) => new THREE.Vector3(station.x - 1.55, station.y, station.z + 5.45)),
+  ACT_FOUR_PROJECT_STATIONS.map((station) => station.clone().add(CAMERA_OFFSET)),
   false,
   "centripetal",
 );
-
 export const ACT_FOUR_TARGET_PATH = new THREE.CatmullRomCurve3(
-  ACT_FOUR_PROJECT_STATIONS.map((station) => new THREE.Vector3(station.x - 1.55, station.y, station.z)),
+  ACT_FOUR_PROJECT_STATIONS.map((station) => station.clone().add(new THREE.Vector3(0, 0.1, 0))),
   false,
   "centripetal",
 );
 
+/** Exit stays on a one-way negative-Z corridor, ending at the distant core. */
 export const ACT_FOUR_EXIT_CAMERA_PATH = new THREE.CatmullRomCurve3([
   ACT_FOUR_CAMERA_PATH.getPointAt(1),
-  ACT_FOUR_CAMERA_PATH.getPointAt(1).clone().add(new THREE.Vector3(0.15, 0.12, -9)),
-  new THREE.Vector3(4.2, 2.8, -48),
-  new THREE.Vector3(2.8, 2.2, -43),
-  ACT_FIVE_ENTRY_CAMERA.clone(),
+  new THREE.Vector3(2.7, 1.1, -76),
+  ACT_FOUR_SINGULARITY_POSITION.clone().add(new THREE.Vector3(0, 0, 10)),
+  ACT_FOUR_SINGULARITY_POSITION.clone(),
 ], false, "centripetal");
-
 export const ACT_FOUR_EXIT_TARGET_PATH = new THREE.CatmullRomCurve3([
   ACT_FOUR_TARGET_PATH.getPointAt(1),
-  ACT_FOUR_TARGET_PATH.getPointAt(1).clone().add(new THREE.Vector3(0, 0, -8)),
-  new THREE.Vector3(4.2, 2.8, -52),
-  new THREE.Vector3(2.8, 2.2, -42),
-  ACT_FIVE_ENTRY_TARGET.clone(),
+  new THREE.Vector3(2.4, 1.2, -84),
+  ACT_FOUR_SINGULARITY_POSITION.clone(),
 ], false, "centripetal");
 
 export function getActFourProjectPose(index: number) {
@@ -44,5 +46,26 @@ export function getActFourProjectPose(index: number) {
   return {
     camera: ACT_FOUR_CAMERA_PATH.getPointAt(progress),
     target: ACT_FOUR_TARGET_PATH.getPointAt(progress),
+  };
+}
+
+/** Build a forward-only exit beginning at the station the visitor is viewing. */
+export function createActFourExitPaths(index: number) {
+  const start = getActFourProjectPose(index);
+  const remainingDistance = Math.max(1, start.camera.z - ACT_FOUR_SINGULARITY_POSITION.z);
+  const firstControlZ = start.camera.z - remainingDistance * 0.34;
+  const secondControlZ = start.camera.z - remainingDistance * 0.72;
+  return {
+    position: new THREE.CatmullRomCurve3([
+      start.camera.clone(),
+      start.camera.clone().lerp(ACT_FOUR_SINGULARITY_POSITION, 0.34).setZ(firstControlZ),
+      start.camera.clone().lerp(ACT_FOUR_SINGULARITY_POSITION, 0.72).setZ(secondControlZ),
+      ACT_FOUR_SINGULARITY_POSITION.clone(),
+    ], false, "centripetal"),
+    target: new THREE.CatmullRomCurve3([
+      start.target.clone(),
+      new THREE.Vector3(2.4, 1.2, firstControlZ - 8),
+      ACT_FOUR_SINGULARITY_POSITION.clone(),
+    ], false, "centripetal"),
   };
 }

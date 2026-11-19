@@ -460,6 +460,8 @@ function ProjectsChapter({
   onWarp,
   onExit,
   onCharge,
+  onSelectProject,
+  warpProgress,
 }: {
   presence: number;
   phase: ActFourPhase;
@@ -467,49 +469,91 @@ function ProjectsChapter({
   onWarp: () => void;
   onExit: () => void;
   onCharge: (progress: number) => void;
+  onSelectProject: (index: number) => void;
+  warpProgress: number;
 }) {
   const project = PROJECTS[projectIndex];
+  const [gatePulse, setGatePulse] = useState(0);
+  const [gateAlert, setGateAlert] = useState(false);
+  const alertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  if (phase === "ready") {
+  useEffect(() => {
+    const onGatePulse = () => {
+      setGatePulse((value) => value + 1);
+      setGateAlert(true);
+      if (alertTimer.current) clearTimeout(alertTimer.current);
+      if (pulseTimer.current) clearTimeout(pulseTimer.current);
+      pulseTimer.current = setTimeout(() => setGatePulse(0), 370);
+      alertTimer.current = setTimeout(() => setGateAlert(false), 2000);
+    };
+    window.addEventListener("act-four-gate-pulse", onGatePulse);
+    return () => {
+      window.removeEventListener("act-four-gate-pulse", onGatePulse);
+      if (alertTimer.current) clearTimeout(alertTimer.current);
+      if (pulseTimer.current) clearTimeout(pulseTimer.current);
+    };
+  }, []);
+
+  if (phase === "act4_exterior") {
     return (
-      <Panel presence={presence} side="left" className="left-6 top-[16vh] w-[min(29rem,calc(100vw-3rem))] md:left-16">
-        <div className="relative grid gap-5 border border-[#ff627c]/38 bg-[linear-gradient(120deg,rgba(12,4,10,0.84),rgba(4,6,12,0.68))] p-6 shadow-[0_24px_78px_rgba(0,0,0,0.4),inset_0_0_34px_rgba(255,30,70,0.05)] backdrop-blur-xl">
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-[#ff4668] to-transparent shadow-[0_0_18px_#ff2448]" />
+      <Panel presence={presence} side="left" className="left-6 top-[17vh] w-[min(27rem,calc(100vw-3rem))] md:left-16">
+        <div
+          className="relative grid gap-5 py-2 pr-5 [text-shadow:0_2px_16px_rgba(0,0,0,0.9)]"
+          style={{ transform: "perspective(1400px) rotateY(5deg) rotateX(1deg)", transformOrigin: "left center" }}
+        >
           <div>
             <Kicker act="ACT IV" label="Core Orbit" />
-            <h2 className="max-w-[10ch] text-4xl font-black uppercase leading-[0.92] tracking-[-0.035em] text-white md:text-5xl">Project Launch</h2>
-            <p className="mt-4 max-w-sm text-sm leading-6 text-white/75">Hold to breach the crimson core and enter the project vault.</p>
+            <h2 className="max-w-[10ch] text-4xl font-black uppercase leading-[0.92] tracking-[-0.035em] text-white [text-shadow:0_0_24px_rgba(255,220,230,0.22)] md:text-5xl">Project Launch</h2>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-white/80 [text-shadow:0_0_12px_rgba(255,210,220,0.16)]">Hold to breach the crimson core and enter the project vault.</p>
           </div>
-          <div className="flex items-center gap-5 border-t border-white/10 pt-4">
-            <HoldToWarp onComplete={onWarp} onProgress={onCharge} compact />
-            <p className="max-w-[15rem] font-mono text-[9px] uppercase leading-5 tracking-[0.16em] text-white/48">Charge the field, then cross into five project telemetry stations.</p>
+          <div className="flex items-center gap-5 pt-1">
+            <div className="relative shrink-0 rounded-full border border-white/10 bg-[radial-gradient(circle,rgba(15,8,12,0.82),rgba(7,6,10,0.55))] p-1.5 shadow-[0_0_38px_rgba(255,100,90,0.12)] backdrop-blur-xl">
+              {gatePulse > 0 && [0, 1, 2].map((wave) => <span key={`${gatePulse}-${wave}`} className="act-four-gate-wave" style={{ animationDelay: `${wave * 110}ms` }} />)}
+              <HoldToWarp onComplete={onWarp} onProgress={onCharge} compact className={gatePulse > 0 ? "act-four-gate-button-pulse" : ""} />
+            </div>
+            <div className="max-w-[16rem]">
+              <p className="font-mono text-[9px] uppercase leading-5 tracking-[0.16em] text-white/65">Charge the field, then cross into five project telemetry stations.</p>
+              <p className={`mt-2 min-h-8 font-mono text-[8px] uppercase leading-4 tracking-[0.1em] text-[#ffd49b] transition duration-300 ${gateAlert ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"}`} role="status" aria-live="polite">Gravity lock active // Hold to warp to enter vault</p>
+            </div>
           </div>
         </div>
       </Panel>
     );
   }
 
-  if (phase === "warping") {
+  if (phase === "act4_warp_in") {
+    const signal = smoothstep(warpProgress, 0.24, 0.29) * (1 - smoothstep(warpProgress, 0.62, 0.68));
     return (
-      <Panel presence={presence} side="center" className="left-1/2 top-[43vh]">
-        <div className="text-center font-mono text-[11px] uppercase tracking-[0.32em] text-[#ffe4ea] drop-shadow-[0_0_18px_rgba(255,228,234,0.8)]">
-          Traversing core orbit
-        </div>
-      </Panel>
+      <>
+        <Panel presence={signal} side="center" className="left-1/2 top-[43vh]">
+          <div className="text-center font-mono text-[9px] uppercase tracking-[0.34em] text-[#ffe4ea]/82 drop-shadow-[0_0_18px_rgba(255,228,234,0.55)]">Traversing event horizon</div>
+        </Panel>
+        <Panel presence={smoothstep(warpProgress, 0.88, 0.98)} side="left" className="left-4 top-[7vh] z-50 w-[min(28rem,calc(40vw-2rem))] md:left-12">
+          <div className="rounded-2xl border border-white/15 bg-[#080a12]/42 p-5 shadow-[0_18px_64px_rgba(0,0,0,.42),inset_0_1px_0_rgba(255,255,255,.12)] backdrop-blur-[22px]">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8deeff]">01 / 05 · Project station</p>
+            <h2 className="mt-3 text-3xl font-black uppercase leading-none text-white">{PROJECTS[0].name}</h2>
+            <p className="mt-3 text-sm leading-6 text-white/80">{PROJECTS[0].description}</p>
+          </div>
+        </Panel>
+      </>
     );
   }
 
-  if (phase === "inside" || phase === "returning") {
+  if (phase === "act4_vault" || phase === "act4_warp_out") {
     const finalProject = projectIndex === PROJECTS.length - 1;
     return (
       <>
-      <Panel presence={presence} side="left" className="left-4 top-[8vh] z-50 w-[min(28rem,calc(40vw-2rem))] max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto md:left-12">
-        <div className="relative overflow-hidden border border-[#ff6680]/40 bg-[linear-gradient(120deg,rgba(17,5,12,0.88),rgba(5,7,13,0.74))] p-4 shadow-[0_20px_72px_rgba(0,0,0,0.42),inset_0_0_32px_rgba(255,34,72,0.05)] backdrop-blur-xl md:p-5">
+      <Panel presence={presence} side="left" className="left-4 top-[7vh] z-50 w-[min(28rem,calc(40vw-2rem))] max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto md:left-12">
+        <div key={project.name} className="act-four-station-panel relative overflow-hidden rounded-2xl border border-white/[0.12] bg-[linear-gradient(120deg,rgba(10,8,14,0.55),rgba(8,7,12,0.42))] p-4 shadow-[0_20px_72px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[24px] md:p-5" style={{ transition: "opacity 220ms ease, transform 220ms ease", opacity: phase === "act4_warp_out" ? 0 : 1, transform: phase === "act4_warp_out" ? "translateY(-12px)" : "translateY(0)" }}>
           <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-[#ff4668] to-transparent shadow-[0_0_18px_#ff2448]" />
           <div className="flex items-center justify-between gap-3 font-mono text-[9px] uppercase tracking-[0.2em] text-[#ff9cab] md:text-[10px]">
             <span>Act IV / Core Orbit</span>
             <span>{String(projectIndex + 1).padStart(2, "0")} / {String(PROJECTS.length).padStart(2, "0")}</span>
           </div>
+          <nav className="mt-4 flex items-center gap-1" aria-label="Project stations">
+            {PROJECTS.map((item, index) => <button key={item.name} type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelectProject(index)} aria-label={`Open station ${String(index + 1).padStart(2, "0")}: ${item.name}`} aria-current={index === projectIndex ? "step" : undefined} className={`relative grid h-7 w-9 place-items-center font-mono text-[9px] transition ${index === projectIndex ? "text-white" : "text-white/45 hover:text-white/85"}`}><span className={`absolute inset-x-1 bottom-0 h-px transition ${index === projectIndex ? "bg-[#ff6d84] shadow-[0_0_10px_#ff4d6d]" : "bg-white/15"}`} />{String(index + 1).padStart(2, "0")}</button>)}
+          </nav>
           <h2 className="mt-3 max-w-full break-words text-[clamp(1.55rem,2.5vw,2.8rem)] font-black uppercase leading-[0.98] tracking-[-0.035em] text-white">{project.name}</h2>
           <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-[#ffb5c0] md:text-[10px]">{project.subtitle}</p>
           <p className="mt-3 max-w-xl text-[11px] leading-[1.65] text-white/78 md:text-xs">{project.description}</p>
@@ -563,8 +607,9 @@ function ProjectsChapter({
         type="button"
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }}
-        className="pointer-events-auto absolute right-6 top-6 z-[60] border border-white/30 bg-black/45 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/85 backdrop-blur-lg transition hover:border-[#ff7388] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="pointer-events-auto absolute right-6 top-6 z-[60] border border-white/20 bg-black/35 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/85 backdrop-blur-lg transition hover:border-[#ff7388] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
         aria-label="Exit the Act IV vault"
+        style={{ transition: "opacity 220ms ease, transform 220ms ease", opacity: phase === "act4_warp_out" ? 0 : 1, transform: phase === "act4_warp_out" ? "translateY(-12px)" : "translateY(0)" }}
       >[ ESC // EXIT VAULT ]</button>
       </>
     );
@@ -816,11 +861,12 @@ function ContactChapter({ presence, progress }: { presence: number; progress: nu
 export default function CinematicJourney({
   scrollProgress,
   visible,
-  actFourPhase = "locked",
+  actFourPhase = "act3",
   actFourProjectIndex = 0,
   onActFourWarp,
   onActFourExit,
   onActFourChargeChange,
+  onActFourSelectProject,
 }: {
   scrollProgress: number;
   visible: boolean;
@@ -829,12 +875,28 @@ export default function CinematicJourney({
   onActFourWarp: () => void;
   onActFourExit: () => void;
   onActFourChargeChange: (progress: number) => void;
+  onActFourSelectProject: (index: number) => void;
 }) {
   const [hoveredCube, setHoveredCube] = useState<CubeModuleId | null>(null);
+  const [actFourWarpProgress, setActFourWarpProgress] = useState(0);
   const [cubeTargets, setCubeTargets] = useState<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
   const cubeTargetsRef = useRef<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
   const cubeCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHoveringCubePanel = useRef(false);
+
+  useEffect(() => {
+    if (actFourPhase === "act4_vault") {
+      setActFourWarpProgress(1);
+      return;
+    }
+    if (actFourPhase !== "act4_warp_in") {
+      setActFourWarpProgress(0);
+      return;
+    }
+    const startedAt = performance.now();
+    const timer = setInterval(() => setActFourWarpProgress(Math.min(1, (performance.now() - startedAt) / 2200)), 40);
+    return () => clearInterval(timer);
+  }, [actFourPhase]);
 
   const clearCubeCloseTimer = useCallback(() => {
     if (cubeCloseTimer.current) {
@@ -958,8 +1020,8 @@ export default function CinematicJourney({
 
   if (!visible) return null;
 
-  const actFourInterior = actFourPhase === "inside" || actFourPhase === "warping" || actFourPhase === "returning";
-  const actFourReturning = actFourPhase === "returning" && scrollProgress < 0.905;
+  const actFourInterior = actFourPhase === "act4_warp_in" || actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out";
+  const actFourReturning = actFourPhase === "act4_warp_out";
   const actFiveProgress = clamp((scrollProgress - ACT_FIVE_TIMING.cameraStart) / (ACT_FIVE_TIMING.sceneExit - ACT_FIVE_TIMING.cameraStart));
   const actFiveHudPresence = scrollProgress >= ACT_FIVE_TIMING.revealInStart && scrollProgress <= ACT_FIVE_TIMING.cameraExitStart
     ? 1
@@ -998,6 +1060,8 @@ export default function CinematicJourney({
         onWarp={onActFourWarp}
         onExit={onActFourExit}
         onCharge={onActFourChargeChange}
+        onSelectProject={onActFourSelectProject}
+        warpProgress={actFourWarpProgress}
       />
       <JourneyChapter
         presence={actFourInterior || actFourReturning ? 0 : actFiveHudPresence}

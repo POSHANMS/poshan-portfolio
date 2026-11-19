@@ -13,6 +13,7 @@ export default function HoldToWarp({
   compact = false,
   className = "",
   onProgress,
+  disabled = false,
 }: {
   onComplete: () => void;
   label?: string;
@@ -22,6 +23,7 @@ export default function HoldToWarp({
   compact?: boolean;
   className?: string;
   onProgress?: (progress: number) => void;
+  disabled?: boolean;
 }) {
   const [progress, setProgress] = useState(0);
   const activePointer = useRef<number | null>(null);
@@ -70,16 +72,19 @@ export default function HoldToWarp({
   return (
     <button
       type="button"
+      disabled={disabled}
       aria-label={ariaLabel}
       className={`group relative grid ${compact ? "h-24 w-24" : "h-36 w-36"} place-items-center rounded-full border border-[#ff6b7f]/55 bg-black/45 font-mono text-[10px] uppercase tracking-[0.2em] text-white shadow-[0_0_48px_rgba(255,23,68,0.2)] backdrop-blur-md transition hover:border-[#ffe4ea] hover:bg-[#ff1744]/14 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe4ea] ${className}`}
-      onPointerDown={beginPointerCharging}
+      onPointerDown={disabled ? undefined : beginPointerCharging}
       onPointerUp={stopCharging}
       onPointerCancel={stopCharging}
       onLostPointerCapture={stopCharging}
       onClick={() => {
+        if (disabled) return;
         if (tapToComplete) onComplete();
       }}
       onKeyDown={(event) => {
+        if (disabled) return;
         if (!event.repeat && (event.key === " " || event.key === "Enter")) beginCharging();
       }}
       onKeyUp={(event) => {
