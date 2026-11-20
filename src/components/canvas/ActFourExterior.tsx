@@ -54,16 +54,14 @@ const horizonFragment = `
     vec3 v = normalize(vViewPosition);
     float fresnel = pow(1.0 - max(dot(n, v), 0.0), 4.5);
     float turbulence = noise3(vLocalPosition * 5.5 + vec3(0.0, uTime * 0.04, -uTime * 0.025));
-    // Keep the center optically black, but give the event horizon a broad,
-    // legible photon rim instead of a hairline that disappears at normal scale.
-    float photonRing = smoothstep(0.84, 0.985, fresnel + (turbulence - 0.5) * 0.018 + uCharge * 0.012);
-    float edgeGlow = exp(-pow((1.0 - fresnel) * 20.0, 2.0));
+    float photonRing = smoothstep(0.91, 0.985, fresnel + (turbulence - 0.5) * 0.008);
+    float edgeGlow = exp(-pow((1.0 - fresnel) * 28.0, 2.0));
     float pulse = 0.94 + 0.06 * sin(uTime * (0.7 + uCharge * 4.0) + turbulence * 4.0);
     vec3 gold = vec3(1.0, 0.93, 0.76);
     vec3 crimson = vec3(0.85, 0.018, 0.075);
     vec3 color = mix(crimson, gold, smoothstep(0.76, 0.94, fresnel));
-    float alpha = (photonRing * 0.82 + edgeGlow * 0.30) * pulse;
-    gl_FragColor = vec4(color * (2.15 + uCharge * 0.9), alpha);
+    float alpha = (photonRing * 0.9 + edgeGlow * 0.16) * pulse;
+    gl_FragColor = vec4(color * (2.1 + uCharge * 3.4), alpha);
   }
 `;
 
@@ -118,20 +116,23 @@ const diskFragment = `
     float cloudField=broad*0.58+fine*0.27+arm*0.3;
     float cloud=smoothstep(0.31,0.67,cloudField);
     float inner=uInnerRatio;
-    float outerFade=1.0-smoothstep(0.30,0.48,r);
+    float outerFade=1.0-smoothstep(0.28,0.49,r);
     float innerFade=smoothstep(inner-0.035,inner+0.055,r);
     float filaments=0.48+0.52*pow(max(0.0,0.5+0.5*sin(armPhase*2.0+broad*8.0+uTime*(0.26+orbit*0.14))),2.0);
     float gas=(0.08+cloud*0.72+arm*0.18)*mix(0.72,1.0,filaments)*(0.7+fine*0.5);
     float innerHeat=1.0-smoothstep(inner+0.025,inner+0.105,r);
-    vec3 whiteGold=vec3(1.0,0.91,0.72);
-    vec3 amber=vec3(1.0,0.28,0.035);
-    vec3 deepCrimson=vec3(0.2,0.008,0.024);
-    vec3 color=mix(deepCrimson,amber,smoothstep(0.26,0.78,cloud+arm*0.22));
-    color=mix(color,vec3(1.0,0.58,0.2),smoothstep(0.55,0.9,gas)*0.48);
-    color=mix(color,whiteGold,innerHeat*0.48);
-    float doppler=0.78+0.35*smoothstep(0.0,0.8,-p.x);
-    float chargeHeat=1.0+uCharge*0.65;
-    float alpha=gas*innerFade*outerFade*uOpacity*doppler*(0.62+uCharge*0.08);
+    vec3 whiteGold=vec3(1.0,0.9569,0.8235);
+    vec3 amber=vec3(1.0,0.5333,0.1333);
+    vec3 ember=vec3(0.9020,0.2706,0.0627);
+    vec3 deepCrimson=vec3(0.4902,0.0549,0.1333);
+    float plasma=smoothstep(0.26,0.78,cloud+arm*0.22);
+    vec3 color=mix(deepCrimson,ember,plasma);
+    color=mix(color,amber,smoothstep(0.38,0.82,gas+arm*0.24));
+    color=mix(color,whiteGold,innerHeat*0.88);
+    // Relativistic beaming: the approaching left side is about 25% hotter.
+    float doppler=0.82+0.28*smoothstep(-0.15,0.85,-p.x);
+    float chargeHeat=1.0+uCharge*1.2;
+    float alpha=gas*innerFade*outerFade*uOpacity*doppler*(0.78+uCharge*0.12);
     if(alpha<0.012) discard;
     gl_FragColor=vec4(color*chargeHeat*(0.24+gas*0.24),alpha);
   }
@@ -152,14 +153,16 @@ const lensingFragment = `
     float angle=atan(p.y,p.x);
     float radius=length(p);
     float warp=noise21(vec2(angle*4.0+uTime*0.08,radius*0.7))*0.045;
-    float photon=exp(-pow((radius-(uCoreRadius+0.15+warp))*22.0,2.0));
-    float halo=exp(-pow((radius-(uCoreRadius+0.55+warp*1.6))*11.0,2.0));
-    float topBottom=0.55+0.45*smoothstep(0.12,1.0,abs(p.y)/max(radius,0.001));
-    float asymmetry=0.76+0.24*smoothstep(0.0,0.9,-p.x);
-    vec3 gold=vec3(1.0,0.84,0.58);
-    vec3 red=vec3(0.82,0.025,0.09);
-    vec3 color=mix(red,gold,photon);
-    float alpha=(photon*0.75+halo*0.31)*topBottom*asymmetry*(0.82+uCharge*0.3);
+    float photon=exp(-pow((radius-(uCoreRadius+0.12+warp))*30.0,2.0));
+    float arcRadius=uCoreRadius+0.40+warp*1.6;
+    float arc=exp(-pow((radius-arcRadius)*8.5,2.0));
+    float crown=smoothstep(0.40,0.82,abs(p.y)/max(radius,0.001));
+    float upperLowerArc=arc*crown;
+    float asymmetry=0.8+0.2*smoothstep(0.0,0.9,-p.x);
+    vec3 gold=vec3(1.0,0.9569,0.8235);
+    vec3 amber=vec3(1.0,0.5333,0.1333);
+    vec3 color=mix(amber,gold,clamp(photon+upperLowerArc*0.6,0.0,1.0));
+    float alpha=(photon*0.82+upperLowerArc*0.62)*asymmetry*(0.82+uCharge*1.5);
     gl_FragColor=vec4(color,alpha);
   }
 `;
@@ -269,7 +272,7 @@ function PhotonSparks({ innerRadius, outerRadius, charge, active }: { innerRadiu
 
 function LensingHalo({ charge, coreRadius = 2.1, showArcs = true }: { charge: ChargeSource; coreRadius?: number; showArcs?: boolean }) {
   const material = useRef<THREE.ShaderMaterial>(null);
-  const arcGeometry = useMemo(() => showArcs ? [
+  const arcGeometry = useMemo(() => showArcs && coreRadius > 5 ? [
     { rx: coreRadius * 1.16, ry: coreRadius * 1.58, z: -coreRadius * 0.12, tube: Math.max(0.018, coreRadius * 0.018) },
     { rx: coreRadius * 1.34, ry: coreRadius * 1.86, z: coreRadius * 0.06, tube: Math.max(0.012, coreRadius * 0.009) },
   ].map(({ rx, ry, z, tube }) => {
@@ -390,11 +393,11 @@ export default function ActFourExterior({ phase, warpCharge }: { phase: ActFourP
   return (
     <group position={ACT_FOUR_CORE_POSITION}>
       <group ref={core} rotation={[0.34, 0, -0.36]}>
-        <LensingHalo charge={charge} showArcs={false} />
+        <LensingHalo charge={charge} showArcs />
         <pointLight color="#ff254c" intensity={2.8} distance={36} decay={2} />
         <pointLight position={[0, 0.2, 2.2]} color="#ffbd7a" intensity={2.4} distance={22} decay={2} />
         <EventHorizon radius={2.1} charge={charge} />
-        <AccretionPlasmaDisk innerRadius={2.34} outerRadius={10.2} charge={charge} />
+        <AccretionPlasmaDisk innerRadius={2.34} outerRadius={7.0} charge={charge} />
         <AnamorphicFlare charge={charge} />
       </group>
       <LensDust charge={charge} active />
