@@ -13,7 +13,7 @@ const PROJECT_COUNT = PROJECTS.length;
 const WHEEL_THRESHOLD = 124;
 const PROJECT_ADVANCE_LOCK_MS = 950;
 const WARP_DURATION_MS = 2200;
-const EXIT_FADE_MS = 220;
+const EXIT_FADE_MS = 200;
 const EXIT_FLIGHT_MS = 900;
 const ACT_FOUR_RETURN_TARGET = ACT_FIVE_TIMING.cameraStart + 0.002;
 const TRANSITION_PHASES = new Set<ActFourPhase>(["act4_warp_in", "act4_vault", "act4_warp_out"]);
@@ -84,12 +84,14 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
         setProjectIndex(0);
         lockedScrollY.current = null;
         actFiveHandoffPending.current = true;
-        transitionTo("act5");
+        // Prepare Act V's checkpoint scroll position before revealing its scene.
+        // This keeps its already-authored CHECKPOINT 01 / 04 reset untouched and
+        // prevents a single frame of the prior vault environment behind the HUD.
+        window.dispatchEvent(new CustomEvent("act-four-scroll-lock", { detail: { locked: false } }));
+        setTrackProgress(ACT_FOUR_RETURN_TARGET);
         requestAnimationFrame(() => {
-          setTrackProgress(ACT_FOUR_RETURN_TARGET);
-          requestAnimationFrame(() => {
-            actFiveHandoffPending.current = false;
-          });
+          transitionTo("act5");
+          requestAnimationFrame(() => { actFiveHandoffPending.current = false; });
         });
       }, EXIT_FLIGHT_MS);
     }, EXIT_FADE_MS);

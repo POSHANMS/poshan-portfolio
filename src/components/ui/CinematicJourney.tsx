@@ -54,21 +54,30 @@ function Panel({
   side = "left",
   className = "",
   verticallyCentered = false,
+  interactive = true,
+  transitionMs = 0,
+  animation,
 }: {
   children: React.ReactNode;
   presence: number;
   side?: "left" | "right" | "center";
   className?: string;
   verticallyCentered?: boolean;
+  interactive?: boolean;
+  transitionMs?: number;
+  animation?: string;
 }) {
   const x = side === "left" ? -34 : side === "right" ? 34 : 0;
   const baseX = side === "center" ? "-50%" : "0px";
 
   return (
     <div
-      className={`pointer-events-auto absolute ${className}`}
+      className={`${interactive ? "pointer-events-auto" : "pointer-events-none"} absolute ${className}`}
+      inert={!interactive}
       style={{
         opacity: presence,
+        transition: transitionMs > 0 ? `opacity ${transitionMs}ms ease, transform ${transitionMs}ms ease` : undefined,
+        animation,
         transform: verticallyCentered
           ? `translate3d(calc(${baseX} + ${(1 - presence) * x * 0.7}px), calc(-50% - 12px + ${(1 - presence) * 12}px), 0)`
           : `translate3d(calc(${baseX} + ${(1 - presence) * x * 0.7}px), ${(1 - presence) * 12}px, 0)`,
@@ -523,18 +532,18 @@ function ProjectsChapter({
   }
 
   if (phase === "act4_warp_in") {
-    const signal = smoothstep(warpProgress, 0.24, 0.29) * (1 - smoothstep(warpProgress, 0.62, 0.68));
+    const signal = smoothstep(warpProgress, 0.12, 0.22) * (1 - smoothstep(warpProgress, 0.62, 0.68));
     return (
       <>
-        <Panel presence={signal} side="center" className="left-1/2 top-[43vh]">
-          <div className="text-center font-mono text-[9px] uppercase tracking-[0.34em] text-[#ffe4ea]/82 drop-shadow-[0_0_18px_rgba(255,228,234,0.55)]">Traversing event horizon</div>
-        </Panel>
-        <Panel presence={smoothstep(warpProgress, 0.88, 0.98)} side="left" className="left-4 top-[7vh] z-50 w-[min(28rem,calc(40vw-2rem))] md:left-12">
-          <div className="rounded-2xl border border-white/15 bg-[#080a12]/42 p-5 shadow-[0_18px_64px_rgba(0,0,0,.42),inset_0_1px_0_rgba(255,255,255,.12)] backdrop-blur-[22px]">
-            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8deeff]">01 / 05 · Project station</p>
-            <h2 className="mt-3 text-3xl font-black uppercase leading-none text-white">{PROJECTS[0].name}</h2>
-            <p className="mt-3 text-sm leading-6 text-white/80">{PROJECTS[0].description}</p>
+        <Panel presence={1} side="left" className="left-6 top-[17vh] w-[min(27rem,calc(100vw-3rem))] md:left-16" interactive={false} animation="act-four-launch-fade 200ms ease-out both">
+          <div className="grid gap-4 py-2 pr-5 [text-shadow:0_2px_16px_rgba(0,0,0,0.9)]">
+            <Kicker act="ACT IV" label="Core Orbit" />
+            <h2 className="max-w-[10ch] text-4xl font-black uppercase leading-[0.92] tracking-[-0.035em] text-white md:text-5xl">Project Launch</h2>
+            <p className="max-w-sm text-sm leading-6 text-white/80">Hold to breach the crimson core and enter the project vault.</p>
           </div>
+        </Panel>
+        <Panel presence={signal} side="center" className="left-1/2 top-[43vh]" interactive={false} transitionMs={180}>
+          <div className="whitespace-nowrap text-center font-mono text-[9px] uppercase tracking-[0.34em] text-[#ffe4ea]/82 drop-shadow-[0_0_18px_rgba(255,228,234,0.55)]">Traversing event horizon</div>
         </Panel>
       </>
     );
@@ -544,8 +553,8 @@ function ProjectsChapter({
     const finalProject = projectIndex === PROJECTS.length - 1;
     return (
       <>
-      <Panel presence={presence} side="left" className="left-4 top-[7vh] z-50 w-[min(28rem,calc(40vw-2rem))] max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto md:left-12">
-        <div key={project.name} className="act-four-station-panel relative overflow-hidden rounded-2xl border border-white/[0.12] bg-[linear-gradient(120deg,rgba(10,8,14,0.55),rgba(8,7,12,0.42))] p-4 shadow-[0_20px_72px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[24px] md:p-5" style={{ transition: "opacity 220ms ease, transform 220ms ease", opacity: phase === "act4_warp_out" ? 0 : 1, transform: phase === "act4_warp_out" ? "translateY(-12px)" : "translateY(0)" }}>
+      <Panel presence={phase === "act4_warp_out" ? 0 : presence} side="left" interactive={phase !== "act4_warp_out"} transitionMs={phase === "act4_warp_out" ? 200 : 0} animation={phase === "act4_vault" ? "act-four-hud-arrive 350ms ease-out both" : undefined} className="left-4 top-[7vh] z-50 w-[min(28rem,calc(40vw-2rem))] max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto md:left-12">
+        <div key={project.name} className="act-four-station-panel relative overflow-hidden rounded-2xl border border-white/[0.12] bg-[linear-gradient(120deg,rgba(10,8,14,0.55),rgba(8,7,12,0.42))] p-4 shadow-[0_20px_72px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[24px] md:p-5" style={{ transition: "opacity 200ms ease, transform 200ms ease", opacity: phase === "act4_warp_out" ? 0 : 1, transform: phase === "act4_warp_out" ? "translateY(-12px)" : "translateY(0)" }}>
           <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-[#ff4668] to-transparent shadow-[0_0_18px_#ff2448]" />
           <div className="flex items-center justify-between gap-3 font-mono text-[9px] uppercase tracking-[0.2em] text-[#ff9cab] md:text-[10px]">
             <span>Act IV / Core Orbit</span>
@@ -609,7 +618,7 @@ function ProjectsChapter({
         onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }}
         className="pointer-events-auto absolute right-6 top-6 z-[60] border border-white/20 bg-black/35 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/85 backdrop-blur-lg transition hover:border-[#ff7388] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
         aria-label="Exit the Act IV vault"
-        style={{ transition: "opacity 220ms ease, transform 220ms ease", opacity: phase === "act4_warp_out" ? 0 : 1, transform: phase === "act4_warp_out" ? "translateY(-12px)" : "translateY(0)" }}
+        style={{ transition: "opacity 200ms ease, transform 200ms ease", animation: phase === "act4_vault" ? "act-four-hud-arrive 350ms ease-out both" : undefined, opacity: phase === "act4_warp_out" ? 0 : 1, pointerEvents: phase === "act4_warp_out" ? "none" : "auto", transform: phase === "act4_warp_out" ? "translateY(-12px)" : "translateY(0)" }}
       >[ ESC // EXIT VAULT ]</button>
       </>
     );
@@ -879,6 +888,8 @@ export default function CinematicJourney({
 }) {
   const [hoveredCube, setHoveredCube] = useState<CubeModuleId | null>(null);
   const [actFourWarpProgress, setActFourWarpProgress] = useState(0);
+  const [actFourExitProgress, setActFourExitProgress] = useState(0);
+  const [handoffBloom, setHandoffBloom] = useState(false);
   const [cubeTargets, setCubeTargets] = useState<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
   const cubeTargetsRef = useRef<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
   const cubeCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -889,14 +900,33 @@ export default function CinematicJourney({
       setActFourWarpProgress(1);
       return;
     }
+    if (actFourPhase === "act4_warp_out") {
+      setActFourWarpProgress(0);
+      setActFourExitProgress(0);
+      setHandoffBloom(false);
+      const startedAt = performance.now();
+      const timer = setInterval(() => {
+        const progress = Math.min(1, (performance.now() - startedAt) / 1100);
+        setActFourExitProgress(progress);
+        if (progress >= 1) setHandoffBloom(true);
+      }, 24);
+      return () => clearInterval(timer);
+    }
     if (actFourPhase !== "act4_warp_in") {
       setActFourWarpProgress(0);
+      setActFourExitProgress(0);
       return;
     }
     const startedAt = performance.now();
     const timer = setInterval(() => setActFourWarpProgress(Math.min(1, (performance.now() - startedAt) / 2200)), 40);
     return () => clearInterval(timer);
   }, [actFourPhase]);
+
+  useEffect(() => {
+    if ((actFourPhase !== "act4_vault" && actFourPhase !== "act5") || !handoffBloom) return;
+    const timer = setTimeout(() => setHandoffBloom(false), 16);
+    return () => clearTimeout(timer);
+  }, [actFourPhase, handoffBloom]);
 
   const clearCubeCloseTimer = useCallback(() => {
     if (cubeCloseTimer.current) {
@@ -1027,9 +1057,30 @@ export default function CinematicJourney({
     ? 1
     : Math.max(states.journey.presence, smoothstep(0, 0.05, actFiveProgress))
       * (1 - smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress));
+  const exitBloomOpacity = actFourPhase === "act4_warp_out"
+    ? 0.85 * smoothstep(actFourExitProgress, 0.72, 1)
+    : handoffBloom ? 0.85 : 0;
+  const entryIrisProgress = actFourWarpProgress;
+  const entryBloomOpacity = actFourPhase === "act4_warp_in"
+    ? 0.88 * (entryIrisProgress <= 0.85
+      ? smoothstep(entryIrisProgress, 0.8, 0.85)
+      : 1 - smoothstep(entryIrisProgress, 0.85, 0.9))
+    : 0;
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
+      {(actFourPhase === "act4_warp_in" || actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out" || handoffBloom) && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[100]"
+          style={{
+            opacity: actFourPhase === "act4_warp_in" ? entryBloomOpacity : handoffBloom ? 0.85 : exitBloomOpacity,
+            transition: actFourPhase === "act4_vault" || actFourPhase === "act5" ? "opacity 300ms ease-out" : "opacity 80ms linear",
+            background: "radial-gradient(ellipse at 50% 50%, rgba(255,205,145,0.92) 0%, rgba(255,103,57,0.78) 18%, rgba(126,10,35,0.82) 48%, rgba(27,1,11,0.96) 100%)",
+            mixBlendMode: "screen",
+          }}
+        />
+      )}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,transparent_0%,transparent_53%,rgba(0,0,0,0.28)_100%)]" />
       <HeroChapter presence={states.hero.presence} />
       <EnterLaptopCue scrollProgress={scrollProgress} />
@@ -1054,7 +1105,7 @@ export default function CinematicJourney({
         }}
       />
       <ProjectsChapter
-        presence={actFourInterior ? 1 : states.projects.presence}
+        presence={actFourPhase === "act4_exterior" || actFourInterior ? 1 : states.projects.presence}
         phase={actFourPhase}
         projectIndex={actFourProjectIndex}
         onWarp={onActFourWarp}

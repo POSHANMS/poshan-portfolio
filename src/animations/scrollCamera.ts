@@ -184,7 +184,9 @@ export function CinematicCamera({
   const phaseStartedAt = useRef(0);
   const breachCurve = useRef<THREE.CatmullRomCurve3 | null>(null);
   const tunnelCurve = useRef<THREE.CatmullRomCurve3 | null>(null);
+  const tunnelTargetCurve = useRef<THREE.CatmullRomCurve3 | null>(null);
   const arrivalCurve = useRef<THREE.CatmullRomCurve3 | null>(null);
+  const arrivalTarget = useRef<THREE.Vector3 | null>(null);
   const returnPositionCurve = useRef<THREE.CatmullRomCurve3 | null>(null);
   const returnTargetCurve = useRef<THREE.CatmullRomCurve3 | null>(null);
   const projectMotion = useRef(0);
@@ -214,15 +216,20 @@ export function CinematicCamera({
         breachCurve.current = new THREE.CatmullRomCurve3([plungeStart, plungeExit], false, "centripetal");
         tunnelCurve.current = new THREE.CatmullRomCurve3([
           plungeExit,
-          new THREE.Vector3(plungeExit.x, plungeExit.y, ACT_FOUR_CORE_POSITION.z - 14),
-          new THREE.Vector3(plungeExit.x, plungeExit.y, ACT_FOUR_CORE_POSITION.z - 34),
+          new THREE.Vector3((plungeExit.x + firstStation.camera.x) * 0.5, (plungeExit.y + firstStation.camera.y) * 0.5, -1.2),
+          firstStation.camera.clone().add(new THREE.Vector3(0, 0, 6)),
+        ], false, "centripetal");
+        tunnelTargetCurve.current = new THREE.CatmullRomCurve3([
+          plungeExit.clone().add(new THREE.Vector3(0, 0, -20)),
+          new THREE.Vector3(firstStation.target.x, firstStation.target.y, -8),
+          firstStation.target.clone(),
         ], false, "centripetal");
         arrivalCurve.current = new THREE.CatmullRomCurve3([
           tunnelCurve.current.getPointAt(1),
-          new THREE.Vector3(plungeExit.x + 0.2, plungeExit.y + 0.08, -56),
-          new THREE.Vector3(firstStation.camera.x - 0.12, firstStation.camera.y + 0.05, -72),
-          new THREE.Vector3(firstStation.camera.x, firstStation.camera.y, -88.4),
+          firstStation.camera.clone().add(new THREE.Vector3(0, 0, 2.5)),
+          firstStation.camera.clone(),
         ], false, "centripetal");
+        arrivalTarget.current = firstStation.target.clone();
       }
       if (actFourPhase === "act4_warp_out") {
         const exitPaths = createActFourExitPaths(actFourProjectIndex);
@@ -329,31 +336,32 @@ export function CinematicCamera({
     } else if (isWarping) {
       const elapsed = time - phaseStartedAt.current;
       const flight = THREE.MathUtils.clamp(elapsed / 2.2, 0, 1);
-      const breachEnd = 0.55 / 2.2;
-      const tunnelEnd = 1.65 / 2.2;
+      const breachEnd = 0.25;
+      const tunnelEnd = 0.75;
+      camera.up.set(0, 1, 0);
       if (flight < breachEnd) {
         const stage = THREE.MathUtils.smootherstep(flight / breachEnd, 0, 1);
         desiredPosition.copy((breachCurve.current ?? ACT_FOUR_EXIT_CAMERA_PATH).getPointAt(stage));
         desiredLookAt.set(desiredPosition.x, desiredPosition.y, desiredPosition.z - 18);
-        desiredFov = THREE.MathUtils.lerp(68, 75, stage);
+        desiredFov = 84;
         authoredActFiveRoll = stage * 0.025;
       } else if (flight < tunnelEnd) {
         const stage = THREE.MathUtils.smootherstep((flight - breachEnd) / (tunnelEnd - breachEnd), 0, 1);
         desiredPosition.copy((tunnelCurve.current ?? ACT_FOUR_EXIT_CAMERA_PATH).getPointAt(stage));
-        desiredLookAt.copy(desiredPosition).add(new THREE.Vector3(0, 0, -24));
-        desiredFov = THREE.MathUtils.lerp(75, 85, stage);
-        const bank = THREE.MathUtils.smoothstep(stage, 0.06, 0.94);
+        desiredLookAt.copy((tunnelTargetCurve.current ?? ACT_FOUR_EXIT_TARGET_PATH).getPointAt(stage));
+        desiredFov = 84;
+        const bank = THREE.MathUtils.smoothstep(stage, 0.06, 0.28) * (1 - THREE.MathUtils.smoothstep(stage, 0.7, 1));
         authoredActFiveRoll = THREE.MathUtils.degToRad(14) * bank;
         authoredActFivePitch = -0.035 * bank;
         authoredActFiveYaw = Math.sin(stage * Math.PI) * 0.025;
       } else {
-        const stage = THREE.MathUtils.smootherstep((flight - tunnelEnd) / (1 - tunnelEnd), 0, 1);
+        const u = THREE.MathUtils.clamp((flight - tunnelEnd) / (1 - tunnelEnd), 0, 1);
+        const stage = 1 - Math.pow(1 - u, 3.5);
         desiredPosition.copy((arrivalCurve.current ?? ACT_FOUR_EXIT_CAMERA_PATH).getPointAt(stage));
-        desiredLookAt.set(desiredPosition.x, desiredPosition.y, desiredPosition.z - 18);
-        desiredFov = THREE.MathUtils.lerp(85, 42, 1 - Math.pow(1 - stage, 4));
-        const bank = 1 - THREE.MathUtils.smootherstep(stage, 0, 1);
-        authoredActFiveRoll = THREE.MathUtils.degToRad(14) * bank;
-        authoredActFivePitch = -0.035 * bank;
+        desiredLookAt.copy(arrivalTarget.current ?? getActFourProjectPose(0).target);
+        desiredFov = THREE.MathUtils.lerp(84, 42, stage);
+        authoredActFiveRoll = 0;
+        authoredActFivePitch = 0;
       }
     } else if (actFourPhase === "act4_vault") {
       if (actFourProjectIndex !== projectMotionTo.current) {
@@ -453,7 +461,8 @@ export function CinematicCamera({
     // Subtle handheld-cinema drift while scrolling; very small so the scene stays premium.
     const actFourBreathing = actFourPhase === "act4_exterior";
     const drift = Math.sin(time * 0.45 + p * Math.PI * 2) * (actFourBreathing ? 0.018 : 0.01);
-    const noiseEnvelope = actFiveCameraActive ? 1 : charge > 0 ? charge : isWarping ? 0.7 : 0;
+    const warpSettle = isWarping ? 1 - THREE.MathUtils.smoothstep((time - phaseStartedAt.current) / 2.2, 0.78, 1) : 0;
+    const noiseEnvelope = actFiveCameraActive ? 1 : charge > 0 ? charge : isWarping ? 0.7 * warpSettle : 0;
     const smoothRigNoise = (frequency: number, phase: number) => {
       const sample = time * frequency + phase;
       const cell = Math.floor(sample);
@@ -491,7 +500,9 @@ export function CinematicCamera({
       camera.position.y += Math.cos(time * 0.16) * 0.018;
     }
     if (charge > 0 || isWarping || actFourPhase === "act4_warp_out") {
-      const shake = charge > 0 ? charge : THREE.MathUtils.smoothstep(Math.sin(time * 0.7) * 0.5 + 0.5, 0.15, 0.85);
+      const shake = charge > 0 ? charge : isWarping
+        ? THREE.MathUtils.smoothstep(Math.sin(time * 0.7) * 0.5 + 0.5, 0.15, 0.85) * warpSettle
+        : THREE.MathUtils.smoothstep(Math.sin(time * 0.7) * 0.5 + 0.5, 0.15, 0.85);
       camera.rotateX(smoothRigNoise(31, 5.3) * 0.004 * shake);
       camera.rotateY(smoothRigNoise(27, 9.1) * 0.005 * shake);
       camera.rotateZ(smoothRigNoise(34, 14.4) * 0.006 * shake);

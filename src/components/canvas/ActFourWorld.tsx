@@ -10,6 +10,8 @@ import ActFourExterior from "./ActFourExterior";
 import ActFourSculpture from "./ActFourSculptures";
 
 const WARP_PARTICLE_COUNT = 1_900;
+const WARP_IN_DURATION_SECONDS = 2.2;
+const WARP_VAULT_CUTOVER_SECONDS = WARP_IN_DURATION_SECONDS * 0.85;
 const DOME_CENTER = new THREE.Vector3(0, 0, -27);
 const PROJECT_ACCENTS = ["#00e5ff", "#8b5cf6", "#f59e0b", "#10b981", "#ff4d6d"];
 
@@ -83,22 +85,36 @@ function WarpStreamParticles({ phase, warpCharge }: { phase: ActFourPhase; warpC
     const isActive = (phase === "act4_exterior" && charge > 0.02) || phase === "act4_warp_in" || phase === "act4_warp_out";
     groupRef.current.visible = isActive;
     const age = (performance.now() - phaseStartedAt.current) / 1000;
-    const stageFade = phase === "act4_warp_in" ? 1 - smoothstep(1.62, 2.2, age) : phase === "act4_warp_out" ? smoothstep(0.22, 0.38, age) * (1 - smoothstep(1.04, 1.12, age)) : 1;
-    materialRef.current.opacity = THREE.MathUtils.damp(materialRef.current.opacity, isActive ? (0.28 + charge * 0.25) * stageFade : 0, 7, delta);
+    const warpDecelerationStart = WARP_IN_DURATION_SECONDS * 0.75;
+    const warpDecelerationDuration = WARP_IN_DURATION_SECONDS - warpDecelerationStart;
+    const warpDrive = phase === "act4_warp_in" ? 1 - smoothstep(warpDecelerationStart, WARP_IN_DURATION_SECONDS, age) : charge;
+    const warpTravel = phase === "act4_warp_in"
+      ? age <= warpDecelerationStart
+        ? age
+        : warpDecelerationStart + warpDecelerationDuration * (() => {
+          const u = THREE.MathUtils.clamp((age - warpDecelerationStart) / warpDecelerationDuration, 0, 1);
+          return u - u * u * u + 0.5 * u * u * u * u;
+        })()
+      : time;
+    const stageFade = phase === "act4_warp_in" ? warpDrive : phase === "act4_warp_out" ? smoothstep(0.22, 0.38, age) * (1 - smoothstep(1.04, 1.12, age)) : 1;
+    const targetOpacity = isActive ? (phase === "act4_warp_in" ? 0.53 : 0.28 + charge * 0.25) * stageFade : 0;
+    materialRef.current.opacity = THREE.MathUtils.damp(materialRef.current.opacity, targetOpacity, 7, delta);
     if (!isActive) return;
     const position = geometry.getAttribute("position") as THREE.BufferAttribute;
     const halfHeightAt = (depth: number) => Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * depth;
-    const tailSpan = 0.012 + charge * 0.035;
+    const tailSpan = phase === "act4_warp_in" ? 0.047 * warpDrive : 0.012 + charge * 0.035;
+    const travelSpeed = phase === "act4_warp_in" ? 1.2 * warpDrive : 0.08 + charge * 1.12;
+    const motionTime = phase === "act4_warp_in" ? warpTravel : time;
     particles.forEach((particle, index) => {
-      const travel = (particle.phaseOffset + time * (0.08 + charge * 1.12) * particle.speed) % 1;
+      const travel = (particle.phaseOffset + warpTravel * (phase === "act4_warp_in" ? 1.2 : travelSpeed) * particle.speed) % 1;
       const pathPoint = (age: number) => {
         const depth = THREE.MathUtils.lerp(64, 1.5, age);
         const halfHeight = halfHeightAt(depth);
         const halfWidth = halfHeight * aspect;
         const funnel = Math.pow(age, 1.45);
         const radius = THREE.MathUtils.lerp(particle.radius, 0.44 + seeded(index, 7) * 0.12, funnel);
-        const angle = particle.angle + Math.sin(time * 1.1 + particle.phaseOffset * 6.28 + age * 3.2) * particle.curve;
-        const inwardLensing = Math.sin(age * Math.PI) * 0.1 * charge;
+        const angle = particle.angle + Math.sin(motionTime * 1.1 + particle.phaseOffset * 6.28 + age * 3.2) * particle.curve;
+        const inwardLensing = Math.sin(age * Math.PI) * 0.1 * (phase === "act4_warp_in" ? warpDrive : charge);
         return new THREE.Vector3(Math.cos(angle) * halfWidth * (radius - inwardLensing), Math.sin(angle) * halfHeight * (radius - inwardLensing), -depth);
       };
       const head = pathPoint(travel);
@@ -120,20 +136,21 @@ function WormholeTunnel({ phase }: { phase: ActFourPhase }) {
   const { camera } = useThree();
   const phaseStartedAt = useRef(performance.now());
   useEffect(() => { phaseStartedAt.current = performance.now(); }, [phase]);
-  const visible = phase === "act4_warp_in";
-  useFrame(({ clock }, delta) => {
+  const isWarpIn = phase === "act4_warp_in";
+  useFrame(({ clock }) => {
     if (!material.current) return;
     material.current.uniforms.uTime.value = clock.getElapsedTime();
     const age = (performance.now() - phaseStartedAt.current) / 1000;
-    const stageFade = visible ? smoothstep(0.5, 0.7, age) * (1 - smoothstep(1.62, 2.2, age)) : 0;
-    material.current.uniforms.uOpacity.value = THREE.MathUtils.damp(material.current.uniforms.uOpacity.value, stageFade * 0.88, 7.5, delta);
-    if (visible && group.current) {
+    const stageFade = isWarpIn ? smoothstep(0.5, 0.7, age) * (1 - smoothstep(WARP_VAULT_CUTOVER_SECONDS - 0.32, WARP_VAULT_CUTOVER_SECONDS, age)) : 0;
+    material.current.uniforms.uOpacity.value = stageFade * 0.88;
+    if (group.current) group.current.visible = isWarpIn && age < WARP_VAULT_CUTOVER_SECONDS;
+    if (isWarpIn && group.current) {
       group.current.position.copy(camera.position);
       group.current.quaternion.copy(camera.quaternion);
     }
   });
   return (
-    <group ref={group} visible={visible}>
+    <group ref={group} visible={isWarpIn}>
       <mesh rotation={[Math.PI / 2, 0, 0]} frustumCulled={false}>
         <cylinderGeometry args={[6, 6, 80, 48, 32, true]} />
         <shaderMaterial ref={material} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }} transparent side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
@@ -154,7 +171,10 @@ function BreachFlash({ phase }: { phase: ActFourPhase }) {
     const time = clock.getElapsedTime();
     if (lastPhase.current !== phase) { lastPhase.current = phase; phaseStart.current = time; }
     const elapsed = time - phaseStart.current;
-    const entry = phase === "act4_warp_in" ? smoothstep(1.62, 1.78, elapsed) * (1 - smoothstep(1.96, 2.2, elapsed)) : 0;
+    const entry = phase === "act4_warp_in"
+      ? smoothstep(WARP_IN_DURATION_SECONDS * 0.8, WARP_VAULT_CUTOVER_SECONDS, elapsed)
+        * (1 - smoothstep(WARP_VAULT_CUTOVER_SECONDS, WARP_IN_DURATION_SECONDS * 0.9, elapsed))
+      : 0;
     const exit = phase === "act4_warp_out" ? smoothstep(0.68, 0.84, elapsed) * (1 - smoothstep(1.05, 1.16, elapsed)) : 0;
     material.current.uniforms.uOpacity.value = THREE.MathUtils.damp(material.current.uniforms.uOpacity.value, Math.max(entry, exit) * 0.24, 10, delta);
     material.current.uniforms.uTime.value = time;
@@ -214,8 +234,8 @@ function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projec
   useFrame(({ clock }, delta) => {
     if (previousPhase.current !== phase) { previousPhase.current = phase; phaseStartedAt.current = performance.now(); }
     const phaseAge = (performance.now() - phaseStartedAt.current) / 1000;
-    const revealTarget = phase === "act4_warp_in" ? smoothstep(1.62, 1.98, phaseAge) : active ? 1 : 0;
-    reveal.current = THREE.MathUtils.damp(reveal.current, revealTarget, 8, delta);
+    const revealTarget = phase === "act4_warp_in" ? smoothstep(1.25, 1.55, phaseAge) : active ? 1 : 0;
+    reveal.current = THREE.MathUtils.damp(reveal.current, revealTarget, 14, delta);
     if (dome.current) dome.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.035) * 0.012;
     if (floorMaterial.current) floorMaterial.current.opacity = reveal.current;
     if (gridMaterial.current) gridMaterial.current.opacity = 0.12 * reveal.current;
@@ -314,7 +334,7 @@ function DataEmbers({ phase, projectIndex }: { phase: ActFourPhase; projectIndex
     }
     const time = clock.getElapsedTime();
     const phaseAge = (performance.now() - phaseStartedAt.current) / 1000;
-    const reveal = phase === "act4_warp_in" ? smoothstep(1.62, 1.98, phaseAge) : active ? 1 : 0;
+    const reveal = phase === "act4_warp_in" ? smoothstep(1.25, 1.55, phaseAge) : active ? 1 : 0;
     material.current.opacity = THREE.MathUtils.damp(material.current.opacity, reveal * 0.76, 3.2, delta);
     const mesh = instances.current;
     const pointerX = pointer.x * 8;
@@ -363,7 +383,7 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
     });
     if (exteriorLayer.current) exteriorLayer.current.visible = phase === "act4_exterior" || (phase === "act4_warp_in" && age < 0.55);
     if (tunnelLayer.current) tunnelLayer.current.visible = (phase === "act4_warp_in" && age >= 0.55 && age < 2.2) || (phase === "act4_warp_out" && age >= 0.22);
-    if (vaultLayer.current) vaultLayer.current.visible = (phase === "act4_warp_in" && age >= 1.62) || phase === "act4_vault" || phase === "act4_warp_out";
+    if (vaultLayer.current) vaultLayer.current.visible = (phase === "act4_warp_in" && age >= WARP_VAULT_CUTOVER_SECONDS) || phase === "act4_vault" || phase === "act4_warp_out";
   });
   return (
     <group>
