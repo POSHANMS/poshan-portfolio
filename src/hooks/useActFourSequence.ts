@@ -11,7 +11,6 @@ const ACT_FOUR_EXIT = 0.905;
 const ACT_FOUR_GATE_ANCHOR = 0.875;
 const PROJECT_COUNT = PROJECTS.length;
 const WHEEL_THRESHOLD = 124;
-const PROJECT_ADVANCE_LOCK_MS = 950;
 const WARP_DURATION_MS = 2200;
 const EXIT_FADE_MS = 200;
 const EXIT_FLIGHT_MS = 900;
@@ -35,7 +34,6 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
   const warpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actFiveHandoffPending = useRef(false);
-  const nextAdvanceAt = useRef(0);
   const lockedScrollY = useRef<number | null>(null);
   const projectIndexRef = useRef(0);
   const scrollProgressRef = useRef(scrollProgress);
@@ -237,18 +235,18 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
       if (Math.abs(wheelCarry) < WHEEL_THRESHOLD) { event.preventDefault(); return; }
       const direction = Math.sign(wheelCarry);
       wheelCarry = 0;
-      if (phase !== "act4_vault" || performance.now() < nextAdvanceAt.current) { event.preventDefault(); return; }
+      if (phase !== "act4_vault") { event.preventDefault(); return; }
       const current = projectIndexRef.current;
       if (direction < 0 && current > 0) {
-        event.preventDefault(); nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
+        event.preventDefault();
         projectIndexRef.current = current - 1; setProjectIndex(current - 1); return;
       }
       if (direction > 0 && current < PROJECT_COUNT - 1) {
-        event.preventDefault(); nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
+        event.preventDefault();
         projectIndexRef.current = current + 1; setProjectIndex(current + 1); return;
       }
       if (direction > 0 && current === PROJECT_COUNT - 1) {
-        event.preventDefault(); nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS; exitProjectWorld();
+        event.preventDefault(); exitProjectWorld();
       } else event.preventDefault();
     };
     const onTouchStart = (event: TouchEvent) => { touchStartY = event.touches[0]?.clientY ?? null; };
@@ -259,13 +257,12 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
       if (endY === undefined) return;
       const distance = touchStartY - endY;
       touchStartY = null;
-      if (Math.abs(distance) < 36 || performance.now() < nextAdvanceAt.current) return;
+      if (Math.abs(distance) < 36) return;
       const current = projectIndexRef.current;
       const direction = distance > 0 ? 1 : -1;
       if (direction < 0 && current > 0) { projectIndexRef.current = current - 1; setProjectIndex(current - 1); }
       else if (direction > 0 && current < PROJECT_COUNT - 1) { projectIndexRef.current = current + 1; setProjectIndex(current + 1); }
       else if (direction > 0 && current === PROJECT_COUNT - 1) exitProjectWorld();
-      nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
     };
     window.addEventListener("wheel", onWheel, { passive: false, capture: true });
     window.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
@@ -282,7 +279,29 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
   useEffect(() => {
     if (phase !== "act4_vault") return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); exitProjectWorld(); }
+      const target = event.target;
+      const isEditing = target instanceof HTMLElement
+        && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+      if (isEditing || event.altKey || event.ctrlKey || event.metaKey) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        exitProjectWorld();
+        return;
+      }
+
+      if (!["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"].includes(event.key) || event.repeat) return;
+      event.preventDefault();
+      const current = projectIndexRef.current;
+      const forward = event.key === "ArrowDown" || event.key === "ArrowRight";
+      if (forward && current === PROJECT_COUNT - 1) {
+        exitProjectWorld();
+        return;
+      }
+      const next = Math.max(0, Math.min(PROJECT_COUNT - 1, current + (forward ? 1 : -1)));
+      if (next === current) return;
+      projectIndexRef.current = next;
+      setProjectIndex(next);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
