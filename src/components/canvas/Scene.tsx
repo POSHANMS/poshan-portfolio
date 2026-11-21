@@ -189,7 +189,7 @@ export default function Scene({
 
         <color attach="background" args={["#000000"]} />
         {isActFive && <fogExp2 attach="fog" args={["#040103", 0.026]} />}
-        {isInsideProjectCore && <fogExp2 attach="fog" args={["#0d1e2b", 0.0038]} />}
+        {isInsideProjectCore && <fogExp2 attach="fog" args={["#05070d", 0.0038]} />}
 
         <SceneLights
           powerUpValues={powerUpValues}

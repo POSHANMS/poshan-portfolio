@@ -49,15 +49,15 @@ function ProjectorBase({ color }: { color: THREE.Color }) {
     <group>
       {[1.8, 1.45, 1.1].map((radius, index) => (
         <mesh key={radius} ref={(node) => { rings.current[index] = node; }} position={[0, -2.2 + index * 0.06, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[radius, index === 0 ? 0.022 : 0.015, 8, 128]} />
-          <meshStandardMaterial color="#1c1d25" metalness={0.98} roughness={0.22} emissive={color} emissiveIntensity={index === 1 ? 0.34 : 0.15} />
+          <torusGeometry args={[radius, index === 0 ? 0.014 : 0.009, 8, 128]} />
+          <meshStandardMaterial color="#171a20" metalness={0.99} roughness={0.28} emissive={color} emissiveIntensity={index === 1 ? 0.09 : 0.045} />
         </mesh>
       ))}
       <mesh position={[0, -0.55, 0]}>
         <planeGeometry args={[2.8, 3.2]} />
         <shaderMaterial ref={beam} uniforms={{ uTime: { value: 0 }, uColor: { value: color } }} transparent depthWrite={false} side={THREE.DoubleSide} blending={THREE.AdditiveBlending} toneMapped={false}
           vertexShader={`varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-          fragmentShader={`uniform float uTime; uniform vec3 uColor; varying vec2 vUv; void main(){vec2 p=(vUv-0.5)*2.0;float radial=exp(-p.x*p.x*8.0);float vertical=smoothstep(-1.0,-0.18,p.y)*(1.0-smoothstep(0.52,1.0,p.y));float shimmer=0.92+0.08*sin(vUv.y*24.0-uTime*1.2);float alpha=min(0.14,radial*vertical*0.11)*shimmer;if(alpha<0.002)discard;gl_FragColor=vec4(uColor,alpha);}`}
+          fragmentShader={`uniform float uTime; uniform vec3 uColor; varying vec2 vUv; void main(){vec2 p=(vUv-0.5)*2.0;float radial=exp(-p.x*p.x*5.5);float vertical=exp(-pow((p.y+0.1)*1.25,2.0))*smoothstep(-1.0,-0.86,p.y)*(1.0-smoothstep(0.62,0.92,p.y));float shimmer=0.97+0.03*sin(vUv.y*18.0-uTime*0.7);float alpha=min(0.12,radial*vertical*0.09)*shimmer;if(alpha<0.001)discard;gl_FragColor=vec4(uColor,alpha);}`}
         />
       </mesh>
     </group>

@@ -2,16 +2,16 @@ import * as THREE from "three";
 import { PROJECTS } from "@/utils/constants";
 
 export const ACT_FOUR_CORE_POSITION = new THREE.Vector3(4.5, 2.5, -8);
-export const ACT_FOUR_SINGULARITY_POSITION = new THREE.Vector3(2.4, 1.2, -95);
+export const ACT_FOUR_SINGULARITY_POSITION = new THREE.Vector3(2.4, 1.2, -155);
 export const ACT_FOUR_CARD_SIZE = new THREE.Vector2(5.5, 3.35);
 
 /** Five real project sculptures occupy the same navigable Z corridor. */
 export const ACT_FOUR_PROJECT_STATIONS = [
   new THREE.Vector3(2.6, -0.3, 0),
-  new THREE.Vector3(3.2, -0.1, -16),
-  new THREE.Vector3(2.2, -0.4, -32),
-  new THREE.Vector3(3.0, -0.2, -48),
-  new THREE.Vector3(2.5, -0.3, -64),
+  new THREE.Vector3(3.2, -0.1, -30),
+  new THREE.Vector3(2.2, -0.4, -60),
+  new THREE.Vector3(3.0, -0.2, -90),
+  new THREE.Vector3(2.5, -0.3, -120),
 ].slice(0, PROJECTS.length);
 
 // Stations are approached from their positive-Z side, so each step travels
@@ -31,7 +31,7 @@ export const ACT_FOUR_TARGET_PATH = new THREE.CatmullRomCurve3(
 /** Exit stays on a one-way negative-Z corridor, ending at the distant core. */
 export const ACT_FOUR_EXIT_CAMERA_PATH = new THREE.CatmullRomCurve3([
   ACT_FOUR_CAMERA_PATH.getPointAt(1),
-  new THREE.Vector3(2.7, 1.1, -76),
+  new THREE.Vector3(2.7, 1.1, ACT_FOUR_CAMERA_PATH.getPointAt(1).z - 24),
   ACT_FOUR_SINGULARITY_POSITION.clone().add(new THREE.Vector3(0, 0, 10)),
   ACT_FOUR_SINGULARITY_POSITION.clone(),
 ], false, "centripetal");

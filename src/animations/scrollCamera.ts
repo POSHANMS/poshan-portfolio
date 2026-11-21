@@ -375,7 +375,7 @@ export function CinematicCamera({
       const pose = getActFourProjectPose(projectMotion.current);
       desiredPosition.copy(pose.camera);
       desiredLookAt.copy(pose.target);
-      desiredFov = 42 + Math.sin(flight * Math.PI) * 8;
+      desiredFov = 42 + Math.sin(flight * Math.PI) * 5;
       const direction = Math.sign(projectMotionTo.current - projectMotionFrom.current);
       authoredActFiveRoll = Math.sin(flight * Math.PI) * THREE.MathUtils.degToRad(3) * direction;
     } else if (actFourPhase === "act4_warp_out") {
