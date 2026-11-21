@@ -2418,6 +2418,10 @@ canvas {
   animation: act-four-station-arrive 420ms cubic-bezier(0.18, 0.72, 0.22, 1) both;
 }
 
+.act-four-station-shell {
+  max-height: calc(100dvh - clamp(4rem, calc(7vh + 2rem), 6.5rem));
+}
+
 .act-four-station-panel::before,
 .act-four-station-panel::after {
   position: absolute;
@@ -2441,7 +2445,7 @@ canvas {
 .act-four-station-content {
   position: relative;
   z-index: 1;
-  padding: clamp(1rem, 1.65vw, 1.45rem);
+  padding: clamp(1.35rem, 2vw, 1.85rem);
 }
 
 .act-four-accent-edge {
@@ -2472,9 +2476,9 @@ canvas {
 .act-four-telemetry-header {
   justify-content: space-between;
   gap: 0.75rem;
-  color: rgba(255, 255, 255, 0.66);
-  font: 600 9px/1.2 var(--font-mono, ui-monospace, monospace);
-  letter-spacing: 0.19em;
+  color: rgba(255, 255, 255, 0.86);
+  font: 600 11px/1.2 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
@@ -2491,7 +2495,7 @@ canvas {
 }
 
 .act-four-telemetry-index {
-  padding: 0.34rem 0.52rem;
+  padding: 0.42rem 0.62rem;
   border: 1px solid color-mix(in srgb, var(--act-four-accent) 35%, rgba(255, 255, 255, 0.12));
   background: color-mix(in srgb, var(--act-four-accent) 8%, rgba(0, 0, 0, 0.42));
   color: #fff;
@@ -2500,9 +2504,9 @@ canvas {
 
 .act-four-station-rail {
   display: flex;
-  gap: 0.3rem;
-  margin-top: 0.95rem;
-  padding: 0.28rem;
+  gap: 0.36rem;
+  margin-top: 1.05rem;
+  padding: 0.32rem;
   border: 1px solid rgba(255, 255, 255, 0.075);
   background: rgba(255, 255, 255, 0.025);
 }
@@ -2511,12 +2515,12 @@ canvas {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 2rem;
+  min-height: 2.35rem;
   flex: 1 1 0;
   place-items: center;
   border: 1px solid transparent;
   color: rgba(255, 255, 255, 0.48);
-  font: 600 9px/1 var(--font-mono, ui-monospace, monospace);
+  font: 650 11px/1 var(--font-mono, ui-monospace, monospace);
   letter-spacing: 0.08em;
   transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
@@ -2550,10 +2554,10 @@ canvas {
 }
 
 .act-four-station-title {
-  max-width: 17ch;
-  margin-top: 1.05rem;
+  max-width: 22ch;
+  margin-top: 1.2rem;
   color: #fff;
-  font-size: clamp(1.6rem, 2.1vw, 2.2rem);
+  font-size: clamp(2rem, 2.7vw, 2.75rem);
   font-weight: 900;
   line-height: 0.98;
   letter-spacing: -0.045em;
@@ -2563,37 +2567,37 @@ canvas {
 }
 
 .act-four-station-subtitle {
-  margin-top: 0.5rem;
+  margin-top: 0.62rem;
   color: color-mix(in srgb, var(--act-four-accent) 62%, white);
-  font: 600 9px/1.45 var(--font-mono, ui-monospace, monospace);
+  font: 600 11.5px/1.45 var(--font-mono, ui-monospace, monospace);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .act-four-station-description {
-  margin-top: 0.72rem;
-  color: rgba(245, 247, 252, 0.84);
-  font-size: 11px;
-  line-height: 1.58;
+  margin-top: 0.82rem;
+  color: rgba(246, 248, 253, 0.9);
+  font-size: 14px;
+  line-height: 1.62;
 }
 
 .act-four-tech-stack {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.38rem;
-  margin-top: 0.82rem;
+  gap: 0.45rem;
+  margin-top: 1rem;
 }
 
 .act-four-tech-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.34rem;
-  min-height: 1.45rem;
-  padding: 0.22rem 0.48rem;
+  gap: 0.45rem;
+  min-height: 1.8rem;
+  padding: 0.34rem 0.65rem;
   border: 1px solid rgba(255, 255, 255, 0.105);
   background: rgba(255, 255, 255, 0.035);
   color: rgba(255, 255, 255, 0.88);
-  font: 500 8px/1.2 var(--font-mono, ui-monospace, monospace);
+  font: 550 10.5px/1.2 var(--font-mono, ui-monospace, monospace);
   transition: border-color 160ms ease, background-color 160ms ease;
 }
 
@@ -2612,19 +2616,19 @@ canvas {
   background: color-mix(in srgb, var(--act-four-accent) 8%, rgba(255, 255, 255, 0.035));
 }
 
-.act-four-project-actions { flex-wrap: wrap; gap: 0.55rem; margin-top: 1rem; }
+.act-four-project-actions { flex-wrap: wrap; gap: 0.65rem; margin-top: 1.15rem; }
 
 .act-four-action {
   position: relative;
   display: inline-flex;
-  min-height: 2.3rem;
+  min-height: 2.65rem;
   align-items: center;
   justify-content: center;
-  gap: 0.55rem;
+  gap: 0.6rem;
   overflow: hidden;
-  padding: 0.55rem 0.8rem;
+  padding: 0.65rem 1.05rem;
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
-  font: 650 9px/1 var(--font-mono, ui-monospace, monospace);
+  font: 650 11px/1 var(--font-mono, ui-monospace, monospace);
   letter-spacing: 0.14em;
   text-decoration: none;
   text-transform: uppercase;
@@ -2659,10 +2663,10 @@ canvas {
 .act-four-action:hover { transform: translateY(-2px); border-color: white; box-shadow: 0 0 24px color-mix(in srgb, var(--act-four-accent) 26%, transparent); }
 
 .act-four-corridor-hint {
-  margin-top: 0.78rem;
-  color: rgba(255, 255, 255, 0.52);
-  font: 500 8px/1.5 var(--font-mono, ui-monospace, monospace);
-  letter-spacing: 0.145em;
+  margin-top: 0.9rem;
+  color: rgba(255, 255, 255, 0.68);
+  font: 500 10px/1.5 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -2681,20 +2685,20 @@ canvas {
 .act-four-launch-control {
   display: flex;
   width: 100%;
-  min-height: 3.85rem;
+  min-height: 4.1rem;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-top: 0.9rem;
-  padding: 0.65rem 0.85rem;
+  margin-top: 1rem;
+  padding: 0.72rem 1rem;
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
   text-align: left;
 }
 
-.act-four-launch-copy { position: relative; z-index: 1; gap: 0.72rem; }
-.act-four-launch-icon { display: grid; width: 2rem; height: 2rem; place-items: center; border: 1px solid color-mix(in srgb, var(--act-four-accent) 64%, white); color: var(--act-four-accent); }
-.act-four-launch-kicker,.act-four-launch-verb { color: color-mix(in srgb, var(--act-four-accent) 65%, white); font: 600 8px/1.3 var(--font-mono, ui-monospace, monospace); letter-spacing: 0.2em; text-transform: uppercase; }
-.act-four-launch-title { display: block; margin-top: 0.22rem; font-size: 12px; font-weight: 850; letter-spacing: 0.06em; text-transform: uppercase; }
+.act-four-launch-copy { position: relative; z-index: 1; gap: 0.82rem; }
+.act-four-launch-icon { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border: 1px solid color-mix(in srgb, var(--act-four-accent) 64%, white); color: var(--act-four-accent); }
+.act-four-launch-kicker,.act-four-launch-verb { color: color-mix(in srgb, var(--act-four-accent) 65%, white); font: 600 9.5px/1.3 var(--font-mono, ui-monospace, monospace); letter-spacing: 0.16em; text-transform: uppercase; }
+.act-four-launch-title { display: block; margin-top: 0.22rem; font-size: 14px; font-weight: 850; letter-spacing: 0.06em; text-transform: uppercase; }
 .act-four-launch-verb { position: relative; z-index: 1; white-space: nowrap; }
 .act-four-launch-edge { position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--act-four-accent); box-shadow: 0 0 16px var(--act-four-accent); }
 .act-four-launch-sweep { position: absolute; inset: 0; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.2), transparent); transform: translateX(-110%); transition: transform 650ms ease; }
@@ -2706,9 +2710,9 @@ canvas {
   top: 1.5rem;
   right: 1.5rem;
   z-index: 60;
-  padding: 0.58rem 0.8rem;
+  padding: 0.66rem 0.92rem;
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
-  font: 600 8px/1.2 var(--font-mono, ui-monospace, monospace);
+  font: 600 9px/1.2 var(--font-mono, ui-monospace, monospace);
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -2735,16 +2739,40 @@ canvas {
   .act-four-station-panel { transform: none; }
 }
 
-@media (max-height: 760px) and (min-width: 801px) {
-  .act-four-station-content { padding: 0.95rem 1rem; }
-  .act-four-station-rail { margin-top: 0.65rem; }
-  .act-four-station-title { margin-top: 0.75rem; font-size: clamp(1.45rem, 2vw, 1.9rem); }
-  .act-four-station-description { margin-top: 0.55rem; line-height: 1.45; }
-  .act-four-tech-stack { gap: 0.28rem; margin-top: 0.6rem; }
-  .act-four-tech-pill { min-height: 1.3rem; padding: 0.18rem 0.4rem; }
-  .act-four-project-actions { margin-top: 0.7rem; }
-  .act-four-corridor-hint { margin-top: 0.55rem; }
-  .act-four-launch-control { min-height: 3.35rem; margin-top: 0.65rem; }
+@media (max-height: 820px) and (min-width: 801px) {
+  .act-four-station-content { padding: 1.1rem 1.25rem; }
+  .act-four-station-rail { gap: 0.28rem; margin-top: 0.72rem; padding: 0.25rem; }
+  .act-four-station-step { min-height: 2.15rem; font-size: 10.5px; }
+  .act-four-station-title { margin-top: 0.86rem; font-size: clamp(1.75rem, 2.35vw, 2.25rem); }
+  .act-four-station-subtitle { margin-top: 0.45rem; font-size: 10.5px; }
+  .act-four-station-description { margin-top: 0.58rem; font-size: 13px; line-height: 1.48; }
+  .act-four-tech-stack { gap: 0.32rem; margin-top: 0.66rem; }
+  .act-four-tech-pill { min-height: 1.55rem; padding: 0.26rem 0.48rem; font-size: 9.5px; }
+  .act-four-project-actions { gap: 0.48rem; margin-top: 0.74rem; }
+  .act-four-action { min-height: 2.4rem; padding: 0.5rem 0.78rem; font-size: 10px; }
+  .act-four-corridor-hint { margin-top: 0.58rem; font-size: 9px; }
+  .act-four-launch-control { min-height: 3.55rem; margin-top: 0.68rem; padding: 0.55rem 0.8rem; }
+  .act-four-launch-title { font-size: 13px; }
+  .act-four-launch-icon { width: 1.95rem; height: 1.95rem; }
+}
+
+@media (max-height: 700px) and (min-width: 801px) {
+  .act-four-station-content { padding: 0.9rem 1.05rem; }
+  .act-four-telemetry-header { font-size: 9.5px; }
+  .act-four-station-rail { margin-top: 0.55rem; }
+  .act-four-station-step { min-height: 1.9rem; }
+  .act-four-station-title { margin-top: 0.66rem; font-size: clamp(1.55rem, 2vw, 1.8rem); }
+  .act-four-station-subtitle { margin-top: 0.34rem; font-size: 9.5px; }
+  .act-four-station-description { margin-top: 0.42rem; font-size: 12px; line-height: 1.42; }
+  .act-four-tech-stack { gap: 0.26rem; margin-top: 0.48rem; }
+  .act-four-tech-pill { min-height: 1.35rem; padding: 0.2rem 0.38rem; font-size: 9px; }
+  .act-four-project-actions { margin-top: 0.54rem; }
+  .act-four-action { min-height: 2.15rem; padding: 0.42rem 0.68rem; font-size: 9.5px; }
+  .act-four-corridor-hint { margin-top: 0.42rem; font-size: 8.5px; }
+  .act-four-launch-control { min-height: 3rem; margin-top: 0.48rem; padding: 0.42rem 0.65rem; }
+  .act-four-launch-title { font-size: 12px; }
+  .act-four-launch-kicker,.act-four-launch-verb { font-size: 8px; }
+  .act-four-launch-icon { width: 1.7rem; height: 1.7rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

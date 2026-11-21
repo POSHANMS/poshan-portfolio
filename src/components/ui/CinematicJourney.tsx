@@ -603,7 +603,7 @@ function ProjectsChapter({
     const copyMotion = copyPhase === "exit" ? "is-exiting" : copyPhase === "enter" ? "is-entering" : "";
     return (
       <>
-      <Panel presence={phase === "act4_warp_out" ? 0 : presence} side="left" interactive={phase !== "act4_warp_out"} transitionMs={phase === "act4_warp_out" ? 200 : 0} animation={phase === "act4_vault" ? "act-four-hud-arrive 350ms ease-out both" : undefined} className="left-4 top-[clamp(1.25rem,7vh,4.5rem)] z-50 w-[min(28rem,calc(40vw-2rem))] max-h-[calc(100dvh-3rem)] md:left-12 max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto">
+      <Panel presence={phase === "act4_warp_out" ? 0 : presence} side="left" interactive={phase !== "act4_warp_out"} transitionMs={phase === "act4_warp_out" ? 200 : 0} animation={phase === "act4_vault" ? "act-four-hud-arrive 350ms ease-out both" : undefined} className="act-four-station-shell left-4 top-[clamp(1.25rem,7vh,4.5rem)] z-50 w-[min(31rem,42vw)] max-w-[500px] max-h-[calc(100dvh-3rem)] md:left-12 max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto">
         <section className={`act-four-station-panel act-four-station-panel--${copyMotion}`} aria-label={`${String(displayProjectIndex + 1).padStart(2, "0")} of ${String(PROJECTS.length).padStart(2, "0")}: ${project.name}`} aria-live="polite" aria-atomic="true" style={{ "--act-four-accent": accent } as React.CSSProperties}>
           <div className="act-four-station-content">
             <span aria-hidden="true" className="act-four-accent-edge" />

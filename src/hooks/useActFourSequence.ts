@@ -11,6 +11,12 @@ const ACT_FOUR_EXIT = 0.905;
 const ACT_FOUR_GATE_ANCHOR = 0.875;
 const PROJECT_COUNT = PROJECTS.length;
 const WHEEL_THRESHOLD = 124;
+const PROJECT_ADVANCE_LOCK_MS = 720;
+// Trackpad momentum can emit sparse tail events long after its initial burst.
+const WHEEL_GESTURE_GAP_MS = 180;
+// Station 05 is also the vault exit. A longer idle window prevents the tail of
+// the 04 -> 05 trackpad gesture from being mistaken for a deliberate exit.
+const STATION_FIVE_GESTURE_GAP_MS = 1400;
 const WARP_DURATION_MS = 2200;
 const EXIT_FADE_MS = 200;
 const EXIT_FLIGHT_MS = 900;
@@ -36,6 +42,11 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
   const actFiveHandoffPending = useRef(false);
   const lockedScrollY = useRef<number | null>(null);
   const projectIndexRef = useRef(0);
+  const wheelCarry = useRef(0);
+  const lastWheelAt = useRef(0);
+  const nextAdvanceAt = useRef(0);
+  const wheelNeedsFreshGesture = useRef(false);
+  const stationFiveExitArmed = useRef(false);
   const scrollProgressRef = useRef(scrollProgress);
   scrollProgressRef.current = scrollProgress;
 
@@ -228,41 +239,86 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
 
   useEffect(() => {
     if (phase !== "act4_warp_in" && phase !== "act4_vault") return;
-    let wheelCarry = 0;
-    let touchStartY: number | null = null;
+    wheelCarry.current = 0;
+    lastWheelAt.current = 0;
+    nextAdvanceAt.current = 0;
+    wheelNeedsFreshGesture.current = false;
+    stationFiveExitArmed.current = false;
+    let touchStart: { y: number; startedAt: number } | null = null;
     const onWheel = (event: WheelEvent) => {
-      wheelCarry += event.deltaY;
-      if (Math.abs(wheelCarry) < WHEEL_THRESHOLD) { event.preventDefault(); return; }
-      const direction = Math.sign(wheelCarry);
-      wheelCarry = 0;
-      if (phase !== "act4_vault") { event.preventDefault(); return; }
+      const now = performance.now();
+      const gestureGap = projectIndexRef.current === PROJECT_COUNT - 1
+        ? STATION_FIVE_GESTURE_GAP_MS
+        : WHEEL_GESTURE_GAP_MS;
+      const startsFreshGesture = now - lastWheelAt.current >= gestureGap;
+      lastWheelAt.current = now;
+      if (phase !== "act4_vault") { wheelCarry.current = 0; event.preventDefault(); return; }
+      if (now < nextAdvanceAt.current) { wheelCarry.current = 0; event.preventDefault(); return; }
+      if (wheelNeedsFreshGesture.current) {
+        wheelCarry.current = 0;
+        if (!startsFreshGesture) { event.preventDefault(); return; }
+        wheelNeedsFreshGesture.current = false;
+      }
+      wheelCarry.current += event.deltaY;
+      if (Math.abs(wheelCarry.current) < WHEEL_THRESHOLD) { event.preventDefault(); return; }
+      const direction = Math.sign(wheelCarry.current);
+      wheelCarry.current = 0;
       const current = projectIndexRef.current;
       if (direction < 0 && current > 0) {
         event.preventDefault();
+        nextAdvanceAt.current = now + PROJECT_ADVANCE_LOCK_MS;
+        wheelNeedsFreshGesture.current = true;
         projectIndexRef.current = current - 1; setProjectIndex(current - 1); return;
       }
       if (direction > 0 && current < PROJECT_COUNT - 1) {
         event.preventDefault();
+        nextAdvanceAt.current = now + PROJECT_ADVANCE_LOCK_MS;
+        wheelNeedsFreshGesture.current = true;
+        if (current === PROJECT_COUNT - 2) stationFiveExitArmed.current = false;
         projectIndexRef.current = current + 1; setProjectIndex(current + 1); return;
       }
       if (direction > 0 && current === PROJECT_COUNT - 1) {
-        event.preventDefault(); exitProjectWorld();
+        event.preventDefault();
+        nextAdvanceAt.current = now + PROJECT_ADVANCE_LOCK_MS;
+        if (!stationFiveExitArmed.current) {
+          stationFiveExitArmed.current = true;
+          wheelNeedsFreshGesture.current = true;
+          return;
+        }
+        exitProjectWorld();
       } else event.preventDefault();
     };
-    const onTouchStart = (event: TouchEvent) => { touchStartY = event.touches[0]?.clientY ?? null; };
+    const onTouchStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      touchStart = touch ? { y: touch.clientY, startedAt: performance.now() } : null;
+    };
     const onTouchMove = (event: TouchEvent) => { if (phase === "act4_vault") event.preventDefault(); };
     const onTouchEnd = (event: TouchEvent) => {
-      if (phase !== "act4_vault" || touchStartY === null) return;
+      if (phase !== "act4_vault" || touchStart === null) { touchStart = null; return; }
       const endY = event.changedTouches[0]?.clientY;
-      if (endY === undefined) return;
-      const distance = touchStartY - endY;
-      touchStartY = null;
+      if (endY === undefined) { touchStart = null; return; }
+      const { y: startY, startedAt } = touchStart;
+      const distance = startY - endY;
+      touchStart = null;
+      if (startedAt < nextAdvanceAt.current || performance.now() < nextAdvanceAt.current) return;
       if (Math.abs(distance) < 36) return;
       const current = projectIndexRef.current;
       const direction = distance > 0 ? 1 : -1;
-      if (direction < 0 && current > 0) { projectIndexRef.current = current - 1; setProjectIndex(current - 1); }
-      else if (direction > 0 && current < PROJECT_COUNT - 1) { projectIndexRef.current = current + 1; setProjectIndex(current + 1); }
-      else if (direction > 0 && current === PROJECT_COUNT - 1) exitProjectWorld();
+      if (direction < 0 && current > 0) {
+        nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
+        wheelCarry.current = 0;
+        wheelNeedsFreshGesture.current = true;
+        projectIndexRef.current = current - 1; setProjectIndex(current - 1);
+      } else if (direction > 0 && current < PROJECT_COUNT - 1) {
+        nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
+        wheelCarry.current = 0;
+        wheelNeedsFreshGesture.current = true;
+        projectIndexRef.current = current + 1; setProjectIndex(current + 1);
+      } else if (direction > 0 && current === PROJECT_COUNT - 1) {
+        nextAdvanceAt.current = performance.now() + PROJECT_ADVANCE_LOCK_MS;
+        wheelCarry.current = 0;
+        exitProjectWorld();
+      }
     };
     window.addEventListener("wheel", onWheel, { passive: false, capture: true });
     window.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
@@ -300,6 +356,11 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
       }
       const next = Math.max(0, Math.min(PROJECT_COUNT - 1, current + (forward ? 1 : -1)));
       if (next === current) return;
+      wheelCarry.current = 0;
+      nextAdvanceAt.current = 0;
+      lastWheelAt.current = performance.now();
+      wheelNeedsFreshGesture.current = true;
+      stationFiveExitArmed.current = false;
       projectIndexRef.current = next;
       setProjectIndex(next);
     };
@@ -310,6 +371,11 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
   const selectProject = useCallback((index: number) => {
     if (phaseRef.current !== "act4_vault" || !Number.isFinite(index)) return;
     const next = Math.max(0, Math.min(PROJECT_COUNT - 1, Math.round(index)));
+    wheelCarry.current = 0;
+    nextAdvanceAt.current = 0;
+    lastWheelAt.current = performance.now();
+    wheelNeedsFreshGesture.current = true;
+    stationFiveExitArmed.current = false;
     projectIndexRef.current = next;
     setProjectIndex(next);
   }, []);
