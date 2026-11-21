@@ -379,6 +379,321 @@ function LensDust({ charge, active }: { charge: ChargeSource; active: boolean })
   return <group ref={group} visible={active}><instancedMesh ref={instances} args={[undefined, undefined, seeds.length]} frustumCulled={false}><planeGeometry args={[1,1]} /><primitive object={dustMaterial} attach="material" /></instancedMesh></group>;
 }
 
+// Exterior Gargantua is rendered as one camera-facing raymarch surface. The
+// ray is bent toward the shadow by a Schwarzschild-inspired weak-field term;
+// every ray then samples the tilted, differentially rotating plasma disk.
+const exteriorVertex = `
+  uniform mat4 uWorldToLocal;
+  varying vec3 vPlanePoint;
+  varying vec2 vQuadUv;
+  void main() {
+    vec4 worldPoint = modelMatrix * vec4(position, 1.0);
+    vec4 localPoint = uWorldToLocal * worldPoint;
+    vPlanePoint = localPoint.xyz;
+    vQuadUv = position.xy * 0.5 + 0.5;
+    gl_Position = projectionMatrix * viewMatrix * worldPoint;
+  }
+`;
+
+const exteriorFragment = `
+  uniform float uTime;
+  uniform float uCharge;
+  uniform vec3 uCameraLocal;
+  uniform vec2 uPlaneSize;
+  uniform vec2 uPointer;
+  varying vec3 vPlanePoint;
+  varying vec2 vQuadUv;
+
+  const float SHADOW_RADIUS = 1.85;
+  const float DISK_INNER = 2.02;
+  const float DISK_OUTER = 5.4;
+
+  float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  }
+  float noise21(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
+  float fbm(vec2 p) {
+    float value = 0.0;
+    float amplitude = 0.52;
+    for (int octave = 0; octave < 4; octave++) {
+      value += noise21(p) * amplitude;
+      p = mat2(1.62, -1.18, 1.18, 1.62) * p + vec2(7.1, 3.7);
+      amplitude *= 0.48;
+    }
+    return value;
+  }
+  vec3 rotateDisk(vec3 p) {
+    float cz = cos(-0.314), sz = sin(-0.314);
+    p = vec3(cz * p.x - sz * p.y, sz * p.x + cz * p.y, p.z);
+    float cx = cos(0.23), sx = sin(0.23);
+    return vec3(p.x, cx * p.y - sx * p.z, sx * p.y + cx * p.z);
+  }
+  vec3 filmic(vec3 x) {
+    // ACES fitted curve: (x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14).
+    return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+  }
+
+  void main() {
+    {
+    // Stable screen-space silhouette, with the raymarch pass below retained
+    // for the capture/lensing field. This compositing pass keeps the shadow
+    // and the tilted disk legible at the unusually wide exterior camera FOV.
+    vec2 p = (vQuadUv - 0.5) * 2.0;
+    float ca = cos(-0.314), sa = sin(-0.314);
+    vec2 diskUv = vec2(ca * p.x - sa * p.y, sa * p.x + ca * p.y);
+    float diskR = length(vec2(diskUv.x / 0.92, diskUv.y / 0.39));
+    float previewCharge = clamp(uCharge, 0.0, 1.0);
+    float previewSwirl = mix(1.0, 5.5, smoothstep(0.0, 1.0, previewCharge));
+    float angle = atan(diskUv.y / 0.39, diskUv.x / 0.92);
+    float orbit = previewSwirl / pow(max(diskR * 5.2, 1.0), 0.75);
+    vec2 polar = vec2(angle * 2.8 - diskR * 13.0 - uTime * orbit * 0.18, diskR * 15.0);
+    float cloud = fbm(polar + vec2(uTime * 0.06, -uTime * 0.035));
+    float detail = fbm(polar * 2.0 + vec2(-uTime * 0.08, uTime * 0.05));
+    float turbulence = smoothstep(0.2, 0.82, cloud * 0.72 + detail * 0.42);
+    float armPhase = diskR * 64.0 - angle * 5.0 + (cloud - 0.45) * 12.0 - uTime * orbit;
+    float filaments = 0.38 + 0.62 * pow(0.5 + 0.5 * sin(armPhase), 6.0);
+    float innerEdge = smoothstep(0.24, 0.32, diskR);
+    float outerEdge = 1.0 - smoothstep(0.88, 1.06, diskR);
+    float gas = innerEdge * outerEdge * (0.2 + turbulence * 0.62) * filaments;
+    vec3 gasColor = mix(vec3(0.34, 0.025, 0.045), vec3(0.82, 0.16, 0.045), turbulence);
+    gasColor = mix(gasColor, vec3(1.0, 0.48, 0.12), smoothstep(0.42, 0.82, turbulence + filaments * 0.22));
+    float innerHeat = exp(-pow((diskR - 0.34) * 15.0, 2.0));
+    gasColor = mix(gasColor, vec3(1.0, 0.87, 0.62), innerHeat * (0.12 + turbulence * 0.24));
+    float doppler = 0.78 + 0.42 * smoothstep(-0.18, 0.9, -diskUv.x / 0.92);
+    gasColor *= doppler * (1.0 + previewCharge * 0.6);
+
+    float shadowRadius = 0.235;
+    float radial = length(p);
+    float shadow = 1.0 - smoothstep(shadowRadius - 0.004, shadowRadius + 0.004, radial);
+    float photon = exp(-pow((radial - shadowRadius * 1.045) * 92.0, 2.0)) * (0.72 + previewCharge * 1.8);
+    float arcRadius = shadowRadius * 1.19;
+    float arcBand = exp(-pow((radial - arcRadius) * 32.0, 2.0));
+    float arcMask = smoothstep(0.22, 0.78, abs(p.y) / max(radial, 0.001));
+    float arc = arcBand * arcMask * (0.14 + turbulence * 0.1);
+
+    vec3 color = gasColor * gas;
+    float alpha = gas * 0.84;
+    color *= 1.0 - shadow;
+    alpha *= 1.0 - shadow;
+    // The near-side plasma crosses the void as a narrow, turbulent belt.
+    float frontBelt = exp(-pow(diskUv.y / 0.39 / 0.055, 2.0)) * smoothstep(0.24, 0.43, abs(diskUv.x) / 0.92);
+    vec3 frontColor = mix(vec3(0.88, 0.28, 0.07), vec3(1.0, 0.78, 0.42), smoothstep(0.35, 0.82, turbulence + filaments * 0.2));
+    color += frontColor * frontBelt * (0.42 + turbulence * 0.42) * (1.0 + previewCharge * 0.8);
+    alpha = max(alpha, frontBelt * 0.78);
+    vec3 photonColor = mix(vec3(1.0, 0.3, 0.12), vec3(1.0, 0.96, 0.82), smoothstep(0.15, 1.4, photon));
+    color += photonColor * photon * 0.72 + vec3(1.0, 0.52, 0.22) * arc;
+    alpha = max(alpha, max(photon * 0.94, arc * 0.72));
+    float edge = max(abs(p.x), abs(p.y));
+    alpha *= 1.0 - smoothstep(0.78, 0.99, edge);
+    if (edge > 0.995 || alpha < 0.003) discard;
+    gl_FragColor = vec4(filmic(color * (0.9 + previewCharge * 0.65)), clamp(alpha, 0.0, 1.0));
+    return;
+    }
+
+    vec3 rayOrigin = uCameraLocal;
+    // Rays originate at the real camera. A virtual eye displaced away from
+    // the core changes the ray bundle and can make every pixel converge onto
+    // the shadow, producing an oversized captured silhouette.
+    vec3 rayDirection = normalize(vPlanePoint - rayOrigin);
+    float parallax = 0.0523599;
+    rayDirection = normalize(rayDirection + vec3(uPointer.x, uPointer.y, 0.0) * parallax);
+    vec3 initialRayDirection = rayDirection;
+
+    float charge = clamp(uCharge, 0.0, 1.0);
+    float swirl = mix(1.0, 5.5, smoothstep(0.0, 1.0, charge));
+    float travel = 0.0;
+    float plasmaAlpha = 0.0;
+    vec3 plasmaColor = vec3(0.0);
+    float photonEmission = 0.0;
+    bool captured = false;
+    bool touchedScene = false;
+
+    // 64 adaptive integration steps keep the lens smooth near the shadow and
+    // traverse the broad disk quickly; rays exit early beyond the scene.
+    for (int stepIndex = 0; stepIndex < 64; stepIndex++) {
+      vec3 position = rayOrigin + rayDirection * travel;
+      float radius = length(position);
+      if (radius < SHADOW_RADIUS * 1.012) {
+        captured = true;
+        touchedScene = true;
+        break;
+      }
+      if (travel > 30.0 || (radius > 18.0 && dot(position, rayDirection) > 0.0)) break;
+
+      float stepLength = clamp((radius - SHADOW_RADIUS) * 0.082, 0.035, 0.42);
+      vec3 radial = position / max(radius, 0.001);
+      vec3 transverse = radial - rayDirection * dot(radial, rayDirection);
+      float bend = 1.5 * SHADOW_RADIUS / max(radius * radius, 0.01);
+      rayDirection = normalize(rayDirection - transverse * bend * stepLength);
+
+      vec3 diskPoint = rotateDisk(position);
+      float diskRadius = length(diskPoint.xz);
+      float thickness = mix(0.075, 0.14, charge) * (1.0 + 0.028 * diskRadius);
+      float planeDensity = exp(-abs(diskPoint.y) / thickness);
+      if (diskRadius > DISK_INNER && diskRadius < DISK_OUTER && planeDensity > 0.012) {
+        touchedScene = true;
+        float theta = atan(diskPoint.z, diskPoint.x);
+        float radial01 = (diskRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER);
+        float kepler = swirl / pow(max(diskRadius / SHADOW_RADIUS, 1.0), 0.75);
+        float twistedAngle = theta + uTime * (0.115 + kepler * 0.13);
+        vec2 polar = vec2(twistedAngle * 2.3 + radial01 * 5.4, radial01 * 8.0);
+        float cloud = fbm(polar + vec2(uTime * 0.045, -uTime * 0.028));
+        float detail = fbm(polar * 2.15 + vec2(-uTime * 0.08, uTime * 0.06));
+        float filamentPhase = diskRadius * 19.0 - twistedAngle * 2.8 + (cloud - 0.48) * 5.0;
+        float filaments = 0.56 + 0.44 * pow(0.5 + 0.5 * sin(filamentPhase), 5.0);
+        float turbulence = smoothstep(0.22, 0.76, cloud * 0.72 + detail * 0.42);
+        float innerGlow = exp(-pow((diskRadius - DISK_INNER - 0.18) * 1.65, 2.0));
+        float outerFade = 1.0 - smoothstep(DISK_OUTER * 0.78, DISK_OUTER, diskRadius);
+        float density = planeDensity * (0.24 + turbulence * 0.82) * filaments * outerFade;
+        float frontFacing = smoothstep(-0.72, 0.82, dot(rayDirection, vec3(0.0, 0.0, 1.0)));
+        float sampleAlpha = clamp(density * stepLength * 0.34, 0.0, 0.18);
+        vec3 ember = vec3(0.42, 0.035, 0.075);
+        vec3 redOrange = vec3(0.85, 0.16, 0.055);
+        vec3 amber = vec3(1.0, 0.48, 0.12);
+        vec3 whiteGold = vec3(1.0, 0.94, 0.78);
+        vec3 gas = mix(ember, redOrange, smoothstep(0.18, 0.62, turbulence));
+        gas = mix(gas, amber, smoothstep(0.36, 0.82, turbulence + filaments * 0.24));
+        gas = mix(gas, whiteGold, clamp(innerGlow * (0.04 + turbulence * 0.16), 0.0, 0.24));
+        // Relativistic Doppler beaming heats the approaching left side by ~30%.
+        float doppler = 0.78 + 0.42 * smoothstep(-0.15, 0.92, -diskPoint.x / DISK_OUTER);
+        gas *= doppler * (0.84 + frontFacing * 0.28) * (1.0 + charge * 0.75);
+        plasmaColor += gas * sampleAlpha * (1.0 - plasmaAlpha);
+        plasmaAlpha += sampleAlpha * (1.0 - plasmaAlpha);
+      }
+
+      if (radius < SHADOW_RADIUS * 1.55) {
+        float photonDistance = abs(radius - SHADOW_RADIUS * 1.065);
+        float photonNoise = noise21(position.xy * 3.2 + vec2(uTime * 0.07, -uTime * 0.045));
+        photonEmission = max(photonEmission,
+          exp(-photonDistance * (23.0 - charge * 3.5)) * (0.62 + photonNoise * 0.54) * (1.0 + charge * 3.8));
+      }
+      travel += stepLength;
+    }
+
+    // An exact tilted-plane sample supplements the bent integration. It keeps
+    // the broad foreground belt crisp even when adaptive steps skim the thin gas.
+    float directFrontAmount = 0.0;
+    vec3 diskOrigin = rotateDisk(rayOrigin);
+    vec3 diskDirection = rotateDisk(initialRayDirection);
+    float planeDistance = -diskOrigin.y / (abs(diskDirection.y) < 0.0005 ? 0.0005 : diskDirection.y);
+    if (planeDistance > 0.0 && (!captured || planeDistance < travel + 0.08)) {
+      vec3 directDiskPoint = diskOrigin + diskDirection * planeDistance;
+      float directRadius = length(directDiskPoint.xz);
+      if (directRadius > DISK_INNER && directRadius < DISK_OUTER) {
+        float directTheta = atan(directDiskPoint.z, directDiskPoint.x);
+        float direct01 = (directRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER);
+        float directKepler = swirl / pow(max(directRadius / SHADOW_RADIUS, 1.0), 0.75);
+        float directAngle = directTheta + uTime * (0.115 + directKepler * 0.13);
+        vec2 directPolar = vec2(directAngle * 2.3 + direct01 * 5.4, direct01 * 8.0);
+        float directCloud = fbm(directPolar + vec2(uTime * 0.045, -uTime * 0.028));
+        float directDetail = fbm(directPolar * 2.15 + vec2(-uTime * 0.08, uTime * 0.06));
+        float directTurbulence = smoothstep(0.22, 0.76, directCloud * 0.72 + directDetail * 0.42);
+        float directFilament = 0.34 + 0.66 * pow(0.5 + 0.5 * sin(directRadius * 19.0 - directAngle * 2.8 + (directCloud - 0.48) * 5.0), 8.0);
+        float directInnerHeat = exp(-pow((directRadius - DISK_INNER - 0.22) * 1.8, 2.0));
+        float directOuterFade = 1.0 - smoothstep(DISK_OUTER * 0.74, DISK_OUTER, directRadius);
+        float directDoppler = 0.78 + 0.42 * smoothstep(-0.15, 0.92, -directDiskPoint.x / DISK_OUTER);
+        vec3 directColor = mix(vec3(0.48, 0.035, 0.075), vec3(0.88, 0.2, 0.055), directTurbulence);
+        directColor = mix(directColor, vec3(1.0, 0.48, 0.12), smoothstep(0.34, 0.8, directTurbulence + directFilament * 0.2));
+        directColor = mix(directColor, vec3(1.0, 0.95, 0.82), directInnerHeat * (0.04 + directTurbulence * 0.12));
+        directColor *= directDoppler * (1.0 + charge * 0.72);
+        float directAlpha = directOuterFade * (0.1 + directTurbulence * 0.18) * directFilament;
+        directFrontAmount = directAlpha;
+        plasmaColor = mix(plasmaColor / max(plasmaAlpha, 0.001), directColor, directAlpha) * max(plasmaAlpha, directAlpha);
+        plasmaAlpha = max(plasmaAlpha, directAlpha);
+        touchedScene = true;
+      }
+    }
+
+    vec2 screenPoint = (vQuadUv - 0.5) * 2.0;
+    float edgeDistance = max(abs(screenPoint.x), abs(screenPoint.y));
+    float edgeFade = 1.0 - smoothstep(0.68, 0.98, edgeDistance);
+    vec3 color = plasmaColor / max(plasmaAlpha, 0.001);
+    float alpha = plasmaAlpha;
+    float impact = length(cross(rayOrigin, initialRayDirection));
+    // The exact silhouette is also evaluated analytically so the shadow
+    // remains a clean, centered black circle even at oblique camera angles.
+    if (impact < SHADOW_RADIUS * 1.08) {
+      captured = true;
+      if (directFrontAmount < 0.5) {
+        plasmaColor = vec3(0.0);
+        plasmaAlpha = 0.0;
+      }
+    } else {
+      // The adaptive integrator can over-bend grazing paths at this screen
+      // resolution; keep the opaque silhouette tied to the photon shadow.
+      captured = false;
+    }
+    photonEmission = max(photonEmission, exp(-pow((impact - SHADOW_RADIUS * 1.12) * 5.0, 2.0)) * (0.72 + charge * 2.6));
+    if (photonEmission > 0.012) {
+      vec3 photon = mix(vec3(1.0, 0.40, 0.20), vec3(1.0, 0.97, 0.84), smoothstep(0.35, 1.5, photonEmission));
+      color += photon * photonEmission * 0.78;
+      alpha = max(alpha, clamp(photonEmission * 0.88, 0.0, 1.0));
+      touchedScene = true;
+    }
+    if (captured) {
+      // Fully opaque void: the captured ray hides stars and scenery behind it.
+      vec3 foreground = plasmaAlpha > 0.025 ? filmic((plasmaColor / max(plasmaAlpha, 0.001)) * (0.82 + charge * 0.7)) : vec3(0.0);
+      gl_FragColor = vec4(foreground, 1.0);
+      return;
+    }
+    if (!touchedScene || alpha < 0.004) discard;
+    alpha = clamp(alpha * edgeFade, 0.0, 0.98);
+    color = filmic(color * (0.52 + charge * 0.68));
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+function RaymarchedExterior({ charge, radius = 1.85 }: { charge: ChargeSource; radius?: number }) {
+  const mesh = useRef<THREE.Mesh>(null);
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const pointer = useRef(new THREE.Vector2());
+  const uniforms = useMemo(() => ({
+    uTime: { value: 0 },
+    uCharge: { value: 0 },
+    uCameraLocal: { value: new THREE.Vector3() },
+    uPlaneSize: { value: new THREE.Vector2(18, 18) },
+    uPointer: { value: new THREE.Vector2() },
+    uWorldToLocal: { value: new THREE.Matrix4() },
+  }), []);
+  useFrame(({ camera, pointer: cursor, clock }, delta) => {
+    if (!mesh.current || !material.current) return;
+    const parent = mesh.current.parent;
+    if (!parent) return;
+    parent.updateWorldMatrix(true, false);
+    uniforms.uWorldToLocal.value.copy(parent.matrixWorld).invert();
+    const cameraLocal = camera.getWorldPosition(new THREE.Vector3()).applyMatrix4(uniforms.uWorldToLocal.value);
+    uniforms.uCameraLocal.value.copy(cameraLocal);
+
+    // Keep the raymarch surface tight around the disk to bound GPU fill cost.
+    const planeWidth = radius * 10.0;
+    const planeHeight = radius * 10.0;
+    mesh.current.scale.set(planeWidth * 0.5, planeHeight * 0.5, 1);
+    uniforms.uPlaneSize.value.set(planeWidth, planeHeight);
+    const inverseParentRotation = parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+    mesh.current.quaternion.copy(inverseParentRotation.multiply(camera.quaternion));
+
+    pointer.current.x = THREE.MathUtils.damp(pointer.current.x, cursor.x, 3.5, delta);
+    pointer.current.y = THREE.MathUtils.damp(pointer.current.y, cursor.y, 3.5, delta);
+    uniforms.uPointer.value.copy(pointer.current);
+    // Keep the shadow and disk orientation fixed; only the plasma inside the
+    // raymarched ring field flows, at a visible but still cinematic pace.
+    uniforms.uTime.value = clock.getElapsedTime() * 2.2;
+    uniforms.uCharge.value = THREE.MathUtils.damp(uniforms.uCharge.value, readCharge(charge), 4.5, delta);
+  });
+  return (
+    <mesh ref={mesh} frustumCulled={false} renderOrder={3}>
+      <planeGeometry args={[2, 2]} />
+      <shaderMaterial ref={material} vertexShader={exteriorVertex} fragmentShader={exteriorFragment} uniforms={uniforms} transparent blending={THREE.NormalBlending} depthTest depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
 export default function ActFourExterior({ phase, warpCharge }: { phase: ActFourPhase; warpCharge: React.RefObject<number> }) {
   const core = useRef<THREE.Group>(null);
   const charge = useRef(0);
@@ -392,12 +707,10 @@ export default function ActFourExterior({ phase, warpCharge }: { phase: ActFourP
   if (!active) return null;
   return (
     <group position={ACT_FOUR_CORE_POSITION}>
-      <group ref={core} rotation={[0.34, 0, -0.36]}>
-        <LensingHalo charge={charge} showArcs />
+      <group ref={core}>
         <pointLight color="#ff254c" intensity={2.8} distance={36} decay={2} />
         <pointLight position={[0, 0.2, 2.2]} color="#ffbd7a" intensity={2.4} distance={22} decay={2} />
-        <EventHorizon radius={2.1} charge={charge} />
-        <AccretionPlasmaDisk innerRadius={2.34} outerRadius={7.0} charge={charge} />
+        <RaymarchedExterior radius={1.85} charge={charge} />
         <AnamorphicFlare charge={charge} />
       </group>
       <LensDust charge={charge} active />
