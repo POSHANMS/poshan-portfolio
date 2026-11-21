@@ -196,11 +196,95 @@ function FlashInFrontOfCamera({ material }: { material: React.RefObject<THREE.Sh
 }
 
 function buildVaultRibGeometry() {
-  const points = Array.from({ length: 25 }, (_, index) => {
-    const angle = Math.PI - (index / 24) * Math.PI;
-    return new THREE.Vector3(Math.cos(angle) * 22, -3.4 + Math.sin(angle) * 24, 0);
+  const floorY = -3.65;
+  const springY = -3.38;
+  const outerRadius = 22;
+  const innerRadius = 21.05;
+  const shape = new THREE.Shape();
+  shape.moveTo(-outerRadius, floorY);
+  shape.lineTo(-outerRadius, springY);
+  for (let index = 1; index <= 48; index += 1) {
+    const angle = Math.PI - (index / 48) * Math.PI;
+    shape.lineTo(Math.cos(angle) * outerRadius, springY + Math.sin(angle) * outerRadius);
+  }
+  shape.lineTo(outerRadius, floorY);
+  shape.lineTo(innerRadius, floorY);
+  shape.lineTo(innerRadius, springY);
+  for (let index = 1; index <= 48; index += 1) {
+    const angle = (index / 48) * Math.PI;
+    shape.lineTo(Math.cos(angle) * innerRadius, springY + Math.sin(angle) * innerRadius);
+  }
+  shape.lineTo(-innerRadius, floorY);
+  shape.closePath();
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: 1.05,
+    steps: 1,
+    bevelEnabled: true,
+    bevelSegments: 3,
+    bevelSize: 0.12,
+    bevelThickness: 0.1,
   });
-  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 96, 0.72, 8, false);
+  geometry.translate(0, 0, -0.525);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function buildVaultRibAccentGeometry() {
+  const springY = -3.38;
+  const innerRadius = 21.05;
+  const points = Array.from({ length: 49 }, (_, index) => {
+    const angle = (index / 48) * Math.PI;
+    return new THREE.Vector3(Math.cos(angle) * innerRadius, springY + Math.sin(angle) * innerRadius, 0.54);
+  });
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 96, 0.024, 6, false);
+}
+
+function buildVaultStars() {
+  const count = 420;
+  const positions = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+  const phases = new Float32Array(count);
+  const colors = new Float32Array(count * 3);
+  for (let index = 0; index < count; index += 1) {
+    const y = seeded(index, 71) * 2 - 1;
+    const angle = seeded(index, 72) * Math.PI * 2;
+    const radius = 86 + seeded(index, 73) * 72;
+    const horizontal = Math.sqrt(1 - y * y);
+    positions.set([Math.cos(angle) * horizontal * radius, y * radius, Math.sin(angle) * horizontal * radius], index * 3);
+    sizes[index] = 0.13 + seeded(index, 74) * 0.2;
+    phases[index] = seeded(index, 75) * Math.PI * 2;
+    const tint = seeded(index, 76);
+    const color = tint > 0.86 ? new THREE.Color("#bdd9ff") : tint > 0.68 ? new THREE.Color("#ffe6ce") : new THREE.Color("#dce6f5");
+    colors.set([color.r, color.g, color.b], index * 3);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+  geometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
+  geometry.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
+function VaultDistantStars() {
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const geometry = useMemo(buildVaultStars, []);
+  useFrame(({ clock }) => {
+    if (material.current) material.current.uniforms.uTime.value = clock.getElapsedTime();
+  });
+  return (
+    <points geometry={geometry} frustumCulled={false}>
+      <shaderMaterial
+        ref={material}
+        transparent
+        depthWrite={false}
+        toneMapped={false}
+        uniforms={{ uTime: { value: 0 } }}
+        vertexShader={`attribute float aSize;attribute float aPhase;attribute vec3 aColor;uniform float uTime;varying float vTwinkle;varying vec3 vColor;void main(){vec4 mvPosition=modelViewMatrix*vec4(position,1.0);vColor=aColor;vTwinkle=0.56+0.44*(0.5+0.5*sin(uTime*0.7+aPhase));gl_PointSize=clamp(aSize*(700.0/max(-mvPosition.z,1.0)),0.65,2.6);gl_Position=projectionMatrix*mvPosition;}`}
+        fragmentShader={`varying float vTwinkle;varying vec3 vColor;void main(){float radius=length(gl_PointCoord-0.5);float disc=1.0-smoothstep(0.26,0.5,radius);if(disc<0.01)discard;gl_FragColor=vec4(vColor*vTwinkle,disc*vTwinkle*0.78);}`}
+      />
+    </points>
+  );
 }
 
 function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projectIndex: number }) {
@@ -209,8 +293,10 @@ function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projec
   const keyLight = useRef<THREE.PointLight>(null);
   const floorMaterial = useRef<THREE.ShaderMaterial>(null);
   const canopyWire = useRef<THREE.ShaderMaterial>(null);
+  const ribAccentMaterial = useRef<THREE.MeshStandardMaterial>(null);
   const activeStationPosition = useMemo(() => new THREE.Vector3(), []);
   const ribGeometry = useMemo(buildVaultRibGeometry, []);
+  const ribAccentGeometry = useMemo(buildVaultRibAccentGeometry, []);
   const active = phase === "act4_warp_in" || phase === "act4_vault" || phase === "act4_warp_out";
   const phaseStartedAt = useRef(performance.now());
   const previousPhase = useRef(phase);
@@ -231,8 +317,10 @@ function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projec
     }
     if (keyLight.current) {
       keyLight.current.color.lerp(color, 1 - Math.exp(-delta * 1.8));
-      keyLight.current.intensity = 3.6 * reveal.current;
+      keyLight.current.position.set(activeStationPosition.x, activeStationPosition.y + 3.8, activeStationPosition.z + 1.5);
+      keyLight.current.intensity = 4.6 * reveal.current;
     }
+    if (ribAccentMaterial.current) ribAccentMaterial.current.emissive.copy(color);
     if (canopyWire.current) {
       canopyWire.current.uniforms.uAccent.value.lerp(color, 1 - Math.exp(-delta * 1.8));
       canopyWire.current.uniforms.uOpacity.value = 0.08 * reveal.current;
@@ -250,7 +338,7 @@ function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projec
           <icosahedronGeometry args={[170, 5]} />
           <shaderMaterial ref={gradientMaterial} side={THREE.BackSide} transparent depthWrite={false} toneMapped={false}
             vertexShader={`varying vec3 vLocal;void main(){vLocal=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-            fragmentShader={`uniform vec3 uAccent;uniform float uReveal;uniform float uTime;varying vec3 vLocal;float hash31(vec3 p){p=fract(p*0.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}float noise3(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(mix(hash31(i),hash31(i+vec3(1,0,0)),f.x),mix(hash31(i+vec3(0,1,0)),hash31(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash31(i+vec3(0,0,1)),hash31(i+vec3(1,0,1)),f.x),mix(hash31(i+vec3(0,1,1)),hash31(i+vec3(1,1,1)),f.x),f.y),f.z);}float fbm(vec3 p){float sum=0.0;float amp=0.5;for(int i=0;i<4;i++){sum+=noise3(p)*amp;p=p*2.03+vec3(7.1,3.7,5.3);amp*=0.5;}return sum;}void main(){float zenith=smoothstep(-0.12,0.92,vLocal.y);vec3 base=mix(vec3(0.0275,0.0431,0.0784),vec3(0.0118,0.0196,0.0392),zenith);float horizon=pow(1.0-abs(vLocal.y),2.0);vec3 drift=vec3(uTime*0.0015,uTime*0.001,-uTime*0.0012);float mist=fbm(vLocal*8.0+drift);float veil=smoothstep(0.48,0.76,mist)*horizon;vec3 color=base+uAccent*(veil*0.15+horizon*0.012);gl_FragColor=vec4(color,0.97*uReveal);}`}
+            fragmentShader={`uniform vec3 uAccent;uniform float uReveal;uniform float uTime;varying vec3 vLocal;float hash31(vec3 p){p=fract(p*0.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}float noise3(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(mix(hash31(i),hash31(i+vec3(1,0,0)),f.x),mix(hash31(i+vec3(0,1,0)),hash31(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash31(i+vec3(0,0,1)),hash31(i+vec3(1,0,1)),f.x),mix(hash31(i+vec3(0,1,1)),hash31(i+vec3(1,1,1)),f.x),f.y),f.z);}float fbm(vec3 p){float sum=0.0;float amp=0.5;for(int i=0;i<4;i++){sum+=noise3(p)*amp;p=p*2.03+vec3(7.1,3.7,5.3);amp*=0.5;}return sum;}void main(){float zenith=smoothstep(-0.12,0.92,vLocal.y);vec3 base=mix(vec3(0.0035,0.0055,0.011),vec3(0.0018,0.0028,0.006),zenith);float horizon=pow(1.0-abs(vLocal.y),2.0);vec3 drift=vec3(uTime*0.0015,uTime*0.001,-uTime*0.0012);float mist=fbm(vLocal*8.0+drift);float veil=smoothstep(0.48,0.76,mist)*horizon;float atmosphericGlow=veil*0.10+horizon*0.012;vec3 color=base+uAccent*atmosphericGlow;gl_FragColor=vec4(color,0.97*uReveal);}`}
             uniforms={{ uAccent: { value: color }, uReveal: { value: 0 }, uTime: { value: 0 } }} />
         </mesh>
         <mesh frustumCulled={false}>
@@ -270,24 +358,23 @@ function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projec
         </mesh>
       </group>
       <mesh position={[0, -3.4, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
-        <planeGeometry args={[160, 280]} />
+        <planeGeometry args={[180, 320]} />
         <shaderMaterial ref={floorMaterial} transparent depthWrite={false} side={THREE.DoubleSide} toneMapped={false}
           uniforms={{ uTime: { value: 0 }, uReveal: { value: 0 }, uAccent: { value: color }, uActiveStationPos: { value: activeStationPosition.clone() } }}
           vertexShader={`varying vec2 vDeck;void main(){vDeck=position.xy;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-          fragmentShader={`uniform float uTime;uniform float uReveal;uniform vec3 uAccent;uniform vec3 uActiveStationPos;varying vec2 vDeck;float line(float x,float halfWidth){float d=abs(fract(x+0.5)-0.5);return 1.0-smoothstep(halfWidth,halfWidth+0.012,d);}void main(){vec2 p=vec2(vDeck.x,-vDeck.y);vec3 worldPos=vec3(p.x,${(DOME_CENTER.y - 3.4).toFixed(1)},p.y+${DOME_CENTER.z.toFixed(1)});float dist=distance(cameraPosition,worldPos);float fog=1.0-smoothstep(32.0,156.0,dist);float sideFade=1.0-smoothstep(50.0,84.0,abs(p.x));float seams=max(line((p.x+80.0)/5.0,0.018),line((p.y+140.0)/7.5,0.018))*0.055;float runway=exp(-pow(p.x/0.12,2.0))*0.11;float tick=exp(-pow(p.x/0.34,2.0))*line((p.y+140.0)/2.8,0.028)*0.14;vec2 poolDelta=p-uActiveStationPos.xz;float pool=exp(-dot(poolDelta,poolDelta)*0.11);float spec=exp(-dot(poolDelta*vec2(0.9,0.45),poolDelta*vec2(0.9,0.45))*0.42)*(0.5+0.5*sin(uTime*0.35+length(poolDelta)*2.0));vec3 base=vec3(0.012,0.018,0.028);vec3 color=base+vec3(seams+runway+tick)*0.30+uAccent*(pool*0.035+spec*0.012);float alpha=uReveal*fog*sideFade;gl_FragColor=vec4(color,alpha);}`}
+          fragmentShader={`uniform float uTime;uniform float uReveal;uniform vec3 uAccent;uniform vec3 uActiveStationPos;varying vec2 vDeck;float hash21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float line(float x,float halfWidth){float d=abs(fract(x+0.5)-0.5);return 1.0-smoothstep(halfWidth,halfWidth+0.01,d);}void main(){vec2 p=vec2(vDeck.x,-vDeck.y);vec3 worldPos=vec3(p.x,${(DOME_CENTER.y - 3.4).toFixed(1)},p.y+${DOME_CENTER.z.toFixed(1)});float dist=distance(cameraPosition,worldPos);float fog=1.0-smoothstep(34.0,176.0,dist);float sideFade=1.0-smoothstep(64.0,92.0,abs(p.x));float seams=max(line((p.x+90.0)/6.0,0.012),line((p.y+160.0)/9.0,0.012))*0.045;float guideL=exp(-pow((p.x-0.24)/0.035,2.0));float guideR=exp(-pow((p.x+0.24)/0.035,2.0));float runway=(guideL+guideR)*0.022;vec2 poolDelta=p-uActiveStationPos.xz;float radial=dot(poolDelta*vec2(0.58,0.3),poolDelta*vec2(0.58,0.3));float pool=exp(-radial*0.62);float spec=exp(-radial*2.4)*(0.96+0.04*sin(uTime*0.55+length(poolDelta)*1.7));float brushed=(hash21(floor(p*vec2(76.0,18.0)+vec2(uTime*0.02,0.0)))-0.5)*0.0008;vec3 base=vec3(0.0032,0.0042,0.0075);vec3 color=base+vec3(seams*0.045+runway+brushed)+uAccent*(pool*0.075+spec*0.09)+vec3(0.20,0.23,0.31)*spec*0.018;float alpha=uReveal*fog*sideFade;gl_FragColor=vec4(max(color,vec3(0.0)),alpha);}`}
         />
       </mesh>
-      {Array.from({ length: 8 }, (_, index) => <group key={`vault-rib-${index}`} position={[0, 0, 23 - index * 25.5]}>
-        <mesh geometry={ribGeometry}><meshStandardMaterial color="#05070d" metalness={0.72} roughness={0.62} /></mesh>
-        <mesh geometry={ribGeometry} scale={0.986}>
-          <shaderMaterial transparent depthWrite={false} toneMapped={false}
-            uniforms={{ uAccent: { value: color }, uOpacity: { value: 0.24 } }}
-            vertexShader={`varying vec3 vNormal;varying vec3 vView;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vNormal=normalize(normalMatrix*normal);vView=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`}
-            fragmentShader={`uniform vec3 uAccent;uniform float uOpacity;varying vec3 vNormal;varying vec3 vView;void main(){float edge=pow(1.0-max(dot(normalize(vNormal),normalize(vView)),0.0),2.5);float alpha=min(0.28,uOpacity*edge);gl_FragColor=vec4(mix(vec3(0.22,0.25,0.3),uAccent,0.25),alpha);}`}
-          />
+      {Array.from({ length: 8 }, (_, index) => <group key={`vault-rib-${index}`} position={[0, 0, 32 - index * 25.5]}>
+        <mesh geometry={ribGeometry}>
+          <meshStandardMaterial color="#121722" metalness={0.88} roughness={0.32} emissive={color} emissiveIntensity={0.035} />
+        </mesh>
+        <mesh geometry={ribAccentGeometry}>
+          <meshStandardMaterial ref={index === 0 ? ribAccentMaterial : undefined} color="#10141d" emissive={color} emissiveIntensity={0.65} metalness={0.88} roughness={0.32} />
         </mesh>
       </group>)}
-      <pointLight ref={keyLight} position={[2.4, 1.2, -68]} color={color} intensity={3.6} distance={34} decay={2} />
+      <pointLight ref={keyLight} position={[2.6, 3.5, 27]} color={color} intensity={4.6} distance={30} decay={2} />
+      <VaultDistantStars />
     </group>
   );
 }

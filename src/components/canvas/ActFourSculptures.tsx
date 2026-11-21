@@ -3,6 +3,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 const ACCENTS = ["#00e5ff", "#8b5cf6", "#f59e0b", "#10b981", "#ff4d6d"];
 
@@ -156,7 +157,7 @@ function ZaminSculpture({ color }: { color: THREE.Color }) {
     if (scanner.current) scanner.current.position.y = 0.13 + (Math.sin(clock.getElapsedTime() * 1.1) * 0.5 + 0.5) * 0.65;
   });
   return (
-    <group ref={root} rotation={[-0.18, 0, 0]}>
+    <group ref={root}>
       <mesh geometry={terrain} position={[0, -0.22, 0]}><meshStandardMaterial color="#171126" metalness={0.34} roughness={0.4} emissive={color} emissiveIntensity={0.12} side={THREE.DoubleSide} /></mesh>
       <mesh geometry={terrain} position={[0, -0.205, 0]}><meshBasicMaterial color={color} wireframe transparent opacity={0.48} /></mesh>
       <mesh ref={scanner} position={[0, 0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[3.3, 3.3]} /><meshBasicMaterial color={color} transparent opacity={0.13} side={THREE.DoubleSide} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
@@ -168,34 +169,46 @@ function ZaminSculpture({ color }: { color: THREE.Color }) {
 
 function HostelSculpture({ color }: { color: THREE.Color }) {
   const root = useRef<THREE.Group>(null);
+  const windowsRef = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
   const towers = useMemo(() => [
     { x: -0.78, z: -0.5, w: 0.42, d: 0.46, h: 1.55 }, { x: -0.26, z: -0.56, w: 0.48, d: 0.5, h: 2.05 },
     { x: 0.34, z: -0.48, w: 0.5, d: 0.48, h: 1.42 }, { x: 0.83, z: -0.42, w: 0.38, d: 0.42, h: 1.86 },
     { x: -0.62, z: 0.2, w: 0.44, d: 0.44, h: 1.2 }, { x: 0.02, z: 0.25, w: 0.56, d: 0.52, h: 1.68 },
     { x: 0.67, z: 0.3, w: 0.42, d: 0.46, h: 1.32 },
   ], []);
+  const windowNodes = useMemo(() => towers.flatMap((tower, towerIndex) => {
+    const floors = Math.max(2, Math.floor(tower.h * 2));
+    return Array.from({ length: floors }, (_, floor) => ({ towerIndex, floor, tower }));
+  }), [towers]);
   useFrame(({ clock, pointer }, delta) => {
     if (!root.current) return;
     root.current.rotation.y = THREE.MathUtils.damp(root.current.rotation.y, pointer.x * 0.07 + Math.sin(clock.getElapsedTime() * 0.12) * 0.025, 2.4, delta);
     root.current.rotation.x = THREE.MathUtils.damp(root.current.rotation.x, -pointer.y * 0.04, 2.4, delta);
+    windowsRef.current.forEach((material, index) => {
+      if (material) material.opacity = 0.28 + (0.5 + 0.5 * Math.sin(clock.getElapsedTime() * 1.25 + index * 0.71)) * 0.42;
+    });
   });
   return (
     <group ref={root}>
-      {towers.map((tower, index) => <group key={index} position={[tower.x, -2.18 + tower.h / 2, tower.z]}>
+      {towers.map((tower, index) => {
+        const scale = 1.35;
+        return <group key={index} position={[tower.x * scale, -2.18 + tower.h * scale / 2, tower.z * scale]}>
         <mesh>
-          <boxGeometry args={[tower.w, tower.h, tower.d]} />
-          <meshPhysicalMaterial color="#101720" metalness={0.36} roughness={0.16} transmission={0.52} thickness={0.8} transparent opacity={0.25} clearcoat={1} clearcoatRoughness={0.08} emissive={color} emissiveIntensity={0.08} />
+          <boxGeometry args={[tower.w * scale, tower.h * scale, tower.d * scale]} />
+          <meshPhysicalMaterial color="#101720" metalness={0.7} roughness={0.15} transmission={0.42} thickness={0.8} transparent opacity={0.28} clearcoat={1} clearcoatRoughness={0.08} emissive={color} emissiveIntensity={0.035} />
         </mesh>
         <lineSegments>
-          <edgesGeometry args={[new THREE.BoxGeometry(tower.w, tower.h, tower.d)]} />
-          <lineBasicMaterial color={color} transparent opacity={0.72} toneMapped={false} />
+          <edgesGeometry args={[new THREE.BoxGeometry(tower.w * scale, tower.h * scale, tower.d * scale)]} />
+          <lineBasicMaterial color={color} transparent opacity={0.94} toneMapped={false} />
         </lineSegments>
-        {Array.from({ length: Math.max(2, Math.floor(tower.h * 2)) }, (_, floor) => <mesh key={floor} position={[0, -tower.h / 2 + 0.24 + floor * 0.38, tower.d / 2 + 0.006]}>
-          <planeGeometry args={[tower.w * 0.54, 0.045]} />
-          <meshBasicMaterial color={color} transparent opacity={0.36 + 0.18 * Math.sin(floor + index)} toneMapped={false} />
-        </mesh>)}
-      </group>)}
-      <mesh position={[0, -2.2, 0]}><boxGeometry args={[2.55, 0.08, 2.55]} /><meshStandardMaterial color="#10131a" metalness={0.92} roughness={0.25} emissive={color} emissiveIntensity={0.16} /></mesh>
+        {windowNodes.filter((node) => node.towerIndex === index).map(({ floor }) => (
+          <mesh key={`window-${floor}`} position={[0, -tower.h * scale / 2 + 0.28 + floor * 0.38 * scale, tower.d * scale / 2 + 0.009]}>
+            <planeGeometry args={[tower.w * scale * 0.54, 0.055]} />
+            <meshBasicMaterial ref={(node) => { windowsRef.current[windowNodes.findIndex((entry) => entry.towerIndex === index && entry.floor === floor)] = node; }} color="#ffd28a" transparent opacity={0.48} toneMapped={false} />
+          </mesh>
+        ))}
+      </group>;
+      })}
     </group>
   );
 }
@@ -204,6 +217,9 @@ function HealthSculpture({ color }: { color: THREE.Color }) {
   const root = useRef<THREE.Group>(null);
   const neuronMesh = useRef<THREE.InstancedMesh>(null);
   const wave = useRef<THREE.Mesh>(null);
+  const scanPlane = useRef<THREE.Mesh>(null);
+  const linkMaterial = useRef<THREE.ShaderMaterial>(null);
+  const scanMaterial = useRef<THREE.ShaderMaterial>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const neurons = useMemo(() => Array.from({ length: 20 }, (_, index) => {
     const layer = Math.floor(index / 5);
@@ -248,10 +264,30 @@ function HealthSculpture({ color }: { color: THREE.Color }) {
       wave.current.position.set(0, Math.sin(progress * Math.PI * 2) * 0.2, THREE.MathUtils.lerp(-1.15, 1.15, progress));
       wave.current.scale.setScalar(0.8 + 0.3 * Math.sin(progress * Math.PI));
     }
+    if (scanPlane.current) {
+      const progress = (t * 0.14) % 1;
+      scanPlane.current.position.z = THREE.MathUtils.lerp(-1.35, 1.35, progress);
+    }
+    if (linkMaterial.current) linkMaterial.current.uniforms.uTime.value = t;
+    if (scanMaterial.current) scanMaterial.current.uniforms.uTime.value = t;
   });
   return (
     <group ref={root}>
-      <lineSegments geometry={links}><lineBasicMaterial color={color} transparent opacity={0.38} blending={THREE.AdditiveBlending} depthWrite={false} /></lineSegments>
+      <lineSegments geometry={links}>
+        <shaderMaterial ref={linkMaterial} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
+          uniforms={{ uTime: { value: 0 }, uColor: { value: color } }}
+          vertexShader={`varying float vDepth;void main(){vDepth=clamp((position.z+1.0)*0.5,0.0,1.0);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
+          fragmentShader={`uniform float uTime;uniform vec3 uColor;varying float vDepth;void main(){float head=fract(uTime*0.24);float pulse=exp(-pow((vDepth-head)*30.0,2.0));float base=0.16+0.18*(0.5+0.5*sin(vDepth*18.0-uTime*1.8));vec3 glow=mix(uColor,vec3(0.72,1.0,0.88),pulse*0.8);gl_FragColor=vec4(glow,base+pulse*0.78);}`}
+        />
+      </lineSegments>
+      <mesh ref={scanPlane} position={[0, 0, -1.35]}>
+        <planeGeometry args={[2.7, 2.65]} />
+        <shaderMaterial ref={scanMaterial} transparent depthWrite={false} side={THREE.DoubleSide} blending={THREE.AdditiveBlending} toneMapped={false}
+          uniforms={{ uTime: { value: 0 }, uColor: { value: color } }}
+          vertexShader={`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
+          fragmentShader={`uniform float uTime;uniform vec3 uColor;varying vec2 vUv;void main(){float edge=smoothstep(0.0,0.16,vUv.x)*(1.0-smoothstep(0.84,1.0,vUv.x));float vertical=smoothstep(0.0,0.12,vUv.y)*(1.0-smoothstep(0.88,1.0,vUv.y));float band=exp(-pow((vUv.x-0.5)*3.0,2.0));float scanline=0.5+0.5*sin(vUv.y*64.0-uTime*2.8);float alpha=(0.035+band*0.11+scanline*0.018)*edge*vertical;gl_FragColor=vec4(uColor*1.35,alpha);}`}
+        />
+      </mesh>
       <instancedMesh ref={neuronMesh} args={[undefined, undefined, neurons.length]}>
         <sphereGeometry args={[1, 16, 12]} />
         <meshStandardMaterial color="#ffffff" emissive={color} emissiveIntensity={0.62} metalness={0.12} roughness={0.28} />
@@ -267,11 +303,17 @@ function NoteFlashSculpture({ color }: { color: THREE.Color }) {
   const cards = useRef<(THREE.Mesh | null)[]>([]);
   const sparks = useRef<(THREE.Mesh | null)[]>([]);
   const filament = useMemo(() => new THREE.BufferGeometry(), []);
-  const filamentPositions = useMemo(() => new Float32Array(7 * 3), []);
-  const filamentLine = useMemo(() => new THREE.Line(
+  const filamentPositions = useMemo(() => new Float32Array(7 * 8 * 2 * 3), []);
+  const filamentLine = useMemo(() => new THREE.LineSegments(
     filament,
-    new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.52, blending: THREE.AdditiveBlending, depthWrite: false }),
-  ), [color, filament]);
+    new THREE.LineBasicMaterial({ color: "#ff9b83", transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
+  ), [filament]);
+  const cardGeometry = useMemo(() => new RoundedBoxGeometry(0.62, 0.82, 0.055, 3, 0.035), []);
+  const cardEdges = useMemo(() => new THREE.EdgesGeometry(cardGeometry), [cardGeometry]);
+  const bezierControl = useMemo(() => new THREE.Vector3(), []);
+  const bezierStart = useMemo(() => new THREE.Vector3(), []);
+  const bezierPointA = useMemo(() => new THREE.Vector3(), []);
+  const bezierPointB = useMemo(() => new THREE.Vector3(), []);
   if (!filament.getAttribute("position")) {
     filament.setAttribute("position", new THREE.BufferAttribute(filamentPositions, 3).setUsage(THREE.DynamicDrawUsage));
   }
@@ -284,11 +326,22 @@ function NoteFlashSculpture({ color }: { color: THREE.Color }) {
       if (!card) return;
       const angle = t * 0.22 + (index / 7) * Math.PI * 2;
       card.position.set(Math.cos(angle) * 1.28, Math.sin(angle * 1.4) * 0.82, Math.sin(angle) * 0.74);
-      card.lookAt(card.position.clone().multiplyScalar(2));
+      card.lookAt(card.position.x * 2, card.position.y * 2, card.position.z * 2);
       card.rotateY(0.18);
-      filamentPositions[index * 3] = card.position.x * 0.78;
-      filamentPositions[index * 3 + 1] = card.position.y * 0.78;
-      filamentPositions[index * 3 + 2] = card.position.z * 0.78;
+      bezierStart.copy(card.position);
+      bezierControl.copy(card.position).multiplyScalar(0.42);
+      bezierControl.y += 0.16;
+      for (let segment = 0; segment < 8; segment += 1) {
+        const t0 = segment / 8;
+        const t1 = (segment + 1) / 8;
+        const one0 = 1 - t0;
+        const one1 = 1 - t1;
+        bezierPointA.set(one0 * one0 * bezierStart.x + 2 * one0 * t0 * bezierControl.x, one0 * one0 * bezierStart.y + 2 * one0 * t0 * bezierControl.y, one0 * one0 * bezierStart.z + 2 * one0 * t0 * bezierControl.z);
+        bezierPointB.set(one1 * one1 * bezierStart.x + 2 * one1 * t1 * bezierControl.x, one1 * one1 * bezierStart.y + 2 * one1 * t1 * bezierControl.y, one1 * one1 * bezierStart.z + 2 * one1 * t1 * bezierControl.z);
+        const offset = (index * 8 + segment) * 6;
+        filamentPositions.set(bezierPointA.toArray(), offset);
+        filamentPositions.set(bezierPointB.toArray(), offset + 3);
+      }
     });
     filament.attributes.position.needsUpdate = true;
     filament.computeBoundingSphere();
@@ -303,8 +356,17 @@ function NoteFlashSculpture({ color }: { color: THREE.Color }) {
       <mesh><octahedronGeometry args={[0.48, 1]} /><meshPhysicalMaterial color="#4a111d" emissive={color} emissiveIntensity={0.72} metalness={0.56} roughness={0.16} clearcoat={1} /></mesh>
       <mesh scale={1.13}><octahedronGeometry args={[0.48, 1]} /><meshBasicMaterial color={color} wireframe transparent opacity={0.42} /></mesh>
       {Array.from({ length: 7 }, (_, index) => <mesh key={index} ref={(node) => { cards.current[index] = node; }}>
-        <boxGeometry args={[0.62, 0.82, 0.08]} />
-        <meshPhysicalMaterial color="#34121b" emissive={color} emissiveIntensity={0.12} metalness={0.22} roughness={0.17} transmission={0.28} thickness={0.75} clearcoat={1} transparent opacity={0.9} />
+        <primitive object={cardGeometry} attach="geometry" />
+        <meshPhysicalMaterial color="#392a36" emissive={color} emissiveIntensity={0.035} metalness={0.4} roughness={0.12} transmission={0.22} thickness={0.75} clearcoat={1} clearcoatRoughness={0.08} transparent opacity={0.3} />
+        <lineSegments geometry={cardEdges} scale={1.008}>
+          <lineBasicMaterial color="#ff9b83" transparent opacity={0.9} toneMapped={false} />
+        </lineSegments>
+        <group position={[0, 0, 0.031]}>
+          {[0, 1, 2, 3].map((bar) => <mesh key={bar} position={[-0.06 + (bar % 2) * 0.04, 0.2 - Math.floor(bar / 2) * 0.12, 0]}>
+            <planeGeometry args={[bar === 0 ? 0.28 : 0.38 - (bar % 2) * 0.08, 0.018]} />
+            <meshBasicMaterial color={bar === 0 ? "#ffe1bd" : "#ff9b83"} transparent opacity={bar === 0 ? 0.62 : 0.36} toneMapped={false} />
+          </mesh>)}
+        </group>
       </mesh>)}
       <primitive object={filamentLine} />
       {Array.from({ length: 5 }, (_, index) => <mesh key={`spark-${index}`} ref={(node) => { sparks.current[index] = node; }}>
