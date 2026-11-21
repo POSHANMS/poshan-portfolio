@@ -5,11 +5,13 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import type { ActFourPhase } from "@/types/actFour";
-import { ACT_FOUR_PROJECT_STATIONS } from "@/animations/actFourChoreography";
+import { ACT_FOUR_PROJECT_STATIONS, ACT_FOUR_SINGULARITY_POSITION } from "@/animations/actFourChoreography";
 import ActFourExterior from "./ActFourExterior";
 import ActFourSculpture from "./ActFourSculptures";
 
 const WARP_PARTICLE_COUNT = 1_900;
+const WARP_IN_DURATION_SECONDS = 2.2;
+const WARP_VAULT_CUTOVER_SECONDS = WARP_IN_DURATION_SECONDS * 0.85;
 const DOME_CENTER = new THREE.Vector3(0, 0, -27);
 const PROJECT_ACCENTS = ["#00e5ff", "#8b5cf6", "#f59e0b", "#10b981", "#ff4d6d"];
 
@@ -85,22 +87,36 @@ function WarpStreamParticles({ phase, warpCharge }: { phase: ActFourPhase; warpC
     const isActive = (phase === "act4_exterior" && charge > 0.02) || phase === "act4_warp_in" || phase === "act4_warp_out";
     groupRef.current.visible = isActive;
     const age = (performance.now() - phaseStartedAt.current) / 1000;
-    const stageFade = phase === "act4_warp_in" ? 1 - smoothstep(1.62, 2.2, age) : phase === "act4_warp_out" ? smoothstep(0.22, 0.38, age) * (1 - smoothstep(1.04, 1.12, age)) : 1;
-    materialRef.current.opacity = THREE.MathUtils.damp(materialRef.current.opacity, isActive ? (0.28 + charge * 0.25) * stageFade : 0, 7, delta);
+    const warpDecelerationStart = WARP_IN_DURATION_SECONDS * 0.75;
+    const warpDecelerationDuration = WARP_IN_DURATION_SECONDS - warpDecelerationStart;
+    const warpDrive = phase === "act4_warp_in" ? 1 - smoothstep(warpDecelerationStart, WARP_IN_DURATION_SECONDS, age) : charge;
+    const warpTravel = phase === "act4_warp_in"
+      ? age <= warpDecelerationStart
+        ? age
+        : warpDecelerationStart + warpDecelerationDuration * (() => {
+          const u = THREE.MathUtils.clamp((age - warpDecelerationStart) / warpDecelerationDuration, 0, 1);
+          return u - u * u * u + 0.5 * u * u * u * u;
+        })()
+      : time;
+    const stageFade = phase === "act4_warp_in" ? warpDrive : phase === "act4_warp_out" ? smoothstep(0.22, 0.38, age) * (1 - smoothstep(1.04, 1.12, age)) : 1;
+    const targetOpacity = isActive ? (phase === "act4_warp_in" ? 0.53 : 0.28 + charge * 0.25) * stageFade : 0;
+    materialRef.current.opacity = THREE.MathUtils.damp(materialRef.current.opacity, targetOpacity, 7, delta);
     if (!isActive) return;
     const position = geometry.getAttribute("position") as THREE.BufferAttribute;
     const halfHeightAt = (depth: number) => Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * depth;
-    const tailSpan = 0.012 + charge * 0.035;
+    const tailSpan = phase === "act4_warp_in" ? 0.047 * warpDrive : 0.012 + charge * 0.035;
+    const travelSpeed = phase === "act4_warp_in" ? 1.2 * warpDrive : 0.08 + charge * 1.12;
+    const motionTime = phase === "act4_warp_in" ? warpTravel : time;
     particles.forEach((particle, index) => {
-      const travel = (particle.phaseOffset + time * (0.08 + charge * 1.12) * particle.speed) % 1;
+      const travel = (particle.phaseOffset + warpTravel * (phase === "act4_warp_in" ? 1.2 : travelSpeed) * particle.speed) % 1;
       const pathPoint = (age: number) => {
         const depth = THREE.MathUtils.lerp(64, 1.5, age);
         const halfHeight = halfHeightAt(depth);
         const halfWidth = halfHeight * aspect;
         const funnel = Math.pow(age, 1.45);
         const radius = THREE.MathUtils.lerp(particle.radius, 0.44 + seeded(index, 7) * 0.12, funnel);
-        const angle = particle.angle + Math.sin(time * 1.1 + particle.phaseOffset * 6.28 + age * 3.2) * particle.curve;
-        const inwardLensing = Math.sin(age * Math.PI) * 0.1 * charge;
+        const angle = particle.angle + Math.sin(motionTime * 1.1 + particle.phaseOffset * 6.28 + age * 3.2) * particle.curve;
+        const inwardLensing = Math.sin(age * Math.PI) * 0.1 * (phase === "act4_warp_in" ? warpDrive : charge);
         return new THREE.Vector3(Math.cos(angle) * halfWidth * (radius - inwardLensing), Math.sin(angle) * halfHeight * (radius - inwardLensing), -depth);
       };
       const head = pathPoint(travel);
@@ -122,20 +138,21 @@ function WormholeTunnel({ phase }: { phase: ActFourPhase }) {
   const { camera } = useThree();
   const phaseStartedAt = useRef(performance.now());
   useEffect(() => { phaseStartedAt.current = performance.now(); }, [phase]);
-  const visible = phase === "act4_warp_in";
-  useFrame(({ clock }, delta) => {
+  const isWarpIn = phase === "act4_warp_in";
+  useFrame(({ clock }) => {
     if (!material.current) return;
     material.current.uniforms.uTime.value = clock.getElapsedTime();
     const age = (performance.now() - phaseStartedAt.current) / 1000;
-    const stageFade = visible ? smoothstep(0.5, 0.7, age) * (1 - smoothstep(1.62, 2.2, age)) : 0;
-    material.current.uniforms.uOpacity.value = THREE.MathUtils.damp(material.current.uniforms.uOpacity.value, stageFade * 0.88, 7.5, delta);
-    if (visible && group.current) {
+    const stageFade = isWarpIn ? smoothstep(0.5, 0.7, age) * (1 - smoothstep(WARP_VAULT_CUTOVER_SECONDS - 0.32, WARP_VAULT_CUTOVER_SECONDS, age)) : 0;
+    material.current.uniforms.uOpacity.value = stageFade * 0.88;
+    if (group.current) group.current.visible = isWarpIn && age < WARP_VAULT_CUTOVER_SECONDS;
+    if (isWarpIn && group.current) {
       group.current.position.copy(camera.position);
       group.current.quaternion.copy(camera.quaternion);
     }
   });
   return (
-    <group ref={group} visible={visible}>
+    <group ref={group} visible={isWarpIn}>
       <mesh rotation={[Math.PI / 2, 0, 0]} frustumCulled={false}>
         <cylinderGeometry args={[6, 6, 80, 48, 32, true]} />
         <shaderMaterial ref={material} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }} transparent side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
@@ -156,7 +173,10 @@ function BreachFlash({ phase }: { phase: ActFourPhase }) {
     const time = clock.getElapsedTime();
     if (lastPhase.current !== phase) { lastPhase.current = phase; phaseStart.current = time; }
     const elapsed = time - phaseStart.current;
-    const entry = phase === "act4_warp_in" ? smoothstep(1.62, 1.78, elapsed) * (1 - smoothstep(1.96, 2.2, elapsed)) : 0;
+    const entry = phase === "act4_warp_in"
+      ? smoothstep(WARP_IN_DURATION_SECONDS * 0.8, WARP_VAULT_CUTOVER_SECONDS, elapsed)
+        * (1 - smoothstep(WARP_VAULT_CUTOVER_SECONDS, WARP_IN_DURATION_SECONDS * 0.9, elapsed))
+      : 0;
     const exit = phase === "act4_warp_out" ? smoothstep(0.68, 0.84, elapsed) * (1 - smoothstep(1.05, 1.16, elapsed)) : 0;
     material.current.uniforms.uOpacity.value = THREE.MathUtils.damp(material.current.uniforms.uOpacity.value, Math.max(entry, exit) * 0.24, 10, delta);
     material.current.uniforms.uTime.value = time;
@@ -177,86 +197,156 @@ function FlashInFrontOfCamera({ material }: { material: React.RefObject<THREE.Sh
   /></mesh>;
 }
 
-function buildMicroGrid() {
-  const positions: number[] = [];
-  const centerX = 2.6;
-  const centerZ = -18;
-  for (let ring = 1; ring <= 12; ring += 1) {
-    const radius = ring * 2.4;
-    for (let step = 0; step < 64; step += 1) {
-      const a = step / 64 * Math.PI * 2;
-      const b = (step + 1) / 64 * Math.PI * 2;
-      positions.push(centerX + Math.cos(a) * radius, 0, centerZ + Math.sin(a) * radius, centerX + Math.cos(b) * radius, 0, centerZ + Math.sin(b) * radius);
-    }
+function buildVaultRibGeometry() {
+  const floorY = -3.65;
+  const springY = -3.38;
+  const outerRadius = 22;
+  const innerRadius = 21.05;
+  const shape = new THREE.Shape();
+  shape.moveTo(-outerRadius, floorY);
+  shape.lineTo(-outerRadius, springY);
+  for (let index = 1; index <= 48; index += 1) {
+    const angle = Math.PI - (index / 48) * Math.PI;
+    shape.lineTo(Math.cos(angle) * outerRadius, springY + Math.sin(angle) * outerRadius);
   }
-  for (let ray = 0; ray < 48; ray += 1) {
-    const angle = ray / 48 * Math.PI * 2;
-    positions.push(centerX, 0, centerZ, centerX + Math.cos(angle) * 30, 0, centerZ + Math.sin(angle) * 30);
+  shape.lineTo(outerRadius, floorY);
+  shape.lineTo(innerRadius, floorY);
+  shape.lineTo(innerRadius, springY);
+  for (let index = 1; index <= 48; index += 1) {
+    const angle = (index / 48) * Math.PI;
+    shape.lineTo(Math.cos(angle) * innerRadius, springY + Math.sin(angle) * innerRadius);
+  }
+  shape.lineTo(-innerRadius, floorY);
+  shape.closePath();
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: 1.05,
+    steps: 1,
+    bevelEnabled: true,
+    bevelSegments: 3,
+    bevelSize: 0.12,
+    bevelThickness: 0.1,
+  });
+  geometry.translate(0, 0, -0.525);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function buildVaultRibAccentGeometry() {
+  const springY = -3.38;
+  const innerRadius = 21.05;
+  const points = Array.from({ length: 49 }, (_, index) => {
+    const angle = (index / 48) * Math.PI;
+    return new THREE.Vector3(Math.cos(angle) * innerRadius, springY + Math.sin(angle) * innerRadius, 0.54);
+  });
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 96, 0.024, 6, false);
+}
+
+function buildVaultStars() {
+  const count = 420;
+  const positions = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+  const phases = new Float32Array(count);
+  const colors = new Float32Array(count * 3);
+  for (let index = 0; index < count; index += 1) {
+    const y = seeded(index, 71) * 2 - 1;
+    const angle = seeded(index, 72) * Math.PI * 2;
+    const radius = 86 + seeded(index, 73) * 72;
+    const horizontal = Math.sqrt(1 - y * y);
+    positions.set([Math.cos(angle) * horizontal * radius, y * radius, Math.sin(angle) * horizontal * radius], index * 3);
+    sizes[index] = 0.13 + seeded(index, 74) * 0.2;
+    phases[index] = seeded(index, 75) * Math.PI * 2;
+    const tint = seeded(index, 76);
+    const color = tint > 0.86 ? new THREE.Color("#bdd9ff") : tint > 0.68 ? new THREE.Color("#ffe6ce") : new THREE.Color("#dce6f5");
+    colors.set([color.r, color.g, color.b], index * 3);
   }
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+  geometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
+  geometry.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
   return geometry;
+}
+
+function VaultDistantStars() {
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const geometry = useMemo(buildVaultStars, []);
+  useFrame(({ clock }) => {
+    if (material.current) material.current.uniforms.uTime.value = clock.getElapsedTime();
+  });
+  return (
+    <points geometry={geometry} frustumCulled={false}>
+      <shaderMaterial
+        ref={material}
+        transparent
+        depthWrite={false}
+        toneMapped={false}
+        uniforms={{ uTime: { value: 0 } }}
+        vertexShader={`attribute float aSize;attribute float aPhase;attribute vec3 aColor;uniform float uTime;varying float vTwinkle;varying vec3 vColor;void main(){vec4 mvPosition=modelViewMatrix*vec4(position,1.0);vColor=aColor;vTwinkle=0.56+0.44*(0.5+0.5*sin(uTime*0.7+aPhase));gl_PointSize=clamp(aSize*(700.0/max(-mvPosition.z,1.0)),0.65,2.6);gl_Position=projectionMatrix*mvPosition;}`}
+        fragmentShader={`varying float vTwinkle;varying vec3 vColor;void main(){float radius=length(gl_PointCoord-0.5);float disc=1.0-smoothstep(0.26,0.5,radius);if(disc<0.01)discard;gl_FragColor=vec4(vColor*vTwinkle,disc*vTwinkle*0.78);}`}
+      />
+    </points>
+  );
 }
 
 function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projectIndex: number }) {
   const dome = useRef<THREE.Group>(null);
-  const domeMaterial = useRef<THREE.ShaderMaterial>(null);
   const gradientMaterial = useRef<THREE.ShaderMaterial>(null);
   const keyLight = useRef<THREE.PointLight>(null);
-  const floorMaterial = useRef<THREE.MeshStandardMaterial>(null);
-  const gridMaterial = useRef<THREE.LineBasicMaterial>(null);
-  const accentWire = useRef<THREE.MeshBasicMaterial>(null);
-  const reflectionMaterials = useRef<(THREE.ShaderMaterial | null)[]>([]);
+  const floorMaterial = useRef<THREE.ShaderMaterial>(null);
+  const canopyWire = useRef<THREE.ShaderMaterial>(null);
+  const ribAccentMaterial = useRef<THREE.MeshStandardMaterial>(null);
+  const activeStationPosition = useMemo(() => new THREE.Vector3(), []);
+  const ribGeometry = useMemo(buildVaultRibGeometry, []);
+  const ribAccentGeometry = useMemo(buildVaultRibAccentGeometry, []);
   const active = phase === "act4_warp_in" || phase === "act4_vault" || phase === "act4_warp_out";
   const phaseStartedAt = useRef(performance.now());
   const previousPhase = useRef(phase);
-  const previousProjectIndex = useRef(projectIndex);
-  const projectFlightStartedAt = useRef(performance.now());
   const reveal = useRef(0);
-  const geometry = useMemo(buildMicroGrid, []);
   const color = useMemo(() => new THREE.Color(PROJECT_ACCENTS[projectIndex] ?? PROJECT_ACCENTS[0]), [projectIndex]);
   useFrame(({ clock }, delta) => {
     if (previousPhase.current !== phase) { previousPhase.current = phase; phaseStartedAt.current = performance.now(); }
     const phaseAge = (performance.now() - phaseStartedAt.current) / 1000;
-    const revealTarget = phase === "act4_warp_in" ? smoothstep(1.62, 1.98, phaseAge) : active ? 1 : 0;
-    reveal.current = THREE.MathUtils.damp(reveal.current, revealTarget, 8, delta);
+    const revealTarget = phase === "act4_warp_in" ? smoothstep(1.25, 1.55, phaseAge) : active ? 1 : 0;
+    reveal.current = THREE.MathUtils.damp(reveal.current, revealTarget, 14, delta);
     if (dome.current) dome.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.035) * 0.012;
-    if (floorMaterial.current) floorMaterial.current.opacity = reveal.current;
-    if (gridMaterial.current) gridMaterial.current.opacity = 0.12 * reveal.current;
+    activeStationPosition.copy(ACT_FOUR_PROJECT_STATIONS[projectIndex] ?? ACT_FOUR_PROJECT_STATIONS[0]).sub(DOME_CENTER);
+    if (floorMaterial.current) {
+      floorMaterial.current.uniforms.uTime.value = clock.getElapsedTime();
+      floorMaterial.current.uniforms.uReveal.value = reveal.current;
+      floorMaterial.current.uniforms.uAccent.value.lerp(color, 1 - Math.exp(-delta * 1.8));
+      floorMaterial.current.uniforms.uActiveStationPos.value.copy(activeStationPosition);
+    }
     if (keyLight.current) {
       keyLight.current.color.lerp(color, 1 - Math.exp(-delta * 1.8));
-      keyLight.current.intensity = 18 * reveal.current;
+      keyLight.current.position.set(activeStationPosition.x, activeStationPosition.y + 3.8, activeStationPosition.z + 1.5);
+      keyLight.current.intensity = 4.6 * reveal.current;
     }
-    if (accentWire.current) accentWire.current.opacity = 0.09 * reveal.current;
-    if (domeMaterial.current) {
-      domeMaterial.current.uniforms.uAccent.value.lerp(color, 1 - Math.exp(-delta * 1.8));
-      domeMaterial.current.uniforms.uOpacity.value = 0.16 * reveal.current;
+    if (ribAccentMaterial.current) ribAccentMaterial.current.emissive.copy(color);
+    if (canopyWire.current) {
+      canopyWire.current.uniforms.uAccent.value.lerp(color, 1 - Math.exp(-delta * 1.8));
+      canopyWire.current.uniforms.uOpacity.value = 0.08 * reveal.current;
     }
     if (gradientMaterial.current) {
       gradientMaterial.current.uniforms.uAccent.value.lerp(color, 1 - Math.exp(-delta * 1.8));
+      gradientMaterial.current.uniforms.uTime.value = clock.getElapsedTime();
       gradientMaterial.current.uniforms.uReveal.value = reveal.current;
     }
-    reflectionMaterials.current.forEach((reflection, index) => {
-      if (!reflection) return;
-      reflection.uniforms.uReveal.value = reveal.current;
-      reflection.uniforms.uStrength.value = index === projectIndex ? 0.24 : 0.07;
-      reflection.uniforms.uColor.value.set(PROJECT_ACCENTS[index]);
-    });
   });
   return (
     <group position={DOME_CENTER} visible={active}>
       <group ref={dome}>
         <mesh frustumCulled={false}>
-          <icosahedronGeometry args={[64.55, 4]} />
+          <icosahedronGeometry args={[170, 5]} />
           <shaderMaterial ref={gradientMaterial} side={THREE.BackSide} transparent depthWrite={false} toneMapped={false}
             vertexShader={`varying vec3 vLocal;void main(){vLocal=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-            fragmentShader={`uniform vec3 uAccent;uniform float uReveal;varying vec3 vLocal;void main(){float horizon=pow(1.0-abs(vLocal.y),2.2);float zenith=smoothstep(-0.15,0.9,vLocal.y);vec3 zenithColor=vec3(0.028,0.034,0.061);vec3 horizonColor=mix(vec3(0.051,0.11,0.16),uAccent,0.17);vec3 color=mix(horizonColor,zenithColor,zenith);float glow=horizon*(0.12+0.08*sin(vLocal.x*13.0+vLocal.z*7.0));gl_FragColor=vec4(color+uAccent*glow,0.76*uReveal);}`}
-            uniforms={{ uAccent: { value: color }, uReveal: { value: 0 } }} />
+            fragmentShader={`uniform vec3 uAccent;uniform float uReveal;uniform float uTime;varying vec3 vLocal;float hash31(vec3 p){p=fract(p*0.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}float noise3(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(mix(hash31(i),hash31(i+vec3(1,0,0)),f.x),mix(hash31(i+vec3(0,1,0)),hash31(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash31(i+vec3(0,0,1)),hash31(i+vec3(1,0,1)),f.x),mix(hash31(i+vec3(0,1,1)),hash31(i+vec3(1,1,1)),f.x),f.y),f.z);}float fbm(vec3 p){float sum=0.0;float amp=0.5;for(int i=0;i<4;i++){sum+=noise3(p)*amp;p=p*2.03+vec3(7.1,3.7,5.3);amp*=0.5;}return sum;}void main(){float zenith=smoothstep(-0.12,0.92,vLocal.y);vec3 base=mix(vec3(0.0035,0.0055,0.011),vec3(0.0018,0.0028,0.006),zenith);float horizon=pow(1.0-abs(vLocal.y),2.0);vec3 drift=vec3(uTime*0.0015,uTime*0.001,-uTime*0.0012);float mist=fbm(vLocal*8.0+drift);float veil=smoothstep(0.48,0.76,mist)*horizon;float atmosphericGlow=veil*0.10+horizon*0.012;vec3 color=base+uAccent*atmosphericGlow;gl_FragColor=vec4(color,0.97*uReveal);}`}
+            uniforms={{ uAccent: { value: color }, uReveal: { value: 0 }, uTime: { value: 0 } }} />
         </mesh>
         <mesh frustumCulled={false}>
-          <icosahedronGeometry args={[65, 3]} />
+          <icosahedronGeometry args={[169, 3]} />
           <shaderMaterial
-            ref={domeMaterial}
+            ref={canopyWire}
             wireframe
             transparent
             side={THREE.BackSide}
@@ -265,29 +355,28 @@ function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projec
             toneMapped={false}
             uniforms={{ uAccent: { value: color }, uOpacity: { value: 0 } }}
             vertexShader={`varying vec3 vWorldPosition; varying vec3 vWorldNormal; void main(){vec4 world=modelMatrix*vec4(position,1.0);vWorldPosition=world.xyz;vWorldNormal=normalize(mat3(modelMatrix)*normal);gl_Position=projectionMatrix*viewMatrix*world;}`}
-            fragmentShader={`uniform vec3 uAccent;uniform float uOpacity;varying vec3 vWorldPosition;varying vec3 vWorldNormal;void main(){vec3 viewDir=normalize(cameraPosition-vWorldPosition);float fresnel=pow(1.0-abs(dot(normalize(vWorldNormal),viewDir)),2.1);float distanceFade=1.0-smoothstep(32.0,78.0,distance(cameraPosition,vWorldPosition));float ribFade=mix(0.34,1.0,fresnel);float alpha=uOpacity*ribFade*distanceFade;if(alpha<0.006)discard;vec3 color=mix(vec3(0.08,0.055,0.075),uAccent,0.28+fresnel*0.55);gl_FragColor=vec4(color,alpha);}`}
+            fragmentShader={`uniform vec3 uAccent;uniform float uOpacity;varying vec3 vWorldPosition;varying vec3 vWorldNormal;void main(){vec3 viewDir=normalize(cameraPosition-vWorldPosition);float fresnel=pow(1.0-abs(dot(normalize(vWorldNormal),viewDir)),2.0);float fade=1.0-smoothstep(65.0,150.0,distance(cameraPosition,vWorldPosition));float alpha=min(0.08,uOpacity*(0.18+fresnel*0.7))*fade;if(alpha<0.003)discard;gl_FragColor=vec4(mix(vec3(0.025,0.032,0.047),uAccent,0.18+fresnel*0.28),alpha);}`}
           />
-        </mesh>
-        <mesh rotation={[0.16, 0, 0.08]} frustumCulled={false}>
-          <icosahedronGeometry args={[64.7, 2]} />
-          <meshBasicMaterial ref={accentWire} color="#281321" wireframe transparent opacity={0} side={THREE.BackSide} depthWrite={false} toneMapped={false} />
         </mesh>
       </group>
       <mesh position={[0, -3.4, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
-        <planeGeometry args={[150, 150]} />
-        <meshStandardMaterial ref={floorMaterial} color="#10121a" metalness={0.88} roughness={0.3} transparent opacity={0} side={THREE.DoubleSide} />
+        <planeGeometry args={[180, 320]} />
+        <shaderMaterial ref={floorMaterial} transparent depthWrite={false} side={THREE.DoubleSide} toneMapped={false}
+          uniforms={{ uTime: { value: 0 }, uReveal: { value: 0 }, uAccent: { value: color }, uActiveStationPos: { value: activeStationPosition.clone() } }}
+          vertexShader={`varying vec2 vDeck;void main(){vDeck=position.xy;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
+          fragmentShader={`uniform float uTime;uniform float uReveal;uniform vec3 uAccent;uniform vec3 uActiveStationPos;varying vec2 vDeck;float hash21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float line(float x,float halfWidth){float d=abs(fract(x+0.5)-0.5);return 1.0-smoothstep(halfWidth,halfWidth+0.01,d);}void main(){vec2 p=vec2(vDeck.x,-vDeck.y);vec3 worldPos=vec3(p.x,${(DOME_CENTER.y - 3.4).toFixed(1)},p.y+${DOME_CENTER.z.toFixed(1)});float dist=distance(cameraPosition,worldPos);float fog=1.0-smoothstep(34.0,176.0,dist);float sideFade=1.0-smoothstep(64.0,92.0,abs(p.x));float seams=max(line((p.x+90.0)/6.0,0.012),line((p.y+160.0)/9.0,0.012))*0.045;float guideL=exp(-pow((p.x-0.24)/0.035,2.0));float guideR=exp(-pow((p.x+0.24)/0.035,2.0));float runway=(guideL+guideR)*0.022;vec2 poolDelta=p-uActiveStationPos.xz;float radial=dot(poolDelta*vec2(0.58,0.3),poolDelta*vec2(0.58,0.3));float pool=exp(-radial*0.62);float spec=exp(-radial*2.4)*(0.96+0.04*sin(uTime*0.55+length(poolDelta)*1.7));float brushed=(hash21(floor(p*vec2(76.0,18.0)+vec2(uTime*0.02,0.0)))-0.5)*0.0008;vec3 base=vec3(0.0032,0.0042,0.0075);vec3 color=base+vec3(seams*0.045+runway+brushed)+uAccent*(pool*0.075+spec*0.09)+vec3(0.20,0.23,0.31)*spec*0.018;float alpha=uReveal*fog*sideFade;gl_FragColor=vec4(max(color,vec3(0.0)),alpha);}`}
+        />
       </mesh>
-      <lineSegments geometry={geometry} position={[0, -3.37, 0]}>
-        <lineBasicMaterial ref={gridMaterial} color="#8b9ba8" transparent opacity={0} depthWrite={false} />
-      </lineSegments>
-      {ACT_FOUR_PROJECT_STATIONS.map((station, index) => <mesh key={`station-reflection-${index}`} position={[station.x, -3.34, station.z - DOME_CENTER.z]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[2.8, 64]} />
-        <shaderMaterial ref={(node) => { reflectionMaterials.current[index] = node; }} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
-          uniforms={{ uColor: { value: new THREE.Color(PROJECT_ACCENTS[index]) }, uStrength: { value: index === projectIndex ? 0.24 : 0.07 }, uReveal: { value: reveal.current } }}
-          vertexShader={`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-          fragmentShader={`uniform vec3 uColor;uniform float uStrength;uniform float uReveal;varying vec2 vUv;void main(){float radius=length(vUv-0.5)*2.0;float halo=exp(-radius*radius*8.0);float rim=exp(-pow((radius-0.42)*12.0,2.0))*0.14;float alpha=(halo*0.54+rim)*uStrength*uReveal;gl_FragColor=vec4(uColor*(0.5+halo*0.8),alpha);}`} />
-      </mesh>)}
-      <pointLight ref={keyLight} position={[2.4, 1.2, -68]} color={color} intensity={18} distance={48} decay={2} />
+      {Array.from({ length: 8 }, (_, index) => <group key={`vault-rib-${index}`} position={[0, 0, 32 - index * 25.5]}>
+        <mesh geometry={ribGeometry}>
+          <meshStandardMaterial color="#121722" metalness={0.88} roughness={0.32} emissive={color} emissiveIntensity={0.035} />
+        </mesh>
+        <mesh geometry={ribAccentGeometry}>
+          <meshStandardMaterial ref={index === 0 ? ribAccentMaterial : undefined} color="#10141d" emissive={color} emissiveIntensity={0.65} metalness={0.88} roughness={0.32} />
+        </mesh>
+      </group>)}
+      <pointLight ref={keyLight} position={[2.6, 3.5, 27]} color={color} intensity={4.6} distance={30} decay={2} />
+      <VaultDistantStars />
     </group>
   );
 }
@@ -300,14 +389,14 @@ function DataEmbers({ phase, projectIndex }: { phase: ActFourPhase; projectIndex
   const previousPhase = useRef(phase);
   const previousProjectIndex = useRef(projectIndex);
   const projectFlightStartedAt = useRef(performance.now());
-  const seeds = useMemo(() => Array.from({ length: 920 }, (_, index) => {
+  const seeds = useMemo(() => Array.from({ length: 950 }, (_, index) => {
     const angle = seeded(index, 21) * Math.PI * 2;
     const radius = 3 + seeded(index, 22) * 17;
-    return { x: Math.cos(angle) * radius, y: -2 + seeded(index, 20) * 20, z: 5 - seeded(index, 26) * 50, phase: seeded(index, 24) * Math.PI * 2, size: 0.025 + seeded(index, 25) * 0.065, color: new THREE.Color(PROJECT_ACCENTS[projectIndex] ?? PROJECT_ACCENTS[0]).multiplyScalar(0.5 + seeded(index, 23) * 0.55) };
+    return { x: Math.cos(angle) * radius, y: -2 + seeded(index, 20) * 20, z: 28 - seeded(index, 26) * 178, phase: seeded(index, 24) * Math.PI * 2, size: 0.018 + seeded(index, 25) * 0.045, color: new THREE.Color(PROJECT_ACCENTS[projectIndex] ?? PROJECT_ACCENTS[0]).multiplyScalar(0.22 + seeded(index, 23) * 0.24) };
   }), [projectIndex]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const curl = useMemo(() => new THREE.Vector3(), []);
-  const noiseFields = useMemo(() => [101, 211, 307].map((seed) => new SimplexNoise(seededRandom(seed))), []);
+  const noiseFields = useMemo(() => [101, 211, 307].map((seed) => new SimplexNoise({ random: seededRandom(seed) })), []);
   const active = phase === "act4_vault" || phase === "act4_warp_out" || phase === "act4_warp_in";
   useFrame(({ clock }, delta) => {
     if (!instances.current || !material.current) return;
@@ -318,7 +407,7 @@ function DataEmbers({ phase, projectIndex }: { phase: ActFourPhase; projectIndex
     }
     const time = clock.getElapsedTime();
     const phaseAge = (performance.now() - phaseStartedAt.current) / 1000;
-    const reveal = phase === "act4_warp_in" ? smoothstep(1.62, 1.98, phaseAge) : active ? 1 : 0;
+    const reveal = phase === "act4_warp_in" ? smoothstep(1.25, 1.55, phaseAge) : active ? 1 : 0;
     material.current.opacity = THREE.MathUtils.damp(material.current.opacity, reveal * 0.76, 3.2, delta);
     const mesh = instances.current;
     const pointerX = pointer.x * 8;
@@ -344,6 +433,46 @@ function DataEmbers({ phase, projectIndex }: { phase: ActFourPhase; projectIndex
   return <instancedMesh ref={instances} args={[undefined, undefined, seeds.length]} visible={phase === "act4_warp_in" || phase === "act4_vault" || phase === "act4_warp_out"} frustumCulled={false}><icosahedronGeometry args={[1, 1]} /><meshBasicMaterial ref={material} vertexColors transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></instancedMesh>;
 }
 
+function AttenuatedStation({ index, focusIndex, station, children }: {
+  index: number;
+  focusIndex: React.RefObject<number>;
+  station: THREE.Vector3;
+  children: React.ReactNode;
+}) {
+  const group = useRef<THREE.Group>(null);
+  useFrame(() => {
+    const root = group.current;
+    if (!root) return;
+    const delta = Math.abs(index - (focusIndex.current ?? 0));
+    root.visible = delta < 1.5;
+    const attenuation = delta < 0.5 ? 1 : 1 - smoothstep(0.5, 1, delta) * 0.92;
+    root.traverse((object) => {
+      if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => {
+          const values = material.userData as { vaultOpacity?: number; vaultTransparent?: boolean; vaultDepthWrite?: boolean; vaultVisible?: boolean };
+          if (values.vaultOpacity === undefined) {
+            values.vaultOpacity = material.opacity;
+            values.vaultTransparent = material.transparent;
+            values.vaultDepthWrite = material.depthWrite;
+            values.vaultVisible = material.visible;
+          }
+          material.transparent = values.vaultTransparent || attenuation < 1;
+          material.opacity = (values.vaultOpacity ?? material.opacity) * attenuation;
+          material.depthWrite = attenuation < 1 ? false : values.vaultDepthWrite ?? true;
+          material.visible = material instanceof THREE.ShaderMaterial && attenuation < 0.99 ? false : values.vaultVisible ?? true;
+        });
+      } else if (object instanceof THREE.PointLight || object instanceof THREE.SpotLight) {
+        const values = object.userData as { vaultIntensity?: number };
+        if (values.vaultIntensity === undefined) values.vaultIntensity = object.intensity;
+        object.intensity = values.vaultIntensity * attenuation;
+        object.visible = attenuation > 0.02;
+      }
+    });
+  });
+  return <group ref={group} position={station}><>{children}</></group>;
+}
+
 export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phase: ActFourPhase; projectIndex: number; warpCharge: React.RefObject<number> }) {
   const phaseStartedAt = useRef(performance.now());
   const previousPhase = useRef(phase);
@@ -351,23 +480,25 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
   const tunnelLayer = useRef<THREE.Group>(null);
   const vaultLayer = useRef<THREE.Group>(null);
   const astrolabeRings = useRef<(THREE.Group | null)[]>([]);
+  const stationFocus = useRef(projectIndex);
   useEffect(() => {
     phaseStartedAt.current = performance.now();
     previousPhase.current = phase;
   }, [phase]);
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (previousPhase.current !== phase) {
       previousPhase.current = phase;
       phaseStartedAt.current = performance.now();
     }
     const age = (performance.now() - phaseStartedAt.current) / 1000;
     const time = performance.now() * 0.001;
+    stationFocus.current = THREE.MathUtils.damp(stationFocus.current, projectIndex, 5.5, delta);
     astrolabeRings.current.forEach((ring, index) => {
       if (ring) ring.rotation.z = (index % 2 === 0 ? 1 : -1) * time * (0.012 + index * 0.004);
     });
     if (exteriorLayer.current) exteriorLayer.current.visible = phase === "act4_exterior" || (phase === "act4_warp_in" && age < 0.55);
     if (tunnelLayer.current) tunnelLayer.current.visible = (phase === "act4_warp_in" && age >= 0.55 && age < 2.2) || (phase === "act4_warp_out" && age >= 0.22);
-    if (vaultLayer.current) vaultLayer.current.visible = (phase === "act4_warp_in" && age >= 1.62) || phase === "act4_vault" || phase === "act4_warp_out";
+    if (vaultLayer.current) vaultLayer.current.visible = (phase === "act4_warp_in" && age >= WARP_VAULT_CUTOVER_SECONDS) || phase === "act4_vault" || phase === "act4_warp_out";
   });
   return (
     <group>
@@ -377,24 +508,24 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
         <WarpStreamParticles phase={phase} warpCharge={warpCharge} />
       </group>
       <group ref={vaultLayer} visible={phase === "act4_vault" || phase === "act4_warp_out"}>
-        <mesh position={[2.4, 1.2, -95]}><sphereGeometry args={[7, 40, 24]} /><meshBasicMaterial color="#2a0d20" transparent opacity={0.16} side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
-        <mesh position={[2.4, 1.2, -95]}><sphereGeometry args={[1.15, 48, 32]} /><meshBasicMaterial color="#030106" /></mesh>
-        <mesh position={[2.4, 1.2, -95]} scale={1.035}>
+        <mesh position={ACT_FOUR_SINGULARITY_POSITION}><sphereGeometry args={[7, 40, 24]} /><meshBasicMaterial color="#11131a" transparent opacity={0.09} side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
+        <mesh position={ACT_FOUR_SINGULARITY_POSITION}><sphereGeometry args={[1.15, 48, 32]} /><meshBasicMaterial color="#03050a" /></mesh>
+        <mesh position={ACT_FOUR_SINGULARITY_POSITION} scale={1.035}>
           <sphereGeometry args={[1.15, 48, 32]} />
           <shaderMaterial transparent blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
             vertexShader={`varying vec3 vNormal;varying vec3 vView;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vNormal=normalize(normalMatrix*normal);vView=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`}
             fragmentShader={`varying vec3 vNormal;varying vec3 vView;void main(){float edge=pow(1.0-max(dot(normalize(vNormal),normalize(vView)),0.0),3.4);vec3 color=mix(vec3(0.72,0.055,0.12),vec3(1.0,0.62,0.31),smoothstep(0.68,0.96,edge));gl_FragColor=vec4(color,edge*0.95);}`} />
         </mesh>
-        <pointLight position={[2.4, 1.2, -93.5]} color="#ff784e" intensity={2.2} distance={36} decay={2} />
-        {[9, 12, 15].map((radius, index) => <group key={radius} ref={(node) => { astrolabeRings.current[index] = node; }} position={[2.4, 1.2, -95]} rotation={index === 0 ? [0.28, 0.05, 0.18] : index === 1 ? [1.08, 0.72, -0.24] : [0.72, -0.5, 0.48]}>
-          <mesh><torusGeometry args={[radius, 0.018, 6, 220]} /><meshStandardMaterial color="#34404a" metalness={0.94} roughness={0.22} emissive={PROJECT_ACCENTS[index]} emissiveIntensity={0.2} /></mesh>
-          <mesh><torusGeometry args={[radius, 0.007, 5, 220]} /><meshBasicMaterial color={PROJECT_ACCENTS[index]} transparent opacity={0.46} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>
+        <pointLight position={ACT_FOUR_SINGULARITY_POSITION.clone().add(new THREE.Vector3(0, 0, 1.5))} color="#b4c4dc" intensity={0.45} distance={30} decay={2} />
+        {[28, 36, 44].map((radius, index) => <group key={radius} ref={(node) => { astrolabeRings.current[index] = node; }} position={ACT_FOUR_SINGULARITY_POSITION} rotation={index === 0 ? [0.28, 0.05, 0.18] : index === 1 ? [1.08, 0.72, -0.24] : [0.72, -0.5, 0.48]}>
+          <mesh><torusGeometry args={[radius, 0.025, 6, 220]} /><meshStandardMaterial color="#151923" metalness={0.98} roughness={0.38} emissive="#344152" emissiveIntensity={0.035} /></mesh>
+          <mesh><torusGeometry args={[radius, 0.009, 5, 220]} /><meshBasicMaterial color="#8190a8" transparent opacity={0.07} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>
         </group>)}
         <ObservatoryVault phase={phase} projectIndex={projectIndex} />
         <DataEmbers phase={phase} projectIndex={projectIndex} />
-        {ACT_FOUR_PROJECT_STATIONS.map((station, index) => <group key={index} position={station}>
+        {ACT_FOUR_PROJECT_STATIONS.map((station, index) => <AttenuatedStation key={index} index={index} focusIndex={stationFocus} station={station}>
           <ActFourSculpture projectIndex={index} />
-        </group>)}
+        </AttenuatedStation>)}
       </group>
       <BreachFlash phase={phase} />
     </group>

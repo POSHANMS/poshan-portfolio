@@ -189,7 +189,7 @@ export default function Scene({
 
         <color attach="background" args={["#000000"]} />
         {isActFive && <fogExp2 attach="fog" args={["#040103", 0.026]} />}
-        {isInsideProjectCore && <fogExp2 attach="fog" args={["#0d1e2b", 0.0038]} />}
+        {isInsideProjectCore && <fogExp2 attach="fog" args={["#020308", 0.0038]} />}
 
         <SceneLights
           powerUpValues={powerUpValues}
@@ -210,6 +210,7 @@ export default function Scene({
               // Keep the shared starfield filling the camera view through the
               // final contact orbit without increasing its particle count.
               cameraFramed={isActFive || isActSix}
+              backdropDepth={showActFourStarfield}
               warpProgress={isActSix ? actSixWarpProgress : 0}
               cameraParallax={isActSix ? 0.24 : 0}
               handoffProgress={handoffProgress}
@@ -268,7 +269,7 @@ export default function Scene({
             cardContrast={cardContrast}
             particleCount={deviceTier === "mobile" ? 4_200 : deviceTier === "tablet" ? 8_600 : 14_500}
           />
-          <group visible={isActSix}><ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} /></group>
+          <group visible={isActSix && !actFourExteriorActive}><ActSixWorld scrollProgress={scrollProgress} deviceTier={deviceTier} /></group>
 
           <PostProcessing
             hologramActive={hologramVisible}

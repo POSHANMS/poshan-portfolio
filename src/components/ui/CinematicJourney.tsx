@@ -16,6 +16,8 @@ import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
 
 type ChapterId = "hero" | "laptop" | "skills" | "projects" | "journey" | "contact";
 
+const ACT_FOUR_PROJECT_ACCENTS = ["#66dcff", "#b69aff", "#ffc56e", "#68e3ad", "#ff718d"] as const;
+
 const chapters: { id: ChapterId; act: string; label: string; range: [number, number]; holdUntilEnd?: boolean; persistAtEnd?: boolean }[] = [
   { id: "hero", act: "ACT I", label: "Hero", range: [0.0, 0.17] },
   { id: "laptop", act: "ACT II", label: "About", range: [0.18, 0.54] },
@@ -54,21 +56,30 @@ function Panel({
   side = "left",
   className = "",
   verticallyCentered = false,
+  interactive = true,
+  transitionMs = 0,
+  animation,
 }: {
   children: React.ReactNode;
   presence: number;
   side?: "left" | "right" | "center";
   className?: string;
   verticallyCentered?: boolean;
+  interactive?: boolean;
+  transitionMs?: number;
+  animation?: string;
 }) {
   const x = side === "left" ? -34 : side === "right" ? 34 : 0;
   const baseX = side === "center" ? "-50%" : "0px";
 
   return (
     <div
-      className={`pointer-events-auto absolute ${className}`}
+      className={`${interactive ? "pointer-events-auto" : "pointer-events-none"} absolute ${className}`}
+      inert={!interactive}
       style={{
         opacity: presence,
+        transition: transitionMs > 0 ? `opacity ${transitionMs}ms ease, transform ${transitionMs}ms ease` : undefined,
+        animation,
         transform: verticallyCentered
           ? `translate3d(calc(${baseX} + ${(1 - presence) * x * 0.7}px), calc(-50% - 12px + ${(1 - presence) * 12}px), 0)`
           : `translate3d(calc(${baseX} + ${(1 - presence) * x * 0.7}px), ${(1 - presence) * 12}px, 0)`,
@@ -472,7 +483,54 @@ function ProjectsChapter({
   onSelectProject: (index: number) => void;
   warpProgress: number;
 }) {
-  const project = PROJECTS[projectIndex];
+  const [displayProjectIndex, setDisplayProjectIndex] = useState(projectIndex);
+  const [copyPhase, setCopyPhase] = useState<"idle" | "exit" | "enter">("idle");
+  const copyPhaseRef = useRef<"idle" | "exit" | "enter">("idle");
+  const previousProjectIndex = useRef(projectIndex);
+  const copyTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const project = PROJECTS[displayProjectIndex];
+  const accent = ACT_FOUR_PROJECT_ACCENTS[displayProjectIndex] ?? ACT_FOUR_PROJECT_ACCENTS[0];
+
+  const setCopyPhaseNow = useCallback((next: "idle" | "exit" | "enter") => {
+    copyPhaseRef.current = next;
+    setCopyPhase(next);
+  }, []);
+
+  useEffect(() => {
+    const clearCopyTimers = () => {
+      copyTimers.current.forEach(clearTimeout);
+      copyTimers.current = [];
+    };
+
+    if (phase !== "act4_vault") {
+      clearCopyTimers();
+      previousProjectIndex.current = projectIndex;
+      setDisplayProjectIndex(projectIndex);
+      setCopyPhaseNow("idle");
+      return clearCopyTimers;
+    }
+    if (previousProjectIndex.current === projectIndex) return clearCopyTimers;
+
+    previousProjectIndex.current = projectIndex;
+    const rapidRetarget = copyPhaseRef.current !== "idle";
+    clearCopyTimers();
+
+    if (rapidRetarget) {
+      setDisplayProjectIndex(projectIndex);
+      setCopyPhaseNow("enter");
+      copyTimers.current.push(setTimeout(() => setCopyPhaseNow("idle"), 280));
+      return clearCopyTimers;
+    }
+
+    setCopyPhaseNow("exit");
+    copyTimers.current.push(setTimeout(() => {
+      setDisplayProjectIndex(projectIndex);
+      setCopyPhaseNow("enter");
+      copyTimers.current.push(setTimeout(() => setCopyPhaseNow("idle"), 280));
+    }, 180));
+    return clearCopyTimers;
+  }, [phase, projectIndex, setCopyPhaseNow]);
+
   const [gatePulse, setGatePulse] = useState(0);
   const [gateAlert, setGateAlert] = useState(false);
   const alertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -523,93 +581,73 @@ function ProjectsChapter({
   }
 
   if (phase === "act4_warp_in") {
-    const signal = smoothstep(warpProgress, 0.24, 0.29) * (1 - smoothstep(warpProgress, 0.62, 0.68));
+    const signal = smoothstep(warpProgress, 0.12, 0.22) * (1 - smoothstep(warpProgress, 0.62, 0.68));
     return (
       <>
-        <Panel presence={signal} side="center" className="left-1/2 top-[43vh]">
-          <div className="text-center font-mono text-[9px] uppercase tracking-[0.34em] text-[#ffe4ea]/82 drop-shadow-[0_0_18px_rgba(255,228,234,0.55)]">Traversing event horizon</div>
-        </Panel>
-        <Panel presence={smoothstep(warpProgress, 0.88, 0.98)} side="left" className="left-4 top-[7vh] z-50 w-[min(28rem,calc(40vw-2rem))] md:left-12">
-          <div className="rounded-2xl border border-white/15 bg-[#080a12]/42 p-5 shadow-[0_18px_64px_rgba(0,0,0,.42),inset_0_1px_0_rgba(255,255,255,.12)] backdrop-blur-[22px]">
-            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8deeff]">01 / 05 · Project station</p>
-            <h2 className="mt-3 text-3xl font-black uppercase leading-none text-white">{PROJECTS[0].name}</h2>
-            <p className="mt-3 text-sm leading-6 text-white/80">{PROJECTS[0].description}</p>
+        <Panel presence={1} side="left" className="left-6 top-[17vh] w-[min(27rem,calc(100vw-3rem))] md:left-16" interactive={false} animation="act-four-launch-fade 200ms ease-out both">
+          <div className="grid gap-4 py-2 pr-5 [text-shadow:0_2px_16px_rgba(0,0,0,0.9)]">
+            <Kicker act="ACT IV" label="Core Orbit" />
+            <h2 className="max-w-[10ch] text-4xl font-black uppercase leading-[0.92] tracking-[-0.035em] text-white md:text-5xl">Project Launch</h2>
+            <p className="max-w-sm text-sm leading-6 text-white/80">Hold to breach the crimson core and enter the project vault.</p>
           </div>
+        </Panel>
+        <Panel presence={signal} side="center" className="left-1/2 top-[43vh]" interactive={false} transitionMs={180}>
+          <div className="whitespace-nowrap text-center font-mono text-[9px] uppercase tracking-[0.34em] text-[#ffe4ea]/82 drop-shadow-[0_0_18px_rgba(255,228,234,0.55)]">Traversing event horizon</div>
         </Panel>
       </>
     );
   }
 
   if (phase === "act4_vault" || phase === "act4_warp_out") {
-    const finalProject = projectIndex === PROJECTS.length - 1;
+    const finalProject = displayProjectIndex === PROJECTS.length - 1;
+    const copyMotion = copyPhase === "exit" ? "is-exiting" : copyPhase === "enter" ? "is-entering" : "";
     return (
       <>
-      <Panel presence={presence} side="left" className="left-4 top-[7vh] z-50 w-[min(28rem,calc(40vw-2rem))] max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto md:left-12">
-        <div key={project.name} className="act-four-station-panel relative overflow-hidden rounded-2xl border border-white/[0.12] bg-[linear-gradient(120deg,rgba(10,8,14,0.55),rgba(8,7,12,0.42))] p-4 shadow-[0_20px_72px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[24px] md:p-5" style={{ transition: "opacity 220ms ease, transform 220ms ease", opacity: phase === "act4_warp_out" ? 0 : 1, transform: phase === "act4_warp_out" ? "translateY(-12px)" : "translateY(0)" }}>
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-[#ff4668] to-transparent shadow-[0_0_18px_#ff2448]" />
-          <div className="flex items-center justify-between gap-3 font-mono text-[9px] uppercase tracking-[0.2em] text-[#ff9cab] md:text-[10px]">
-            <span>Act IV / Core Orbit</span>
-            <span>{String(projectIndex + 1).padStart(2, "0")} / {String(PROJECTS.length).padStart(2, "0")}</span>
+      <Panel presence={phase === "act4_warp_out" ? 0 : presence} side="left" interactive={phase !== "act4_warp_out"} transitionMs={phase === "act4_warp_out" ? 200 : 0} animation={phase === "act4_vault" ? "act-four-hud-arrive 350ms ease-out both" : undefined} className="act-four-station-shell left-4 top-[clamp(1.25rem,7vh,4.5rem)] z-50 w-[min(31rem,42vw)] max-w-[500px] max-h-[calc(100dvh-3rem)] md:left-12 max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto">
+        <section className={`act-four-station-panel act-four-station-panel--${copyMotion}`} aria-label={`${String(displayProjectIndex + 1).padStart(2, "0")} of ${String(PROJECTS.length).padStart(2, "0")}: ${project.name}`} aria-live="polite" aria-atomic="true" style={{ "--act-four-accent": accent } as React.CSSProperties}>
+          <div className="act-four-station-content">
+            <span aria-hidden="true" className="act-four-accent-edge" />
+            <span aria-hidden="true" className="act-four-hairline-frame" />
+            <header className="act-four-telemetry-header">
+              <span className="act-four-telemetry-label"><i aria-hidden="true" />{String(displayProjectIndex + 1).padStart(2, "0")}{" // Station Telemetry"}</span>
+              <span className="act-four-telemetry-index">{String(displayProjectIndex + 1).padStart(2, "0")} / {String(PROJECTS.length).padStart(2, "0")}</span>
+            </header>
+            <nav className="act-four-station-rail" aria-label="Project stations">
+              {PROJECTS.map((item, index) => <button key={item.name} type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelectProject(index)} aria-label={`Open station ${String(index + 1).padStart(2, "0")}: ${item.name}`} title={item.name} aria-current={index === displayProjectIndex ? "step" : undefined} className="act-four-station-step">{String(index + 1).padStart(2, "0")}</button>)}
+            </nav>
+            <div className={`act-four-station-copy ${copyMotion}`}>
+              <h2 className="act-four-station-title">{project.name}</h2>
+              <p className="act-four-station-subtitle">{project.subtitle}</p>
+              <p className="act-four-station-description">{project.description}</p>
+              <div className="act-four-tech-stack" aria-label="Technology stack">
+                {project.stack.map((item) => <span key={item} className="act-four-tech-pill">{item}</span>)}
+              </div>
+              <div className="act-four-project-actions">
+                <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()} className="act-four-action act-four-action--secondary">GitHub <span aria-hidden="true">↗</span></a>
+                {project.href && (
+                  <a href={project.href} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()} className="act-four-action act-four-action--primary">Live Demo <span aria-hidden="true">↗</span></a>
+                )}
+              </div>
+              <p className="act-four-corridor-hint">{finalProject ? "Scroll forward to launch toward Act V" : "Scroll to advance through the project corridor"}</p>
+              {finalProject && (
+                <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }} className="act-four-launch-control" aria-label="Launch forward from the Act IV vault">
+                  <span aria-hidden="true" className="act-four-launch-edge" />
+                  <span aria-hidden="true" className="act-four-launch-sweep" />
+                  <span className="act-four-launch-copy"><span className="act-four-launch-icon" aria-hidden="true">↗</span><span><span className="act-four-launch-kicker">Recall sequence</span><span className="act-four-launch-title">Launch / Exit Vault</span></span></span>
+                  <span className="act-four-launch-verb">Launch</span>
+                </button>
+              )}
+            </div>
           </div>
-          <nav className="mt-4 flex items-center gap-1" aria-label="Project stations">
-            {PROJECTS.map((item, index) => <button key={item.name} type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelectProject(index)} aria-label={`Open station ${String(index + 1).padStart(2, "0")}: ${item.name}`} aria-current={index === projectIndex ? "step" : undefined} className={`relative grid h-7 w-9 place-items-center font-mono text-[9px] transition ${index === projectIndex ? "text-white" : "text-white/45 hover:text-white/85"}`}><span className={`absolute inset-x-1 bottom-0 h-px transition ${index === projectIndex ? "bg-[#ff6d84] shadow-[0_0_10px_#ff4d6d]" : "bg-white/15"}`} />{String(index + 1).padStart(2, "0")}</button>)}
-          </nav>
-          <h2 className="mt-3 max-w-full break-words text-[clamp(1.55rem,2.5vw,2.8rem)] font-black uppercase leading-[0.98] tracking-[-0.035em] text-white">{project.name}</h2>
-          <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.12em] text-[#ffb5c0] md:text-[10px]">{project.subtitle}</p>
-          <p className="mt-3 max-w-xl text-[11px] leading-[1.65] text-white/78 md:text-xs">{project.description}</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {project.stack.map((item) => <span key={item} className="border border-[#ff6b7f]/35 bg-[#ff1744]/10 px-2 py-1 font-mono text-[8px] text-white/88 md:text-[9px]">{item}</span>)}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2" style={{ pointerEvents: "auto" }}>
-            <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()} className="pointer-events-auto relative z-[60] border border-[#ff5a66]/65 bg-[#260008]/85 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white shadow-[0_0_16px_rgba(255,23,68,0.16)] transition hover:-translate-y-0.5 hover:border-white hover:bg-[#5b0017]/90">
-              GitHub
-            </a>
-            {project.href && (
-              <a href={project.href} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()} className="pointer-events-auto relative z-[60] border border-[#ff5a66]/65 bg-[#260008]/85 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white shadow-[0_0_16px_rgba(255,23,68,0.16)] transition hover:-translate-y-0.5 hover:border-white hover:bg-[#5b0017]/90">
-                Live Demo
-              </a>
-            )}
-          </div>
-          <p className="mt-3 font-mono text-[8px] uppercase tracking-[0.16em] text-white/52 md:text-[9px]">
-            {finalProject ? "Scroll forward to launch toward Act V" : "Scroll to advance through the project corridor"}
-          </p>
-          {finalProject && (
-            <button
-              type="button"
-              onPointerDown={(event) => {
-                // The 3D canvas listens globally for pointer input; keep this dock's
-                // full rectangular hit area owned by the return control.
-                event.stopPropagation();
-              }}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onExit();
-              }}
-              className="group relative z-50 mt-4 flex w-full cursor-pointer select-none items-center justify-between overflow-hidden border border-[#ff9cab]/75 bg-[#260008]/88 px-4 py-3 text-left shadow-[0_0_34px_rgba(255,23,68,0.25)] backdrop-blur-xl transition duration-300 [&>span]:pointer-events-none hover:border-white hover:bg-[#5b0017]/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              aria-label="Launch forward from the Act IV vault"
-            >
-              <span className="absolute inset-y-0 left-0 w-1 bg-[#ff1744] shadow-[0_0_18px_rgba(255,23,68,0.9)]" />
-              <span className="absolute inset-0 translate-x-[-105%] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.22),transparent)] transition duration-700 group-hover:translate-x-[105%]" />
-              <span className="pointer-events-none relative flex items-center gap-3">
-                <span className="grid h-9 w-9 place-items-center rounded-full border border-[#ffb5c0]/70 bg-[#ff1744]/15 font-mono text-base text-white shadow-[0_0_18px_rgba(255,23,68,0.45)]">↗</span>
-                <span>
-                  <span className="block font-mono text-[9px] uppercase tracking-[0.26em] text-[#ffb5c0]">Recall sequence</span>
-                  <span className="mt-1 block text-sm font-black uppercase tracking-normal text-white">Launch / Exit Vault</span>
-                </span>
-              </span>
-              <span className="pointer-events-none relative font-mono text-[10px] uppercase tracking-[0.18em] text-[#ffd9df]">Launch</span>
-            </button>
-          )}
-        </div>
+        </section>
       </Panel>
       <button
         type="button"
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }}
-        className="pointer-events-auto absolute right-6 top-6 z-[60] border border-white/20 bg-black/35 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/85 backdrop-blur-lg transition hover:border-[#ff7388] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="act-four-exit-control pointer-events-auto absolute right-6 top-6 z-[60]"
         aria-label="Exit the Act IV vault"
-        style={{ transition: "opacity 220ms ease, transform 220ms ease", opacity: phase === "act4_warp_out" ? 0 : 1, transform: phase === "act4_warp_out" ? "translateY(-12px)" : "translateY(0)" }}
+        style={{ "--act-four-accent": accent, transition: "opacity 200ms ease, transform 200ms ease", animation: phase === "act4_vault" ? "act-four-hud-arrive 350ms ease-out both" : undefined, opacity: phase === "act4_warp_out" ? 0 : 1, pointerEvents: phase === "act4_warp_out" ? "none" : "auto", transform: phase === "act4_warp_out" ? "translateY(-12px)" : undefined } as React.CSSProperties}
       >[ ESC // EXIT VAULT ]</button>
       </>
     );
@@ -879,6 +917,8 @@ export default function CinematicJourney({
 }) {
   const [hoveredCube, setHoveredCube] = useState<CubeModuleId | null>(null);
   const [actFourWarpProgress, setActFourWarpProgress] = useState(0);
+  const [actFourExitProgress, setActFourExitProgress] = useState(0);
+  const [handoffBloom, setHandoffBloom] = useState(false);
   const [cubeTargets, setCubeTargets] = useState<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
   const cubeTargetsRef = useRef<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
   const cubeCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -889,14 +929,33 @@ export default function CinematicJourney({
       setActFourWarpProgress(1);
       return;
     }
+    if (actFourPhase === "act4_warp_out") {
+      setActFourWarpProgress(0);
+      setActFourExitProgress(0);
+      setHandoffBloom(false);
+      const startedAt = performance.now();
+      const timer = setInterval(() => {
+        const progress = Math.min(1, (performance.now() - startedAt) / 1100);
+        setActFourExitProgress(progress);
+        if (progress >= 1) setHandoffBloom(true);
+      }, 24);
+      return () => clearInterval(timer);
+    }
     if (actFourPhase !== "act4_warp_in") {
       setActFourWarpProgress(0);
+      setActFourExitProgress(0);
       return;
     }
     const startedAt = performance.now();
     const timer = setInterval(() => setActFourWarpProgress(Math.min(1, (performance.now() - startedAt) / 2200)), 40);
     return () => clearInterval(timer);
   }, [actFourPhase]);
+
+  useEffect(() => {
+    if ((actFourPhase !== "act4_vault" && actFourPhase !== "act5") || !handoffBloom) return;
+    const timer = setTimeout(() => setHandoffBloom(false), 16);
+    return () => clearTimeout(timer);
+  }, [actFourPhase, handoffBloom]);
 
   const clearCubeCloseTimer = useCallback(() => {
     if (cubeCloseTimer.current) {
@@ -1027,9 +1086,30 @@ export default function CinematicJourney({
     ? 1
     : Math.max(states.journey.presence, smoothstep(0, 0.05, actFiveProgress))
       * (1 - smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress));
+  const exitBloomOpacity = actFourPhase === "act4_warp_out"
+    ? 0.85 * smoothstep(actFourExitProgress, 0.72, 1)
+    : handoffBloom ? 0.85 : 0;
+  const entryIrisProgress = actFourWarpProgress;
+  const entryBloomOpacity = actFourPhase === "act4_warp_in"
+    ? 0.88 * (entryIrisProgress <= 0.85
+      ? smoothstep(entryIrisProgress, 0.8, 0.85)
+      : 1 - smoothstep(entryIrisProgress, 0.85, 0.9))
+    : 0;
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
+      {(actFourPhase === "act4_warp_in" || actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out" || handoffBloom) && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[100]"
+          style={{
+            opacity: actFourPhase === "act4_warp_in" ? entryBloomOpacity : handoffBloom ? 0.85 : exitBloomOpacity,
+            transition: actFourPhase === "act4_vault" || actFourPhase === "act5" ? "opacity 300ms ease-out" : "opacity 80ms linear",
+            background: "radial-gradient(ellipse at 50% 50%, rgba(255,205,145,0.92) 0%, rgba(255,103,57,0.78) 18%, rgba(126,10,35,0.82) 48%, rgba(27,1,11,0.96) 100%)",
+            mixBlendMode: "screen",
+          }}
+        />
+      )}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,transparent_0%,transparent_53%,rgba(0,0,0,0.28)_100%)]" />
       <HeroChapter presence={states.hero.presence} />
       <EnterLaptopCue scrollProgress={scrollProgress} />
@@ -1054,7 +1134,7 @@ export default function CinematicJourney({
         }}
       />
       <ProjectsChapter
-        presence={actFourInterior ? 1 : states.projects.presence}
+        presence={actFourPhase === "act4_exterior" || actFourInterior ? 1 : states.projects.presence}
         phase={actFourPhase}
         projectIndex={actFourProjectIndex}
         onWarp={onActFourWarp}

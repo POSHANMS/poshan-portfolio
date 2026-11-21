@@ -2,13 +2,13 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-const HOLD_DURATION = 1450;
+const HOLD_DURATION = 1150;
 
 export default function HoldToWarp({
   onComplete,
   label = "Hold to\nwarp",
   idleLabel = "CORE LINK",
-  ariaLabel = "Hold to launch into the project core",
+  ariaLabel = "Hold to warp into project vault",
   tapToComplete = false,
   compact = false,
   className = "",
@@ -73,25 +73,42 @@ export default function HoldToWarp({
     <button
       type="button"
       disabled={disabled}
+      role="button"
       aria-label={ariaLabel}
-      className={`group relative grid ${compact ? "h-24 w-24" : "h-36 w-36"} place-items-center rounded-full border border-[#ff6b7f]/55 bg-black/45 font-mono text-[10px] uppercase tracking-[0.2em] text-white shadow-[0_0_48px_rgba(255,23,68,0.2)] backdrop-blur-md transition hover:border-[#ffe4ea] hover:bg-[#ff1744]/14 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe4ea] ${className}`}
+      className={`group relative grid touch-none select-none ${compact ? "h-24 w-24" : "h-36 w-36"} place-items-center rounded-full border border-[#ff6b7f]/55 bg-black/45 font-mono text-[10px] uppercase tracking-[0.2em] text-white shadow-[0_0_48px_rgba(255,23,68,0.2)] backdrop-blur-md transition hover:border-[#ffe4ea] hover:bg-[#ff1744]/14 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe4ea] ${className}`}
       onPointerDown={disabled ? undefined : beginPointerCharging}
       onPointerUp={stopCharging}
       onPointerCancel={stopCharging}
       onLostPointerCapture={stopCharging}
+      onContextMenu={(event) => event.preventDefault()}
       onClick={() => {
         if (disabled) return;
         if (tapToComplete) onComplete();
       }}
       onKeyDown={(event) => {
         if (disabled) return;
-        if (!event.repeat && (event.key === " " || event.key === "Enter")) beginCharging();
+        if (event.key === " " || event.key === "Enter") {
+          event.preventDefault();
+          if (!event.repeat) beginCharging();
+        }
       }}
       onKeyUp={(event) => {
-        if (event.key === " " || event.key === "Enter") stopCharging();
+        if (event.key === " " || event.key === "Enter") {
+          event.preventDefault();
+          stopCharging();
+        }
       }}
     >
-      <svg className="absolute inset-2 -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+      <svg
+        className="absolute inset-2 -rotate-90"
+        viewBox="0 0 100 100"
+        role="progressbar"
+        aria-label="Warp charge"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress * 100)}
+        aria-valuetext={`${Math.round(progress * 100)}% charged`}
+      >
         <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
         <circle
           cx="50"
