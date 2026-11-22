@@ -19,6 +19,19 @@ type ChapterId = "hero" | "laptop" | "skills" | "projects" | "journey" | "contac
 
 const ACT_FOUR_PROJECT_ACCENTS = ["#66dcff", "#b69aff", "#ffc56e", "#68e3ad", "#ff718d"] as const;
 
+function TimeSliceProjectMark({ index }: { index: number }) {
+  const common = { fill: "none", stroke: "currentColor", strokeLinecap: "round" as const, strokeLinejoin: "round" as const, strokeWidth: 1.25 };
+  return (
+    <svg className="act-four-time-slice-mark" viewBox="0 0 36 36" aria-hidden="true">
+      {index === 0 && <><circle cx="16" cy="18" r="11" {...common} /><circle cx="16" cy="18" r="6" {...common} /><circle cx="16" cy="18" r="1.5" {...common} /><path d="M16 7a11 11 0 0 1 10 6M16 29a11 11 0 0 0 10-6" {...common} /><path d="M24 8v5h-5" {...common} /><circle cx="27.5" cy="8" r="1.7" fill="#ff3554" /></>}
+      {index === 1 && <><path d="M5 8 17 5l13 4-2 18-12 4-12-6zM5 8l11 5 14-4M16 13v18M5 8l-1 17M17 5l-1 8M24 7l-1 20" {...common} /><path d="m22 17 3 3 6-7" {...common} /><circle cx="30" cy="13" r="1.6" fill="#ff3554" /></>}
+      {index === 2 && <><rect x="5" y="5" width="26" height="26" rx="1" {...common} /><path d="M14 5v26M22 5v26M5 14h26M5 22h26" {...common} /><circle cx="26.5" cy="9.5" r="1.6" fill="#ff3554" /></>}
+      {index === 3 && <><circle cx="18" cy="18" r="13" {...common} /><path d="M6 19h6l3-7 5 13 3-7h7" {...common} /><circle cx="27.5" cy="8.5" r="1.6" fill="#ff3554" /></>}
+      {index === 4 && <><path d="M9 4.75h12l7 7V31H9zM21 5v7h7" {...common} /><path d="m19 15-4 6h4l-2 6 7-9h-4l2-3z" {...common} /><circle cx="27.5" cy="7.5" r="1.6" fill="#ff3554" /></>}
+    </svg>
+  );
+}
+
 const chapters: { id: ChapterId; act: string; label: string; range: [number, number]; holdUntilEnd?: boolean; persistAtEnd?: boolean }[] = [
   { id: "hero", act: "ACT I", label: "Hero", range: [0.0, 0.17] },
   { id: "laptop", act: "ACT II", label: "About", range: [0.18, 0.54] },
@@ -485,14 +498,14 @@ function ProjectsChapter({
   warpProgress: number;
 }) {
   const [displayProjectIndex, setDisplayProjectIndex] = useState(projectIndex);
-  const [copyPhase, setCopyPhase] = useState<"idle" | "exit" | "enter">("idle");
-  const copyPhaseRef = useRef<"idle" | "exit" | "enter">("idle");
+  const [copyPhase, setCopyPhase] = useState<"idle" | "folding" | "arriving">("idle");
+  const copyPhaseRef = useRef<"idle" | "folding" | "arriving">("idle");
   const previousProjectIndex = useRef(projectIndex);
   const copyTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const project = PROJECTS[displayProjectIndex];
   const accent = ACT_FOUR_PROJECT_ACCENTS[displayProjectIndex] ?? ACT_FOUR_PROJECT_ACCENTS[0];
 
-  const setCopyPhaseNow = useCallback((next: "idle" | "exit" | "enter") => {
+  const setCopyPhaseNow = useCallback((next: "idle" | "folding" | "arriving") => {
     copyPhaseRef.current = next;
     setCopyPhase(next);
   }, []);
@@ -513,22 +526,11 @@ function ProjectsChapter({
     if (previousProjectIndex.current === projectIndex) return clearCopyTimers;
 
     previousProjectIndex.current = projectIndex;
-    const rapidRetarget = copyPhaseRef.current !== "idle";
     clearCopyTimers();
-
-    if (rapidRetarget) {
-      setDisplayProjectIndex(projectIndex);
-      setCopyPhaseNow("enter");
-      copyTimers.current.push(setTimeout(() => setCopyPhaseNow("idle"), 280));
-      return clearCopyTimers;
-    }
-
-    setCopyPhaseNow("exit");
-    copyTimers.current.push(setTimeout(() => {
-      setDisplayProjectIndex(projectIndex);
-      setCopyPhaseNow("enter");
-      copyTimers.current.push(setTimeout(() => setCopyPhaseNow("idle"), 280));
-    }, 180));
+    setCopyPhaseNow("folding");
+    copyTimers.current.push(setTimeout(() => setDisplayProjectIndex(projectIndex), 120));
+    copyTimers.current.push(setTimeout(() => setCopyPhaseNow("arriving"), 900));
+    copyTimers.current.push(setTimeout(() => setCopyPhaseNow("idle"), 1120));
     return clearCopyTimers;
   }, [phase, projectIndex, setCopyPhaseNow]);
 
@@ -608,47 +610,37 @@ function ProjectsChapter({
 
   if (phase === "act4_warp_in" || phase === "act4_vault" || phase === "act4_warp_out") {
     const finalProject = displayProjectIndex === PROJECTS.length - 1;
-    const copyMotion = copyPhase === "exit" ? "is-exiting" : copyPhase === "enter" ? "is-entering" : "";
     return (
       <>
-      <Panel presence={phase === "act4_warp_out" ? 0 : smoothstep(warpProgress, 0.88, 1)} side="left" interactive={phase === "act4_vault"} transitionMs={phase === "act4_warp_out" ? 200 : 0} className="act-four-station-shell left-4 top-[clamp(1.25rem,7vh,4.5rem)] z-50 w-[min(31rem,42vw)] max-w-[500px] max-h-[calc(100dvh-3rem)] md:left-12 max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto">
-        <section className={`act-four-station-panel act-four-station-panel--${copyMotion}`} aria-label={`${String(displayProjectIndex + 1).padStart(2, "0")} of ${String(PROJECTS.length).padStart(2, "0")}: ${project.name}`} aria-live="polite" aria-atomic="true" style={{ "--act-four-accent": accent } as React.CSSProperties}>
-          <div className="act-four-station-content">
-            <span aria-hidden="true" className="act-four-accent-edge" />
-            <span aria-hidden="true" className="act-four-hairline-frame" />
-            <header className="act-four-telemetry-header">
-              <span className="act-four-telemetry-label"><i aria-hidden="true" />{String(displayProjectIndex + 1).padStart(2, "0")}{" // Station Telemetry"}</span>
-              <span className="act-four-telemetry-index">{String(displayProjectIndex + 1).padStart(2, "0")} / {String(PROJECTS.length).padStart(2, "0")}</span>
+      {phase === "act4_vault" && (
+        <div className="act-four-time-slice-layer" aria-label="Act IV project dossier">
+          <section className={`act-four-time-slice-dossier ${copyPhase === "folding" ? "is-folding" : copyPhase === "arriving" ? "is-arriving" : ""}`} aria-label={`${String(displayProjectIndex + 1).padStart(2, "0")} of ${String(PROJECTS.length).padStart(2, "0")}: ${project.name}`} aria-live="polite" aria-atomic="true" style={{ "--act-four-accent": accent } as React.CSSProperties}>
+            <header className="act-four-time-slice-topline">
+              <div className="act-four-time-slice-index"><span>{String(displayProjectIndex + 1).padStart(2, "0")} / {String(PROJECTS.length).padStart(2, "0")}</span><i aria-hidden="true">—</i><span className="act-four-time-slice-category">{project.subtitle}</span></div>
+              <TimeSliceProjectMark index={displayProjectIndex} />
             </header>
-            <nav className="act-four-station-rail" aria-label="Project stations">
-              {PROJECTS.map((item, index) => <button key={item.name} type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelectProject(index)} aria-label={`Open station ${String(index + 1).padStart(2, "0")}: ${item.name}`} title={item.name} aria-current={index === displayProjectIndex ? "step" : undefined} className="act-four-station-step">{String(index + 1).padStart(2, "0")}</button>)}
-            </nav>
-            <div className={`act-four-station-copy ${copyMotion}`}>
-              <h2 className="act-four-station-title">{project.name}</h2>
-              <p className="act-four-station-subtitle">{project.subtitle}</p>
-              <p className="act-four-station-description">{project.description}</p>
-              <div className="act-four-tech-stack" aria-label="Technology stack">
-                {project.stack.map((item) => <span key={item} className="act-four-tech-pill">{item}</span>)}
-              </div>
-              <div className="act-four-project-actions">
-                <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()} className="act-four-action act-four-action--secondary">GitHub <span aria-hidden="true">↗</span></a>
-                {project.href && (
-                  <a href={project.href} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()} className="act-four-action act-four-action--primary">Live Demo <span aria-hidden="true">↗</span></a>
-                )}
-              </div>
-              <p className="act-four-corridor-hint">{finalProject ? "Scroll forward to launch toward Act V" : "Scroll to advance through the project corridor"}</p>
-              {finalProject && (
-                <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }} className="act-four-launch-control" aria-label="Launch forward from the Act IV vault">
-                  <span aria-hidden="true" className="act-four-launch-edge" />
-                  <span aria-hidden="true" className="act-four-launch-sweep" />
-                  <span className="act-four-launch-copy"><span className="act-four-launch-icon" aria-hidden="true">↗</span><span><span className="act-four-launch-kicker">Recall sequence</span><span className="act-four-launch-title">Launch / Exit Vault</span></span></span>
-                  <span className="act-four-launch-verb">Launch</span>
-                </button>
-              )}
+            <div className="act-four-time-slice-hero">
+              <h2 className={project.name.length > 17 ? "is-long-title" : ""}>{project.name}</h2>
+              <p>{project.description}</p>
             </div>
-          </div>
-        </section>
-      </Panel>
+            <footer className="act-four-time-slice-footer">
+              <div className="act-four-time-slice-stack" aria-label="Technology stack">
+                {project.stack.map((item, index) => <React.Fragment key={item}>{index > 0 && <span className="act-four-time-slice-slash" aria-hidden="true">/</span>}<span>{item}</span></React.Fragment>)}
+              </div>
+              <div className="act-four-time-slice-links">
+                {PROFILE.github && <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()}>GitHub <span aria-hidden="true">↗</span></a>}
+                {typeof project.href === "string" && project.href.trim() !== "" && <a className="is-live" href={project.href} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()}>Live Demo <span aria-hidden="true">↗</span></a>}
+              </div>
+            </footer>
+          </section>
+          <nav className="act-four-time-slice-rail" aria-label="Project stations">
+            {PROJECTS.map((item, index) => <React.Fragment key={item.name}>{index > 0 && <span className="act-four-time-slice-rail-separator" aria-hidden="true">—</span>}<button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelectProject(index)} aria-label={`Open station ${String(index + 1).padStart(2, "0")}: ${item.name}`} aria-current={index === displayProjectIndex ? "step" : undefined}>{String(index + 1).padStart(2, "0")}</button></React.Fragment>)}
+          </nav>
+          {finalProject ? (
+            <button type="button" className="act-four-time-slice-hint is-launch" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }}>Scroll forward or click to launch Act V <span aria-hidden="true">↗</span></button>
+          ) : <p className="act-four-time-slice-hint">Scroll to fold dimension</p>}
+        </div>
+      )}
       <button
         type="button"
         onPointerDown={(event) => event.stopPropagation()}
@@ -1108,15 +1100,15 @@ export default function CinematicJourney({
     ? 0.85 * smoothstep(actFourExitProgress, 0.72, 1)
     : handoffBloom ? 0.85 : 0;
   const entryIrisProgress = actFourWarpProgress;
-  const entryBloomRise = smoothstep(entryIrisProgress, 0.74, 0.79);
-  const entryBloomFall = 1 - smoothstep(entryIrisProgress, 0.79, 0.88);
+  const entryBloomRise = smoothstep(entryIrisProgress, 0.70, 0.75);
+  const entryBloomFall = 1 - smoothstep(entryIrisProgress, 0.75, 0.84);
   const entryBloomOpacity = actFourPhase === "act4_warp_in"
     ? 0.88 * (entryIrisProgress <= 0.79 ? entryBloomRise : entryBloomFall)
     : 0;
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
-      {actFourPhase === "act4_warp_in" && entryIrisProgress >= 0.74 && entryIrisProgress < 0.88 ? (
+      {actFourPhase === "act4_warp_in" && entryIrisProgress >= 0.70 && entryIrisProgress < 0.84 ? (
         <div aria-hidden="true" className="act-four-emergence-overlay pointer-events-none absolute inset-0 z-[100]" style={{ opacity: entryBloomOpacity }} />
       ) : (actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out" || handoffBloom) && (
         <div
