@@ -6,15 +6,15 @@ import * as THREE from "three";
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import type { ActFourPhase } from "@/types/actFour";
 import { ACT_FOUR_PROJECT_STATIONS, ACT_FOUR_SINGULARITY_POSITION } from "@/animations/actFourChoreography";
-import { WORMHOLE_CURVE, WORMHOLE_PATH_LENGTH, WORMHOLE_TUBE_RADIUS } from "@/animations/scrollCamera";
+import { ACT_FOUR_WARP_IN_DURATION_MS, WORMHOLE_CURVE, WORMHOLE_PATH_LENGTH, WORMHOLE_TUBE_RADIUS } from "@/animations/scrollCamera";
 import ActFourExterior from "./ActFourExterior";
 import ActFourSculpture from "./ActFourSculptures";
 
 const WARP_PARTICLE_COUNT = 1_200;
 const WORMHOLE_RING_COUNT = 32;
-const WARP_NEEDLE_COUNT = 1_000;
-const WARP_IN_DURATION_SECONDS = 2.2;
-const WARP_VAULT_CUTOVER_SECONDS = WARP_IN_DURATION_SECONDS * 0.81;
+const WARP_NEEDLE_COUNT = 640;
+const WARP_IN_DURATION_SECONDS = ACT_FOUR_WARP_IN_DURATION_MS / 1000;
+const WARP_VAULT_CUTOVER_SECONDS = WARP_IN_DURATION_SECONDS * 0.77;
 const DOME_CENTER = new THREE.Vector3(0, 0, -27);
 const PROJECT_ACCENTS = ["#00e5ff", "#8b5cf6", "#f59e0b", "#10b981", "#ff4d6d"];
 
@@ -132,8 +132,8 @@ function WormholeTunnel({ phase }: { phase: ActFourPhase }) {
     material.current.uniforms.uTime.value = clock.getElapsedTime();
     const age = (performance.now() - phaseStartedAt.current) / 1000;
     const progress = clamp(age / WARP_IN_DURATION_SECONDS);
-    material.current.uniforms.uTubeVisibility.value = isWarpIn ? smoothstep(0.26, 0.34, progress) : 0;
-    if (group.current) group.current.visible = isWarpIn && progress >= 0.26 && progress < 0.84;
+    material.current.uniforms.uTubeVisibility.value = isWarpIn ? smoothstep(0.23, 0.31, progress) : 0;
+    if (group.current) group.current.visible = isWarpIn && progress >= 0.22 && progress < 0.79;
   });
   return (
     <group ref={group} visible={false}>
@@ -147,7 +147,7 @@ function WormholeTunnel({ phase }: { phase: ActFourPhase }) {
           depthWrite
           toneMapped={false}
           vertexShader={`varying vec2 vUv;varying float vDistFromCamera;void main(){vUv=uv;vec4 worldPos=modelMatrix*vec4(position,1.0);vDistFromCamera=distance(cameraPosition,worldPos.xyz);gl_Position=projectionMatrix*viewMatrix*worldPos;}`}
-          fragmentShader={`uniform float uTime;uniform float uTubeVisibility;varying vec2 vUv;varying float vDistFromCamera;float hash21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash21(i),hash21(i+vec2(1.0,0.0)),f.x),mix(hash21(i+vec2(0.0,1.0)),hash21(i+1.0),f.x),f.y);}float fbm(vec2 p){float sum=0.0,amp=0.5;for(int i=0;i<4;i++){sum+=noise(p)*amp;p=mat2(1.62,-1.18,1.18,1.62)*p+vec2(3.7,5.2);amp*=0.5;}return sum;}void main(){float lengthAxis=vUv.x;float around=vUv.y;float flow=fbm(vec2(around*8.5+uTime*0.07,lengthAxis*12.0-uTime*2.5));float turbulence=fbm(vec2(around*17.0-uTime*0.1,lengthAxis*21.0-uTime*1.9));float goldVeins=pow(max(0.0,0.5+0.5*sin(around*118.0+flow*4.2+sin(lengthAxis*12.0)*0.34)),23.0);float rubyVeins=pow(max(0.0,0.5+0.5*sin(around*76.0-flow*3.1+lengthAxis*2.0)),18.0);float gaps=smoothstep(0.25,0.62,flow);float fog=1.0-smoothstep(7.0,${(WORMHOLE_PATH_LENGTH * 0.94).toFixed(2)},vDistFromCamera);vec3 voidColor=vec3(0.0078,0.0039,0.0196);vec3 baseColor=vec3(0.0157,0.0039,0.0314);vec3 obsidian=vec3(0.1176,0.0118,0.0471);vec3 gold=vec3(1.0,0.54,0.20);vec3 ruby=vec3(0.85,0.035,0.12);vec3 plasma=gold*goldVeins*0.48+ ruby*rubyVeins*0.16;vec3 nearWall=mix(baseColor,obsidian+plasma*gaps,clamp(uTubeVisibility,0.0,1.0));vec3 color=mix(voidColor,nearWall,fog);gl_FragColor=vec4(color,1.0);}`}
+          fragmentShader={`uniform float uTime;uniform float uTubeVisibility;varying vec2 vUv;varying float vDistFromCamera;float hash21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash21(i),hash21(i+vec2(1.0,0.0)),f.x),mix(hash21(i+vec2(0.0,1.0)),hash21(i+1.0),f.x),f.y);}float fbm(vec2 p){float sum=0.0,amp=0.5;for(int i=0;i<4;i++){sum+=noise(p)*amp;p=mat2(1.62,-1.18,1.18,1.62)*p+vec2(3.7,5.2);amp*=0.5;}return sum;}void main(){float lengthAxis=vUv.x;float around=vUv.y+lengthAxis*1.45;float flow=fbm(vec2(around*8.5+uTime*0.07,lengthAxis*12.0-uTime*2.5));float turbulence=fbm(vec2(around*17.0-uTime*0.1,lengthAxis*21.0-uTime*1.9));float goldVeins=pow(max(0.0,0.5+0.5*sin(around*118.0+flow*4.2+sin(lengthAxis*12.0-uTime*0.7)*0.34+turbulence*0.22)),23.0);float rubyVeins=pow(max(0.0,0.5+0.5*sin(around*76.0-flow*3.1+lengthAxis*2.0-uTime*0.45)),18.0);float gaps=smoothstep(0.25,0.62,flow);float fog=1.0-smoothstep(7.0,${(WORMHOLE_PATH_LENGTH * 0.94).toFixed(2)},vDistFromCamera);vec3 voidColor=vec3(0.0078,0.0039,0.0196);vec3 obsidian=vec3(0.0196,0.0039,0.0314);vec3 wallColor=vec3(0.0941,0.0078,0.0431);vec3 gold=vec3(1.0,0.745,0.333);vec3 ruby=vec3(0.878,0.118,0.282);vec3 plasma=gold*goldVeins*0.92+ruby*rubyVeins*0.38;vec3 nearWall=mix(obsidian,wallColor+plasma*gaps,clamp(uTubeVisibility,0.0,1.0));vec3 color=mix(voidColor,nearWall,fog);gl_FragColor=vec4(color,1.0);}`}
         />
       </mesh>
     </group>
@@ -168,7 +168,7 @@ function WormholeLandmarks({ phase }: { phase: ActFourPhase }) {
       dummy.quaternion.setFromUnitVectors(zAxis, frames.tangents[frameIndex]);
       dummy.scale.setScalar(1);
       dummy.updateMatrix();
-      return { matrix: dummy.matrix.clone(), color: new THREE.Color(index % 2 === 0 ? "#ffcf70" : "#ff2a55") };
+      return { matrix: dummy.matrix.clone(), color: new THREE.Color(index % 2 === 0 ? "#ffd882" : "#ff2e55") };
     });
   }, [dummy]);
   useEffect(() => {
@@ -184,19 +184,19 @@ function WormholeLandmarks({ phase }: { phase: ActFourPhase }) {
   useEffect(() => { phaseStartedAt.current = performance.now(); }, [phase]);
   useFrame(() => {
     const progress = clamp((performance.now() - phaseStartedAt.current) / (WARP_IN_DURATION_SECONDS * 1000));
-    const active = phase === "act4_warp_in" && progress >= 0.26 && progress < 0.84;
+    const active = phase === "act4_warp_in" && progress >= 0.22 && progress < 0.79;
     if (!instances.current || !material.current) return;
     instances.current.visible = active;
-    material.current.uniforms.uOpacity.value = 0.78 * smoothstep(0.24, 0.30, progress) * (1 - smoothstep(0.82, 0.84, progress));
+    material.current.uniforms.uOpacity.value = 0.78 * smoothstep(0.24, 0.30, progress) * (1 - smoothstep(0.75, 0.79, progress));
   });
   return (
     <instancedMesh ref={instances} args={[undefined, undefined, WORMHOLE_RING_COUNT]} frustumCulled={false} renderOrder={14}>
-      <torusGeometry args={[WORMHOLE_TUBE_RADIUS * 0.92, 0.048, 8, 48]} />
+      <torusGeometry args={[WORMHOLE_TUBE_RADIUS * 0.93, 0.055, 8, 48]} />
       <shaderMaterial
         ref={material}
         uniforms={{ uOpacity: { value: 0 } }}
         vertexShader={`varying vec3 vColor;varying vec3 vRingCenter;void main(){vec4 center=modelMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0);vec4 worldPosition=modelMatrix*instanceMatrix*vec4(position,1.0);vRingCenter=center.xyz;vColor=instanceColor;gl_Position=projectionMatrix*viewMatrix*worldPosition;}`}
-        fragmentShader={`uniform float uOpacity;varying vec3 vColor;varying vec3 vRingCenter;void main(){float cameraDistance=distance(vRingCenter,cameraPosition);float nearFade=smoothstep(2.0,7.0,cameraDistance);gl_FragColor=vec4(vColor,uOpacity*nearFade);}`}
+        fragmentShader={`uniform float uOpacity;varying vec3 vColor;varying vec3 vRingCenter;void main(){float cameraDistance=distance(vRingCenter,cameraPosition);float nearFade=smoothstep(2.0,6.5,cameraDistance);gl_FragColor=vec4(vColor,uOpacity*nearFade);}`}
         transparent
         depthTest
         depthWrite={false}
@@ -221,12 +221,12 @@ function WarpNeedles({ phase }: { phase: ActFourPhase }) {
       const binormal = frames.binormals[frameIndex];
       const tangent = frames.tangents[frameIndex];
       const angle = seeded(index, 92) * Math.PI * 2;
-      const radius = WORMHOLE_TUBE_RADIUS * (0.58 + seeded(index, 93) * 0.28);
+      const radius = WORMHOLE_TUBE_RADIUS * (0.64 + seeded(index, 93) * 0.26);
       const radial = normal.clone().multiplyScalar(Math.cos(angle) * radius).addScaledVector(binormal, Math.sin(angle) * radius);
       const position = WORMHOLE_CURVE.getPointAt(u).add(radial);
       const quaternion = new THREE.Quaternion().setFromUnitVectors(zAxis, tangent);
       const length = 4 + seeded(index, 94) * 2;
-      const color = new THREE.Color(index % 5 === 0 ? "#d91b42" : index % 3 === 0 ? "#fff1cd" : "#ffbe55");
+      const color = new THREE.Color(index % 5 === 0 ? "#ff3554" : index % 3 === 0 ? "#fff6e5" : "#ffd27d");
       dummy.position.copy(position);
       dummy.quaternion.copy(quaternion);
       dummy.scale.set(1, 1, length);
@@ -247,16 +247,16 @@ function WarpNeedles({ phase }: { phase: ActFourPhase }) {
   useEffect(() => { phaseStartedAt.current = performance.now(); }, [phase]);
   useFrame(() => {
     const progress = clamp((performance.now() - phaseStartedAt.current) / (WARP_IN_DURATION_SECONDS * 1000));
-    const active = phase === "act4_warp_in" && progress >= 0.24 && progress < 0.98;
+    const active = phase === "act4_warp_in" && progress >= 0.24 && progress < 0.79;
     if (!instances.current || !material.current) return;
     instances.current.visible = active;
-    const brake = smoothstep(0.84, 0.98, progress);
+    const dissolve = smoothstep(0.74, 0.79, progress);
     const reveal = smoothstep(0.24, 0.29, progress);
-    material.current.uniforms.uOpacity.value = reveal * (1 - smoothstep(0.94, 0.98, progress));
+    material.current.uniforms.uOpacity.value = reveal * (1 - dissolve);
     layout.forEach((needle, index) => {
       dummy.position.copy(needle.position);
       dummy.quaternion.copy(needle.quaternion);
-      dummy.scale.set(1, 1, THREE.MathUtils.lerp(needle.length, 0.02, brake));
+      dummy.scale.set(1, 1, needle.length);
       dummy.updateMatrix();
       instances.current?.setMatrixAt(index, dummy.matrix);
     });
@@ -268,8 +268,8 @@ function WarpNeedles({ phase }: { phase: ActFourPhase }) {
       <shaderMaterial
         ref={material}
         uniforms={{ uOpacity: { value: 0 } }}
-        vertexShader={`varying vec3 vColor;varying vec3 vNeedleCenter;void main(){vec4 center=modelMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0);vec4 worldPosition=modelMatrix*instanceMatrix*vec4(position,1.0);vNeedleCenter=center.xyz;vColor=instanceColor;gl_Position=projectionMatrix*viewMatrix*worldPosition;}`}
-        fragmentShader={`uniform float uOpacity;varying vec3 vColor;varying vec3 vNeedleCenter;void main(){float distanceToCamera=distance(vNeedleCenter,cameraPosition);float nearFade=smoothstep(1.5,5.5,distanceToCamera);gl_FragColor=vec4(vColor,uOpacity*nearFade);}`}
+        vertexShader={`varying vec3 vColor;varying vec3 vNeedleCenter;varying float vAlong;void main(){vec4 center=modelMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0);vec4 worldPosition=modelMatrix*instanceMatrix*vec4(position,1.0);vNeedleCenter=center.xyz;vColor=instanceColor;vAlong=clamp(position.z+0.5,0.0,1.0);gl_Position=projectionMatrix*viewMatrix*worldPosition;}`}
+        fragmentShader={`uniform float uOpacity;varying vec3 vColor;varying vec3 vNeedleCenter;varying float vAlong;void main(){float distanceToCamera=distance(vNeedleCenter,cameraPosition);float nearFade=smoothstep(1.8,5.5,distanceToCamera);float endTaper=smoothstep(0.0,0.16,vAlong)*(1.0-smoothstep(0.84,1.0,vAlong));gl_FragColor=vec4(vColor,uOpacity*nearFade*endTaper);}`}
         transparent
         depthTest
         depthWrite={false}
@@ -292,15 +292,15 @@ function WormholeExitAperture({ phase }: { phase: ActFourPhase }) {
   useEffect(() => { phaseStartedAt.current = performance.now(); }, [phase]);
   useFrame(() => {
     const progress = clamp((performance.now() - phaseStartedAt.current) / (WARP_IN_DURATION_SECONDS * 1000));
-    const appear = smoothstep(0.74, 0.84, progress);
+    const appear = smoothstep(0.72, 0.76, progress) * (1 - smoothstep(0.76, 0.79, progress));
     if (group.current) {
-      group.current.visible = phase === "act4_warp_in" && progress >= 0.74 && progress < 0.92;
+      group.current.visible = phase === "act4_warp_in" && progress >= 0.72 && progress < 0.79;
       group.current.position.copy(position);
       group.current.quaternion.copy(quaternion);
       group.current.scale.setScalar(0.35 + appear * 0.65);
     }
-    if (material.current) material.current.uniforms.uOpacity.value = appear * (1 - smoothstep(0.84, 0.92, progress));
-    if (light.current) light.current.intensity = appear * (1 - smoothstep(0.84, 0.92, progress)) * 8;
+    if (material.current) material.current.uniforms.uOpacity.value = appear;
+    if (light.current) light.current.intensity = appear * 10;
   });
   return (
     <group ref={group} visible={false}>
@@ -315,10 +315,10 @@ function WormholeExitAperture({ phase }: { phase: ActFourPhase }) {
           depthWrite={false}
           toneMapped={false}
           vertexShader={`varying vec2 vPortalUv;void main(){vPortalUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-          fragmentShader={`uniform float uOpacity;varying vec2 vPortalUv;void main(){vec2 p=(vPortalUv-0.5)*2.0;float r2=dot(p,p);float glow=exp(-r2*6.0);gl_FragColor=vec4(vec3(0.55,0.93,1.0),glow*uOpacity);}`}
+          fragmentShader={`uniform float uOpacity;varying vec2 vPortalUv;void main(){vec2 p=(vPortalUv-0.5)*2.0;float r2=dot(p,p);float halo=exp(-r2*3.2);float core=exp(-r2*12.0);vec3 warmGold=vec3(1.0,0.66,0.27);vec3 whiteGold=vec3(1.0,0.96,0.84);vec3 glowColor=mix(warmGold,whiteGold,core);float glowAlpha=max(halo*0.42,core*0.92)*uOpacity;gl_FragColor=vec4(glowColor,glowAlpha);}`}
         />
       </mesh>
-      <pointLight ref={light} color="#8ef3ff" intensity={0} distance={40} decay={1.5} />
+      <pointLight ref={light} color="#fff0cf" intensity={0} distance={40} decay={1.5} />
     </group>
   );
 }
@@ -655,8 +655,8 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
       if (ring) ring.rotation.z = (index % 2 === 0 ? 1 : -1) * time * (0.012 + index * 0.004);
     });
     const progress = age / WARP_IN_DURATION_SECONDS;
-    if (exteriorLayer.current) exteriorLayer.current.visible = phase === "act4_exterior" || (phase === "act4_warp_in" && progress < 0.25);
-    if (tunnelLayer.current) tunnelLayer.current.visible = (phase === "act4_warp_in" && progress >= 0.26 && progress < 0.84) || (phase === "act4_warp_out" && age >= 0.22);
+    if (exteriorLayer.current) exteriorLayer.current.visible = phase === "act4_exterior" || (phase === "act4_warp_in" && progress < 0.27);
+    if (tunnelLayer.current) tunnelLayer.current.visible = (phase === "act4_warp_in" && progress >= 0.22 && progress < 0.79) || (phase === "act4_warp_out" && age >= 0.22);
     if (vaultLayer.current) vaultLayer.current.visible = (phase === "act4_warp_in" && age >= WARP_VAULT_CUTOVER_SECONDS) || phase === "act4_vault" || phase === "act4_warp_out";
   });
   return (

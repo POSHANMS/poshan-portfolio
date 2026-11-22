@@ -13,6 +13,7 @@ import { sendContactMessage } from "@/lib/contactDelivery";
 import HoldToWarp from "./HoldToWarp";
 import type { ActFourPhase } from "@/types/actFour";
 import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
+import { ACT_FOUR_WARP_IN_DURATION_MS } from "@/animations/scrollCamera";
 
 type ChapterId = "hero" | "laptop" | "skills" | "projects" | "journey" | "contact";
 
@@ -583,8 +584,8 @@ function ProjectsChapter({
     );
   }
 
-  if (phase === "act4_warp_in") {
-    const signal = smoothstep(warpProgress, 0.24, 0.3) * (1 - smoothstep(warpProgress, 0.56, 0.62));
+  if (phase === "act4_warp_in" && warpProgress < 0.88) {
+    const signal = smoothstep(warpProgress, 0.24, 0.3) * (1 - smoothstep(warpProgress, 0.42, 0.52));
     return (
       <>
         <Panel presence={1} side="left" className="act-four-warp-launch left-6 top-[17vh] w-[min(27rem,calc(100vw-3rem))] md:left-16" interactive={false} animation="act-four-launch-fade 180ms ease-out both">
@@ -596,19 +597,21 @@ function ProjectsChapter({
             <p className="max-w-sm text-[clamp(0.96rem,1.18vw,1.1rem)] leading-[1.55] text-white/90 [text-shadow:0_0_12px_rgba(255,53,84,0.12)]">Hold to cross the event horizon and enter the project vault.</p>
           </div>
         </Panel>
-        <Panel presence={signal} side="center" className="left-1/2 top-[43vh]" interactive={false} transitionMs={180}>
-          <div className="whitespace-nowrap text-center font-mono text-[9px] uppercase tracking-[0.34em] text-white/75 drop-shadow-[0_0_12px_rgba(142,243,255,0.28)]">Traversing event horizon</div>
-        </Panel>
+        {warpProgress < 0.55 && (
+          <Panel presence={signal} side="center" className="left-1/2 top-[43vh]" interactive={false}>
+            <div className="whitespace-nowrap text-center font-mono text-[9px] uppercase tracking-[0.34em] text-white/75 drop-shadow-[0_0_12px_rgba(255,190,85,0.28)]">Traversing event horizon</div>
+          </Panel>
+        )}
       </>
     );
   }
 
-  if (phase === "act4_vault" || phase === "act4_warp_out") {
+  if (phase === "act4_warp_in" || phase === "act4_vault" || phase === "act4_warp_out") {
     const finalProject = displayProjectIndex === PROJECTS.length - 1;
     const copyMotion = copyPhase === "exit" ? "is-exiting" : copyPhase === "enter" ? "is-entering" : "";
     return (
       <>
-      <Panel presence={phase === "act4_warp_out" ? 0 : phase === "act4_vault" ? smoothstep(warpProgress, 0.93, 0.97) : presence} side="left" interactive={phase !== "act4_warp_out"} transitionMs={phase === "act4_warp_out" ? 200 : 0} animation={phase === "act4_vault" && warpProgress >= 0.93 ? "act-four-hud-arrive 320ms cubic-bezier(0.18,0.72,0.22,1) both" : undefined} className="act-four-station-shell left-4 top-[clamp(1.25rem,7vh,4.5rem)] z-50 w-[min(31rem,42vw)] max-w-[500px] max-h-[calc(100dvh-3rem)] md:left-12 max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto">
+      <Panel presence={phase === "act4_warp_out" ? 0 : smoothstep(warpProgress, 0.88, 1)} side="left" interactive={phase === "act4_vault"} transitionMs={phase === "act4_warp_out" ? 200 : 0} className="act-four-station-shell left-4 top-[clamp(1.25rem,7vh,4.5rem)] z-50 w-[min(31rem,42vw)] max-w-[500px] max-h-[calc(100dvh-3rem)] md:left-12 max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto">
         <section className={`act-four-station-panel act-four-station-panel--${copyMotion}`} aria-label={`${String(displayProjectIndex + 1).padStart(2, "0")} of ${String(PROJECTS.length).padStart(2, "0")}: ${project.name}`} aria-live="polite" aria-atomic="true" style={{ "--act-four-accent": accent } as React.CSSProperties}>
           <div className="act-four-station-content">
             <span aria-hidden="true" className="act-four-accent-edge" />
@@ -652,7 +655,7 @@ function ProjectsChapter({
         onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }}
         className="act-four-exit-control pointer-events-auto absolute right-6 top-6 z-[60]"
         aria-label="Exit the Act IV vault"
-        style={{ "--act-four-accent": accent, transition: "opacity 200ms ease, transform 200ms ease", animation: phase === "act4_vault" ? "act-four-hud-arrive 350ms ease-out both" : undefined, opacity: phase === "act4_warp_out" ? 0 : 1, pointerEvents: phase === "act4_warp_out" ? "none" : "auto", transform: phase === "act4_warp_out" ? "translateY(-12px)" : undefined } as React.CSSProperties}
+        style={{ "--act-four-accent": accent, transition: "opacity 200ms ease, transform 200ms ease", opacity: phase === "act4_vault" ? 1 : 0, pointerEvents: phase === "act4_vault" ? "auto" : "none", transform: phase === "act4_vault" ? undefined : "translateY(-12px)" } as React.CSSProperties}
       >[ ESC // EXIT VAULT ]</button>
       </>
     );
@@ -959,7 +962,7 @@ export default function CinematicJourney({
       return;
     }
     const timer = setInterval(() => {
-      const progress = Math.min(1, (performance.now() - (actFourWarpStartedAt.current ?? performance.now())) / 2200);
+      const progress = Math.min(1, (performance.now() - (actFourWarpStartedAt.current ?? performance.now())) / ACT_FOUR_WARP_IN_DURATION_MS);
       setActFourWarpProgress(progress);
       if (progress >= 1) clearInterval(timer);
     }, 32);
@@ -1105,18 +1108,16 @@ export default function CinematicJourney({
     ? 0.85 * smoothstep(actFourExitProgress, 0.72, 1)
     : handoffBloom ? 0.85 : 0;
   const entryIrisProgress = actFourWarpProgress;
+  const entryBloomRise = smoothstep(entryIrisProgress, 0.74, 0.79);
+  const entryBloomFall = 1 - smoothstep(entryIrisProgress, 0.79, 0.88);
   const entryBloomOpacity = actFourPhase === "act4_warp_in"
-    ? 0.82 * smoothstep(entryIrisProgress, 0.72, 0.84) * (1 - smoothstep(entryIrisProgress, 0.84, 0.92))
+    ? 0.88 * (entryIrisProgress <= 0.79 ? entryBloomRise : entryBloomFall)
     : 0;
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
-      {actFourPhase === "act4_warp_in" ? (
-        <div aria-hidden="true" className="act-four-emergence-overlay pointer-events-none absolute inset-0 z-[100]" style={{ opacity: entryBloomOpacity }}>
-          <span className="act-four-emergence-pinpoint" />
-          <span className="act-four-emergence-shockwave" style={{ transform: `translate(-50%, -50%) scale(${0.15 + smoothstep(entryIrisProgress, 0.72, 0.92) * 8.5})`, opacity: entryBloomOpacity }} />
-          <span className="act-four-emergence-flare" style={{ opacity: entryBloomOpacity }} />
-        </div>
+      {actFourPhase === "act4_warp_in" && entryIrisProgress >= 0.74 && entryIrisProgress < 0.88 ? (
+        <div aria-hidden="true" className="act-four-emergence-overlay pointer-events-none absolute inset-0 z-[100]" style={{ opacity: entryBloomOpacity }} />
       ) : (actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out" || handoffBloom) && (
         <div
           aria-hidden="true"

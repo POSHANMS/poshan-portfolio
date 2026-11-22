@@ -5,6 +5,7 @@ import type { MutableRefObject } from "react";
 import type { ActFourPhase } from "@/types/actFour";
 import { PROJECTS } from "@/utils/constants";
 import { ACT_FIVE_TIMING } from "@/animations/actFiveChoreography";
+import { ACT_FOUR_WARP_IN_DURATION_MS } from "@/animations/scrollCamera";
 
 const ACT_FOUR_ENTRY = 0.825;
 const ACT_FOUR_EXIT = 0.905;
@@ -17,7 +18,6 @@ const WHEEL_GESTURE_GAP_MS = 180;
 // Station 05 is also the vault exit. A longer idle window prevents the tail of
 // the 04 -> 05 trackpad gesture from being mistaken for a deliberate exit.
 const STATION_FIVE_GESTURE_GAP_MS = 1400;
-const WARP_DURATION_MS = 2200;
 const EXIT_FADE_MS = 200;
 const EXIT_FLIGHT_MS = 900;
 const ACT_FOUR_RETURN_TARGET = ACT_FIVE_TIMING.cameraStart + 0.002;
@@ -79,7 +79,7 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
     setProjectIndex(0);
     lockedScrollY.current = window.scrollY;
     transitionTo("act4_warp_in");
-    warpTimer.current = setTimeout(() => transitionTo("act4_vault"), WARP_DURATION_MS);
+    warpTimer.current = setTimeout(() => transitionTo("act4_vault"), ACT_FOUR_WARP_IN_DURATION_MS);
   }, [clearExitTimer, clearWarpTimer, transitionTo]);
 
   const exitProjectWorld = useCallback(() => {
