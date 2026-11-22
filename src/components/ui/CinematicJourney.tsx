@@ -584,18 +584,20 @@ function ProjectsChapter({
   }
 
   if (phase === "act4_warp_in") {
-    const signal = smoothstep(warpProgress, 0.12, 0.22) * (1 - smoothstep(warpProgress, 0.62, 0.68));
+    const signal = smoothstep(warpProgress, 0.24, 0.3) * (1 - smoothstep(warpProgress, 0.56, 0.62));
     return (
       <>
-        <Panel presence={1} side="left" className="left-6 top-[17vh] w-[min(27rem,calc(100vw-3rem))] md:left-16" interactive={false} animation="act-four-launch-fade 200ms ease-out both">
+        <Panel presence={1} side="left" className="act-four-warp-launch left-6 top-[17vh] w-[min(27rem,calc(100vw-3rem))] md:left-16" interactive={false} animation="act-four-launch-fade 180ms ease-out both">
           <div className="grid gap-4 py-2 pr-5 [text-shadow:0_2px_16px_rgba(0,0,0,0.9)]">
-            <Kicker act="ACT IV" label="Core Orbit" />
-            <h2 className="max-w-[10ch] text-4xl font-black uppercase leading-[0.92] tracking-[-0.035em] text-white md:text-5xl">Project Launch</h2>
-            <p className="max-w-sm text-sm leading-6 text-white/80">Hold to breach the crimson core and enter the project vault.</p>
+            <div className="act-four-exterior-kicker mb-2" aria-label="Act IV // Event Horizon">
+              <span>ACT IV</span><span aria-hidden="true">{"//"}</span><span>EVENT HORIZON</span>
+            </div>
+            <h2 className="max-w-[12ch] text-[clamp(3rem,4.6vw,4.4rem)] font-black uppercase leading-[0.94] tracking-[-0.04em] text-white [text-shadow:0_0_24px_rgba(255,53,84,0.18)]">Project <span className="act-four-brand-accent">Launch</span></h2>
+            <p className="max-w-sm text-[clamp(0.96rem,1.18vw,1.1rem)] leading-[1.55] text-white/90 [text-shadow:0_0_12px_rgba(255,53,84,0.12)]">Hold to cross the event horizon and enter the project vault.</p>
           </div>
         </Panel>
         <Panel presence={signal} side="center" className="left-1/2 top-[43vh]" interactive={false} transitionMs={180}>
-          <div className="whitespace-nowrap text-center font-mono text-[9px] uppercase tracking-[0.34em] text-[#ffe4ea]/82 drop-shadow-[0_0_18px_rgba(255,228,234,0.55)]">Traversing event horizon</div>
+          <div className="whitespace-nowrap text-center font-mono text-[9px] uppercase tracking-[0.34em] text-white/75 drop-shadow-[0_0_12px_rgba(142,243,255,0.28)]">Traversing event horizon</div>
         </Panel>
       </>
     );
@@ -606,7 +608,7 @@ function ProjectsChapter({
     const copyMotion = copyPhase === "exit" ? "is-exiting" : copyPhase === "enter" ? "is-entering" : "";
     return (
       <>
-      <Panel presence={phase === "act4_warp_out" ? 0 : presence} side="left" interactive={phase !== "act4_warp_out"} transitionMs={phase === "act4_warp_out" ? 200 : 0} animation={phase === "act4_vault" ? "act-four-hud-arrive 350ms ease-out both" : undefined} className="act-four-station-shell left-4 top-[clamp(1.25rem,7vh,4.5rem)] z-50 w-[min(31rem,42vw)] max-w-[500px] max-h-[calc(100dvh-3rem)] md:left-12 max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto">
+      <Panel presence={phase === "act4_warp_out" ? 0 : phase === "act4_vault" ? smoothstep(warpProgress, 0.93, 0.97) : presence} side="left" interactive={phase !== "act4_warp_out"} transitionMs={phase === "act4_warp_out" ? 200 : 0} animation={phase === "act4_vault" && warpProgress >= 0.93 ? "act-four-hud-arrive 320ms cubic-bezier(0.18,0.72,0.22,1) both" : undefined} className="act-four-station-shell left-4 top-[clamp(1.25rem,7vh,4.5rem)] z-50 w-[min(31rem,42vw)] max-w-[500px] max-h-[calc(100dvh-3rem)] md:left-12 max-[800px]:left-4 max-[800px]:top-4 max-[800px]:w-[calc(100vw-2rem)] max-[800px]:max-h-[47vh] max-[800px]:overflow-y-auto">
         <section className={`act-four-station-panel act-four-station-panel--${copyMotion}`} aria-label={`${String(displayProjectIndex + 1).padStart(2, "0")} of ${String(PROJECTS.length).padStart(2, "0")}: ${project.name}`} aria-live="polite" aria-atomic="true" style={{ "--act-four-accent": accent } as React.CSSProperties}>
           <div className="act-four-station-content">
             <span aria-hidden="true" className="act-four-accent-edge" />
@@ -920,6 +922,7 @@ export default function CinematicJourney({
 }) {
   const [hoveredCube, setHoveredCube] = useState<CubeModuleId | null>(null);
   const [actFourWarpProgress, setActFourWarpProgress] = useState(0);
+  const actFourWarpStartedAt = useRef<number | null>(null);
   const [actFourExitProgress, setActFourExitProgress] = useState(0);
   const [handoffBloom, setHandoffBloom] = useState(false);
   const [cubeTargets, setCubeTargets] = useState<Partial<Record<CubeModuleId, CubeHoverTarget>>>({});
@@ -928,11 +931,8 @@ export default function CinematicJourney({
   const isHoveringCubePanel = useRef(false);
 
   useEffect(() => {
-    if (actFourPhase === "act4_vault") {
-      setActFourWarpProgress(1);
-      return;
-    }
     if (actFourPhase === "act4_warp_out") {
+      actFourWarpStartedAt.current = null;
       setActFourWarpProgress(0);
       setActFourExitProgress(0);
       setHandoffBloom(false);
@@ -944,13 +944,25 @@ export default function CinematicJourney({
       }, 24);
       return () => clearInterval(timer);
     }
-    if (actFourPhase !== "act4_warp_in") {
+    if (actFourPhase !== "act4_warp_in" && actFourPhase !== "act4_vault") {
+      actFourWarpStartedAt.current = null;
       setActFourWarpProgress(0);
       setActFourExitProgress(0);
       return;
     }
-    const startedAt = performance.now();
-    const timer = setInterval(() => setActFourWarpProgress(Math.min(1, (performance.now() - startedAt) / 2200)), 40);
+    if (actFourPhase === "act4_warp_in") {
+      actFourWarpStartedAt.current = performance.now();
+      setActFourWarpProgress(0);
+    }
+    if (actFourWarpStartedAt.current === null) {
+      setActFourWarpProgress(1);
+      return;
+    }
+    const timer = setInterval(() => {
+      const progress = Math.min(1, (performance.now() - (actFourWarpStartedAt.current ?? performance.now())) / 2200);
+      setActFourWarpProgress(progress);
+      if (progress >= 1) clearInterval(timer);
+    }, 32);
     return () => clearInterval(timer);
   }, [actFourPhase]);
 
@@ -1094,19 +1106,23 @@ export default function CinematicJourney({
     : handoffBloom ? 0.85 : 0;
   const entryIrisProgress = actFourWarpProgress;
   const entryBloomOpacity = actFourPhase === "act4_warp_in"
-    ? 0.88 * (entryIrisProgress <= 0.85
-      ? smoothstep(entryIrisProgress, 0.8, 0.85)
-      : 1 - smoothstep(entryIrisProgress, 0.85, 0.9))
+    ? 0.82 * smoothstep(entryIrisProgress, 0.72, 0.84) * (1 - smoothstep(entryIrisProgress, 0.84, 0.92))
     : 0;
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
-      {(actFourPhase === "act4_warp_in" || actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out" || handoffBloom) && (
+      {actFourPhase === "act4_warp_in" ? (
+        <div aria-hidden="true" className="act-four-emergence-overlay pointer-events-none absolute inset-0 z-[100]" style={{ opacity: entryBloomOpacity }}>
+          <span className="act-four-emergence-pinpoint" />
+          <span className="act-four-emergence-shockwave" style={{ transform: `translate(-50%, -50%) scale(${0.15 + smoothstep(entryIrisProgress, 0.72, 0.92) * 8.5})`, opacity: entryBloomOpacity }} />
+          <span className="act-four-emergence-flare" style={{ opacity: entryBloomOpacity }} />
+        </div>
+      ) : (actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out" || handoffBloom) && (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-[100]"
           style={{
-            opacity: actFourPhase === "act4_warp_in" ? entryBloomOpacity : handoffBloom ? 0.85 : exitBloomOpacity,
+            opacity: handoffBloom ? 0.85 : exitBloomOpacity,
             transition: actFourPhase === "act4_vault" || actFourPhase === "act5" ? "opacity 300ms ease-out" : "opacity 80ms linear",
             background: "radial-gradient(ellipse at 50% 50%, rgba(255,205,145,0.92) 0%, rgba(255,103,57,0.78) 18%, rgba(126,10,35,0.82) 48%, rgba(27,1,11,0.96) 100%)",
             mixBlendMode: "screen",

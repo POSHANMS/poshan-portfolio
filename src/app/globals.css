@@ -2393,13 +2393,56 @@ canvas {
 }
 
 @keyframes act-four-launch-fade {
-  from { opacity: 1; }
-  to { opacity: 0; }
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.96); }
 }
 
 @keyframes act-four-hud-arrive {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.985); filter: blur(3px); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
+}
+
+.act-four-emergence-overlay {
+  overflow: hidden;
+  isolation: isolate;
+  mix-blend-mode: screen;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 247, 219, 0.2) 0%, rgba(142, 243, 255, 0.16) 12%, rgba(49, 179, 213, 0.07) 27%, transparent 48%);
+}
+
+.act-four-emergence-pinpoint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.55rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #e9fdff;
+  box-shadow: 0 0 12px 5px rgba(142, 243, 255, 0.82), 0 0 34px 14px rgba(57, 203, 235, 0.42);
+  transform: translate(-50%, -50%);
+}
+
+.act-four-emergence-shockwave {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 11vmin;
+  min-width: 4rem;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 250, 227, 0.98);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255, 248, 216, 0.98), inset 0 0 12px rgba(142, 243, 255, 0.68), 0 0 36px rgba(73, 213, 241, 0.52), 0 0 64px rgba(255, 195, 115, 0.22);
+  will-change: transform, opacity;
+}
+
+.act-four-emergence-flare {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(100vw, 110rem);
+  height: 1px;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(90deg, transparent, rgba(142, 243, 255, 0.16) 28%, rgba(255, 224, 170, 0.34) 44%, rgba(255, 252, 238, 0.96) 50%, rgba(142, 243, 255, 0.2) 72%, transparent);
+  box-shadow: 0 0 12px 2px rgba(142, 243, 255, 0.74), 0 0 34px 7px rgba(72, 202, 232, 0.34), 0 0 24px 3px rgba(255, 210, 140, 0.25);
 }
 
 .act-four-station-panel {
