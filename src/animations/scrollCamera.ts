@@ -334,10 +334,11 @@ export function CinematicCamera({
     const isWarping = actFourPhase === "act4_warp_in";
     const charge = actFourPhase === "act4_exterior" ? THREE.MathUtils.clamp(warpCharge?.current ?? 0, 0, 1) : 0;
     if (actFourPhase === "act4_exterior" && charge > 0) {
-      // Close the camera distance as the lens widens: the combined projection
-      // keeps the horizon about 15–20% larger at full charge, never smaller.
-      desiredPosition.lerp(desiredLookAt, charge * 0.37);
-      desiredFov = THREE.MathUtils.lerp(45, 58, charge);
+      // Move straight along the existing camera-to-target sightline. The
+      // distance pull and 45°→52° lens change combine to enlarge the horizon
+      // by roughly 13% while keeping its screen placement and angle fixed.
+      desiredPosition.lerp(desiredLookAt, charge * 0.25);
+      desiredFov = THREE.MathUtils.lerp(45, 52, charge);
     } else if (isWarping) {
       const elapsed = time - phaseStartedAt.current;
       const flight = THREE.MathUtils.clamp(elapsed / 2.2, 0, 1);
@@ -467,10 +468,11 @@ export function CinematicCamera({
 
     // Subtle handheld-cinema drift while scrolling; very small so the scene stays premium.
     const actFourBreathing = actFourPhase === "act4_exterior";
-    const drift = Math.sin(time * 0.45 + p * Math.PI * 2) * (actFourBreathing ? 0.018 : 0.01);
+    const actFourCharging = actFourBreathing && charge > 0;
+    const drift = Math.sin(time * 0.45 + p * Math.PI * 2) * (actFourBreathing ? (actFourCharging ? 0 : 0.006) : 0.01);
     const warpSettle = isWarping ? 1 - THREE.MathUtils.smoothstep((time - phaseStartedAt.current) / 2.2, 0.78, 1) : 0;
-      const chargeTremor = THREE.MathUtils.smoothstep(charge, 0.4, 1);
-      const noiseEnvelope = actFiveCameraActive ? 1 : charge > 0 ? chargeTremor : isWarping ? 0.7 * warpSettle : 0;
+    const chargeTremor = THREE.MathUtils.smoothstep(charge, 0.55, 1);
+    const noiseEnvelope = actFiveCameraActive ? 1 : charge > 0 ? chargeTremor : isWarping ? 0.7 * warpSettle : 0;
     const smoothRigNoise = (frequency: number, phase: number) => {
       const sample = time * frequency + phase;
       const cell = Math.floor(sample);
@@ -480,11 +482,19 @@ export function CinematicCamera({
       const b = Math.sin((cell + 1) * 127.1 + phase * 311.7) * 43758.5453;
       return THREE.MathUtils.lerp(a - Math.floor(a) - 0.5, b - Math.floor(b) - 0.5, eased);
     };
-    cameraNoise.current.set(
-      smoothRigNoise(actFourPhase === "act4_exterior" && charge > 0 ? 44 : noiseEnvelope > 0 ? 26 : 7.4, 0.31) * (charge > 0 || isWarping ? 0.028 : 0.0042) * noiseEnvelope,
-      smoothRigNoise(actFourPhase === "act4_exterior" && charge > 0 ? 49 : noiseEnvelope > 0 ? 22 : 6.1, 1.77) * (charge > 0 || isWarping ? 0.022 : 0.0032) * noiseEnvelope,
-      smoothRigNoise(actFourPhase === "act4_exterior" && charge > 0 ? 54 : noiseEnvelope > 0 ? 22 : 8.2, 2.43) * (charge > 0 || isWarping ? 0.009 : 0.0012) * noiseEnvelope,
-    );
+    if (actFourCharging) {
+      // Keep charging tremor symmetric and on the optical axis: no lateral
+      // translation, camera bank, or angle change can peel the disk layers apart.
+      const sightline = currentLookAt.current.clone().sub(currentPos.current).normalize();
+      const axialTremor = smoothRigNoise(48, 0.31) * 0.0024 * chargeTremor;
+      cameraNoise.current.copy(sightline).multiplyScalar(axialTremor);
+    } else {
+      cameraNoise.current.set(
+        smoothRigNoise(noiseEnvelope > 0 ? 26 : 7.4, 0.31) * (isWarping ? 0.028 : 0.0042) * noiseEnvelope,
+        smoothRigNoise(noiseEnvelope > 0 ? 22 : 6.1, 1.77) * (isWarping ? 0.022 : 0.0032) * noiseEnvelope,
+        smoothRigNoise(noiseEnvelope > 0 ? 22 : 8.2, 2.43) * (isWarping ? 0.009 : 0.0012) * noiseEnvelope,
+      );
+    }
 
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0)).add(cameraNoise.current);
     if (actFourPhase === "act4_exterior") {
@@ -493,23 +503,28 @@ export function CinematicCamera({
     }
     camera.lookAt(currentLookAt.current);
     const actFourCameraActive = actFourPhase === "act4_warp_in" || actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out";
-    const targetRoll = (actFiveCameraActive || actFourCameraActive ? authoredActFiveRoll : actSixCameraActive ? authoredActSixRoll : 0)
-      + (actFourPhase === "act4_exterior" ? THREE.MathUtils.degToRad(7) * charge : 0);
+    const targetRoll = actFiveCameraActive || actFourCameraActive ? authoredActFiveRoll : actSixCameraActive ? authoredActSixRoll : 0;
     const targetPitch = actFiveCameraActive || actFourCameraActive ? authoredActFivePitch : actSixCameraActive ? authoredActSixPitch : 0;
     const targetYaw = actFiveCameraActive || actFourCameraActive ? authoredActFiveYaw : actSixCameraActive ? authoredActSixYaw : 0;
     const cinematicCameraActive = actFiveCameraActive || actSixCameraActive || actFourCameraActive;
-    cameraRoll.current = THREE.MathUtils.damp(cameraRoll.current, targetRoll, cinematicCameraActive ? 5.5 : 8, delta);
-    cameraPitch.current = THREE.MathUtils.damp(cameraPitch.current, targetPitch, cinematicCameraActive ? 5.2 : 8, delta);
-    cameraYaw.current = THREE.MathUtils.damp(cameraYaw.current, targetYaw, cinematicCameraActive ? 5.2 : 8, delta);
+    if (actFourCharging) {
+      cameraRoll.current = 0;
+      cameraPitch.current = 0;
+      cameraYaw.current = 0;
+    } else {
+      cameraRoll.current = THREE.MathUtils.damp(cameraRoll.current, targetRoll, cinematicCameraActive ? 5.5 : 8, delta);
+      cameraPitch.current = THREE.MathUtils.damp(cameraPitch.current, targetPitch, cinematicCameraActive ? 5.2 : 8, delta);
+      cameraYaw.current = THREE.MathUtils.damp(cameraYaw.current, targetYaw, cinematicCameraActive ? 5.2 : 8, delta);
+    }
     camera.rotateY(cameraYaw.current);
     camera.rotateX(cameraPitch.current);
     camera.rotateZ(cameraRoll.current);
-    if (actFourBreathing) {
-      camera.position.x += Math.sin(time * 0.19) * 0.025;
-      camera.position.y += Math.cos(time * 0.16) * 0.018;
+    if (actFourBreathing && !actFourCharging) {
+      camera.position.x += Math.sin(time * 0.19) * 0.008;
+      camera.position.y += Math.cos(time * 0.16) * 0.006;
     }
-    if (charge > 0 || isWarping || actFourPhase === "act4_warp_out") {
-      const shake = charge > 0 ? THREE.MathUtils.smoothstep(charge, 0.4, 1) : isWarping
+    if (isWarping || actFourPhase === "act4_warp_out") {
+      const shake = isWarping
         ? THREE.MathUtils.smoothstep(Math.sin(time * 0.7) * 0.5 + 0.5, 0.15, 0.85) * warpSettle
         : THREE.MathUtils.smoothstep(Math.sin(time * 0.7) * 0.5 + 0.5, 0.15, 0.85);
       camera.rotateX(smoothRigNoise(31, 5.3) * 0.009 * shake);

@@ -515,7 +515,8 @@ const exteriorFragment = `
     float coronaBreath = 1.0 + 0.04 * sin(uTime * 0.82 + cloud * 3.0);
     vec2 lensP = p + vec2(yaw, pitch) * 0.22;
     float lensRadial = length(lensP);
-    float rimAngle = atan(lensP.y, lensP.x) - uFlowPhase * 2.6;
+    // The rim phase uses the exact inner-disk Kepler rate and direction.
+    float rimAngle = atan(lensP.y, lensP.x) - uFlowPhase * 3.2;
     float rimSurgeA = pow(max(0.0, cos(rimAngle)), 18.0);
     float rimSurgeB = pow(max(0.0, cos(rimAngle - 2.0943951)), 18.0);
     float rimSurgeC = pow(max(0.0, cos(rimAngle - 4.1887902)), 18.0);
@@ -524,9 +525,9 @@ const exteriorFragment = `
     float photonRadius = shadowRadius * (1.045 + rimWarp);
     float photon = exp(-pow((radial - photonRadius) * 92.0, 2.0)) * (0.62 + charge * 1.8 + rimSurges * 1.45) * coronaBreath;
     float glintAngle = atan(p.y, p.x) + yaw * 0.5 + pitch * 0.35;
-    float glintA = pow(max(0.0, cos(glintAngle - uFlowPhase * 2.2)), 34.0);
-    float glintB = pow(max(0.0, cos(glintAngle - uFlowPhase * 1.63 + 2.08)), 38.0);
-    float glintC = pow(max(0.0, cos(glintAngle - uFlowPhase * 2.65 - 2.17)), 42.0);
+    float glintA = pow(max(0.0, cos(glintAngle - uFlowPhase * 3.2)), 34.0);
+    float glintB = pow(max(0.0, cos(glintAngle - uFlowPhase * 3.2 + 2.08)), 38.0);
+    float glintC = pow(max(0.0, cos(glintAngle - uFlowPhase * 3.2 - 2.17)), 42.0);
     float travelingGlints = (glintA + glintB + glintC) * (0.18 + charge * 0.28);
     photon += travelingGlints * exp(-pow((radial - shadowRadius * 1.045) * 82.0, 2.0));
     // Let the soft lensed arcs follow the same diagonal plane as the disk.
@@ -587,8 +588,29 @@ const exteriorFragment = `
     float pulseWaves = energyWave * (0.5 + 0.5 * sin(uFlowPhase * 8.0 + radial * 62.0));
     color += photonColor * photon * 0.72 + whiteGold * travelingGlints * 0.7 + whiteGold * rimSurges * contactBand * 0.92 + photonColor * rimJoin + vec3(1.0, 0.52, 0.22) * arc * coronaBreath + whiteGold * (pulseWaves + highChargeShimmer * photon);
     alpha = max(alpha, max(photon * 0.94 + travelingGlints * 0.3, max(rimJoin * 0.72, arc * 0.72 + pulseWaves)));
+    // Supplemental Act-IV-only star points fill the lower negative space.
+    // They are composited behind the opaque shadow and dimmed by dense plasma.
+    vec2 starGrid = vQuadUv * vec2(144.0, 81.0);
+    vec2 starCell = floor(starGrid);
+    vec2 starLocal = fract(starGrid);
+    vec2 starOffset = vec2(hash21(starCell + 17.0), hash21(starCell + 53.0));
+    float starSeed = hash21(starCell + 91.0);
+    float starSize = mix(0.018, 0.058, starSeed);
+    float starDistance = length(starLocal - starOffset);
+    float starPoint = (1.0 - smoothstep(starSize * 0.3, starSize, starDistance)) * step(0.978, hash21(starCell + 29.0));
+    float starTwinkle = 0.68 + 0.32 * sin(uTime * (0.8 + starSeed * 1.8) + starSeed * 6.2831853);
+    float lowerSpaceBias = mix(0.22, 1.0, smoothstep(0.02, 0.82, -p.y));
+    float plasmaOcclusion = 1.0 - smoothstep(0.08, 0.52, gas);
+    float rimOcclusion = smoothstep(shadowRadius * 1.08, shadowRadius * 1.24, radial);
+    float backgroundStars = starPoint * starTwinkle * lowerSpaceBias * plasmaOcclusion * rimOcclusion;
+    color += vec3(0.72, 0.79, 0.92) * backgroundStars * 0.19;
+    alpha = max(alpha, backgroundStars * 0.82);
     float edge = max(abs(p.x), abs(p.y));
     alpha *= 1.0 - smoothstep(0.78, 0.99, edge);
+    if (radial < shadowRadius * 0.992) {
+      color = vec3(0.0);
+      alpha = 1.0;
+    }
     if (edge > 0.995 || alpha < 0.003) discard;
     gl_FragColor = vec4(filmic(color * (0.9 + charge * 1.35)), clamp(alpha, 0.0, 1.0));
     return;
@@ -751,7 +773,7 @@ const exteriorFragment = `
   }
 `;
 
-function RaymarchedExterior({ charge, radius = 1.85, flowPhase }: { charge: ChargeSource; radius?: number; flowPhase: React.MutableRefObject<number> }) {
+function RaymarchedExterior({ charge, radius = 1.85, flowPhase, diskTilt }: { charge: ChargeSource; radius?: number; flowPhase: React.MutableRefObject<number>; diskTilt: React.MutableRefObject<number> }) {
   const mesh = useRef<THREE.Mesh>(null);
   const shadow = useRef<THREE.Mesh>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
@@ -791,11 +813,11 @@ function RaymarchedExterior({ charge, radius = 1.85, flowPhase }: { charge: Char
     pointer.current.x = THREE.MathUtils.damp(pointer.current.x, cursor.x, 3.5, delta);
     pointer.current.y = THREE.MathUtils.damp(pointer.current.y, cursor.y, 3.5, delta);
     uniforms.uPointer.value.copy(pointer.current);
-    uniforms.uDiskTilt.value = -0.314 + Math.sin(clock.getElapsedTime() * 0.46) * 0.035 + pointer.current.x * 0.0698;
+    uniforms.uDiskTilt.value = diskTilt.current;
     uniforms.uCharge.value = THREE.MathUtils.damp(uniforms.uCharge.value, readCharge(charge), 4.5, delta);
     // Integrate velocity instead of multiplying time by charge: when the hold
     // is released, flow slows smoothly without the phase jumping backward.
-    const flowSpeed = 1.0 + 6.5 * Math.pow(uniforms.uCharge.value, 1.8);
+    const flowSpeed = 1.2 + 8.0 * Math.pow(uniforms.uCharge.value, 1.7);
     flowPhase.current += Math.min(delta, 0.05) * flowSpeed;
     uniforms.uFlowPhase.value = flowPhase.current;
     uniforms.uTime.value = clock.getElapsedTime();
@@ -819,13 +841,12 @@ function RaymarchedExterior({ charge, radius = 1.85, flowPhase }: { charge: Char
   );
 }
 
-function ExteriorAccretionSparks({ charge, radius, flowPhase }: { charge: ChargeSource; radius: number; flowPhase: React.MutableRefObject<number> }) {
+function ExteriorPhotonRimSparks({ charge, radius, flowPhase }: { charge: ChargeSource; radius: number; flowPhase: React.MutableRefObject<number> }) {
   const group = useRef<THREE.Group>(null);
   const sparks = useRef<THREE.InstancedMesh>(null);
-  const pointer = useRef(new THREE.Vector2());
   const initialized = useRef(false);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const count = 220;
+  const count = 72;
   const geometry = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
   const material = useMemo(() => new THREE.ShaderMaterial({
     vertexShader: `
@@ -842,11 +863,14 @@ function ExteriorAccretionSparks({ charge, radius, flowPhase }: { charge: Charge
       varying vec2 vUv;
       varying vec3 vColor;
       void main() {
-        float longitudinal = smoothstep(0.0, 0.16, vUv.x) * (1.0 - smoothstep(0.82, 1.0, vUv.x));
-        float transverse = 1.0 - smoothstep(0.18, 0.5, abs(vUv.y - 0.5) * 2.0);
-        float alpha = longitudinal * transverse;
-        if (alpha < 0.025) discard;
-        gl_FragColor = vec4(vColor, alpha * 0.92);
+        vec2 q = (vUv - 0.5) * 2.0;
+        float dash = 1.0 - smoothstep(0.68, 1.0, abs(q.x));
+        float hotCore = exp(-q.y * q.y * 34.0);
+        float softGlow = exp(-q.y * q.y * 7.0);
+        float alpha = dash * (hotCore * 0.96 + softGlow * 0.34);
+        if (alpha < 0.012) discard;
+        vec3 emitted = vColor * (hotCore * 1.9 + softGlow * 0.9);
+        gl_FragColor = vec4(emitted, alpha);
       }
     `,
     transparent: true,
@@ -856,69 +880,34 @@ function ExteriorAccretionSparks({ charge, radius, flowPhase }: { charge: Charge
     toneMapped: false,
   }), []);
   const attributes = useMemo(() => {
-    const radii = new Float32Array(count);
     const angles = new Float32Array(count);
     const phases = new Float32Array(count);
     const lengths = new Float32Array(count);
-    const depths = new Float32Array(count);
     const colors = new Array<THREE.Color>(count);
     for (let index = 0; index < count; index += 1) {
-      radii[index] = 0.14 + unit(index, 72) * 0.82;
       angles[index] = unit(index, 71) * Math.PI * 2;
       phases[index] = unit(index, 73) * Math.PI * 2;
-      lengths[index] = 0.018 + unit(index, 74) * 0.036;
-      depths[index] = (unit(index, 75) - 0.5) * 0.018;
-      colors[index] = new THREE.Color().lerpColors(new THREE.Color("#ffad4c"), new THREE.Color("#fff4d7"), unit(index, 76));
+      lengths[index] = 0.009 + unit(index, 74) * 0.009;
+      colors[index] = new THREE.Color().lerpColors(new THREE.Color("#ffc978"), new THREE.Color("#fff7df"), unit(index, 76));
     }
-    return { radii, angles, phases, lengths, depths, colors };
+    return { angles, phases, lengths, colors };
   }, []);
-  useFrame(({ camera, pointer: cursor, clock }, delta) => {
+  useFrame(({ camera }) => {
     if (!group.current || !sparks.current) return;
-    const parent = group.current.parent;
-    if (!parent) return;
-    parent.updateWorldMatrix(true, false);
-    // Match the disk plane and retain the exterior group's gyroscopic tilt.
     group.current.quaternion.copy(camera.quaternion);
     group.current.scale.setScalar(radius * 5.0);
-    pointer.current.x = THREE.MathUtils.damp(pointer.current.x, cursor.x, 3.5, delta);
-    pointer.current.y = THREE.MathUtils.damp(pointer.current.y, cursor.y, 3.5, delta);
     const liveCharge = readCharge(charge);
     if (!initialized.current) {
       for (let index = 0; index < count; index += 1) sparks.current.setColorAt(index, attributes.colors[index]);
       if (sparks.current.instanceColor) sparks.current.instanceColor.needsUpdate = true;
       initialized.current = true;
     }
-    const tilt = -0.314 + Math.sin(clock.getElapsedTime() * 0.46) * 0.035 + pointer.current.x * 0.0698;
-    const tiltCos = Math.cos(tilt);
-    const tiltSin = Math.sin(tilt);
     for (let index = 0; index < count; index += 1) {
-      const baseRadius = attributes.radii[index];
-      const inverseRootRadius = 1 / Math.sqrt(Math.max(baseRadius, 0.14));
-      const inverseRootOuter = 1 / Math.sqrt(0.96);
-      const inverseRootInner = 1 / Math.sqrt(0.14);
-      const keplerMix = THREE.MathUtils.clamp(
-        (inverseRootRadius - inverseRootOuter) / (inverseRootInner - inverseRootOuter),
-        0,
-        1,
-      );
-      const orbitRate = 0.9 + 2.3 * keplerMix;
-      const angle = attributes.angles[index] + attributes.phases[index] + flowPhase.current * orbitRate;
-      const orbitRadius = Math.max(0.12, baseRadius - 0.2 * Math.pow(liveCharge, 1.8));
-      const diskX = 0.92 * orbitRadius * Math.cos(angle);
-      const diskY = 0.39 * orbitRadius * Math.sin(angle);
-      const x = tiltCos * diskX - tiltSin * diskY + pointer.current.x * 0.012;
-      const y = tiltSin * diskX + tiltCos * diskY + pointer.current.y * 0.012;
-      // Preserve the shared disk's projected ellipse while giving its near and
-      // far arcs real depth, so the opaque core can occlude the far-side sparks.
-      const z = attributes.depths[index] + Math.sin(angle) * orbitRadius * 0.28;
-      dummy.position.set(x, y, z);
-      // The source tangent is the circular orbit derivative; apply the same
-      // ellipse projection and shared tilted basis used for the disk surface.
-      const tangentX = -0.92 * Math.sin(angle);
-      const tangentY = 0.39 * Math.cos(angle);
-      const tangentAngle = Math.atan2(tiltSin * tangentX + tiltCos * tangentY, tiltCos * tangentX - tiltSin * tangentY);
-      dummy.rotation.set(0, 0, tangentAngle);
-      dummy.scale.set(attributes.lengths[index] * (1.0 + liveCharge * 1.8), 0.0022 + liveCharge * 0.0018, 1);
+      const angle = attributes.angles[index] + attributes.phases[index] + flowPhase.current * 3.2;
+      const photonRadius = 0.235 * 1.05;
+      dummy.position.set(Math.cos(angle) * photonRadius, Math.sin(angle) * photonRadius, 0.028);
+      dummy.rotation.set(0, 0, angle + Math.PI * 0.5);
+      dummy.scale.set(attributes.lengths[index] * (1.0 + liveCharge * 0.65), 0.006 + liveCharge * 0.001, 1);
       dummy.updateMatrix();
       sparks.current.setMatrixAt(index, dummy.matrix);
     }
@@ -926,13 +915,17 @@ function ExteriorAccretionSparks({ charge, radius, flowPhase }: { charge: Charge
   });
   return (
     <group ref={group} renderOrder={21}>
-      <instancedMesh ref={(mesh) => {
-        sparks.current = mesh;
-        if (mesh && mesh.instanceColor === null) {
-          mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(count * 3).fill(1), 3);
-        }
-      }} args={[geometry, material, count]} frustumCulled={false} renderOrder={21}>
-      </instancedMesh>
+      <instancedMesh
+        ref={(mesh) => {
+          sparks.current = mesh;
+          if (mesh && mesh.instanceColor === null) {
+            mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(count * 3).fill(1), 3);
+          }
+        }}
+        args={[geometry, material, count]}
+        frustumCulled={false}
+        renderOrder={21}
+      />
     </group>
   );
 }
@@ -942,6 +935,7 @@ export default function ActFourExterior({ phase, warpCharge }: { phase: ActFourP
   const core = useRef<THREE.Group>(null);
   const charge = useRef(0);
   const flowPhase = useRef(0);
+  const diskTilt = useRef(-0.314);
   const pointer = useRef(new THREE.Vector2());
   const active = phase === "act4_exterior" || phase === "act4_warp_in";
   useFrame(({ clock, pointer: cursor }, delta) => {
@@ -952,12 +946,18 @@ export default function ActFourExterior({ phase, warpCharge }: { phase: ActFourP
     const targetCharge = phase === "act4_warp_in" ? 1 : phase === "act4_exterior" ? THREE.MathUtils.clamp(warpCharge.current ?? 0, 0, 1) : 0;
     charge.current = THREE.MathUtils.damp(charge.current, targetCharge, 7, delta);
     core.current.scale.setScalar(THREE.MathUtils.damp(core.current.scale.x, active ? 1 : 0.001, 5.5, delta));
+    const idle = 1 - THREE.MathUtils.smoothstep(charge.current, 0.01, 0.08);
     motion.current.position.set(
-      ACT_FOUR_CORE_POSITION.x + Math.sin(t * 0.31) * 0.14,
-      ACT_FOUR_CORE_POSITION.y + Math.cos(t * 0.27 + 0.7) * 0.14,
-      ACT_FOUR_CORE_POSITION.z + Math.sin(t * 0.18) * 0.035,
+      ACT_FOUR_CORE_POSITION.x + Math.sin(t * 0.31) * 0.012 * idle,
+      ACT_FOUR_CORE_POSITION.y + Math.cos(t * 0.27 + 0.7) * 0.012 * idle,
+      ACT_FOUR_CORE_POSITION.z,
     );
-    motion.current.rotation.set(Math.sin(t * 0.38) * 0.035, pointer.current.x * THREE.MathUtils.degToRad(4), Math.sin(t * 0.46) * 0.05 + pointer.current.y * THREE.MathUtils.degToRad(4));
+    motion.current.rotation.set(
+      Math.sin(t * 0.38) * 0.003 * idle,
+      pointer.current.x * THREE.MathUtils.degToRad(0.3) * idle,
+      Math.sin(t * 0.46) * 0.004 * idle + pointer.current.y * THREE.MathUtils.degToRad(0.3) * idle,
+    );
+    diskTilt.current = THREE.MathUtils.lerp(-0.314 + Math.sin(t * 0.22) * 0.004 * idle, -0.314, 1 - idle);
   });
   if (!active) return null;
   return (
@@ -965,8 +965,8 @@ export default function ActFourExterior({ phase, warpCharge }: { phase: ActFourP
       <group ref={core}>
         <pointLight color="#ff254c" intensity={2.8} distance={36} decay={2} />
         <pointLight position={[0, 0.2, 2.2]} color="#ffbd7a" intensity={2.4} distance={22} decay={2} />
-        <RaymarchedExterior radius={1.85} charge={charge} flowPhase={flowPhase} />
-        <ExteriorAccretionSparks radius={1.85} charge={charge} flowPhase={flowPhase} />
+        <RaymarchedExterior radius={1.85} charge={charge} flowPhase={flowPhase} diskTilt={diskTilt} />
+        <ExteriorPhotonRimSparks radius={1.85} charge={charge} flowPhase={flowPhase} />
         <AnamorphicFlare charge={charge} />
       </group>
       <LensDust charge={charge} active />
