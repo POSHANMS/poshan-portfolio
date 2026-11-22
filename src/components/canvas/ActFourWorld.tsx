@@ -556,7 +556,7 @@ function DataEmbers({ phase, projectIndex }: { phase: ActFourPhase; projectIndex
   }), [projectIndex]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const curl = useMemo(() => new THREE.Vector3(), []);
-  const noiseFields = useMemo(() => [101, 211, 307].map((seed) => new SimplexNoise({ random: seededRandom(seed) })), []);
+  const noiseFields = useMemo(() => [101, 211, 307].map((seed) => new SimplexNoise(seededRandom(seed))), []);
   const active = phase === "act4_vault" || phase === "act4_warp_out" || phase === "act4_warp_in";
   useFrame(({ clock }, delta) => {
     if (!instances.current || !material.current) return;
