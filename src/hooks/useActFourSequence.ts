@@ -51,10 +51,10 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
   scrollProgressRef.current = scrollProgress;
 
   const transitionTo = useCallback((next: ActFourPhase) => {
-    if (next === "act4_exterior") {
-      // Returning from Act III, V, or VI always restores a ready-to-warp gate.
-      // Completion remains latched separately so it only unlocks the downward exit.
-      warpCharge.current = 0;
+    if (next === "act4_exterior" || next === "act4_vault") {
+      // Exterior return and every vault arrival restore Station 01; completion
+      // remains latched separately so it only unlocks the downward exit.
+      if (next === "act4_exterior") warpCharge.current = 0;
       projectIndexRef.current = 0;
       setProjectIndex(0);
     }
@@ -77,10 +77,11 @@ export function useActFourSequence(scrollProgress: number, warpCharge: MutableRe
     clearExitTimer();
     projectIndexRef.current = 0;
     setProjectIndex(0);
+    warpCharge.current = 0;
     lockedScrollY.current = window.scrollY;
     transitionTo("act4_warp_in");
     warpTimer.current = setTimeout(() => transitionTo("act4_vault"), ACT_FOUR_WARP_IN_DURATION_MS);
-  }, [clearExitTimer, clearWarpTimer, transitionTo]);
+  }, [clearExitTimer, clearWarpTimer, transitionTo, warpCharge]);
 
   const exitProjectWorld = useCallback(() => {
     if (phaseRef.current !== "act4_vault") return;

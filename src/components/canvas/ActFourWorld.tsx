@@ -1,22 +1,21 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import type { ActFourPhase } from "@/types/actFour";
-import { ACT_FOUR_PROJECT_STATIONS, ACT_FOUR_SINGULARITY_POSITION } from "@/animations/actFourChoreography";
-import { ACT_FOUR_WARP_IN_DURATION_MS, WORMHOLE_CURVE, WORMHOLE_PATH_LENGTH, WORMHOLE_TUBE_RADIUS } from "@/animations/scrollCamera";
+import { ACT_FOUR_FOLD_POSES, ACT_FOUR_WARP_IN_DURATION_MS, WORMHOLE_CURVE, WORMHOLE_PATH_LENGTH, WORMHOLE_TUBE_RADIUS } from "@/animations/scrollCamera";
+import { PROJECTS } from "@/utils/constants";
 import ActFourExterior from "./ActFourExterior";
-import ActFourSculpture from "./ActFourSculptures";
 
 const WARP_PARTICLE_COUNT = 1_200;
 const WORMHOLE_RING_COUNT = 32;
 const WARP_NEEDLE_COUNT = 640;
 const WARP_IN_DURATION_SECONDS = ACT_FOUR_WARP_IN_DURATION_MS / 1000;
-const WARP_VAULT_CUTOVER_SECONDS = WARP_IN_DURATION_SECONDS * 0.77;
-const DOME_CENTER = new THREE.Vector3(0, 0, -27);
-const PROJECT_ACCENTS = ["#00e5ff", "#8b5cf6", "#f59e0b", "#10b981", "#ff4d6d"];
+const WARP_VAULT_CUTOVER_SECONDS = WARP_IN_DURATION_SECONDS * 0.755;
+const VAULT_GOLD = "#fff2cf";
+const VAULT_AMBER = "#ffbe55";
+const VAULT_CRIMSON = "#ff3554";
 
 function clamp(value: number, min = 0, max = 1) { return Math.max(min, Math.min(max, value)); }
 function smoothstep(edge0: number, edge1: number, value: number) {
@@ -26,33 +25,6 @@ function smoothstep(edge0: number, edge1: number, value: number) {
 function seeded(index: number, salt: number) {
   const value = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453;
   return value - Math.floor(value);
-}
-
-function seededRandom(seed: number) {
-  let value = seed;
-  return {
-    random: () => {
-      value = (value * 16807) % 2147483647;
-      return (value - 1) / 2147483646;
-    },
-  };
-}
-
-/** Numerical curl of three 3D Simplex potentials gives a smooth, divergence-free ember field. */
-function curlDrift(x: number, y: number, z: number, time: number, fields: SimplexNoise[], target: THREE.Vector3) {
-  const px = x * 0.085;
-  const py = y * 0.085;
-  const pz = z * 0.085;
-  const t = time * 0.055;
-  const e = 0.018;
-  const sample = (field: SimplexNoise, sx: number, sy: number, sz: number) => field.noise3d(sx + t, sy - t * 0.72, sz + t * 0.43);
-  const dAzDy = (sample(fields[2], px, py + e, pz) - sample(fields[2], px, py - e, pz)) / (2 * e);
-  const dAyDz = (sample(fields[1], px, py, pz + e) - sample(fields[1], px, py, pz - e)) / (2 * e);
-  const dAxDz = (sample(fields[0], px, py, pz + e) - sample(fields[0], px, py, pz - e)) / (2 * e);
-  const dAzDx = (sample(fields[2], px + e, py, pz) - sample(fields[2], px - e, py, pz)) / (2 * e);
-  const dAyDx = (sample(fields[1], px + e, py, pz) - sample(fields[1], px - e, py, pz)) / (2 * e);
-  const dAxDy = (sample(fields[0], px, py + e, pz) - sample(fields[0], px, py - e, pz)) / (2 * e);
-  return target.set(dAzDy - dAyDz, dAxDz - dAzDx, dAyDx - dAxDy).multiplyScalar(0.035);
 }
 
 function WarpStreamParticles({ phase, warpCharge }: { phase: ActFourPhase; warpCharge: React.RefObject<number> }) {
@@ -353,284 +325,329 @@ function FlashInFrontOfCamera({ material }: { material: React.RefObject<THREE.Sh
   /></mesh>;
 }
 
-function buildVaultRibGeometry() {
-  const floorY = -3.65;
-  const springY = -3.38;
-  const outerRadius = 22;
-  const innerRadius = 21.05;
-  const shape = new THREE.Shape();
-  shape.moveTo(-outerRadius, floorY);
-  shape.lineTo(-outerRadius, springY);
-  for (let index = 1; index <= 48; index += 1) {
-    const angle = Math.PI - (index / 48) * Math.PI;
-    shape.lineTo(Math.cos(angle) * outerRadius, springY + Math.sin(angle) * outerRadius);
-  }
-  shape.lineTo(outerRadius, floorY);
-  shape.lineTo(innerRadius, floorY);
-  shape.lineTo(innerRadius, springY);
-  for (let index = 1; index <= 48; index += 1) {
-    const angle = (index / 48) * Math.PI;
-    shape.lineTo(Math.cos(angle) * innerRadius, springY + Math.sin(angle) * innerRadius);
-  }
-  shape.lineTo(-innerRadius, floorY);
-  shape.closePath();
+type SheetInstance = { matrix: THREE.Matrix4; color: THREE.Color };
 
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: 1.05,
-    steps: 1,
-    bevelEnabled: true,
-    bevelSegments: 3,
-    bevelSize: 0.12,
-    bevelThickness: 0.1,
+function buildSheets(axis: "depth" | "vertical" | "cross") {
+  const dummy = new THREE.Object3D();
+  const sheets: SheetInstance[] = [];
+  const add = (position: THREE.Vector3, scale: THREE.Vector3, rotation: THREE.Euler, color: string) => {
+    dummy.position.copy(position); dummy.scale.copy(scale); dummy.rotation.copy(rotation); dummy.updateMatrix();
+    sheets.push({ matrix: dummy.matrix.clone(), color: new THREE.Color(color) });
+  };
+  const stationColor = (index: number, goldCount: number, total: number) => index % total < goldCount ? VAULT_GOLD : VAULT_CRIMSON;
+  ACT_FOUR_FOLD_POSES.forEach(({ target }, stationIndex) => {
+    const wallZ = target.z - 2.6;
+    const centerY = target.y + 4.5;
+    if (axis === "depth") {
+      const columns = [-18, -12, -6, 0, 6, 12, 18];
+      columns.forEach((offset, index) => add(
+        new THREE.Vector3(target.x + offset, centerY, wallZ),
+        new THREE.Vector3(0.115, 18, 1), new THREE.Euler(),
+        stationColor(index + stationIndex, 7, 12),
+      ));
+      [-3, 1, 5, 9, 13].forEach((offset, index) => add(
+        new THREE.Vector3(target.x, target.y + offset, wallZ),
+        new THREE.Vector3(40, 0.095, 1), new THREE.Euler(),
+        stationColor(index + stationIndex + 8, 7, 12),
+      ));
+    } else if (axis === "vertical") {
+      [-18, -9, 9, 18].forEach((offset, index) => add(
+        new THREE.Vector3(target.x + offset, centerY, target.z - 15),
+        new THREE.Vector3(30, 18, 1), new THREE.Euler(0, Math.PI / 2, 0),
+        stationColor(index + stationIndex, 2, 4),
+      ));
+    } else {
+      [target.y + 12.8, target.y + 10.5, target.y - 1.8, target.y - 4.8].forEach((y, index) => add(
+        new THREE.Vector3(target.x, y, target.z - 15),
+        new THREE.Vector3(42, 30, 1), new THREE.Euler(-Math.PI / 2, 0, 0),
+        stationColor(index + stationIndex, 3, 4),
+      ));
+    }
   });
-  geometry.translate(0, 0, -0.525);
-  geometry.computeVertexNormals();
-  return geometry;
+  return sheets;
 }
 
-function buildVaultRibAccentGeometry() {
-  const springY = -3.38;
-  const innerRadius = 21.05;
-  const points = Array.from({ length: 49 }, (_, index) => {
-    const angle = (index / 48) * Math.PI;
-    return new THREE.Vector3(Math.cos(angle) * innerRadius, springY + Math.sin(angle) * innerRadius, 0.54);
-  });
-  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 96, 0.024, 6, false);
-}
-
-function buildVaultStars() {
-  const count = 420;
-  const positions = new Float32Array(count * 3);
-  const sizes = new Float32Array(count);
-  const phases = new Float32Array(count);
-  const colors = new Float32Array(count * 3);
-  for (let index = 0; index < count; index += 1) {
-    const y = seeded(index, 71) * 2 - 1;
-    const angle = seeded(index, 72) * Math.PI * 2;
-    const radius = 86 + seeded(index, 73) * 72;
-    const horizontal = Math.sqrt(1 - y * y);
-    positions.set([Math.cos(angle) * horizontal * radius, y * radius, Math.sin(angle) * horizontal * radius], index * 3);
-    sizes[index] = 0.13 + seeded(index, 74) * 0.2;
-    phases[index] = seeded(index, 75) * Math.PI * 2;
-    const tint = seeded(index, 76);
-    const color = tint > 0.86 ? new THREE.Color("#bdd9ff") : tint > 0.68 ? new THREE.Color("#ffe6ce") : new THREE.Color("#dce6f5");
-    colors.set([color.r, color.g, color.b], index * 3);
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
-  geometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
-  geometry.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
-  return geometry;
-}
-
-function VaultDistantStars() {
-  const material = useRef<THREE.ShaderMaterial>(null);
-  const geometry = useMemo(buildVaultStars, []);
+function LightSheetSet({ axis }: { axis: "depth" | "vertical" | "cross" }) {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const shader = useRef<THREE.ShaderMaterial>(null);
+  const { pointer, camera } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const ground = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 4.2), []);
+  const hit = useMemo(() => new THREE.Vector3(), []);
+  const pointerWorld = useMemo(() => new THREE.Vector2(0, -60), []);
+  const sheets = useMemo(() => buildSheets(axis), [axis]);
+  useEffect(() => {
+    if (!mesh.current) return;
+    sheets.forEach((sheet, index) => { mesh.current?.setMatrixAt(index, sheet.matrix); mesh.current?.setColorAt(index, sheet.color); });
+    mesh.current.instanceMatrix.needsUpdate = true;
+    if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
+  }, [sheets]);
   useFrame(({ clock }) => {
-    if (material.current) material.current.uniforms.uTime.value = clock.getElapsedTime();
+    if (!shader.current) return;
+    raycaster.setFromCamera(pointer, camera);
+    if (raycaster.ray.intersectPlane(ground, hit)) pointerWorld.set(hit.x, hit.z);
+    shader.current.uniforms.uTime.value = clock.getElapsedTime();
+    shader.current.uniforms.uPointer.value.copy(pointerWorld);
   });
-  return (
-    <points geometry={geometry} frustumCulled={false}>
-      <shaderMaterial
-        ref={material}
-        transparent
-        depthWrite={false}
-        toneMapped={false}
-        uniforms={{ uTime: { value: 0 } }}
-        vertexShader={`attribute float aSize;attribute float aPhase;attribute vec3 aColor;uniform float uTime;varying float vTwinkle;varying vec3 vColor;void main(){vec4 mvPosition=modelViewMatrix*vec4(position,1.0);vColor=aColor;vTwinkle=0.56+0.44*(0.5+0.5*sin(uTime*0.7+aPhase));gl_PointSize=clamp(aSize*(700.0/max(-mvPosition.z,1.0)),0.65,2.6);gl_Position=projectionMatrix*mvPosition;}`}
-        fragmentShader={`varying float vTwinkle;varying vec3 vColor;void main(){float radius=length(gl_PointCoord-0.5);float disc=1.0-smoothstep(0.26,0.5,radius);if(disc<0.01)discard;gl_FragColor=vec4(vColor*vTwinkle,disc*vTwinkle*0.78);}`}
-      />
-    </points>
-  );
+  return <instancedMesh ref={mesh} args={[undefined, undefined, sheets.length]} frustumCulled={false} renderOrder={4}>
+    <planeGeometry args={[1, 1]} />
+    <shaderMaterial ref={shader} transparent depthWrite={false} depthTest side={THREE.DoubleSide} blending={THREE.AdditiveBlending} toneMapped={false}
+      uniforms={{ uTime: { value: 0 }, uPointer: { value: pointerWorld.clone() } }}
+      vertexShader={`varying vec2 vUv;varying vec3 vColor;varying vec3 vWorld;void main(){vUv=uv;vColor=instanceColor;vec4 world=modelMatrix*instanceMatrix*vec4(position,1.0);vWorld=world.xyz;gl_Position=projectionMatrix*viewMatrix*world;}`}
+      fragmentShader={`uniform float uTime;uniform vec2 uPointer;varying vec2 vUv;varying vec3 vColor;varying vec3 vWorld;void main(){float core=exp(-pow((vUv.y-0.5)/0.2,2.0));float flow=0.64+0.36*(0.5+0.5*sin(vUv.x*74.0-uTime*1.6+sin(vUv.x*15.0-uTime*0.28)*1.2));float filaments=0.86+0.14*sin(vUv.x*231.0-uTime*2.2);float ends=smoothstep(0.0,0.08,vUv.x)*(1.0-smoothstep(0.92,1.0,vUv.x));float shimmer=exp(-dot(vWorld.xz-uPointer,vWorld.xz-uPointer)*0.012);float emission=core*flow*filaments*ends;float alpha=smoothstep(0.02,0.18,core)*ends*(0.26+emission*0.86)*(0.7+shimmer*0.45);if(alpha<0.012)discard;gl_FragColor=vec4(vColor*emission*(0.9+shimmer*0.4),alpha);}`}
+    />
+  </instancedMesh>;
 }
 
-function ObservatoryVault({ phase, projectIndex }: { phase: ActFourPhase; projectIndex: number }) {
-  const dome = useRef<THREE.Group>(null);
-  const gradientMaterial = useRef<THREE.ShaderMaterial>(null);
-  const keyLight = useRef<THREE.PointLight>(null);
-  const floorMaterial = useRef<THREE.ShaderMaterial>(null);
-  const canopyWire = useRef<THREE.ShaderMaterial>(null);
-  const ribAccentMaterial = useRef<THREE.MeshStandardMaterial>(null);
-  const activeStationPosition = useMemo(() => new THREE.Vector3(), []);
-  const ribGeometry = useMemo(buildVaultRibGeometry, []);
-  const ribAccentGeometry = useMemo(buildVaultRibAccentGeometry, []);
-  const active = phase === "act4_warp_in" || phase === "act4_vault" || phase === "act4_warp_out";
-  const phaseStartedAt = useRef(performance.now());
-  const previousPhase = useRef(phase);
-  const reveal = useRef(0);
-  const color = useMemo(() => new THREE.Color(PROJECT_ACCENTS[projectIndex] ?? PROJECT_ACCENTS[0]), [projectIndex]);
-  useFrame(({ clock }, delta) => {
-    if (previousPhase.current !== phase) { previousPhase.current = phase; phaseStartedAt.current = performance.now(); }
-    const phaseAge = (performance.now() - phaseStartedAt.current) / 1000;
-    const revealTarget = phase === "act4_warp_in" ? smoothstep(1.25, 1.55, phaseAge) : active ? 1 : 0;
-    reveal.current = THREE.MathUtils.damp(reveal.current, revealTarget, 14, delta);
-    if (dome.current) dome.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.035) * 0.012;
-    activeStationPosition.copy(ACT_FOUR_PROJECT_STATIONS[projectIndex] ?? ACT_FOUR_PROJECT_STATIONS[0]).sub(DOME_CENTER);
-    if (floorMaterial.current) {
-      floorMaterial.current.uniforms.uTime.value = clock.getElapsedTime();
-      floorMaterial.current.uniforms.uReveal.value = reveal.current;
-      floorMaterial.current.uniforms.uAccent.value.lerp(color, 1 - Math.exp(-delta * 1.8));
-      floorMaterial.current.uniforms.uActiveStationPos.value.copy(activeStationPosition);
-    }
-    if (keyLight.current) {
-      keyLight.current.color.lerp(color, 1 - Math.exp(-delta * 1.8));
-      keyLight.current.position.set(activeStationPosition.x, activeStationPosition.y + 3.8, activeStationPosition.z + 1.5);
-      const arrivalProgress = phaseAge / WARP_IN_DURATION_SECONDS;
-      const energyLock = phase === "act4_warp_in" && projectIndex === 0
-        ? 1 + Math.sin(clamp((arrivalProgress - 0.82) / 0.14) * Math.PI * 5) * 0.16 * (1 - smoothstep(0.94, 0.98, arrivalProgress))
-        : 1;
-      keyLight.current.intensity = 4.6 * reveal.current * energyLock;
-    }
-    if (ribAccentMaterial.current) ribAccentMaterial.current.emissive.copy(color);
-    if (canopyWire.current) {
-      canopyWire.current.uniforms.uAccent.value.lerp(color, 1 - Math.exp(-delta * 1.8));
-      canopyWire.current.uniforms.uOpacity.value = 0.08 * reveal.current;
-    }
-    if (gradientMaterial.current) {
-      gradientMaterial.current.uniforms.uAccent.value.lerp(color, 1 - Math.exp(-delta * 1.8));
-      gradientMaterial.current.uniforms.uTime.value = clock.getElapsedTime();
-      gradientMaterial.current.uniforms.uReveal.value = reveal.current;
-    }
+function buildLatticeFilaments() {
+  const dummy = new THREE.Object3D();
+  const filaments: SheetInstance[] = [];
+  const add = (position: THREE.Vector3, size: THREE.Vector3, color: string) => {
+    dummy.position.copy(position); dummy.scale.copy(size); dummy.rotation.set(0, 0, 0); dummy.updateMatrix();
+    filaments.push({ matrix: dummy.matrix.clone(), color: new THREE.Color(color) });
+  };
+  ACT_FOUR_FOLD_POSES.forEach(({ target }, stationIndex) => {
+    const wallZ = target.z - 2.75;
+    const centerY = target.y + 4.5;
+    [-18, -12, -6, 0, 6, 12, 18].forEach((offset, index) => add(
+      new THREE.Vector3(target.x + offset, centerY, wallZ),
+      new THREE.Vector3(0.045, 18, 0.045),
+      (index + stationIndex) % 12 < 7 ? VAULT_GOLD : VAULT_CRIMSON,
+    ));
+    [-3, 1, 5, 9, 13].forEach((offset, index) => add(
+      new THREE.Vector3(target.x, target.y + offset, wallZ),
+      new THREE.Vector3(40, 0.035, 0.045),
+      (index + stationIndex + 7) % 12 < 7 ? VAULT_GOLD : VAULT_CRIMSON,
+    ));
+    [-18, -9, 9, 18].forEach((offset, index) => add(
+      new THREE.Vector3(target.x + offset, centerY, target.z - 15),
+      new THREE.Vector3(0.045, 18, 30),
+      (index + stationIndex) % 4 < 2 ? VAULT_GOLD : VAULT_CRIMSON,
+    ));
+    [target.y + 12.8, target.y + 10.5, target.y - 1.8, target.y - 4.8].forEach((y, index) => add(
+      new THREE.Vector3(target.x, y, target.z - 15),
+      new THREE.Vector3(42, 0.035, 30),
+      (index + stationIndex) % 4 < 3 ? VAULT_GOLD : VAULT_CRIMSON,
+    ));
+
   });
-  return (
-    <group position={DOME_CENTER} visible={active}>
-      <group ref={dome}>
-        <mesh frustumCulled={false}>
-          <icosahedronGeometry args={[170, 5]} />
-          <shaderMaterial ref={gradientMaterial} side={THREE.BackSide} transparent depthWrite={false} toneMapped={false}
-            vertexShader={`varying vec3 vLocal;void main(){vLocal=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-            fragmentShader={`uniform vec3 uAccent;uniform float uReveal;uniform float uTime;varying vec3 vLocal;float hash31(vec3 p){p=fract(p*0.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}float noise3(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(mix(hash31(i),hash31(i+vec3(1,0,0)),f.x),mix(hash31(i+vec3(0,1,0)),hash31(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash31(i+vec3(0,0,1)),hash31(i+vec3(1,0,1)),f.x),mix(hash31(i+vec3(0,1,1)),hash31(i+vec3(1,1,1)),f.x),f.y),f.z);}float fbm(vec3 p){float sum=0.0;float amp=0.5;for(int i=0;i<4;i++){sum+=noise3(p)*amp;p=p*2.03+vec3(7.1,3.7,5.3);amp*=0.5;}return sum;}void main(){float zenith=smoothstep(-0.12,0.92,vLocal.y);vec3 base=mix(vec3(0.0035,0.0055,0.011),vec3(0.0018,0.0028,0.006),zenith);float horizon=pow(1.0-abs(vLocal.y),2.0);vec3 drift=vec3(uTime*0.0015,uTime*0.001,-uTime*0.0012);float mist=fbm(vLocal*8.0+drift);float veil=smoothstep(0.48,0.76,mist)*horizon;float atmosphericGlow=veil*0.10+horizon*0.012;vec3 color=base+uAccent*atmosphericGlow;gl_FragColor=vec4(color,0.97*uReveal);}`}
-            uniforms={{ uAccent: { value: color }, uReveal: { value: 0 }, uTime: { value: 0 } }} />
-        </mesh>
-        <mesh frustumCulled={false}>
-          <icosahedronGeometry args={[169, 3]} />
-          <shaderMaterial
-            ref={canopyWire}
-            wireframe
-            transparent
-            side={THREE.BackSide}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-            uniforms={{ uAccent: { value: color }, uOpacity: { value: 0 } }}
-            vertexShader={`varying vec3 vWorldPosition; varying vec3 vWorldNormal; void main(){vec4 world=modelMatrix*vec4(position,1.0);vWorldPosition=world.xyz;vWorldNormal=normalize(mat3(modelMatrix)*normal);gl_Position=projectionMatrix*viewMatrix*world;}`}
-            fragmentShader={`uniform vec3 uAccent;uniform float uOpacity;varying vec3 vWorldPosition;varying vec3 vWorldNormal;void main(){vec3 viewDir=normalize(cameraPosition-vWorldPosition);float fresnel=pow(1.0-abs(dot(normalize(vWorldNormal),viewDir)),2.0);float fade=1.0-smoothstep(65.0,150.0,distance(cameraPosition,vWorldPosition));float alpha=min(0.08,uOpacity*(0.18+fresnel*0.7))*fade;if(alpha<0.003)discard;gl_FragColor=vec4(mix(vec3(0.025,0.032,0.047),uAccent,0.18+fresnel*0.28),alpha);}`}
-          />
-        </mesh>
-      </group>
-      <mesh position={[0, -3.4, 0]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false}>
-        <planeGeometry args={[180, 320]} />
-        <shaderMaterial ref={floorMaterial} transparent depthWrite={false} side={THREE.DoubleSide} toneMapped={false}
-          uniforms={{ uTime: { value: 0 }, uReveal: { value: 0 }, uAccent: { value: color }, uActiveStationPos: { value: activeStationPosition.clone() } }}
-          vertexShader={`varying vec2 vDeck;void main(){vDeck=position.xy;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-          fragmentShader={`uniform float uTime;uniform float uReveal;uniform vec3 uAccent;uniform vec3 uActiveStationPos;varying vec2 vDeck;float hash21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float line(float x,float halfWidth){float d=abs(fract(x+0.5)-0.5);return 1.0-smoothstep(halfWidth,halfWidth+0.01,d);}void main(){vec2 p=vec2(vDeck.x,-vDeck.y);vec3 worldPos=vec3(p.x,${(DOME_CENTER.y - 3.4).toFixed(1)},p.y+${DOME_CENTER.z.toFixed(1)});float dist=distance(cameraPosition,worldPos);float fog=1.0-smoothstep(34.0,176.0,dist);float sideFade=1.0-smoothstep(64.0,92.0,abs(p.x));float seams=max(line((p.x+90.0)/6.0,0.012),line((p.y+160.0)/9.0,0.012))*0.045;float guideL=exp(-pow((p.x-0.24)/0.035,2.0));float guideR=exp(-pow((p.x+0.24)/0.035,2.0));float runway=(guideL+guideR)*0.022;vec2 poolDelta=p-uActiveStationPos.xz;float radial=dot(poolDelta*vec2(0.58,0.3),poolDelta*vec2(0.58,0.3));float pool=exp(-radial*0.62);float spec=exp(-radial*2.4)*(0.96+0.04*sin(uTime*0.55+length(poolDelta)*1.7));float brushed=(hash21(floor(p*vec2(76.0,18.0)+vec2(uTime*0.02,0.0)))-0.5)*0.0008;vec3 base=vec3(0.0032,0.0042,0.0075);vec3 color=base+vec3(seams*0.045+runway+brushed)+uAccent*(pool*0.075+spec*0.09)+vec3(0.20,0.23,0.31)*spec*0.018;float alpha=uReveal*fog*sideFade;gl_FragColor=vec4(max(color,vec3(0.0)),alpha);}`}
-        />
-      </mesh>
-      {Array.from({ length: 8 }, (_, index) => <group key={`vault-rib-${index}`} position={[0, 0, 32 - index * 25.5]}>
-        <mesh geometry={ribGeometry}>
-          <meshStandardMaterial color="#121722" metalness={0.88} roughness={0.32} emissive={color} emissiveIntensity={0.035} />
-        </mesh>
-        <mesh geometry={ribAccentGeometry}>
-          <meshStandardMaterial ref={index === 0 ? ribAccentMaterial : undefined} color="#10141d" emissive={color} emissiveIntensity={0.65} metalness={0.88} roughness={0.32} />
-        </mesh>
-      </group>)}
-      <pointLight ref={keyLight} position={[2.6, 3.5, 27]} color={color} intensity={4.6} distance={30} decay={2} />
-      <VaultDistantStars />
-    </group>
-  );
+  return filaments;
 }
 
-function DataEmbers({ phase, projectIndex }: { phase: ActFourPhase; projectIndex: number }) {
-  const instances = useRef<THREE.InstancedMesh>(null);
+function StationPortalFrames() {
+  return <>
+    {ACT_FOUR_FOLD_POSES.map(({ target, camera }, index) => {
+      const frame = new THREE.Object3D();
+      frame.position.copy(target);
+      frame.lookAt(camera);
+      const quaternion = frame.quaternion.toArray() as [number, number, number, number];
+      const gold = index % 2 === 0 ? VAULT_GOLD : VAULT_AMBER;
+      const red = VAULT_CRIMSON;
+      const rails = [
+        { x: -4.1, y: 0, w: 0.035, h: 5.4, color: gold },
+        { x: 4.1, y: 0, w: 0.035, h: 5.4, color: red },
+        { x: -5.5, y: 0, w: 0.022, h: 7.4, color: gold },
+        { x: 5.5, y: 0, w: 0.022, h: 7.4, color: red },
+        { x: 0, y: 2.7, w: 8.2, h: 0.035, color: gold },
+        { x: 0, y: -2.7, w: 8.2, h: 0.035, color: red },
+        { x: 0, y: 3.8, w: 11, h: 0.022, color: gold },
+        { x: 0, y: -3.8, w: 11, h: 0.022, color: red },
+        { x: -2.9, y: 1.35, w: 0.02, h: 2.7, color: gold },
+        { x: 2.9, y: -1.35, w: 0.02, h: 2.7, color: gold },
+      ];
+      return <group key={`station-frame-${index}`} position={target.toArray()} quaternion={quaternion}>
+        {rails.map((rail, railIndex) => <mesh key={railIndex} position={[rail.x, rail.y, 0.15]} renderOrder={10}>
+          <boxGeometry args={[rail.w, rail.h, 0.025]} />
+          <meshBasicMaterial color={rail.color} transparent opacity={0.62} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        </mesh>)}
+      </group>;
+    })}
+  </>;
+}
+
+function FindItArrivalCurtain({ projectIndex }: { projectIndex: number }) {
+  const mesh = useRef<THREE.Mesh>(null);
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const direction = useMemo(() => new THREE.Vector3(), []);
+  useFrame(({ camera, clock }) => {
+    if (!mesh.current || !material.current) return;
+    camera.getWorldDirection(direction);
+    mesh.current.position.copy(camera.position).addScaledVector(direction, 18);
+    mesh.current.quaternion.copy(camera.quaternion);
+    material.current.uniforms.uTime.value = clock.getElapsedTime();
+  });
+  if (projectIndex !== 0) return null;
+  return <mesh ref={mesh} renderOrder={1} frustumCulled={false}>
+    <planeGeometry args={[34, 20]} />
+    <shaderMaterial ref={material} transparent depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
+      uniforms={{ uTime: { value: 0 } }}
+      vertexShader={`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
+      fragmentShader={`uniform float uTime;varying vec2 vUv;void main(){vec2 uv=vUv;float edge=smoothstep(0.0,0.16,uv.y)*(1.0-smoothstep(0.84,1.0,uv.y));float curtains=pow(0.5+0.5*sin(uv.x*116.0+sin(uv.x*17.0-uTime*0.14)*2.1),13.0);float broad=exp(-pow((uv.x-0.18)/0.24,2.0))*0.22+exp(-pow((uv.x-0.86)/0.2,2.0))*0.18;float crossing=exp(-pow((uv.y-0.3-sin(uv.x*5.0-uTime*0.12)*0.035)/0.07,2.0))*0.22+exp(-pow((uv.y-0.68+sin(uv.x*4.0-uTime*0.1)*0.04)/0.08,2.0))*0.16;float centerKeep=0.48+0.52*smoothstep(0.12,0.72,abs(uv.x-0.5));float energy=(curtains*0.24+broad+crossing)*edge*centerKeep;vec3 gold=vec3(1.0,0.72,0.34);vec3 red=vec3(1.0,0.06,0.16);vec3 color=mix(gold,red,smoothstep(0.48,0.94,uv.x));gl_FragColor=vec4(color,clamp(energy,0.0,0.58));}`}
+  /></mesh>;
+}
+
+function LatticeFilaments() {
+  const mesh = useRef<THREE.InstancedMesh>(null);
   const material = useRef<THREE.MeshBasicMaterial>(null);
-  const { pointer } = useThree();
-  const phaseStartedAt = useRef(performance.now());
-  const previousPhase = useRef(phase);
-  const previousProjectIndex = useRef(projectIndex);
-  const projectFlightStartedAt = useRef(performance.now());
-  const seeds = useMemo(() => Array.from({ length: 950 }, (_, index) => {
-    const angle = seeded(index, 21) * Math.PI * 2;
-    const radius = 3 + seeded(index, 22) * 17;
-    return { x: Math.cos(angle) * radius, y: -2 + seeded(index, 20) * 20, z: 28 - seeded(index, 26) * 178, phase: seeded(index, 24) * Math.PI * 2, size: 0.018 + seeded(index, 25) * 0.045, color: new THREE.Color(PROJECT_ACCENTS[projectIndex] ?? PROJECT_ACCENTS[0]).multiplyScalar(0.22 + seeded(index, 23) * 0.24) };
-  }), [projectIndex]);
-  const dummy = useMemo(() => new THREE.Object3D(), []);
-  const curl = useMemo(() => new THREE.Vector3(), []);
-  const noiseFields = useMemo(() => [101, 211, 307].map((seed) => new SimplexNoise(seededRandom(seed))), []);
-  const active = phase === "act4_vault" || phase === "act4_warp_out" || phase === "act4_warp_in";
-  useFrame(({ clock }, delta) => {
-    if (!instances.current || !material.current) return;
-    if (previousPhase.current !== phase) { previousPhase.current = phase; phaseStartedAt.current = performance.now(); }
-    if (previousProjectIndex.current !== projectIndex) {
-      previousProjectIndex.current = projectIndex;
-      projectFlightStartedAt.current = performance.now();
-    }
-    const time = clock.getElapsedTime();
-    const phaseAge = (performance.now() - phaseStartedAt.current) / 1000;
-    const reveal = phase === "act4_warp_in" ? smoothstep(1.25, 1.55, phaseAge) : active ? 1 : 0;
-    material.current.opacity = THREE.MathUtils.damp(material.current.opacity, reveal * 0.76, 3.2, delta);
-    const mesh = instances.current;
-    const pointerX = pointer.x * 8;
-    const pointerY = pointer.y * 4;
-    for (let index = 0; index < seeds.length; index += 1) {
-      const mote = seeds[index];
-      curlDrift(mote.x + mote.phase, mote.y, mote.z, time, noiseFields, curl);
-      const radius = 1 + 0.012 * Math.sin(time * 0.38 + mote.phase);
-      const wake = Math.exp(-((mote.x - pointerX) ** 2 + (mote.y - pointerY) ** 2) / 22);
-      const flight = smoothstep(0, 0.18, (performance.now() - projectFlightStartedAt.current) / 1000)
-        * (1 - smoothstep(0.66, 0.85, (performance.now() - projectFlightStartedAt.current) / 1000));
-      const stretch = Math.sin(flight * Math.PI) * 2.2;
-      dummy.position.set(mote.x * radius + curl.x * 0.42 - (mote.y - pointerY) * wake * 0.16, mote.y * radius + curl.y * 0.34 + (mote.x - pointerX) * wake * 0.16, mote.z + curl.z * 0.38);
-      const moteSize = mote.size * (0.8 + 0.2 * Math.sin(time + mote.phase));
-      dummy.scale.set(moteSize, moteSize, moteSize * (1 + stretch));
-      dummy.updateMatrix();
-      mesh.setMatrixAt(index, dummy.matrix);
-      mesh.setColorAt(index, mote.color);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  const filaments = useMemo(buildLatticeFilaments, []);
+  useEffect(() => {
+    if (!mesh.current) return;
+    filaments.forEach((entry, index) => {
+      mesh.current?.setMatrixAt(index, entry.matrix);
+      mesh.current?.setColorAt(index, entry.color);
+    });
+    mesh.current.instanceMatrix.needsUpdate = true;
+    if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
+  }, [filaments]);
+  useFrame(({ clock }) => {
+    if (!mesh.current || !material.current) return;
+    const pulse = 0.78 + Math.sin(clock.getElapsedTime() * 1.4) * 0.045;
+    material.current.opacity = pulse;
   });
-  return <instancedMesh ref={instances} args={[undefined, undefined, seeds.length]} visible={phase === "act4_warp_in" || phase === "act4_vault" || phase === "act4_warp_out"} frustumCulled={false}><icosahedronGeometry args={[1, 1]} /><meshBasicMaterial ref={material} vertexColors transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} /></instancedMesh>;
+  return <instancedMesh ref={mesh} args={[undefined, undefined, filaments.length]} frustumCulled={false} renderOrder={6}>
+    <boxGeometry args={[1, 1, 1]} />
+    <meshBasicMaterial ref={material} vertexColors transparent opacity={0.78} depthTest depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+  </instancedMesh>;
 }
 
-function AttenuatedStation({ index, focusIndex, station, children }: {
-  index: number;
-  focusIndex: React.RefObject<number>;
-  station: THREE.Vector3;
-  children: React.ReactNode;
-}) {
-  const group = useRef<THREE.Group>(null);
-  useFrame(() => {
-    const root = group.current;
-    if (!root) return;
-    const delta = Math.abs(index - (focusIndex.current ?? 0));
-    root.visible = delta < 1.5;
-    const attenuation = delta < 0.5 ? 1 : 1 - smoothstep(0.5, 1, delta) * 0.92;
-    root.traverse((object) => {
-      if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
-        const materials = Array.isArray(object.material) ? object.material : [object.material];
-        materials.forEach((material) => {
-          const values = material.userData as { vaultOpacity?: number; vaultTransparent?: boolean; vaultDepthWrite?: boolean; vaultVisible?: boolean };
-          if (values.vaultOpacity === undefined) {
-            values.vaultOpacity = material.opacity;
-            values.vaultTransparent = material.transparent;
-            values.vaultDepthWrite = material.depthWrite;
-            values.vaultVisible = material.visible;
-          }
-          material.transparent = values.vaultTransparent || attenuation < 1;
-          material.opacity = (values.vaultOpacity ?? material.opacity) * attenuation;
-          material.depthWrite = attenuation < 1 ? false : values.vaultDepthWrite ?? true;
-          material.visible = material instanceof THREE.ShaderMaterial && attenuation < 0.99 ? false : values.vaultVisible ?? true;
-        });
-      } else if (object instanceof THREE.PointLight || object instanceof THREE.SpotLight) {
-        const values = object.userData as { vaultIntensity?: number };
-        if (values.vaultIntensity === undefined) values.vaultIntensity = object.intensity;
-        object.intensity = values.vaultIntensity * attenuation;
-        object.visible = attenuation > 0.02;
-      }
-    });
+function BeamIntersectionFlare() {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const layout = useMemo(() => {
+    const dummy = new THREE.Object3D(); const entries: SheetInstance[] = [];
+    for (let z = 10; z >= -130; z -= 20) for (const x of [-24, -12, 0, 12, 24]) {
+      dummy.position.set(x, 3.4, z); dummy.scale.setScalar(0.11); dummy.updateMatrix();
+      entries.push({ matrix: dummy.matrix.clone(), color: (Math.abs(x / 12 + z / 20) % 2) < 1 ? new THREE.Color(VAULT_AMBER) : new THREE.Color(VAULT_CRIMSON) });
+    }
+    return entries;
+  }, []);
+  useEffect(() => {
+    if (!mesh.current) return;
+    layout.forEach((entry, index) => { mesh.current?.setMatrixAt(index, entry.matrix); mesh.current?.setColorAt(index, entry.color); });
+    mesh.current.instanceMatrix.needsUpdate = true;
+    if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
+  }, [layout]);
+  return <instancedMesh ref={mesh} args={[undefined, undefined, layout.length]} frustumCulled={false}>
+    <sphereGeometry args={[1, 8, 6]} /><meshBasicMaterial vertexColors transparent opacity={0.32} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+  </instancedMesh>;
+}
+
+function ObsidianFloor({ projectIndex }: { projectIndex: number }) {
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const { pointer, camera } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 4.2), []);
+  const hit = useMemo(() => new THREE.Vector3(), []);
+  const pointerWorld = useMemo(() => new THREE.Vector2(0, -60), []);
+  const station = ACT_FOUR_FOLD_POSES[projectIndex]?.target ?? ACT_FOUR_FOLD_POSES[0].target;
+  useFrame(({ clock }) => {
+    if (!material.current) return;
+    raycaster.setFromCamera(pointer, camera);
+    if (raycaster.ray.intersectPlane(plane, hit)) pointerWorld.set(hit.x, hit.z);
+    const uniforms = material.current.uniforms;
+    uniforms.uTime.value = clock.getElapsedTime(); uniforms.uPointer.value.copy(pointerWorld); uniforms.uActive.value.set(station.x, station.z);
   });
-  return <group ref={group} position={station}><>{children}</></group>;
+  return <mesh position={[0, -4.2, -60]} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false} renderOrder={2}>
+    <planeGeometry args={[260, 190]} />
+    <shaderMaterial ref={material} transparent depthWrite={false} depthTest side={THREE.DoubleSide} toneMapped={false}
+      uniforms={{ uTime: { value: 0 }, uPointer: { value: pointerWorld.clone() }, uActive: { value: new THREE.Vector2(station.x, station.z) } }}
+      vertexShader={`varying vec3 vWorld;void main(){vec4 world=modelMatrix*vec4(position,1.0);vWorld=world.xyz;gl_Position=projectionMatrix*viewMatrix*world;}`}
+      fragmentShader={`uniform float uTime;uniform vec2 uPointer;uniform vec2 uActive;varying vec3 vWorld;void main(){vec2 p=vWorld.xz;float pillars=0.0;for(int i=0;i<5;i++){float x=(float(i)-2.0)*12.0;pillars+=exp(-pow((p.x-x)/1.65,2.0))*(0.42+0.08*sin(p.y*0.11-uTime*0.32+float(i)));}float pools=0.0;for(int i=0;i<5;i++){float z=-30.0*float(i);vec2 d=(p-vec2(2.7,z))*vec2(0.34,0.16);pools+=exp(-dot(d,d)*0.32)*0.72;}vec2 activeDelta=(p-uActive)*vec2(0.31,0.2);float activePool=exp(-dot(activeDelta,activeDelta)*0.38);float pointerPool=exp(-dot(p-uPointer,p-uPointer)*0.018);float edge=max(abs(p.x)/130.0,abs(p.y+60.0)/95.0);float edgeFade=1.0-smoothstep(0.76,1.0,edge);float distanceFade=1.0-smoothstep(54.0,150.0,distance(cameraPosition,vWorld));float warm=clamp(pillars*0.34+pools*0.22+activePool*0.36+pointerPool*0.16,0.0,1.0);vec3 color=vec3(0.006,0.004,0.009)+vec3(1.0,0.55,0.19)*warm*0.22+vec3(0.88,0.035,0.12)*clamp(pools*0.08+pointerPool*0.06,0.0,0.2);gl_FragColor=vec4(color,edgeFade*distanceFade*(0.52+warm*0.34));}`}
+    />
+  </mesh>;
+}
+
+function buildStardust() {
+  const count = 1_400; const positions = new Float32Array(count * 3); const sizes = new Float32Array(count); const phases = new Float32Array(count); const colors = new Float32Array(count * 3);
+  for (let i = 0; i < count; i += 1) {
+    if (i < 1_100) {
+      const pose = ACT_FOUR_FOLD_POSES[Math.floor(i / 220)];
+      const forward = pose.target.clone().sub(pose.camera).normalize();
+      const right = forward.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+      const up = right.clone().cross(forward).normalize();
+      const point = pose.target.clone()
+        .addScaledVector(forward, 2.6 + seeded(i, 33) * 12.4)
+        .addScaledVector(right, (seeded(i, 31) - 0.5) * 30)
+        .addScaledVector(up, (seeded(i, 32) - 0.5) * 17);
+      positions.set(point.toArray(), i * 3);
+    } else {
+      positions.set([-18 + seeded(i, 31) * 40, -4.8 + seeded(i, 32) * 18, 6 - seeded(i, 33) * 138], i * 3);
+    }
+    sizes[i] = 0.05 + seeded(i, 34) * 0.1; phases[i] = seeded(i, 35) * Math.PI * 2;
+    const tint = seeded(i, 36); const color = new THREE.Color(tint > 0.74 ? "#ffffff" : "#ffe8b5");
+    colors.set([color.r, color.g, color.b], i * 3);
+  }
+  const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1)); geometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1)); geometry.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
+function CathedralStardust() {
+  const material = useRef<THREE.ShaderMaterial>(null); const geometry = useMemo(buildStardust, []);
+  useFrame(({ clock }) => { if (material.current) material.current.uniforms.uTime.value = clock.getElapsedTime(); });
+  return <points geometry={geometry} frustumCulled={false} renderOrder={5}>
+    <shaderMaterial ref={material} transparent depthWrite={false} depthTest toneMapped={false} blending={THREE.AdditiveBlending} uniforms={{ uTime: { value: 0 } }}
+      vertexShader={`attribute float aSize;attribute float aPhase;attribute vec3 aColor;uniform float uTime;varying float vTwinkle;varying vec3 vColor;void main(){vec3 p=position;p.x+=sin(uTime*0.14+aPhase)*0.12;p.y+=cos(uTime*0.11+aPhase*1.7)*0.09;p.z+=sin(uTime*0.08+aPhase*0.7)*0.08;vec4 mv=modelViewMatrix*vec4(p,1.0);vColor=aColor;vTwinkle=0.68+0.32*sin(uTime*1.1+aPhase);gl_PointSize=clamp(aSize*(650.0/max(-mv.z,1.0)),1.1,5.2);gl_Position=projectionMatrix*mv;}`}
+      fragmentShader={`varying float vTwinkle;varying vec3 vColor;void main(){float d=length(gl_PointCoord-0.5);float core=1.0-smoothstep(0.08,0.5,d);float halo=1.0-smoothstep(0.2,0.5,d);float alpha=(core*0.78+halo*0.32)*vTwinkle;if(alpha<0.02)discard;gl_FragColor=vec4(vColor*vTwinkle,alpha*0.86);}`}
+    />
+  </points>;
+}
+
+function createSlabTexture(title: string, index: number): THREE.CanvasTexture | null {
+  const canvas = document.createElement("canvas"); canvas.width = 1536; canvas.height = 864;
+  const context = canvas.getContext("2d"); if (!context) return null;
+  context.fillStyle = "rgba(255,190,85,0.78)"; context.font = "600 34px ui-monospace, Consolas, monospace"; context.fillText(`${String(index + 1).padStart(2, "0")} / 05`, 104, 154);
+  context.strokeStyle = "rgba(255,190,85,0.62)"; context.lineWidth = 2; context.beginPath(); context.moveTo(104, 196); context.lineTo(1432, 196); context.stroke();
+  let size = 100; context.font = `800 ${size}px Inter, Arial, sans-serif`;
+  while (context.measureText(title.toUpperCase()).width > 1328 && size > 54) { size -= 4; context.font = `800 ${size}px Inter, Arial, sans-serif`; }
+  context.fillStyle = "#f8f2e7"; context.shadowColor = "rgba(255,190,85,0.22)"; context.shadowBlur = 18; context.fillText(title.toUpperCase(), 104, 500, 1328);
+  context.shadowBlur = 0; context.fillStyle = "rgba(255,53,84,0.78)"; context.fillRect(104, 570, 150, 5);
+  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4; return texture;
+}
+
+function TimeSliceSlab({ index, projectIndex, isFolding }: { index: number; projectIndex: number; isFolding: boolean }) {
+  const titleMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null);
+  useEffect(() => {
+    const nextTexture = createSlabTexture(PROJECTS[index]?.name ?? "Project", index);
+    setTexture(nextTexture);
+    return () => nextTexture?.dispose();
+  }, [index]);
+  const pose = ACT_FOUR_FOLD_POSES[index] ?? ACT_FOUR_FOLD_POSES[0];
+  const transform = useMemo(() => {
+    const object = new THREE.Object3D();
+    object.position.copy(pose.target);
+    object.up.set(0, 1, 0);
+    object.lookAt(pose.camera);
+    return { position: pose.target.toArray() as [number, number, number], quaternion: object.quaternion.toArray() as [number, number, number, number] };
+  }, [pose]);
+  const edges = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(6.8, 3.85, 0.16)), []);
+  useFrame((_, delta) => {
+    if (titleMaterial.current) {
+      const visibleTitle = index === projectIndex && !isFolding ? 0 : 1;
+      titleMaterial.current.opacity = THREE.MathUtils.damp(titleMaterial.current.opacity, visibleTitle, 28, delta);
+    }
+  });
+  return <group position={transform.position} quaternion={transform.quaternion}>
+    <mesh renderOrder={3}><boxGeometry args={[6.8, 3.85, 0.16]} /><meshBasicMaterial color="#100d12" transparent opacity={index === projectIndex && !isFolding ? 0.22 : 0.3} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} /></mesh>
+    {texture && <mesh position={[0, 0, 0.082]} renderOrder={4}><planeGeometry args={[6.76, 3.81]} /><meshBasicMaterial ref={titleMaterial} map={texture} transparent opacity={index === projectIndex && !isFolding ? 0 : 1} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} /></mesh>}
+    <lineSegments geometry={edges} scale={1.006} renderOrder={7}><lineBasicMaterial color={VAULT_GOLD} transparent opacity={0.96} depthTest={false} depthWrite={false} toneMapped={false} /></lineSegments>
+    <lineSegments geometry={edges} scale={1.01} renderOrder={8}><lineBasicMaterial color={VAULT_CRIMSON} transparent opacity={0.72} depthTest={false} depthWrite={false} toneMapped={false} /></lineSegments>
+  </group>;
+}
+
+function TesseractCathedral({ projectIndex, isFolding }: { projectIndex: number; isFolding: boolean }) {
+  return <group>
+    <FindItArrivalCurtain projectIndex={projectIndex} />
+    <LightSheetSet axis="depth" /><LightSheetSet axis="vertical" /><LightSheetSet axis="cross" /><LatticeFilaments /><StationPortalFrames />
+    <BeamIntersectionFlare /><ObsidianFloor projectIndex={projectIndex} /><CathedralStardust />
+    {ACT_FOUR_FOLD_POSES.map((_, index) => <TimeSliceSlab key={`time-slice-${index}`} index={index} projectIndex={projectIndex} isFolding={isFolding} />)}
+    <ambientLight color="#8a7560" intensity={0.18} />
+    <pointLight position={[2.6, 4.6, 6]} color={VAULT_GOLD} intensity={24} distance={34} decay={1.5} />
+    <pointLight position={[2.8, 5.2, -34]} color={VAULT_AMBER} intensity={30} distance={38} decay={1.5} />
+    <pointLight position={[2.4, 4.8, -66]} color={VAULT_GOLD} intensity={28} distance={38} decay={1.5} />
+    <pointLight position={[3.1, 5.0, -98]} color={VAULT_CRIMSON} intensity={24} distance={40} decay={1.5} />
+    <pointLight position={[2.5, 4.6, -124]} color={VAULT_AMBER} intensity={26} distance={36} decay={1.5} />
+  </group>;
 }
 
 export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phase: ActFourPhase; projectIndex: number; warpCharge: React.RefObject<number> }) {
@@ -639,59 +656,39 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
   const exteriorLayer = useRef<THREE.Group>(null);
   const tunnelLayer = useRef<THREE.Group>(null);
   const vaultLayer = useRef<THREE.Group>(null);
-  const astrolabeRings = useRef<(THREE.Group | null)[]>([]);
-  const stationFocus = useRef(projectIndex);
+  const previousProjectIndex = useRef(projectIndex);
+  const foldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isFolding, setIsFolding] = useState(false);
   useEffect(() => {
-    phaseStartedAt.current = performance.now();
-    previousPhase.current = phase;
-  }, [phase]);
-  useFrame((_, delta) => {
-    if (previousPhase.current !== phase) {
-      previousPhase.current = phase;
-      phaseStartedAt.current = performance.now();
+    if (phase !== "act4_vault") {
+      if (foldTimer.current) clearTimeout(foldTimer.current);
+      foldTimer.current = null;
+      previousProjectIndex.current = projectIndex;
+      setIsFolding(false);
+      return;
     }
+    if (previousProjectIndex.current === projectIndex) return;
+    previousProjectIndex.current = projectIndex;
+    if (foldTimer.current) clearTimeout(foldTimer.current);
+    setIsFolding(true);
+    foldTimer.current = setTimeout(() => { setIsFolding(false); foldTimer.current = null; }, 900);
+  }, [phase, projectIndex]);
+  useEffect(() => () => { if (foldTimer.current) clearTimeout(foldTimer.current); }, []);
+  useEffect(() => { phaseStartedAt.current = performance.now(); previousPhase.current = phase; }, [phase]);
+  useFrame((_, delta) => {
+    if (previousPhase.current !== phase) { previousPhase.current = phase; phaseStartedAt.current = performance.now(); }
     const age = (performance.now() - phaseStartedAt.current) / 1000;
-    const time = performance.now() * 0.001;
-    stationFocus.current = THREE.MathUtils.damp(stationFocus.current, projectIndex, 5.5, delta);
-    astrolabeRings.current.forEach((ring, index) => {
-      if (ring) ring.rotation.z = (index % 2 === 0 ? 1 : -1) * time * (0.012 + index * 0.004);
-    });
     const progress = age / WARP_IN_DURATION_SECONDS;
     if (exteriorLayer.current) exteriorLayer.current.visible = phase === "act4_exterior" || (phase === "act4_warp_in" && progress < 0.27);
-    if (tunnelLayer.current) tunnelLayer.current.visible = (phase === "act4_warp_in" && progress >= 0.22 && progress < 0.79) || (phase === "act4_warp_out" && age >= 0.22);
+    if (tunnelLayer.current) tunnelLayer.current.visible = (phase === "act4_warp_in" && progress >= 0.22 && progress < 0.755) || (phase === "act4_warp_out" && age >= 0.22);
     if (vaultLayer.current) vaultLayer.current.visible = (phase === "act4_warp_in" && age >= WARP_VAULT_CUTOVER_SECONDS) || phase === "act4_vault" || phase === "act4_warp_out";
+    void delta; void projectIndex;
   });
-  return (
-    <group>
-      <group ref={exteriorLayer} visible={phase === "act4_exterior"}><ActFourExterior phase={phase} warpCharge={warpCharge} /></group>
-      <group ref={tunnelLayer}>
-        <WormholeTunnel phase={phase} />
-        <WormholeLandmarks phase={phase} />
-        <WormholeExitAperture phase={phase} />
-      </group>
-      <WarpStreamParticles phase={phase} warpCharge={warpCharge} />
-      <WarpNeedles phase={phase} />
-      <group ref={vaultLayer} visible={phase === "act4_vault" || phase === "act4_warp_out"}>
-        <mesh position={ACT_FOUR_SINGULARITY_POSITION}><sphereGeometry args={[7, 40, 24]} /><meshBasicMaterial color="#11131a" transparent opacity={0.09} side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
-        <mesh position={ACT_FOUR_SINGULARITY_POSITION}><sphereGeometry args={[1.15, 48, 32]} /><meshBasicMaterial color="#03050a" /></mesh>
-        <mesh position={ACT_FOUR_SINGULARITY_POSITION} scale={1.035}>
-          <sphereGeometry args={[1.15, 48, 32]} />
-          <shaderMaterial transparent blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
-            vertexShader={`varying vec3 vNormal;varying vec3 vView;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vNormal=normalize(normalMatrix*normal);vView=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}`}
-            fragmentShader={`varying vec3 vNormal;varying vec3 vView;void main(){float edge=pow(1.0-max(dot(normalize(vNormal),normalize(vView)),0.0),3.4);vec3 color=mix(vec3(0.72,0.055,0.12),vec3(1.0,0.62,0.31),smoothstep(0.68,0.96,edge));gl_FragColor=vec4(color,edge*0.95);}`} />
-        </mesh>
-        <pointLight position={ACT_FOUR_SINGULARITY_POSITION.clone().add(new THREE.Vector3(0, 0, 1.5))} color="#b4c4dc" intensity={0.45} distance={30} decay={2} />
-        {[28, 36, 44].map((radius, index) => <group key={radius} ref={(node) => { astrolabeRings.current[index] = node; }} position={ACT_FOUR_SINGULARITY_POSITION} rotation={index === 0 ? [0.28, 0.05, 0.18] : index === 1 ? [1.08, 0.72, -0.24] : [0.72, -0.5, 0.48]}>
-          <mesh><torusGeometry args={[radius, 0.025, 6, 220]} /><meshStandardMaterial color="#151923" metalness={0.98} roughness={0.38} emissive="#344152" emissiveIntensity={0.035} /></mesh>
-          <mesh><torusGeometry args={[radius, 0.009, 5, 220]} /><meshBasicMaterial color="#8190a8" transparent opacity={0.07} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>
-        </group>)}
-        <ObservatoryVault phase={phase} projectIndex={projectIndex} />
-        <DataEmbers phase={phase} projectIndex={projectIndex} />
-        {ACT_FOUR_PROJECT_STATIONS.map((station, index) => <AttenuatedStation key={index} index={index} focusIndex={stationFocus} station={station}>
-          <ActFourSculpture projectIndex={index} />
-        </AttenuatedStation>)}
-      </group>
-      <BreachFlash phase={phase} />
-    </group>
-  );
+  return <group>
+    <group ref={exteriorLayer} visible={phase === "act4_exterior"}><ActFourExterior phase={phase} warpCharge={warpCharge} /></group>
+    <group ref={tunnelLayer}><WormholeTunnel phase={phase} /><WormholeLandmarks phase={phase} /><WormholeExitAperture phase={phase} /></group>
+    <WarpStreamParticles phase={phase} warpCharge={warpCharge} /><WarpNeedles phase={phase} />
+    <group ref={vaultLayer} visible={phase === "act4_vault" || phase === "act4_warp_out"}><TesseractCathedral projectIndex={projectIndex} isFolding={isFolding} /></group>
+    <BreachFlash phase={phase} />
+  </group>;
 }
