@@ -214,6 +214,7 @@ export default function Scene({
               warpProgress={isActSix ? actSixWarpProgress : 0}
               cameraParallax={isActSix ? 0.24 : 0}
               handoffProgress={handoffProgress}
+              blackHoleLensingStrength={showActFourStarfield ? 1 : 0}
             />
             {!isActFive && !isActSix && !actFourOwnsScene && <ShootingStars />}
           </group>
