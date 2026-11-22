@@ -3,6 +3,7 @@
 import React, { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { ACT_FOUR_CORE_POSITION } from "@/animations/actFourChoreography";
 
 // ═══════════════════════════════════════════════════════════════════════
 // REALISTIC CONSTELLATIONS — Clean stick-figure asterisms
@@ -129,6 +130,8 @@ export default function StarField({
   warpProgress = 0,
   cameraParallax = 0,
   handoffProgress = 0,
+  backdropDepth = false,
+  blackHoleLensingStrength = 0,
 }: {
   starsOpacity?: number;
   showHeroStars?: boolean;
@@ -137,10 +140,20 @@ export default function StarField({
   warpProgress?: number;
   cameraParallax?: number;
   handoffProgress?: number;
+  backdropDepth?: boolean;
+  blackHoleLensingStrength?: number;
 }) {
   const fieldRef = useRef<THREE.Group>(null);
   const starsRef = useRef<THREE.Points>(null);
   const heroStarsRef = useRef<THREE.Points>(null);
+  const horizonWorldCenter = useMemo(() => ACT_FOUR_CORE_POSITION.clone(), []);
+  const horizonRightEdge = useMemo(() => new THREE.Vector3(), []);
+  const horizonUpEdge = useMemo(() => new THREE.Vector3(), []);
+  const horizonCenterNdc = useMemo(() => new THREE.Vector3(), []);
+  const horizonRightNdc = useMemo(() => new THREE.Vector3(), []);
+  const horizonUpNdc = useMemo(() => new THREE.Vector3(), []);
+  const horizonCameraRight = useMemo(() => new THREE.Vector3(), []);
+  const horizonCameraUp = useMemo(() => new THREE.Vector3(), []);
 
   const { positions, colors, sizes, phases } = useMemo(() => {
     const rand = seededRandom(42);
@@ -204,7 +217,13 @@ export default function StarField({
 
   const starMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 1.0 }, uWarp: { value: 0 }, uHandoff: { value: 0 }, ...cardContrast },
+      uniforms: {
+        uTime: { value: 0 }, uOpacity: { value: 1.0 }, uWarp: { value: 0 }, uHandoff: { value: 0 },
+        uBackdropDepth: { value: 0 }, uHorizonMask: { value: 0 },
+        uBlackHoleLensingStrength: { value: 0 },
+        uHorizonCenter: { value: new THREE.Vector2(0.5, 0.5) }, uHorizonRadii: { value: new THREE.Vector2(0.08, 0.08) },
+        ...cardContrast,
+      },
       vertexShader: `
         attribute float aSize;
         attribute float aPhase;
@@ -213,6 +232,10 @@ export default function StarField({
         varying vec2 vWarpDirection;
         uniform float uTime;
         uniform float uWarp;
+        uniform float uBackdropDepth;
+        uniform float uBlackHoleLensingStrength;
+        uniform vec2 uHorizonCenter;
+        uniform vec2 uHorizonRadii;
         void main() {
           float twinkle = 0.5 + 0.5 * sin(uTime * 1.2 + aPhase);
           vAlpha = twinkle;
@@ -225,10 +248,23 @@ export default function StarField({
           vec4 clipPosition = projectionMatrix * mv;
           vWarpDirection = normalize(clipPosition.xy + vec2(0.0001));
           clipPosition.xy += vWarpDirection * uWarp * 0.16 * clipPosition.w;
+          vec2 sourceScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
+          vec2 lensVector = (sourceScreenUv - uHorizonCenter) / max(uHorizonRadii, vec2(0.001));
+          float lensDistance = length(lensVector);
+          float lensField = (1.0 - smoothstep(1.0, 4.5, lensDistance)) * uBlackHoleLensingStrength;
+          float einsteinDeflection = 0.035 * lensField / max(lensDistance, 0.72);
+          clipPosition.xy += normalize(lensVector + vec2(0.00001)) * einsteinDeflection * uHorizonRadii * 2.0 * clipPosition.w;
+          clipPosition.xy += vec2(-lensVector.y, lensVector.x) * (0.0015 * lensField / max(lensDistance, 0.8)) * uHorizonRadii * 2.0 * clipPosition.w;
+          // Keep the shared stars behind opaque scene objects in Act IV while
+          // preserving their screen-space placement and authored point sizes.
+          clipPosition.z = mix(clipPosition.z, clipPosition.w * 0.9999, uBackdropDepth);
           gl_Position = clipPosition;
-          vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
+          // Mask from the star's source location, not its deflected location:
+          // otherwise a star starting inside the shadow can bend outside the
+          // mask and leak back into the photon rim.
+          vScreenUv = sourceScreenUv;
           float authoredPointSize = aSize * (1.0 + uWarp * 3.5);
-          gl_PointSize = min(authoredPointSize, 6.0);
+          gl_PointSize = authoredPointSize;
         }
       `,
       fragmentShader: `
@@ -241,6 +277,10 @@ export default function StarField({
         uniform float uCardDim;
         uniform float uWarp;
         uniform float uHandoff;
+        uniform float uHorizonMask;
+        uniform float uBlackHoleLensingStrength;
+        uniform vec2 uHorizonCenter;
+        uniform vec2 uHorizonRadii;
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
           float d = length(uv);
@@ -256,17 +296,33 @@ export default function StarField({
           float cardRadius = length(cardUv);
           float cardMask = 1.0 - smoothstep(0.92, 1.2, cardRadius);
           float contrast = mix(1.0, 0.4, cardMask * uCardDim);
+          vec2 horizonUv = (vScreenUv - uHorizonCenter) / max(uHorizonRadii, vec2(0.001));
+          float horizonRadius = length(horizonUv);
+          // Fully suppress source stars through the shadow and photon rim,
+          // with a short feather immediately outside the rim.
+          float shadowClear = smoothstep(1.16, 1.28, horizonRadius);
+          float diskAngle = -0.314;
+          vec2 diskUv = vec2(cos(diskAngle) * horizonUv.x - sin(diskAngle) * horizonUv.y, sin(diskAngle) * horizonUv.x + cos(diskAngle) * horizonUv.y);
+          float denseDiskRadius = length(vec2(diskUv.x / 3.91, diskUv.y / 1.66));
+          float denseBelt = smoothstep(0.17, 0.27, denseDiskRadius) * (1.0 - smoothstep(0.78, 1.08, denseDiskRadius));
+          // Hard discard guarantees no background point leaks through the
+          // opaque shadow/photon rim or the dense projected plasma lanes.
+          if (uBlackHoleLensingStrength > 0.5 && (horizonRadius < 1.16 || denseBelt > 0.035)) discard;
+          float horizonClear = mix(1.0, shadowClear * (1.0 - denseBelt), uBlackHoleLensingStrength);
+          horizonClear = mix(horizonClear, smoothstep(1.04, 1.2, horizonRadius), uHorizonMask * (1.0 - uBlackHoleLensingStrength));
           vec3 crimson = vec3(1.0, 0.08, 0.18);
           vec3 amber = vec3(1.0, 0.56, 0.16);
           vec3 starlight = vec3(0.72, 0.84, 1.0);
           vec3 transferColor = mix(crimson, amber, smoothstep(0.0, 0.52, uHandoff));
           transferColor = mix(transferColor, starlight, smoothstep(0.48, 1.0, uHandoff));
           vec3 starColor = mix(vec3(1.0, 0.75, 0.78), transferColor, uHandoff);
-          gl_FragColor = vec4(starColor, (core + glow) * vAlpha * uOpacity * contrast);
+          float lensHalo = exp(-pow((horizonRadius - 1.35) * 2.6, 2.0)) * uBlackHoleLensingStrength * 0.22;
+          gl_FragColor = vec4(starColor + transferColor * lensHalo, (core + glow) * vAlpha * uOpacity * contrast * horizonClear * (1.0 + lensHalo));
         }
       `,
       transparent: true,
       blending: THREE.AdditiveBlending,
+      depthTest: true,
       depthWrite: false,
     });
   }, [cardContrast]);
@@ -288,7 +344,7 @@ export default function StarField({
           gl_Position = clipPosition;
           vScreenUv = clipPosition.xy / clipPosition.w * 0.5 + 0.5;
           float safeDist = max(8.0, -mv.z);
-          gl_PointSize = min(aSize * (60.0 / safeDist), 6.0);
+          gl_PointSize = aSize * (60.0 / safeDist);
         }
       `,
       fragmentShader: `
@@ -328,6 +384,25 @@ export default function StarField({
     starMaterial.uniforms.uOpacity.value = starsOpacity;
     starMaterial.uniforms.uWarp.value = warpProgress;
     starMaterial.uniforms.uHandoff.value = handoffProgress;
+    starMaterial.uniforms.uBackdropDepth.value = backdropDepth ? 1 : 0;
+    starMaterial.uniforms.uHorizonMask.value = backdropDepth ? 1 : 0;
+    starMaterial.uniforms.uBlackHoleLensingStrength.value = backdropDepth ? blackHoleLensingStrength : 0;
+    if (backdropDepth) {
+      horizonWorldCenter.set(
+        ACT_FOUR_CORE_POSITION.x + Math.sin(t * 0.31) * 0.14,
+        ACT_FOUR_CORE_POSITION.y + Math.cos(t * 0.27 + 0.7) * 0.14,
+        ACT_FOUR_CORE_POSITION.z + Math.sin(t * 0.18) * 0.035,
+      );
+      horizonCameraRight.setFromMatrixColumn(state.camera.matrixWorld, 0).normalize();
+      horizonCameraUp.setFromMatrixColumn(state.camera.matrixWorld, 1).normalize();
+      horizonRightEdge.copy(horizonWorldCenter).addScaledVector(horizonCameraRight, 2.1);
+      horizonUpEdge.copy(horizonWorldCenter).addScaledVector(horizonCameraUp, 2.1);
+      horizonCenterNdc.copy(horizonWorldCenter).project(state.camera);
+      horizonRightNdc.copy(horizonRightEdge).project(state.camera);
+      horizonUpNdc.copy(horizonUpEdge).project(state.camera);
+      starMaterial.uniforms.uHorizonCenter.value.set(horizonCenterNdc.x * 0.5 + 0.5, horizonCenterNdc.y * 0.5 + 0.5);
+      starMaterial.uniforms.uHorizonRadii.value.set(Math.abs(horizonRightNdc.x - horizonCenterNdc.x) * 0.5 * 1.04, Math.abs(horizonUpNdc.y - horizonCenterNdc.y) * 0.5 * 1.04);
+    }
     heroStarMaterial.uniforms.uTime.value = t;
     heroStarMaterial.uniforms.uOpacity.value = starsOpacity;
     heroStarMaterial.uniforms.uHandoff.value = handoffProgress;
@@ -354,7 +429,7 @@ export default function StarField({
 
   return (
     <group ref={fieldRef}>
-      <points ref={starsRef}>
+      <points ref={starsRef} renderOrder={0}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[positions, 3]} />
           <bufferAttribute attach="attributes-color" args={[colors, 3]} />
