@@ -26,6 +26,7 @@ export default function HoldToWarp({
   disabled?: boolean;
 }) {
   const [progress, setProgress] = useState(0);
+  const isActFourDial = className.split(/\s+/).includes("act-four-warp-dial");
   const activePointer = useRef<number | null>(null);
   const frame = useRef<number | null>(null);
   const startedAt = useRef(0);
@@ -75,7 +76,7 @@ export default function HoldToWarp({
       disabled={disabled}
       role="button"
       aria-label={ariaLabel}
-      className={`group relative grid touch-none select-none ${compact ? "h-24 w-24" : "h-36 w-36"} place-items-center rounded-full border border-[#ff6b7f]/55 bg-black/45 font-mono text-[10px] uppercase tracking-[0.2em] text-white shadow-[0_0_48px_rgba(255,23,68,0.2)] backdrop-blur-md transition hover:border-[#ffe4ea] hover:bg-[#ff1744]/14 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe4ea] ${className}`}
+      className={`group relative grid touch-none select-none ${compact ? "h-24 w-24" : "h-36 w-36"} place-items-center rounded-full border border-[#ffb84d]/55 bg-black/50 font-mono text-[10px] uppercase tracking-[0.2em] text-white shadow-[0_0_42px_rgba(255,184,77,0.16)] backdrop-blur-md transition hover:border-[#fff3d1] hover:bg-[#ffb84d]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#fff3d1] ${className}`}
       onPointerDown={disabled ? undefined : beginPointerCharging}
       onPointerUp={stopCharging}
       onPointerCancel={stopCharging}
@@ -115,16 +116,16 @@ export default function HoldToWarp({
           cy="50"
           r="45"
           fill="none"
-          stroke="#fff0f2"
+          stroke={isActFourDial ? "#ff3554" : "#fff3d1"}
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={circumference * (1 - progress)}
-          style={{ filter: "drop-shadow(0 0 7px rgba(255,236,239,0.9))", transition: progress === 0 ? "stroke-dashoffset 220ms ease-out" : "none" }}
+          style={{ filter: isActFourDial ? "drop-shadow(0 0 7px rgba(255,53,84,0.82))" : "drop-shadow(0 0 7px rgba(255,219,145,0.9))", transition: progress === 0 ? "stroke-dashoffset 220ms ease-out" : "none" }}
         />
       </svg>
       <span className="relative grid gap-2 text-center leading-4">
-        <span className="text-[#ffb5c0]">{progress > 0 ? `${Math.round(progress * 100)}%` : idleLabel}</span>
+        <span className={isActFourDial ? "act-four-dial-label" : "text-[#ffcf78]"}>{progress > 0 ? `${Math.round(progress * 100)}%` : idleLabel}</span>
         <span className="whitespace-pre-line font-bold text-white">{label}</span>
       </span>
     </button>

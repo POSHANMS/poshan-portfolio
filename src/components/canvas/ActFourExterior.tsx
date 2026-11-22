@@ -376,7 +376,12 @@ function LensDust({ charge, active }: { charge: ChargeSource; active: boolean })
     dustMaterial.uniforms.uOpacity.value = THREE.MathUtils.damp(dustMaterial.uniforms.uOpacity.value, active ? 0.7 : 0, 4, delta);
     dustMaterial.uniforms.uCharge.value = readCharge(charge);
   });
-  return <group ref={group} visible={active}><instancedMesh ref={instances} args={[undefined, undefined, seeds.length]} frustumCulled={false}><planeGeometry args={[1,1]} /><primitive object={dustMaterial} attach="material" /></instancedMesh></group>;
+  return <group ref={group} visible={active}><instancedMesh ref={(mesh) => {
+    instances.current = mesh;
+    if (mesh && mesh.instanceColor === null) {
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(seeds.length * 3).fill(1), 3);
+    }
+  }} args={[undefined, undefined, seeds.length]} frustumCulled={false}><planeGeometry args={[1,1]} /><primitive object={dustMaterial} attach="material" /></instancedMesh></group>;
 }
 
 // Exterior Gargantua is rendered as one camera-facing raymarch surface. The
@@ -399,6 +404,7 @@ const exteriorFragment = `
   uniform float uTime;
   uniform float uFlowPhase;
   uniform float uCharge;
+  uniform float uDiskTilt;
   uniform vec3 uCameraLocal;
   uniform vec2 uPlaneSize;
   uniform vec2 uPointer;
@@ -446,7 +452,8 @@ const exteriorFragment = `
     // for the capture/lensing field. Keep the shadow geometry fixed; only its
     // plasma field and lensing cues respond to time, pointer, and warp charge.
     vec2 p = (vQuadUv - 0.5) * 2.0;
-    float ca = cos(-0.314), sa = sin(-0.314);
+    float tilt = uDiskTilt;
+    float ca = cos(tilt), sa = sin(tilt);
     vec2 diskUv = vec2(ca * p.x - sa * p.y, sa * p.x + ca * p.y);
     float charge = clamp(uCharge, 0.0, 1.0);
     float chargeShear = pow(charge, 1.8);
@@ -457,40 +464,65 @@ const exteriorFragment = `
     vec2 plasmaUv = vec2(diskUv.x + yaw * diskUv.y * 0.22, diskUv.y - pitch * diskUv.x * 0.22);
     float diskR = length(vec2(plasmaUv.x / 0.92, plasmaUv.y / 0.39));
     float angle = atan(plasmaUv.y / 0.39, plasmaUv.x / 0.92);
-    float angularVel = 1.8 / pow(max(diskR, 0.18), 0.9);
-    float spiralPhase = angle + log(max(diskR, 0.1)) * 4.2 - uFlowPhase * angularVel * 0.16;
-    float radialDrift = uFlowPhase * (0.22 + chargeShear * 0.36);
+    float inverseRootRadius = 1.0 / sqrt(max(diskR, 0.14));
+    float inverseRootOuter = 1.0 / sqrt(1.0);
+    float inverseRootInner = 1.0 / sqrt(0.14);
+    float keplerMix = clamp((inverseRootRadius - inverseRootOuter) / (inverseRootInner - inverseRootOuter), 0.0, 1.0);
+    float angularVel = mix(0.9, 3.2, keplerMix);
+    float spiralPhase = angle + log(max(diskR, 0.08)) * 4.2 - uFlowPhase * angularVel;
+    float radialDrift = uFlowPhase * 0.25;
     float rSampleA = diskR + radialDrift;
     float rSampleB = diskR + radialDrift * 0.68;
-    vec2 polarA = vec2(spiralPhase * 3.8 + rSampleA * 10.5, rSampleA * 15.0);
-    vec2 polarB = vec2(spiralPhase * 6.1 - rSampleB * 7.2, rSampleB * 22.0);
+    // Rotate the disk coordinates directly instead of sampling FBM with raw
+    // atan(): this periodic transform cannot cut the noise field at +/-PI.
+    float twistA = log(max(diskR, 0.08)) * 4.2 - uFlowPhase * angularVel;
+    float twistB = twistA - 0.32;
+    vec2 diskCoord = vec2(plasmaUv.x / 0.92, plasmaUv.y / 0.39);
+    mat2 flowRotationA = mat2(cos(twistA), -sin(twistA), sin(twistA), cos(twistA));
+    mat2 flowRotationB = mat2(cos(twistB), -sin(twistB), sin(twistB), cos(twistB));
+    vec2 swirledA = flowRotationA * diskCoord;
+    vec2 swirledB = flowRotationB * diskCoord;
+    vec2 polarA = vec2(swirledA.x * 3.8 + rSampleA * 10.5, swirledA.y * 15.0);
+    vec2 polarB = vec2(swirledB.x * 6.1 - rSampleB * 7.2, swirledB.y * 22.0);
     float cloud = fbm(polarA + vec2(-uFlowPhase * 0.18, uFlowPhase * 0.055));
     float detail = fbm(polarB + vec2(uFlowPhase * 0.12, -uFlowPhase * 0.085));
     float turbulence = smoothstep(0.19, 0.78, cloud * 0.68 + detail * 0.5);
     float clumpField = smoothstep(0.34, 0.7, cloud * 0.62 + detail * 0.52);
     float dustLane = smoothstep(0.25, 0.58, cloud * 0.55 + detail * 0.48);
-    float armPhase = diskR * 64.0 - spiralPhase * 5.0 + (cloud - 0.45) * 12.0 - uFlowPhase * angularVel * 0.34;
-    float filaments = 0.38 + 0.62 * pow(0.5 + 0.5 * sin(armPhase), 6.0);
+    float armPhase = diskR * 64.0 - spiralPhase * 5.0 + (cloud - 0.45) * 12.0;
+    float filamentWave = 0.5 + 0.5 * sin(armPhase);
+    // Keep a deliberate 4:1 luminance floor between dark dust lanes and hot streams.
+    float filaments = mix(0.25, 1.0, pow(filamentWave, 9.0));
     // Carry the luminous inner filaments close enough to the shadow that the
     // diagonal disk joins the photon rim instead of appearing detached.
-    float innerEdge = smoothstep(0.21, 0.30, diskR);
+    float innerEdge = smoothstep(0.17, 0.255, diskR);
     float outerEdge = 1.0 - smoothstep(0.88, 1.06, diskR);
     float gas = innerEdge * outerEdge * (0.16 + turbulence * 0.7) * filaments;
-    gas *= mix(0.2, 1.55, clumpField) * mix(0.42, 1.0, dustLane);
+    gas *= mix(0.08, 1.72, clumpField) * mix(0.2, 1.0, dustLane);
     vec3 gasColor = mix(vec3(0.34, 0.025, 0.045), vec3(0.82, 0.16, 0.045), turbulence);
     gasColor = mix(gasColor, vec3(1.0, 0.48, 0.12), smoothstep(0.42, 0.82, turbulence + filaments * 0.22));
     float innerHeat = exp(-pow((diskR - 0.34) * 15.0, 2.0));
     vec3 whiteGold = vec3(1.0, 0.94, 0.78);
     gasColor = mix(gasColor, whiteGold, innerHeat * (0.12 + turbulence * 0.24 + charge * 0.42));
-    float doppler = 0.78 + 0.42 * smoothstep(-0.18, 0.9, -plasmaUv.x / 0.92);
+    float approachingSide = 1.0 - smoothstep(-0.2, 0.9, plasmaUv.x / 0.92);
+    float doppler = 1.0 + 0.2 * approachingSide;
     gasColor *= doppler * (1.0 + charge * 1.35);
 
-    float shadowRadius = 0.235 * (1.0 - 0.06 * charge);
+    const float shadowRadius = 0.235;
     float radial = length(p);
     float shadow = 1.0 - smoothstep(shadowRadius - 0.004, shadowRadius + 0.004, radial);
     float highChargeShimmer = charge > 0.65 ? sin(uTime * 28.0 + spiralPhase * 5.0) * 0.035 * smoothstep(0.65, 1.0, charge) : 0.0;
     float coronaBreath = 1.0 + 0.04 * sin(uTime * 0.82 + cloud * 3.0);
-    float photon = exp(-pow((radial - shadowRadius * 1.045) * 92.0, 2.0)) * (0.72 + charge * 1.8) * coronaBreath;
+    vec2 lensP = p + vec2(yaw, pitch) * 0.22;
+    float lensRadial = length(lensP);
+    float rimAngle = atan(lensP.y, lensP.x) - uFlowPhase * 2.6;
+    float rimSurgeA = pow(max(0.0, cos(rimAngle)), 18.0);
+    float rimSurgeB = pow(max(0.0, cos(rimAngle - 2.0943951)), 18.0);
+    float rimSurgeC = pow(max(0.0, cos(rimAngle - 4.1887902)), 18.0);
+    float rimSurges = clamp(rimSurgeA + rimSurgeB + rimSurgeC, 0.0, 1.0);
+    float rimWarp = 0.012 * sin(rimAngle * 4.0 + uTime * 1.7 + cloud * 2.0);
+    float photonRadius = shadowRadius * (1.045 + rimWarp);
+    float photon = exp(-pow((radial - photonRadius) * 92.0, 2.0)) * (0.62 + charge * 1.8 + rimSurges * 1.45) * coronaBreath;
     float glintAngle = atan(p.y, p.x) + yaw * 0.5 + pitch * 0.35;
     float glintA = pow(max(0.0, cos(glintAngle - uFlowPhase * 2.2)), 34.0);
     float glintB = pow(max(0.0, cos(glintAngle - uFlowPhase * 1.63 + 2.08)), 38.0);
@@ -499,8 +531,6 @@ const exteriorFragment = `
     photon += travelingGlints * exp(-pow((radial - shadowRadius * 1.045) * 82.0, 2.0));
     // Let the soft lensed arcs follow the same diagonal plane as the disk.
     // Pointer parallax shifts only this light field; the core silhouette stays locked.
-    vec2 lensP = p + vec2(yaw, pitch) * 0.22;
-    float lensRadial = length(lensP);
     vec2 lensDiskUv = vec2(ca * lensP.x - sa * lensP.y, sa * lensP.x + ca * lensP.y);
     float arcRadius = shadowRadius * (1.19 + charge * 0.18);
     float arcBand = exp(-pow((lensRadial - arcRadius) * 32.0, 2.0));
@@ -508,29 +538,54 @@ const exteriorFragment = `
     float arc = arcBand * arcMask * (0.14 + turbulence * 0.1) * coronaBreath;
     float diskAngle = atan(diskUv.y, diskUv.x);
     float symmetricContact = pow(abs(cos(diskAngle)), 28.0);
-    float contactBand = exp(-pow((radial - shadowRadius * 1.055) * 52.0, 2.0));
-    float rimJoin = symmetricContact * contactBand * (0.24 + turbulence * 0.18 + charge * 0.34) * coronaBreath;
-    float waveTravel = fract(uFlowPhase * 0.18);
-    float waveRadius = mix(shadowRadius * 1.08, shadowRadius * 1.34, waveTravel);
-    float energyWave = exp(-pow((lensRadial - waveRadius) * 105.0, 2.0)) * charge * 0.32;
+    // Broad bilateral contact blend: the angular lobes sit on both ends of the
+    // tilted disk axis; the Gaussian feathers into the rim near its shadow edge.
+    float contactEnvelope = pow(abs(cos(diskAngle)), 14.0)
+      * exp(-pow((radial - shadowRadius * 1.025) * 24.0, 2.0));
+    // Matched straight plasma streaks extend from each shadow contact along
+    // the tilted disk axis; the black core occludes only their hidden middle.
+    float axisCoreFade = smoothstep(shadowRadius * 0.98, shadowRadius * 1.045, radial);
+    float axisOuterFade = 1.0 - smoothstep(0.68, 0.86, radial);
+    float bilateralStreak = exp(-pow(plasmaUv.y / (0.39 * 0.085), 2.0))
+      * axisCoreFade * axisOuterFade;
+    float contactBand = exp(-pow((radial - shadowRadius * 1.005) * 48.0, 2.0));
+    float rimJoin = symmetricContact * contactBand * (0.38 + turbulence * 0.2 + charge * 0.38) * coronaBreath;
+    float contactPlasma = contactEnvelope;
+    gas = max(gas, contactPlasma * (0.42 + turbulence * 0.14) * outerEdge);
+    gasColor = mix(gasColor, mix(vec3(1.0, 0.48, 0.16), whiteGold, 0.68), contactEnvelope * 0.58);
+    float shockwaveA = fract(uFlowPhase * 0.18);
+    float shockwaveB = fract(uFlowPhase * 0.18 + 0.5);
+    float shockRadiusA = mix(shadowRadius * 1.075, shadowRadius * 1.34, shockwaveA);
+    float shockRadiusB = mix(shadowRadius * 1.075, shadowRadius * 1.34, shockwaveB);
+    float energyWaveA = exp(-pow((lensRadial - shockRadiusA) * 112.0, 2.0));
+    float energyWaveB = exp(-pow((lensRadial - shockRadiusB) * 112.0, 2.0));
+    float energyWave = (energyWaveA + energyWaveB) * charge * 0.2;
 
     vec3 color = gasColor * gas;
     float alpha = gas * 0.84;
     color *= 1.0 - shadow;
+    // Keep both junctions warm and luminous; Doppler beaming adds only a
+    // restrained ~20% lift to the approaching side while the opposite side stays lit.
+    color += mix(vec3(1.0, 0.48, 0.16), whiteGold, 0.68 + turbulence * 0.1)
+      * contactEnvelope * (0.58 + charge * 0.2) * doppler * (1.0 - shadow);
+    color += mix(vec3(1.0, 0.58, 0.28), whiteGold, 0.72 + turbulence * 0.12)
+      * bilateralStreak * (0.34 + turbulence * 0.14) * doppler * (1.0 - shadow);
     // An opaque black shadow keeps stars fully occluded at the center.
     alpha = max(alpha * (1.0 - shadow), shadow);
-    // The near-side plasma crosses the void as a narrow, turbulent belt.
+    alpha = max(alpha, bilateralStreak * (0.3 + turbulence * 0.1) * (1.0 - shadow));
+    // The near-side plasma crosses the void as a broad, feathered turbulent belt.
     float beltCoreFade = smoothstep(0.17, 0.28, diskR);
     float beltOuterFade = 1.0 - smoothstep(0.82, 0.99, diskR);
-    float frontBelt = exp(-pow(plasmaUv.y / 0.39 / 0.12, 2.0))
+    float frontBelt = exp(-pow(plasmaUv.y / 0.39 / 0.2, 2.0))
       * smoothstep(0.16, 0.28, abs(plasmaUv.x) / 0.92) * beltCoreFade * beltOuterFade;
     float streamClumps = mix(0.12, 0.92, clumpField) * (0.58 + filaments * 0.42);
     vec3 frontColor = mix(vec3(0.64, 0.17, 0.035), vec3(1.0, 0.72, 0.34), smoothstep(0.72, 1.08, turbulence + filaments * 0.12 + charge * 0.4));
-    color += frontColor * frontBelt * (0.07 + turbulence * 0.14 + filaments * 0.05) * streamClumps * (1.0 + charge * 1.2) * (1.0 - shadow);
-    alpha = max(alpha, frontBelt * (0.09 + turbulence * 0.16) * (1.0 - shadow));
-    vec3 photonColor = mix(vec3(1.0, 0.3, 0.12), whiteGold, smoothstep(0.15, 1.4, photon + charge * 0.7));
+    color += frontColor * frontBelt * (0.012 + turbulence * 0.03 + filaments * 0.012) * streamClumps * (1.0 + charge * 1.2) * (1.0 - shadow);
+    alpha = max(alpha, frontBelt * (0.025 + turbulence * 0.045) * (1.0 - shadow));
+    alpha = max(alpha, contactPlasma * (0.46 + charge * 0.18) * (1.0 - shadow));
+    vec3 photonColor = mix(vec3(1.0, 0.48, 0.12), whiteGold, smoothstep(0.15, 1.05, photon + rimSurges * 0.85 + charge * 0.7));
     float pulseWaves = energyWave * (0.5 + 0.5 * sin(uFlowPhase * 8.0 + radial * 62.0));
-    color += photonColor * photon * 0.72 + whiteGold * travelingGlints * 0.7 + photonColor * rimJoin + vec3(1.0, 0.52, 0.22) * arc * coronaBreath + whiteGold * (pulseWaves + highChargeShimmer * photon);
+    color += photonColor * photon * 0.72 + whiteGold * travelingGlints * 0.7 + whiteGold * rimSurges * contactBand * 0.92 + photonColor * rimJoin + vec3(1.0, 0.52, 0.22) * arc * coronaBreath + whiteGold * (pulseWaves + highChargeShimmer * photon);
     alpha = max(alpha, max(photon * 0.94 + travelingGlints * 0.3, max(rimJoin * 0.72, arc * 0.72 + pulseWaves)));
     float edge = max(abs(p.x), abs(p.y));
     alpha *= 1.0 - smoothstep(0.78, 0.99, edge);
@@ -585,7 +640,9 @@ const exteriorFragment = `
         float radial01 = (diskRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER);
         float kepler = swirl / pow(max(diskRadius / SHADOW_RADIUS, 1.0), 0.75);
         float twistedAngle = theta + uTime * (0.115 + kepler * 0.13);
-        vec2 polar = vec2(twistedAngle * 2.3 + radial01 * 5.4, radial01 * 8.0);
+        float diskTwist = log(max(diskRadius / SHADOW_RADIUS, 0.08)) * 4.2 - uFlowPhase * kepler;
+        vec2 flowCoord = mat2(cos(diskTwist), -sin(diskTwist), sin(diskTwist), cos(diskTwist)) * diskPoint.xz;
+        vec2 polar = vec2(flowCoord.x * 2.3 + radial01 * 5.4, flowCoord.y * 8.0);
         float cloud = fbm(polar + vec2(uTime * 0.045, -uTime * 0.028));
         float detail = fbm(polar * 2.15 + vec2(-uTime * 0.08, uTime * 0.06));
         float filamentPhase = diskRadius * 19.0 - twistedAngle * 2.8 + (cloud - 0.48) * 5.0;
@@ -633,7 +690,9 @@ const exteriorFragment = `
         float direct01 = (directRadius - DISK_INNER) / (DISK_OUTER - DISK_INNER);
         float directKepler = swirl / pow(max(directRadius / SHADOW_RADIUS, 1.0), 0.75);
         float directAngle = directTheta + uTime * (0.115 + directKepler * 0.13);
-        vec2 directPolar = vec2(directAngle * 2.3 + direct01 * 5.4, direct01 * 8.0);
+        float directTwist = log(max(directRadius / SHADOW_RADIUS, 0.08)) * 4.2 - uFlowPhase * directKepler;
+        vec2 directFlowCoord = mat2(cos(directTwist), -sin(directTwist), sin(directTwist), cos(directTwist)) * directDiskPoint.xz;
+        vec2 directPolar = vec2(directFlowCoord.x * 2.3 + direct01 * 5.4, directFlowCoord.y * 8.0);
         float directCloud = fbm(directPolar + vec2(uTime * 0.045, -uTime * 0.028));
         float directDetail = fbm(directPolar * 2.15 + vec2(-uTime * 0.08, uTime * 0.06));
         float directTurbulence = smoothstep(0.22, 0.76, directCloud * 0.72 + directDetail * 0.42);
@@ -701,6 +760,7 @@ function RaymarchedExterior({ charge, radius = 1.85, flowPhase }: { charge: Char
     uTime: { value: 0 },
     uFlowPhase: { value: 0 },
     uCharge: { value: 0 },
+    uDiskTilt: { value: -0.314 },
     uCameraLocal: { value: new THREE.Vector3() },
     uPlaneSize: { value: new THREE.Vector2(18, 18) },
     uPointer: { value: new THREE.Vector2() },
@@ -720,8 +780,9 @@ function RaymarchedExterior({ charge, radius = 1.85, flowPhase }: { charge: Char
     const planeHeight = radius * 10.0;
     mesh.current.scale.set(planeWidth * 0.5, planeHeight * 0.5, 1);
     uniforms.uPlaneSize.value.set(planeWidth, planeHeight);
-    const inverseParentRotation = parent.getWorldQuaternion(new THREE.Quaternion()).invert();
-    mesh.current.quaternion.copy(inverseParentRotation.multiply(camera.quaternion));
+    // Keep the plane camera-facing at rest, while allowing the small parent
+    // precession to carry it through a restrained physical tilt.
+    mesh.current.quaternion.copy(camera.quaternion);
     if (shadow.current) {
       shadow.current.quaternion.copy(mesh.current.quaternion);
       shadow.current.position.set(0, 0, 0.02);
@@ -730,27 +791,29 @@ function RaymarchedExterior({ charge, radius = 1.85, flowPhase }: { charge: Char
     pointer.current.x = THREE.MathUtils.damp(pointer.current.x, cursor.x, 3.5, delta);
     pointer.current.y = THREE.MathUtils.damp(pointer.current.y, cursor.y, 3.5, delta);
     uniforms.uPointer.value.copy(pointer.current);
+    uniforms.uDiskTilt.value = -0.314 + Math.sin(clock.getElapsedTime() * 0.46) * 0.035 + pointer.current.x * 0.0698;
     uniforms.uCharge.value = THREE.MathUtils.damp(uniforms.uCharge.value, readCharge(charge), 4.5, delta);
     // Integrate velocity instead of multiplying time by charge: when the hold
     // is released, flow slows smoothly without the phase jumping backward.
-    const flowSpeed = 1.0 + 5.5 * Math.pow(uniforms.uCharge.value, 1.8);
+    const flowSpeed = 1.0 + 6.5 * Math.pow(uniforms.uCharge.value, 1.8);
     flowPhase.current += Math.min(delta, 0.05) * flowSpeed;
     uniforms.uFlowPhase.value = flowPhase.current;
     uniforms.uTime.value = clock.getElapsedTime();
     if (shadow.current) {
-      const radiusScale = radius * 5.0 * 0.235 * (1.0 - uniforms.uCharge.value * 0.06) * 0.985;
+      const radiusScale = radius * 5.0 * 0.235 * 0.985;
       shadow.current.scale.setScalar(radiusScale);
     }
   });
   return (
     <>
-      <mesh ref={mesh} frustumCulled={false} renderOrder={3}>
+      {/* Explicitly draw the Act IV lens/composite after the global star points. */}
+      <mesh ref={mesh} frustumCulled={false} renderOrder={10}>
         <planeGeometry args={[2, 2]} />
         <shaderMaterial ref={material} vertexShader={exteriorVertex} fragmentShader={exteriorFragment} uniforms={uniforms} transparent blending={THREE.NormalBlending} depthTest depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={shadow} frustumCulled={false} renderOrder={20}>
         <circleGeometry args={[1, 128]} />
-        <meshBasicMaterial color="#000000" transparent opacity={1} depthTest={false} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color="#000000" transparent opacity={1} depthTest depthWrite toneMapped={false} />
       </mesh>
     </>
   );
@@ -758,89 +821,147 @@ function RaymarchedExterior({ charge, radius = 1.85, flowPhase }: { charge: Char
 
 function ExteriorAccretionSparks({ charge, radius, flowPhase }: { charge: ChargeSource; radius: number; flowPhase: React.MutableRefObject<number> }) {
   const group = useRef<THREE.Group>(null);
-  const points = useRef<THREE.Points>(null);
-  const material = useRef<THREE.ShaderMaterial>(null);
+  const sparks = useRef<THREE.InstancedMesh>(null);
   const pointer = useRef(new THREE.Vector2());
-  const uniforms = useMemo(() => ({
-    uTime: { value: 0 },
-    uFlowPhase: { value: 0 },
-    uCharge: { value: 0 },
-    uPointer: { value: new THREE.Vector2() },
+  const initialized = useRef(false);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const count = 220;
+  const geometry = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vColor;
+      void main() {
+        vec4 instancePosition = instanceMatrix * vec4(position, 1.0);
+        vUv = uv;
+        vColor = instanceColor;
+        gl_Position = projectionMatrix * modelViewMatrix * instancePosition;
+      }
+    `,
+    fragmentShader: `
+      varying vec2 vUv;
+      varying vec3 vColor;
+      void main() {
+        float longitudinal = smoothstep(0.0, 0.16, vUv.x) * (1.0 - smoothstep(0.82, 1.0, vUv.x));
+        float transverse = 1.0 - smoothstep(0.18, 0.5, abs(vUv.y - 0.5) * 2.0);
+        float alpha = longitudinal * transverse;
+        if (alpha < 0.025) discard;
+        gl_FragColor = vec4(vColor, alpha * 0.92);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthTest: true,
+    depthWrite: false,
+    toneMapped: false,
   }), []);
   const attributes = useMemo(() => {
-    const count = 180;
-    const positions = new Float32Array(count * 3);
+    const radii = new Float32Array(count);
+    const angles = new Float32Array(count);
     const phases = new Float32Array(count);
-    const sizes = new Float32Array(count);
+    const lengths = new Float32Array(count);
+    const depths = new Float32Array(count);
+    const colors = new Array<THREE.Color>(count);
     for (let index = 0; index < count; index += 1) {
-      const angle = unit(index, 71) * Math.PI * 2;
-      const ellipseFactor = Math.hypot(0.92 * Math.cos(angle), 0.39 * Math.sin(angle));
-      const minRadius = 0.252 / Math.max(ellipseFactor, 0.01);
-      const orbitRadius = THREE.MathUtils.lerp(minRadius, 0.98, unit(index, 72));
-      const dx = 0.92 * orbitRadius * Math.cos(angle);
-      const dy = 0.39 * orbitRadius * Math.sin(angle);
-      const tilt = 0.314;
-      const x = Math.cos(tilt) * dx - Math.sin(tilt) * dy;
-      const y = Math.sin(tilt) * dx + Math.cos(tilt) * dy;
-      positions.set([x, y, 0.012], index * 3);
+      radii[index] = 0.14 + unit(index, 72) * 0.82;
+      angles[index] = unit(index, 71) * Math.PI * 2;
       phases[index] = unit(index, 73) * Math.PI * 2;
-      sizes[index] = 0.7 + unit(index, 74) * 1.8;
+      lengths[index] = 0.018 + unit(index, 74) * 0.036;
+      depths[index] = (unit(index, 75) - 0.5) * 0.018;
+      colors[index] = new THREE.Color().lerpColors(new THREE.Color("#ffad4c"), new THREE.Color("#fff4d7"), unit(index, 76));
     }
-    return { positions, phases, sizes };
+    return { radii, angles, phases, lengths, depths, colors };
   }, []);
   useFrame(({ camera, pointer: cursor, clock }, delta) => {
-    if (!group.current || !points.current || !material.current) return;
+    if (!group.current || !sparks.current) return;
     const parent = group.current.parent;
     if (!parent) return;
     parent.updateWorldMatrix(true, false);
-    const inverseParentRotation = parent.getWorldQuaternion(new THREE.Quaternion()).invert();
-    group.current.quaternion.copy(inverseParentRotation.multiply(camera.quaternion));
+    // Match the disk plane and retain the exterior group's gyroscopic tilt.
+    group.current.quaternion.copy(camera.quaternion);
     group.current.scale.setScalar(radius * 5.0);
     pointer.current.x = THREE.MathUtils.damp(pointer.current.x, cursor.x, 3.5, delta);
     pointer.current.y = THREE.MathUtils.damp(pointer.current.y, cursor.y, 3.5, delta);
-    uniforms.uPointer.value.copy(pointer.current);
-    uniforms.uFlowPhase.value = flowPhase.current;
-    uniforms.uCharge.value = THREE.MathUtils.damp(uniforms.uCharge.value, readCharge(charge), 4.5, delta);
-    uniforms.uTime.value = clock.getElapsedTime();
+    const liveCharge = readCharge(charge);
+    if (!initialized.current) {
+      for (let index = 0; index < count; index += 1) sparks.current.setColorAt(index, attributes.colors[index]);
+      if (sparks.current.instanceColor) sparks.current.instanceColor.needsUpdate = true;
+      initialized.current = true;
+    }
+    const tilt = -0.314 + Math.sin(clock.getElapsedTime() * 0.46) * 0.035 + pointer.current.x * 0.0698;
+    const tiltCos = Math.cos(tilt);
+    const tiltSin = Math.sin(tilt);
+    for (let index = 0; index < count; index += 1) {
+      const baseRadius = attributes.radii[index];
+      const inverseRootRadius = 1 / Math.sqrt(Math.max(baseRadius, 0.14));
+      const inverseRootOuter = 1 / Math.sqrt(0.96);
+      const inverseRootInner = 1 / Math.sqrt(0.14);
+      const keplerMix = THREE.MathUtils.clamp(
+        (inverseRootRadius - inverseRootOuter) / (inverseRootInner - inverseRootOuter),
+        0,
+        1,
+      );
+      const orbitRate = 0.9 + 2.3 * keplerMix;
+      const angle = attributes.angles[index] + attributes.phases[index] + flowPhase.current * orbitRate;
+      const orbitRadius = Math.max(0.12, baseRadius - 0.2 * Math.pow(liveCharge, 1.8));
+      const diskX = 0.92 * orbitRadius * Math.cos(angle);
+      const diskY = 0.39 * orbitRadius * Math.sin(angle);
+      const x = tiltCos * diskX - tiltSin * diskY + pointer.current.x * 0.012;
+      const y = tiltSin * diskX + tiltCos * diskY + pointer.current.y * 0.012;
+      // Preserve the shared disk's projected ellipse while giving its near and
+      // far arcs real depth, so the opaque core can occlude the far-side sparks.
+      const z = attributes.depths[index] + Math.sin(angle) * orbitRadius * 0.28;
+      dummy.position.set(x, y, z);
+      // The source tangent is the circular orbit derivative; apply the same
+      // ellipse projection and shared tilted basis used for the disk surface.
+      const tangentX = -0.92 * Math.sin(angle);
+      const tangentY = 0.39 * Math.cos(angle);
+      const tangentAngle = Math.atan2(tiltSin * tangentX + tiltCos * tangentY, tiltCos * tangentX - tiltSin * tangentY);
+      dummy.rotation.set(0, 0, tangentAngle);
+      dummy.scale.set(attributes.lengths[index] * (1.0 + liveCharge * 1.8), 0.0022 + liveCharge * 0.0018, 1);
+      dummy.updateMatrix();
+      sparks.current.setMatrixAt(index, dummy.matrix);
+    }
+    sparks.current.instanceMatrix.needsUpdate = true;
   });
   return (
-    <group ref={group} renderOrder={4}>
-      <points ref={points} frustumCulled={false} renderOrder={4}>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[attributes.positions, 3]} />
-          <bufferAttribute attach="attributes-aPhase" args={[attributes.phases, 1]} />
-          <bufferAttribute attach="attributes-aSize" args={[attributes.sizes, 1]} />
-        </bufferGeometry>
-        <shaderMaterial
-          ref={material}
-          uniforms={uniforms}
-          transparent
-          blending={THREE.AdditiveBlending}
-          depthTest={false}
-          depthWrite={false}
-          toneMapped={false}
-          vertexShader={`attribute float aPhase; attribute float aSize; uniform float uTime; uniform float uFlowPhase; uniform float uCharge; uniform vec2 uPointer; varying float vGlow; varying float vTangent; varying float vCharge; void main(){ float c=clamp(uCharge,0.0,1.0); vec2 p=position.xy; float tilt=-0.314; float ct=cos(tilt), st=sin(tilt); vec2 d=vec2(ct*p.x-st*p.y,st*p.x+ct*p.y); float r=length(vec2(d.x/0.92,d.y/0.39)); float a=atan(d.y/0.39,d.x/0.92); float angularVel=1.8/pow(max(r,0.18),0.9); r=max(0.252,r-0.22*pow(c,1.8)); a+=uFlowPhase*angularVel*0.16+aPhase*0.025; vec2 orbit=vec2(0.92*r*cos(a),0.39*r*sin(a)); p=vec2(ct*orbit.x-st*orbit.y,st*orbit.x+ct*orbit.y); p+=uPointer*0.003; vec3 q=vec3(p,position.z+sin(aPhase+uTime*1.6)*0.0015); vec4 mv=modelViewMatrix*vec4(q,1.0); gl_Position=projectionMatrix*mv; gl_PointSize=clamp(aSize*(1.0+c*0.18),0.65,2.5); vGlow=0.62+0.38*sin(aPhase+uFlowPhase*3.4+uTime*1.6); vTangent=a+1.885; vCharge=c; }`}
-          fragmentShader={`varying float vGlow; varying float vTangent; varying float vCharge; void main(){ vec2 q=gl_PointCoord-0.5; float c=cos(vTangent),s=sin(vTangent); q=vec2(c*q.x-s*q.y,s*q.x+c*q.y); q.x/=1.0+vCharge*1.6; float d=length(q); float core=1.0-smoothstep(0.1,0.49,d); if(core<0.02) discard; vec3 color=mix(vec3(1.0,0.48,0.16),vec3(1.0,0.95,0.78),vGlow); gl_FragColor=vec4(color,core*(0.58+vCharge*0.38)); }`}
-        />
-      </points>
+    <group ref={group} renderOrder={21}>
+      <instancedMesh ref={(mesh) => {
+        sparks.current = mesh;
+        if (mesh && mesh.instanceColor === null) {
+          mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(count * 3).fill(1), 3);
+        }
+      }} args={[geometry, material, count]} frustumCulled={false} renderOrder={21}>
+      </instancedMesh>
     </group>
   );
 }
 
 export default function ActFourExterior({ phase, warpCharge }: { phase: ActFourPhase; warpCharge: React.RefObject<number> }) {
+  const motion = useRef<THREE.Group>(null);
   const core = useRef<THREE.Group>(null);
   const charge = useRef(0);
   const flowPhase = useRef(0);
+  const pointer = useRef(new THREE.Vector2());
   const active = phase === "act4_exterior" || phase === "act4_warp_in";
-  useFrame((_, delta) => {
-    if (!core.current) return;
+  useFrame(({ clock, pointer: cursor }, delta) => {
+    if (!core.current || !motion.current) return;
+    const t = clock.getElapsedTime();
+    pointer.current.x = THREE.MathUtils.damp(pointer.current.x, cursor.x, 2.8, delta);
+    pointer.current.y = THREE.MathUtils.damp(pointer.current.y, cursor.y, 2.8, delta);
     const targetCharge = phase === "act4_warp_in" ? 1 : phase === "act4_exterior" ? THREE.MathUtils.clamp(warpCharge.current ?? 0, 0, 1) : 0;
     charge.current = THREE.MathUtils.damp(charge.current, targetCharge, 7, delta);
     core.current.scale.setScalar(THREE.MathUtils.damp(core.current.scale.x, active ? 1 : 0.001, 5.5, delta));
+    motion.current.position.set(
+      ACT_FOUR_CORE_POSITION.x + Math.sin(t * 0.31) * 0.14,
+      ACT_FOUR_CORE_POSITION.y + Math.cos(t * 0.27 + 0.7) * 0.14,
+      ACT_FOUR_CORE_POSITION.z + Math.sin(t * 0.18) * 0.035,
+    );
+    motion.current.rotation.set(Math.sin(t * 0.38) * 0.035, pointer.current.x * THREE.MathUtils.degToRad(4), Math.sin(t * 0.46) * 0.05 + pointer.current.y * THREE.MathUtils.degToRad(4));
   });
   if (!active) return null;
   return (
-    <group position={ACT_FOUR_CORE_POSITION}>
+    <group ref={motion} position={ACT_FOUR_CORE_POSITION}>
       <group ref={core}>
         <pointLight color="#ff254c" intensity={2.8} distance={36} decay={2} />
         <pointLight position={[0, 0.2, 2.2]} color="#ffbd7a" intensity={2.4} distance={22} decay={2} />

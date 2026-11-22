@@ -210,7 +210,11 @@ export function CinematicCamera({
       phaseRef.current = actFourPhase;
       phaseStartedAt.current = time;
       if (actFourPhase === "act4_warp_in") {
-        const plungeStart = new THREE.Vector3(ACT_FOUR_CORE_POSITION.x, ACT_FOUR_CORE_POSITION.y, ACT_FOUR_CORE_POSITION.z + 14);
+        // Start the breach at the charged camera pose. Reusing the old wide
+        // establishing point would pull the camera backward at the exact
+        // moment the visitor crosses the hold threshold.
+        const plungeStart = camera.position.clone();
+        currentPos.current.copy(plungeStart);
         const plungeExit = new THREE.Vector3(ACT_FOUR_CORE_POSITION.x, ACT_FOUR_CORE_POSITION.y, ACT_FOUR_CORE_POSITION.z + 1.5);
         const firstStation = getActFourProjectPose(0);
         breachCurve.current = new THREE.CatmullRomCurve3([plungeStart, plungeExit], false, "centripetal");
@@ -330,9 +334,10 @@ export function CinematicCamera({
     const isWarping = actFourPhase === "act4_warp_in";
     const charge = actFourPhase === "act4_exterior" ? THREE.MathUtils.clamp(warpCharge?.current ?? 0, 0, 1) : 0;
     if (actFourPhase === "act4_exterior" && charge > 0) {
-      const pullback = desiredPosition.clone().sub(desiredLookAt).normalize();
-      desiredPosition.addScaledVector(pullback, charge * 1.15);
-      desiredFov = 45 + charge * 23;
+      // Close the camera distance as the lens widens: the combined projection
+      // keeps the horizon about 15–20% larger at full charge, never smaller.
+      desiredPosition.lerp(desiredLookAt, charge * 0.37);
+      desiredFov = THREE.MathUtils.lerp(45, 58, charge);
     } else if (isWarping) {
       const elapsed = time - phaseStartedAt.current;
       const flight = THREE.MathUtils.clamp(elapsed / 2.2, 0, 1);
@@ -343,13 +348,15 @@ export function CinematicCamera({
         const stage = THREE.MathUtils.smootherstep(flight / breachEnd, 0, 1);
         desiredPosition.copy((breachCurve.current ?? ACT_FOUR_EXIT_CAMERA_PATH).getPointAt(stage));
         desiredLookAt.set(desiredPosition.x, desiredPosition.y, desiredPosition.z - 18);
-        desiredFov = 84;
+        // Preserve the charged 55° lens through the initial plunge; the wide
+        // warp lens opens only after the camera has crossed into the tunnel.
+        desiredFov = 55;
         authoredActFiveRoll = stage * 0.025;
       } else if (flight < tunnelEnd) {
         const stage = THREE.MathUtils.smootherstep((flight - breachEnd) / (tunnelEnd - breachEnd), 0, 1);
         desiredPosition.copy((tunnelCurve.current ?? ACT_FOUR_EXIT_CAMERA_PATH).getPointAt(stage));
         desiredLookAt.copy((tunnelTargetCurve.current ?? ACT_FOUR_EXIT_TARGET_PATH).getPointAt(stage));
-        desiredFov = 84;
+        desiredFov = THREE.MathUtils.lerp(55, 84, THREE.MathUtils.smoothstep(stage, 0.08, 0.55));
         const bank = THREE.MathUtils.smoothstep(stage, 0.06, 0.28) * (1 - THREE.MathUtils.smoothstep(stage, 0.7, 1));
         authoredActFiveRoll = THREE.MathUtils.degToRad(14) * bank;
         authoredActFivePitch = -0.035 * bank;
@@ -462,7 +469,8 @@ export function CinematicCamera({
     const actFourBreathing = actFourPhase === "act4_exterior";
     const drift = Math.sin(time * 0.45 + p * Math.PI * 2) * (actFourBreathing ? 0.018 : 0.01);
     const warpSettle = isWarping ? 1 - THREE.MathUtils.smoothstep((time - phaseStartedAt.current) / 2.2, 0.78, 1) : 0;
-    const noiseEnvelope = actFiveCameraActive ? 1 : charge > 0 ? charge : isWarping ? 0.7 * warpSettle : 0;
+      const chargeTremor = THREE.MathUtils.smoothstep(charge, 0.4, 1);
+      const noiseEnvelope = actFiveCameraActive ? 1 : charge > 0 ? chargeTremor : isWarping ? 0.7 * warpSettle : 0;
     const smoothRigNoise = (frequency: number, phase: number) => {
       const sample = time * frequency + phase;
       const cell = Math.floor(sample);
@@ -473,9 +481,9 @@ export function CinematicCamera({
       return THREE.MathUtils.lerp(a - Math.floor(a) - 0.5, b - Math.floor(b) - 0.5, eased);
     };
     cameraNoise.current.set(
-      smoothRigNoise(noiseEnvelope > 0 ? 26 : 7.4, 0.31) * (charge > 0 || isWarping ? 0.016 : 0.0042) * noiseEnvelope,
-      smoothRigNoise(noiseEnvelope > 0 ? 22 : 6.1, 1.77) * (charge > 0 || isWarping ? 0.012 : 0.0032) * noiseEnvelope,
-      smoothRigNoise(noiseEnvelope > 0 ? 22 : 8.2, 2.43) * (charge > 0 || isWarping ? 0.004 : 0.0012) * noiseEnvelope,
+      smoothRigNoise(actFourPhase === "act4_exterior" && charge > 0 ? 44 : noiseEnvelope > 0 ? 26 : 7.4, 0.31) * (charge > 0 || isWarping ? 0.028 : 0.0042) * noiseEnvelope,
+      smoothRigNoise(actFourPhase === "act4_exterior" && charge > 0 ? 49 : noiseEnvelope > 0 ? 22 : 6.1, 1.77) * (charge > 0 || isWarping ? 0.022 : 0.0032) * noiseEnvelope,
+      smoothRigNoise(actFourPhase === "act4_exterior" && charge > 0 ? 54 : noiseEnvelope > 0 ? 22 : 8.2, 2.43) * (charge > 0 || isWarping ? 0.009 : 0.0012) * noiseEnvelope,
     );
 
     camera.position.copy(currentPos.current).add(new THREE.Vector3(drift, drift * 0.35, 0)).add(cameraNoise.current);
@@ -485,7 +493,8 @@ export function CinematicCamera({
     }
     camera.lookAt(currentLookAt.current);
     const actFourCameraActive = actFourPhase === "act4_warp_in" || actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out";
-    const targetRoll = actFiveCameraActive || actFourCameraActive ? authoredActFiveRoll : actSixCameraActive ? authoredActSixRoll : 0;
+    const targetRoll = (actFiveCameraActive || actFourCameraActive ? authoredActFiveRoll : actSixCameraActive ? authoredActSixRoll : 0)
+      + (actFourPhase === "act4_exterior" ? THREE.MathUtils.degToRad(7) * charge : 0);
     const targetPitch = actFiveCameraActive || actFourCameraActive ? authoredActFivePitch : actSixCameraActive ? authoredActSixPitch : 0;
     const targetYaw = actFiveCameraActive || actFourCameraActive ? authoredActFiveYaw : actSixCameraActive ? authoredActSixYaw : 0;
     const cinematicCameraActive = actFiveCameraActive || actSixCameraActive || actFourCameraActive;
@@ -500,12 +509,12 @@ export function CinematicCamera({
       camera.position.y += Math.cos(time * 0.16) * 0.018;
     }
     if (charge > 0 || isWarping || actFourPhase === "act4_warp_out") {
-      const shake = charge > 0 ? charge : isWarping
+      const shake = charge > 0 ? THREE.MathUtils.smoothstep(charge, 0.4, 1) : isWarping
         ? THREE.MathUtils.smoothstep(Math.sin(time * 0.7) * 0.5 + 0.5, 0.15, 0.85) * warpSettle
         : THREE.MathUtils.smoothstep(Math.sin(time * 0.7) * 0.5 + 0.5, 0.15, 0.85);
-      camera.rotateX(smoothRigNoise(31, 5.3) * 0.004 * shake);
-      camera.rotateY(smoothRigNoise(27, 9.1) * 0.005 * shake);
-      camera.rotateZ(smoothRigNoise(34, 14.4) * 0.006 * shake);
+      camera.rotateX(smoothRigNoise(31, 5.3) * 0.009 * shake);
+      camera.rotateY(smoothRigNoise(27, 9.1) * 0.011 * shake);
+      camera.rotateZ(smoothRigNoise(34, 14.4) * 0.015 * shake);
     }
     camera.fov = currentFov.current + lensDistortion * 15;
     camera.updateProjectionMatrix();

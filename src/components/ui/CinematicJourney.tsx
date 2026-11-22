@@ -555,24 +555,27 @@ function ProjectsChapter({
 
   if (phase === "act4_exterior") {
     return (
-      <Panel presence={presence} side="left" className="left-6 top-[17vh] w-[min(27rem,calc(100vw-3rem))] md:left-16">
+      <Panel presence={presence} side="left" className="act-four-exterior-hud left-6 top-[17vh] w-[min(27rem,calc(100vw-3rem))] md:left-16">
         <div
           className="relative grid gap-5 py-2 pr-5 [text-shadow:0_2px_16px_rgba(0,0,0,0.9)]"
           style={{ transform: "perspective(1400px) rotateY(5deg) rotateX(1deg)", transformOrigin: "left center" }}
         >
           <div>
-            <Kicker act="ACT IV" label="Core Orbit" />
-            <h2 className="max-w-[10ch] text-4xl font-black uppercase leading-[0.92] tracking-[-0.035em] text-white [text-shadow:0_0_24px_rgba(255,220,230,0.22)] md:text-5xl">Project Launch</h2>
-            <p className="mt-4 max-w-sm text-sm leading-6 text-white/80 [text-shadow:0_0_12px_rgba(255,210,220,0.16)]">Hold to breach the crimson core and enter the project vault.</p>
+            <div className="act-four-exterior-kicker mb-5" aria-label="Act IV // Event Horizon">
+              <span>ACT IV</span><span aria-hidden="true">{"//"}</span><span>EVENT HORIZON</span>
+            </div>
+            <h2 className="max-w-[12ch] text-[clamp(3rem,4.6vw,4.4rem)] font-black uppercase leading-[0.94] tracking-[-0.04em] text-white [text-shadow:0_0_24px_rgba(255,53,84,0.18)]">Project <span className="act-four-brand-accent">Launch</span></h2>
+            <p className="mt-4 max-w-sm text-[clamp(0.96rem,1.18vw,1.1rem)] leading-[1.55] text-white/90 [text-shadow:0_0_12px_rgba(255,53,84,0.12)]">Hold to cross the event horizon and enter the project vault.</p>
           </div>
           <div className="flex items-center gap-5 pt-1">
-            <div className="relative shrink-0 rounded-full border border-white/10 bg-[radial-gradient(circle,rgba(15,8,12,0.82),rgba(7,6,10,0.55))] p-1.5 shadow-[0_0_38px_rgba(255,100,90,0.12)] backdrop-blur-xl">
+            <div className="act-four-gate-shell relative shrink-0 rounded-full border p-1.5 backdrop-blur-xl">
               {gatePulse > 0 && [0, 1, 2].map((wave) => <span key={`${gatePulse}-${wave}`} className="act-four-gate-wave" style={{ animationDelay: `${wave * 110}ms` }} />)}
-              <HoldToWarp onComplete={onWarp} onProgress={onCharge} compact className={gatePulse > 0 ? "act-four-gate-button-pulse" : ""} />
+              <HoldToWarp onComplete={onWarp} onProgress={onCharge} compact className={`act-four-warp-dial ${gatePulse > 0 ? "act-four-gate-button-pulse" : ""}`} />
             </div>
             <div className="max-w-[16rem]">
-              <p className="font-mono text-[9px] uppercase leading-5 tracking-[0.16em] text-white/65">Charge the field, then cross into five project telemetry stations.</p>
-              <p className={`mt-2 min-h-8 font-mono text-[8px] uppercase leading-4 tracking-[0.1em] text-[#ffd49b] transition duration-300 ${gateAlert ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"}`} role="status" aria-live="polite">Gravity lock active // Hold to warp to enter vault</p>
+              <p className="font-mono text-[10.5px] uppercase leading-[1.6] tracking-[0.14em] text-white/85">Charge the singularity field to enter five live engineering stations.</p>
+              <p className="act-four-space-hint mt-2 font-mono text-[9.5px] uppercase tracking-[0.13em]">Hold button or press [Space]</p>
+              <p className={`act-four-charge-status mt-2 min-h-8 font-mono text-[9.5px] uppercase leading-[1.5] tracking-[0.1em] transition duration-300 ${gateAlert ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"}`} role="status" aria-live="polite">Gravity lock active // Hold to warp to enter vault</p>
             </div>
           </div>
         </div>

@@ -2789,11 +2789,66 @@ canvas {
   position: absolute;
   inset: 0.35rem;
   z-index: -1;
-  border: 1px solid rgba(255, 148, 98, 0.82);
+  border: 1px solid rgba(255, 53, 84, 0.9);
   border-radius: 9999px;
-  box-shadow: 0 0 18px rgba(255, 77, 65, 0.45), inset 0 0 14px rgba(255, 171, 91, 0.18);
+  box-shadow: 0 0 18px rgba(255, 53, 84, 0.42), inset 0 0 14px rgba(255, 53, 84, 0.2);
   pointer-events: none;
   animation: act-four-gate-sonar 760ms cubic-bezier(0.12, 0.68, 0.2, 1) forwards;
+}
+
+.act-four-exterior-hud {
+  --act-four-crimson: #ff3554;
+  isolation: isolate;
+}
+
+.act-four-exterior-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+}
+
+.act-four-exterior-kicker > span:first-child,
+.act-four-exterior-kicker > span:nth-child(2) {
+  color: var(--act-four-crimson);
+}
+
+.act-four-exterior-kicker > span:last-child { color: rgba(255, 255, 255, 0.72); }
+
+.act-four-brand-accent {
+  color: var(--act-four-crimson);
+  text-shadow: 0 0 24px rgba(255, 53, 84, 0.24);
+}
+
+.act-four-gate-shell {
+  border-color: rgba(255, 53, 84, 0.36);
+  background: radial-gradient(circle, rgba(15, 8, 12, 0.82), rgba(7, 6, 10, 0.55));
+  box-shadow: 0 0 38px rgba(255, 53, 84, 0.12);
+}
+
+.act-four-warp-dial {
+  border-color: rgba(255, 53, 84, 0.72) !important;
+  color: #ff3554;
+  box-shadow: 0 0 40px rgba(255, 53, 84, 0.18), inset 0 0 22px rgba(255, 53, 84, 0.06);
+}
+
+.act-four-warp-dial:hover {
+  border-color: #ff3554 !important;
+  background: rgba(255, 53, 84, 0.12);
+}
+
+.act-four-warp-dial > svg > circle:last-child {
+  stroke: #ff3554 !important;
+  filter: drop-shadow(0 0 7px rgba(255, 53, 84, 0.82));
+}
+
+.act-four-warp-dial > span > span:first-child,
+.act-four-space-hint,
+.act-four-charge-status {
+  color: #ff3554;
 }
 
 .act-four-gate-button-pulse {
