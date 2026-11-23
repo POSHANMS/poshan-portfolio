@@ -2493,6 +2493,7 @@ canvas {
   position: absolute;
   z-index: 50;
   inset: 0;
+  background: transparent;
   pointer-events: none;
 }
 

@@ -25,8 +25,9 @@ const ACT_FOUR_CAMERA_OFFSETS = [
 ];
 /** One canonical set of camera/target poses drives both the fold and each physical slab. */
 export const ACT_FOUR_FOLD_POSES = ACT_FOUR_PROJECT_STATIONS.map((station, index) => ({
-  camera: station.clone().add(ACT_FOUR_CAMERA_OFFSETS[index] ?? ACT_FOUR_CAMERA_OFFSETS[0]),
-  target: station.clone().add(new THREE.Vector3(0, 0.1, 0)),
+  // Station 01 is the exact same pose used by the wormhole arrival endpoint.
+  camera: index === 0 ? WORMHOLE_ARRIVAL_POSE.camera.clone() : station.clone().add(ACT_FOUR_CAMERA_OFFSETS[index] ?? ACT_FOUR_CAMERA_OFFSETS[0]),
+  target: index === 0 ? WORMHOLE_ARRIVAL_POSE.target.clone() : station.clone().add(new THREE.Vector3(0, 0.1, 0)),
 }));
 export const ACT_FOUR_WARP_IN_DURATION_MS = 2200;
 export const ACT_FOUR_WARP_IN_DURATION_SECONDS = ACT_FOUR_WARP_IN_DURATION_MS / 1000;
@@ -233,6 +234,10 @@ export function CinematicCamera({
   const projectMotionTo = useRef(0);
   const projectMotionStartedAt = useRef(0);
   const foldTransitionActive = useRef(false);
+  const foldTransitionDuration = useRef(0.9);
+  const foldStartFov = useRef(42);
+  const foldEndFov = useRef(42);
+  const arrivalSettleActive = useRef(false);
   const foldStartPosition = useRef(new THREE.Vector3());
   const foldControlOne = useRef(new THREE.Vector3());
   const foldControlTwo = useRef(new THREE.Vector3());
@@ -243,7 +248,9 @@ export function CinematicCamera({
   const foldEndQuaternion = useRef(new THREE.Quaternion());
   const foldQuaternion = useRef(new THREE.Quaternion());
   const foldPointer = useRef(new THREE.Vector2());
-  const foldLookObject = useRef(new THREE.Object3D());
+  // Use a Camera, not a generic Object3D: cameras look along local -Z, while
+  // Object3D.lookAt aims local +Z at the target and reverses the view direction.
+  const foldLookObject = useRef(new THREE.Camera());
   const gatePulseAt = useRef(Number.NEGATIVE_INFINITY);
 
   useEffect(() => {
@@ -258,6 +265,7 @@ export function CinematicCamera({
     const camera = state.camera as THREE.PerspectiveCamera;
     const time = state.clock.getElapsedTime();
     if (phaseRef.current !== actFourPhase) {
+      const previousPhase = phaseRef.current;
       phaseRef.current = actFourPhase;
       phaseStartedAt.current = time;
       if (actFourPhase === "act4_warp_in") {
@@ -287,7 +295,30 @@ export function CinematicCamera({
         projectMotionFrom.current = 0;
         projectMotionTo.current = 0;
         projectMotionStartedAt.current = time;
-        foldTransitionActive.current = false;
+        if (previousPhase === "act4_warp_in") {
+          const firstStation = ACT_FOUR_FOLD_POSES[0];
+          foldStartPosition.current.copy(camera.position);
+          foldStartTarget.current.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(12));
+          foldEndPosition.current.copy(firstStation.camera);
+          foldEndTarget.current.copy(firstStation.target);
+          foldControlOne.current.copy(foldStartPosition.current).lerp(foldEndPosition.current, 1 / 3);
+          foldControlTwo.current.copy(foldStartPosition.current).lerp(foldEndPosition.current, 2 / 3);
+          foldStartQuaternion.current.copy(camera.quaternion);
+          foldLookObject.current.position.copy(firstStation.camera);
+          foldLookObject.current.up.set(0, 1, 0);
+          foldLookObject.current.lookAt(firstStation.target);
+          foldEndQuaternion.current.copy(foldLookObject.current.quaternion);
+          foldQuaternion.current.copy(camera.quaternion);
+          foldStartFov.current = camera.fov - lensDistortion * 15;
+          foldEndFov.current = 42;
+          foldTransitionDuration.current = 0.18;
+          arrivalSettleActive.current = true;
+          foldTransitionActive.current = true;
+        } else {
+          foldTransitionActive.current = false;
+          arrivalSettleActive.current = false;
+          foldTransitionDuration.current = 0.9;
+        }
       }
     }
     smoothProgress.current = THREE.MathUtils.damp(smoothProgress.current, clampedProgress, 7.2, delta);
@@ -466,22 +497,32 @@ export function CinematicCamera({
         foldTransitionActive.current = true;
       }
       const rawFlight = foldTransitionActive.current
-        ? THREE.MathUtils.clamp((time - projectMotionStartedAt.current) / 0.9, 0, 1)
+        ? THREE.MathUtils.clamp((time - projectMotionStartedAt.current) / foldTransitionDuration.current, 0, 1)
         : 1;
-      const flight = rawFlight < 0.5 ? 4 * rawFlight ** 3 : 1 - Math.pow(-2 * rawFlight + 2, 3) / 2;
+      const flight = arrivalSettleActive.current
+        ? rawFlight * rawFlight * (3 - 2 * rawFlight)
+        : rawFlight < 0.5 ? 4 * rawFlight ** 3 : 1 - Math.pow(-2 * rawFlight + 2, 3) / 2;
       const destination = ACT_FOUR_FOLD_POSES[projectMotionTo.current] ?? ACT_FOUR_FOLD_POSES[0];
       if (foldTransitionActive.current) {
         desiredPosition.copy(cubicBezier(foldStartPosition.current, foldControlOne.current, foldControlTwo.current, foldEndPosition.current, flight));
         desiredLookAt.lerpVectors(foldStartTarget.current, foldEndTarget.current, flight);
         const elapsed = rawFlight;
-        if (elapsed < 0.38) desiredFov = THREE.MathUtils.lerp(42, 51, THREE.MathUtils.smoothstep(elapsed, 0, 0.38));
+        if (arrivalSettleActive.current) desiredFov = THREE.MathUtils.lerp(foldStartFov.current, foldEndFov.current, flight);
+        else if (elapsed < 0.38) desiredFov = THREE.MathUtils.lerp(42, 51, THREE.MathUtils.smoothstep(elapsed, 0, 0.38));
         else if (elapsed < 0.64) desiredFov = 51;
         else desiredFov = THREE.MathUtils.lerp(51, 42, THREE.MathUtils.smoothstep(elapsed, 0.64, 1));
         const direction = Math.sign(projectMotionTo.current - projectMotionFrom.current) || 1;
         foldQuaternion.current.copy(foldStartQuaternion.current).slerp(foldEndQuaternion.current, flight);
-        foldQuaternion.current.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(9) * Math.sin(rawFlight * Math.PI) * direction));
+        if (!arrivalSettleActive.current) {
+          foldQuaternion.current.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(9) * Math.sin(rawFlight * Math.PI) * direction));
+        }
         projectMotion.current = THREE.MathUtils.lerp(projectMotionFrom.current, projectMotionTo.current, flight);
-        if (rawFlight >= 1) { foldTransitionActive.current = false; projectMotion.current = projectMotionTo.current; }
+        if (rawFlight >= 1) {
+          foldTransitionActive.current = false;
+          arrivalSettleActive.current = false;
+          foldTransitionDuration.current = 0.9;
+          projectMotion.current = projectMotionTo.current;
+        }
       } else {
         desiredPosition.copy(destination.camera);
         desiredLookAt.copy(destination.target);
@@ -490,12 +531,15 @@ export function CinematicCamera({
         foldLookObject.current.up.set(0, 1, 0);
         foldLookObject.current.lookAt(destination.target);
         foldQuaternion.current.copy(foldLookObject.current.quaternion);
-        const pointerWeight = THREE.MathUtils.clamp((time - projectMotionStartedAt.current - 0.9) / 0.45, 0, 1);
+        const pointerWeight = THREE.MathUtils.clamp((time - projectMotionStartedAt.current - foldTransitionDuration.current) / 0.45, 0, 1);
         foldPointer.current.lerp(state.pointer, 1 - Math.exp(-4.2 * delta));
         desiredPosition.x += foldPointer.current.x * 0.45 * pointerWeight;
         desiredPosition.y += foldPointer.current.y * 0.25 * pointerWeight;
         desiredLookAt.x += foldPointer.current.x * 0.11 * pointerWeight;
         desiredLookAt.y += foldPointer.current.y * 0.07 * pointerWeight;
+        foldLookObject.current.position.copy(desiredPosition);
+        foldLookObject.current.lookAt(desiredLookAt);
+        foldQuaternion.current.copy(foldLookObject.current.quaternion);
       }
       authoredActFiveRoll = 0;
     } else if (actFourPhase === "act4_warp_out") {
