@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { ActFourPhase } from "@/types/actFour";
 import { ACT_FOUR_FOLD_POSES, ACT_FOUR_WARP_IN_DURATION_MS, WORMHOLE_CURVE, WORMHOLE_PATH_LENGTH, WORMHOLE_TUBE_RADIUS } from "@/animations/scrollCamera";
@@ -278,10 +278,13 @@ function FlashInFrontOfCamera({ material }: { material: React.RefObject<THREE.Sh
   /></mesh>;
 }
 
-type LightStratum = { matrix: THREE.Matrix4; color: THREE.Color };
-
-const STRATA_GOLD = ["#fff0cc", "#ffbe55", "#c96e14"];
-const STRATA_CRIMSON = ["#e01e48", "#9c102e"];
+type LightRibbon = {
+  matrix: THREE.Matrix4;
+  seed: number;
+  phase: number;
+  alpha: number;
+  crimson: number;
+};
 
 function buildStationLightStrata(stationIndex: number) {
   const pose = ACT_FOUR_FOLD_POSES[stationIndex] ?? ACT_FOUR_FOLD_POSES[0];
@@ -289,49 +292,107 @@ function buildStationLightStrata(stationIndex: number) {
   const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
   const up = new THREE.Vector3().crossVectors(right, forward).normalize();
   const origin = pose.camera;
-  const localPoint = (x: number, y: number, depth: number) => origin.clone()
-    .addScaledVector(right, x)
-    .addScaledVector(up, y)
-    .addScaledVector(forward, depth);
-  const dummy = new THREE.Object3D();
-  const lines: LightStratum[] = [];
-  let sequence = stationIndex * 37;
-  const addSegment = (start: THREE.Vector3, end: THREE.Vector3) => {
-    const direction = end.clone().sub(start);
-    dummy.position.copy(start).add(end).multiplyScalar(0.5);
-    dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
-    dummy.scale.set(0.026, direction.length(), 0.026);
-    dummy.updateMatrix();
-    const paletteIndex = sequence % 10;
-    const color = paletteIndex < 4 ? STRATA_GOLD[0]
-      : paletteIndex < 6 ? STRATA_GOLD[1]
-        : paletteIndex === 6 ? STRATA_GOLD[2]
-          : STRATA_CRIMSON[paletteIndex % 2];
-    lines.push({ matrix: dummy.matrix.clone(), color: new THREE.Color(color) });
-    sequence += 1;
+  const ribbons: LightRibbon[] = [];
+  type Axis = "vertical" | "depth-horizontal" | "depth-vertical" | "horizontal";
+  const addRibbon = (
+    axis: Axis,
+    index: number,
+    rightOffset: number,
+    upOffset: number,
+    depth: number,
+    length: number,
+    width: number,
+    alphaMin: number,
+    alphaMax: number,
+    crimson: boolean,
+  ) => {
+    const position = origin.clone()
+      .addScaledVector(right, rightOffset)
+      .addScaledVector(up, upOffset)
+      .addScaledVector(forward, depth);
+    // Every plane maps local X to its transverse UV and local Y to the shaft direction.
+    const across = axis === "vertical" || axis === "depth-horizontal" ? right.clone()
+      : axis === "depth-vertical" ? up.clone() : up.clone();
+    const along = axis === "vertical" ? up.clone()
+      : axis === "depth-horizontal" || axis === "depth-vertical" ? forward.clone() : right.clone();
+    const normal = new THREE.Vector3().crossVectors(across, along).normalize();
+    const basis = new THREE.Matrix4().makeBasis(across, along, normal);
+    const quaternion = new THREE.Quaternion().setFromRotationMatrix(basis);
+    const scale = new THREE.Vector3(width, length, 1);
+    ribbons.push({
+      matrix: new THREE.Matrix4().compose(position, quaternion, scale),
+      seed: seeded(index + stationIndex * 53, 101),
+      phase: seeded(index + stationIndex * 53, 103) * 2.4,
+      alpha: alphaMin + seeded(index + stationIndex * 53, 107) * (alphaMax - alphaMin),
+      crimson: Number(crimson),
+    });
   };
 
-  const depths = [10, 14, 20, 29, 41, 55, 72];
-  const outerOffsets = [-24, -18, -13, -9, -5.2, 5.2, 9, 13, 18, 24];
-  const verticalOffsets = [-23, -17, -11, -5.2, 5.2, 11, 17, 23];
+  // 20 central shafts: 13 gold and 7 crimson, with no center keepout.
+  const goldWaterfallOffsets = [-3.6, -3.2, -2.8, -2.4, -2.0, -1.6, -1.2, -0.8, -0.4, 0.2, 4.6, 5.7, 6.5];
+  goldWaterfallOffsets.forEach((offset, index) => {
+    addRibbon("vertical", index, offset, (seeded(index, 131) - 0.5) * 2.2,
+      11.5 + seeded(index + stationIndex * 31, 109) * 16.5,
+      62 + seeded(index, 113) * 16, 0.38 + seeded(index, 127) * 2.12, 0.30, 0.58, false);
+  });
 
-  for (const depth of depths) {
-    for (const x of outerOffsets) {
-      addSegment(localPoint(x, -28, depth), localPoint(x, 28, depth));
-    }
-    for (const y of verticalOffsets) {
-      addSegment(localPoint(-30, y, depth), localPoint(-5.2, y, depth));
-      addSegment(localPoint(5.2, y, depth), localPoint(30, y, depth));
-    }
-  }
+  const crimsonWaterfallOffsets = [0.9, 1.5, 2.1, 2.8, 3.4, 4.2, -4.5];
+  crimsonWaterfallOffsets.forEach((offset, index) => {
+    addRibbon("vertical", 13 + index, offset, (seeded(index + 20, 133) - 0.5) * 2.2,
+      11.5 + seeded(index + stationIndex * 37, 139) * 16.5,
+      62 + seeded(index + 20, 141) * 16, 0.38 + seeded(index + 20, 143) * 2.12,
+      index === 6 ? 0.22 : 0.30, index === 6 ? 0.34 : 0.58, true);
+  });
 
-  for (const x of outerOffsets) {
-    for (const y of verticalOffsets) {
-      addSegment(localPoint(x, y, 10), localPoint(x, y, 72));
-    }
-  }
+  // Four quieter outer echoes preserve the black negative-space corners.
+  [-9.4, -7.4, 7.6, 10.0].forEach((offset, index) => {
+    addRibbon("vertical", 20 + index, offset, (seeded(index + 40, 145) - 0.5) * 2.6,
+      12 + seeded(index + stationIndex * 41, 147) * 15,
+      64 + seeded(index + 40, 149) * 12, 0.4 + seeded(index + 40, 151) * 1.1,
+      0.16, 0.26, index === 3);
+  });
 
-  return { lines };
+  // 18 Z-depth sheets: 10 above/below and 8 flanking, all start at depth 0.8.
+  const depthStart = 0.8;
+  const depthLength = 56.0 - depthStart;
+  const topBottomSheets = [
+    { x: -7.5, y: 3.2 }, { x: -3.8, y: 4.2 }, { x: 1.6, y: 5.0 }, { x: 6.8, y: 6.2 }, { x: 9.0, y: 3.7 },
+    { x: -8.8, y: -3.2 }, { x: -4.0, y: -4.2 }, { x: 1.0, y: -5.0 }, { x: 6.2, y: -6.0 }, { x: 9.2, y: -3.6 },
+  ];
+  topBottomSheets.forEach((sheet, index) => {
+    const crimson = [3, 6, 9].includes(index);
+    addRibbon("depth-horizontal", 24 + index, sheet.x, sheet.y, (depthStart + 56.0) * 0.5,
+      depthLength, 0.45 + seeded(index, 157) * 1.75, 0.18, 0.36, crimson);
+  });
+  const sideSheets = [
+    { x: -13.0, y: -3.8 }, { x: -10.0, y: 1.2 }, { x: -7.0, y: 4.5 }, { x: -4.8, y: -1.0 },
+    { x: 4.8, y: 0.5 }, { x: 7.0, y: -4.2 }, { x: 10.0, y: 2.7 }, { x: 13.0, y: -0.8 },
+  ];
+  sideSheets.forEach((sheet, index) => {
+    const crimson = index === 2 || index === 5 || index === 7;
+    addRibbon("depth-vertical", 34 + index, sheet.x, sheet.y, (depthStart + 56.0) * 0.5,
+      depthLength, 0.45 + seeded(index + 20, 159) * 1.75, 0.18, 0.36, crimson);
+  });
+
+  // 12 horizontal cross-streams, with four restrained crimson beams.
+  const crossStreamHeights = [-4.2, -3.4, -2.6, -1.8, -0.9, 0.1, 1.0, 1.9, 2.8, 3.5, 4.0, 4.4];
+  crossStreamHeights.forEach((height, index) => {
+    const crimson = [3, 6, 9, 11].includes(index);
+    addRibbon("horizontal", 42 + index, (seeded(index, 163) - 0.5) * 5.0, height,
+      12.5 + seeded(index + stationIndex * 47, 165) * 23.5,
+      46 + seeded(index, 167) * 18, 0.32 + seeded(index, 169) * 1.03,
+      0.18, 0.36, crimson);
+  });
+
+  const geometry = new THREE.PlaneGeometry(1, 1);
+  const attribute = (field: "seed" | "phase" | "alpha" | "crimson") => new THREE.InstancedBufferAttribute(
+    new Float32Array(ribbons.map((ribbon) => ribbon[field])), 1,
+  );
+  geometry.setAttribute("aSeed", attribute("seed"));
+  geometry.setAttribute("aPhase", attribute("phase"));
+  geometry.setAttribute("aAlpha", attribute("alpha"));
+  geometry.setAttribute("aIsCrimson", attribute("crimson"));
+  return { ribbons, geometry };
 }
 
 function StationLightStrata({
@@ -340,50 +401,29 @@ function StationLightStrata({
   foldFromIndex,
   foldStartedAt,
   isFolding,
+  exitOpacityRef,
 }: {
   stationIndex: number;
   projectIndex: number;
   foldFromIndex: number;
   foldStartedAt: number;
   isFolding: boolean;
+  exitOpacityRef: React.RefObject<number>;
 }) {
-  const haloMesh = useRef<THREE.InstancedMesh>(null);
-  const glowMesh = useRef<THREE.InstancedMesh>(null);
-  const coreMesh = useRef<THREE.InstancedMesh>(null);
-  const haloMaterial = useRef<THREE.ShaderMaterial>(null);
-  const glowMaterial = useRef<THREE.ShaderMaterial>(null);
-  const coreMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const ribbonMesh = useRef<THREE.InstancedMesh>(null);
+  const ribbonMaterial = useRef<THREE.ShaderMaterial>(null);
   const layout = useMemo(() => buildStationLightStrata(stationIndex), [stationIndex]);
   useEffect(() => {
-    if (!haloMesh.current || !glowMesh.current || !coreMesh.current) return;
-    const position = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
-    const sourceScale = new THREE.Vector3();
-    const instance = new THREE.Object3D();
-    const passes = [
-      { mesh: haloMesh.current, width: 0.82, depth: 0.3 },
-      { mesh: glowMesh.current, width: 0.26, depth: 0.12 },
-      { mesh: coreMesh.current, width: 0.05, depth: 0.05 },
-    ];
-    layout.lines.forEach((line, index) => {
-      line.matrix.decompose(position, quaternion, sourceScale);
-      for (const pass of passes) {
-        instance.position.copy(position);
-        instance.quaternion.copy(quaternion);
-        instance.scale.set(pass.width, sourceScale.y, pass.depth);
-        instance.updateMatrix();
-        pass.mesh.setMatrixAt(index, instance.matrix);
-        pass.mesh.setColorAt(index, line.color);
-      }
+    if (!ribbonMesh.current) return;
+    layout.ribbons.forEach((ribbon, index) => {
+      ribbonMesh.current?.setMatrixAt(index, ribbon.matrix);
     });
-    for (const pass of passes) {
-      pass.mesh.instanceMatrix.needsUpdate = true;
-      if (pass.mesh.instanceColor) pass.mesh.instanceColor.needsUpdate = true;
-    }
+    ribbonMesh.current.instanceMatrix.needsUpdate = true;
   }, [layout]);
+  useEffect(() => () => layout.geometry.dispose(), [layout]);
 
   useFrame(({ clock }) => {
-    if (!haloMesh.current || !glowMesh.current || !coreMesh.current || !haloMaterial.current || !glowMaterial.current || !coreMaterial.current) return;
+    if (!ribbonMesh.current || !ribbonMaterial.current) return;
     const t = isFolding && foldStartedAt > 0
       ? clamp((performance.now() - foldStartedAt) / 900)
       : 1;
@@ -392,66 +432,61 @@ function StationLightStrata({
       ? stationIndex === foldFromIndex ? 1 - eased : stationIndex === projectIndex ? eased : 0
       : stationIndex === projectIndex ? 1 : 0;
     const visible = weight > 0.001;
-    haloMesh.current.visible = visible;
-    glowMesh.current.visible = visible;
-    coreMesh.current.visible = visible;
-    for (const material of [haloMaterial.current, glowMaterial.current]) {
-      material.uniforms.uTime.value = clock.getElapsedTime();
-      material.uniforms.uOpacity.value = weight;
-    }
-    coreMaterial.current.opacity = weight * 0.48;
+    ribbonMesh.current.visible = visible;
+    ribbonMaterial.current.uniforms.uTime.value = clock.getElapsedTime();
+    ribbonMaterial.current.uniforms.uOpacity.value = weight * exitOpacityRef.current;
   });
 
   return (
-    <>
-      <instancedMesh ref={haloMesh} args={[undefined, undefined, layout.lines.length]} frustumCulled={false} renderOrder={4}>
-        <boxGeometry args={[1, 1, 1]} />
-        <shaderMaterial ref={haloMaterial} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }} transparent depthTest depthWrite={false} side={THREE.DoubleSide} blending={THREE.AdditiveBlending} toneMapped={false}
-          vertexShader={"varying vec3 vColor;varying vec2 vUv;void main(){vColor=instanceColor;vUv=uv;vec4 world=modelMatrix*instanceMatrix*vec4(position,1.0);gl_Position=projectionMatrix*viewMatrix*world;}"}
-          fragmentShader={"uniform float uTime;uniform float uOpacity;varying vec3 vColor;varying vec2 vUv;void main(){float transverse=exp(-pow((vUv.x-0.5)*2.2,2.0));float pulse=0.82+0.18*sin(uTime*0.8+vUv.y*8.0+vColor.r*2.0);float alpha=transverse*pulse*uOpacity*0.24;gl_FragColor=vec4(vColor*pulse,alpha);}"} />
-      </instancedMesh>
-      <instancedMesh ref={glowMesh} args={[undefined, undefined, layout.lines.length]} frustumCulled={false} renderOrder={5}>
-        <boxGeometry args={[1, 1, 1]} />
-        <shaderMaterial ref={glowMaterial} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }} transparent depthTest depthWrite={false} side={THREE.DoubleSide} blending={THREE.AdditiveBlending} toneMapped={false}
-          vertexShader={"varying vec3 vColor;varying vec2 vUv;void main(){vColor=instanceColor;vUv=uv;vec4 world=modelMatrix*instanceMatrix*vec4(position,1.0);gl_Position=projectionMatrix*viewMatrix*world;}"}
-          fragmentShader={"uniform float uTime;uniform float uOpacity;varying vec3 vColor;varying vec2 vUv;void main(){float filament=0.76+0.24*sin(vUv.y*26.0-uTime*1.45);float pulse=0.88+0.12*sin(uTime*0.9+vColor.r*3.0);float alpha=filament*pulse*uOpacity*0.48;gl_FragColor=vec4(vColor*filament*pulse*1.65,alpha);}"} />
-      </instancedMesh>
-      <instancedMesh ref={coreMesh} args={[undefined, undefined, layout.lines.length]} frustumCulled={false} renderOrder={6}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial ref={coreMaterial} color="#ffffff" vertexColors transparent opacity={0} depthTest depthWrite={false} side={THREE.DoubleSide} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </instancedMesh>
-    </>
+    <instancedMesh ref={ribbonMesh} args={[layout.geometry, undefined, layout.ribbons.length]} frustumCulled={false} renderOrder={4}>
+      <shaderMaterial
+        ref={ribbonMaterial}
+        uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }}
+        transparent
+        depthTest
+        depthWrite={false}
+        side={THREE.DoubleSide}
+        blending={THREE.AdditiveBlending}
+        toneMapped={false}
+        // d = 2*(u-0.5); the three Gaussian widths form aura, shaft, and continuous core.
+        vertexShader={"attribute float aSeed;attribute float aPhase;attribute float aAlpha;attribute float aIsCrimson;varying vec2 vUv;varying float vSeed;varying float vPhase;varying float vAlpha;varying float vIsCrimson;void main(){vUv=uv;vSeed=aSeed;vPhase=aPhase;vAlpha=aAlpha;vIsCrimson=aIsCrimson;vec4 world=modelMatrix*instanceMatrix*vec4(position,1.0);gl_Position=projectionMatrix*viewMatrix*world;}"}
+        fragmentShader={"uniform float uTime;uniform float uOpacity;varying vec2 vUv;varying float vSeed;varying float vPhase;varying float vAlpha;varying float vIsCrimson;void main(){float d=(vUv.x-0.5)*2.0;float halo=exp(-d*d*3.0);float shaft=exp(-d*d*22.0);float core=exp(-d*d*180.0);float ends=smoothstep(0.0,0.14,vUv.y)*smoothstep(1.0,0.86,vUv.y);float drift=0.88+0.12*sin(vUv.y*2.4-uTime*(0.5+vPhase)+vSeed*6.28318);float profile=halo*0.38+shaft*0.72+core*0.95;vec3 goldCol=(vec3(0.58,0.24,0.04)*halo*0.38+vec3(0.96,0.64,0.20)*shaft*0.72+vec3(1.0,0.88,0.62)*core*0.95)/max(profile,0.0001);vec3 crimsonCol=(vec3(0.45,0.03,0.09)*halo*0.38+vec3(0.92,0.14,0.27)*shaft*0.72+vec3(1.0,0.46,0.48)*core*0.95)/max(profile,0.0001);vec3 col=mix(goldCol,crimsonCol,step(0.5,vIsCrimson));float alpha=clamp(profile*drift*ends*uOpacity*vAlpha,0.0,1.0);gl_FragColor=vec4(col,alpha);}"}
+      />
+    </instancedMesh>
   );
 }
 
-function buildStardust() {
-  const count = 1_400;
+function buildStardust(stationIndex: number, count = 2500) {
   const positions = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
   const phases = new Float32Array(count);
   const colors = new Float32Array(count * 3);
-  const bases = ACT_FOUR_FOLD_POSES.map((pose) => {
-    const forward = pose.target.clone().sub(pose.camera).normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
-    return { origin: pose.camera, forward, right, up };
-  });
+  const pose = ACT_FOUR_FOLD_POSES[stationIndex] ?? ACT_FOUR_FOLD_POSES[0];
+  const forward = pose.target.clone().sub(pose.camera).normalize();
+  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+  const up = new THREE.Vector3().crossVectors(right, forward).normalize();
 
   for (let i = 0; i < count; i += 1) {
-    if (i < 1_100) {
-      const base = bases[Math.floor(i / 220)];
-      const point = base.origin.clone()
-        .addScaledVector(base.forward, 8 + seeded(i, 33) * 72)
-        .addScaledVector(base.right, (seeded(i, 31) - 0.5) * 58)
-        .addScaledVector(base.up, (seeded(i, 32) - 0.5) * 46);
-      positions.set(point.toArray(), i * 3);
-    } else {
-      positions.set([-30 + seeded(i, 31) * 60, -25 + seeded(i, 32) * 50, 8 - seeded(i, 33) * 165], i * 3);
-    }
-    sizes[i] = 0.075 + seeded(i, 34) * 0.13;
-    phases[i] = seeded(i, 35) * Math.PI * 2;
-    const tint = seeded(i, 36);
-    const color = new THREE.Color(tint > 0.88 ? "#fff8e8" : "#ffe8b5");
+    const flank = i < Math.round(count * 0.65);
+    const side = seeded(i, stationIndex * 17 + 31) < 0.5 ? -1 : 1;
+    const x = side * (flank
+      ? 1.4 + seeded(i, stationIndex * 19 + 32) * 10.1
+      : 9.0 + seeded(i, stationIndex * 23 + 33) * 13.0);
+    const y = flank
+      ? -13.5 + seeded(i, stationIndex * 29 + 34) * 27.0
+      : -15.0 + seeded(i, stationIndex * 31 + 35) * 30.0;
+    const depth = flank
+      ? 6.0 + seeded(i, stationIndex * 37 + 36) * 36.0
+      : 8.0 + seeded(i, stationIndex * 41 + 37) * 40.0;
+    const point = pose.camera.clone()
+      .addScaledVector(forward, depth)
+      .addScaledVector(right, x)
+      .addScaledVector(up, y);
+    positions.set(point.toArray(), i * 3);
+    sizes[i] = 0.45 + seeded(i, 43) * 1.0;
+    phases[i] = seeded(i, 47) * Math.PI * 2;
+    const tint = seeded(i, 53);
+    const color = new THREE.Color(tint > 0.975 ? "#ff3b5c" : tint > 0.91 ? "#fff4d8" : tint > 0.48 ? "#ffd27d" : "#d97820");
     colors.set([color.r, color.g, color.b], i * 3);
   }
   const geometry = new THREE.BufferGeometry();
@@ -462,11 +497,27 @@ function buildStardust() {
   return geometry;
 }
 
-function CathedralStardust() {
+function CathedralStardust({ stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding, exitOpacityRef }: {
+  stationIndex: number;
+  projectIndex: number;
+  foldFromIndex: number;
+  foldStartedAt: number;
+  isFolding: boolean;
+  exitOpacityRef: React.RefObject<number>;
+}) {
   const material = useRef<THREE.ShaderMaterial>(null);
-  const geometry = useMemo(buildStardust, []);
+  const gl = useThree((state) => state.gl);
+  const geometry = useMemo(() => buildStardust(stationIndex), [stationIndex]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
   useFrame(({ clock }) => {
-    if (material.current) material.current.uniforms.uTime.value = clock.getElapsedTime();
+    if (!material.current) return;
+    const t = isFolding && foldStartedAt > 0 ? clamp((performance.now() - foldStartedAt) / 900) : 1;
+    const eased = smoothstep(0, 1, t);
+    const weight = isFolding
+      ? stationIndex === foldFromIndex ? 1 - eased : stationIndex === projectIndex ? eased : 0
+      : stationIndex === projectIndex ? 1 : 0;
+    material.current.uniforms.uTime.value = clock.getElapsedTime();
+    material.current.uniforms.uOpacity.value = weight * exitOpacityRef.current;
   });
   return (
     <points geometry={geometry} frustumCulled={false} renderOrder={5}>
@@ -477,37 +528,76 @@ function CathedralStardust() {
         depthTest
         toneMapped={false}
         blending={THREE.AdditiveBlending}
-        uniforms={{ uTime: { value: 0 }, uExitOpacity: { value: 1 } }}
-        vertexShader={"attribute float aSize;attribute float aPhase;attribute vec3 aColor;uniform float uTime;varying float vTwinkle;varying vec3 vColor;void main(){vec3 p=position;p.x+=sin(uTime*0.14+aPhase)*0.12;p.y+=cos(uTime*0.11+aPhase*1.7)*0.09;p.z+=sin(uTime*0.08+aPhase*0.7)*0.08;vec4 mv=modelViewMatrix*vec4(p,1.0);vColor=aColor;vTwinkle=0.72+0.28*sin(uTime*1.1+aPhase);gl_PointSize=clamp(aSize*(900.0/max(-mv.z,1.0)),1.5,7.0);gl_Position=projectionMatrix*mv;}"}
-        fragmentShader={"uniform float uExitOpacity;varying float vTwinkle;varying vec3 vColor;void main(){float d=length(gl_PointCoord-0.5);float core=1.0-smoothstep(0.08,0.5,d);float halo=1.0-smoothstep(0.2,0.5,d);float alpha=(core*0.78+halo*0.34)*vTwinkle*uExitOpacity;if(alpha<0.012)discard;gl_FragColor=vec4(vColor*vTwinkle*uExitOpacity,alpha);}"}
+        uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 }, uPixelRatio: { value: Math.min(gl.getPixelRatio(), 2) } }}
+        // Projected point size scales with DPR and inversely with camera-space depth.
+        vertexShader={"attribute float aSize;attribute float aPhase;attribute vec3 aColor;uniform float uTime;uniform float uPixelRatio;varying float vTwinkle;varying vec3 vColor;void main(){vec3 p=position;p.x+=sin(uTime*0.14+aPhase)*0.12;p.y+=cos(uTime*0.11+aPhase*1.7)*0.09;p.z+=sin(uTime*0.08+aPhase*0.7)*0.08;vec4 mvPosition=modelViewMatrix*vec4(p,1.0);vColor=aColor;vTwinkle=0.82+0.18*sin(uTime*1.1+aPhase);gl_PointSize=clamp(aSize*uPixelRatio*(46.0/max(2.5,-mvPosition.z)),1.2*uPixelRatio,3.6*uPixelRatio);gl_Position=projectionMatrix*mvPosition;}"}
+        fragmentShader={"uniform float uOpacity;varying float vTwinkle;varying vec3 vColor;void main(){float d=length(gl_PointCoord-0.5)*2.0;if(d>1.0)discard;float glow=exp(-d*d*7.5);float alpha=glow*vTwinkle*uOpacity*0.92;gl_FragColor=vec4(vColor,alpha);}"}
       />
     </points>
   );
 }
 
-function ActiveStationFrame({ index, projectIndex }: { index: number; projectIndex: number }) {
-  const pose = ACT_FOUR_FOLD_POSES[index] ?? ACT_FOUR_FOLD_POSES[0];
-  const transform = useMemo(() => {
-    const object = new THREE.Object3D();
-    object.position.copy(pose.target);
-    object.up.set(0, 1, 0);
-    object.lookAt(pose.camera);
-    return {
-      position: pose.target.toArray() as [number, number, number],
-      quaternion: object.quaternion.toArray() as [number, number, number, number],
-    };
-  }, [pose]);
-  const edges = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(6.8, 3.85, 0.035)), []);
-  if (index !== projectIndex) return null;
+function buildStationIntersectionFlares(stationIndex: number) {
+  const pose = ACT_FOUR_FOLD_POSES[stationIndex] ?? ACT_FOUR_FOLD_POSES[0];
+  const forward = pose.target.clone().sub(pose.camera).normalize();
+  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+  const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+  const cameraNormal = forward.clone().negate();
+  const points = [
+    [-4.8, 4.7, 13.5, 1.8], [-1.2, 5.5, 16.0, 1.5], [4.7, -4.5, 15.0, 2.0], [2.0, -5.2, 17.0, 1.6],
+  ] as const;
+  const matrices = points.map(([x, y, depth, size]) => {
+    const position = pose.camera.clone().addScaledVector(right, x).addScaledVector(up, y).addScaledVector(forward, depth);
+    const basis = new THREE.Matrix4().makeBasis(right, up, cameraNormal);
+    const quaternion = new THREE.Quaternion().setFromRotationMatrix(basis);
+    return new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(size, size, 1));
+  });
+  return { geometry: new THREE.PlaneGeometry(1, 1), matrices };
+}
+
+function StationIntersectionFlares({ stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding, exitOpacityRef }: {
+  stationIndex: number;
+  projectIndex: number;
+  foldFromIndex: number;
+  foldStartedAt: number;
+  isFolding: boolean;
+  exitOpacityRef: React.RefObject<number>;
+}) {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const layout = useMemo(() => buildStationIntersectionFlares(stationIndex), [stationIndex]);
+  useEffect(() => {
+    if (!mesh.current) return;
+    layout.matrices.forEach((matrix, index) => mesh.current?.setMatrixAt(index, matrix));
+    mesh.current.instanceMatrix.needsUpdate = true;
+  }, [layout]);
+  useEffect(() => () => layout.geometry.dispose(), [layout]);
+  useFrame(({ clock }) => {
+    if (!mesh.current || !material.current) return;
+    const t = isFolding && foldStartedAt > 0 ? clamp((performance.now() - foldStartedAt) / 900) : 1;
+    const eased = smoothstep(0, 1, t);
+    const weight = isFolding
+      ? stationIndex === foldFromIndex ? 1 - eased : stationIndex === projectIndex ? eased : 0
+      : stationIndex === projectIndex ? 1 : 0;
+    mesh.current.visible = weight > 0.001;
+    material.current.uniforms.uTime.value = clock.getElapsedTime();
+    material.current.uniforms.uOpacity.value = weight * exitOpacityRef.current;
+  });
   return (
-    <group position={transform.position} quaternion={transform.quaternion}>
-      <lineSegments geometry={edges} scale={1.004} renderOrder={7}>
-        <lineBasicMaterial color="#ffbe55" transparent opacity={0.62} depthTest depthWrite={false} toneMapped={false} />
-      </lineSegments>
-      <lineSegments geometry={edges} scale={1.009} renderOrder={8}>
-        <lineBasicMaterial color="#9c102e" transparent opacity={0.36} depthTest depthWrite={false} toneMapped={false} />
-      </lineSegments>
-    </group>
+    <instancedMesh ref={mesh} args={[layout.geometry, undefined, layout.matrices.length]} frustumCulled={false} renderOrder={6}>
+      <shaderMaterial
+        ref={material}
+        uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }}
+        transparent
+        depthTest
+        depthWrite={false}
+        side={THREE.DoubleSide}
+        blending={THREE.AdditiveBlending}
+        toneMapped={false}
+        vertexShader={"varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0);}"}
+        fragmentShader={"uniform float uTime;uniform float uOpacity;varying vec2 vUv;void main(){vec2 p=(vUv-0.5)*2.0;float r=length(p);float glow=exp(-r*r*6.5);float core=exp(-r*r*30.0);float pulse=0.94+0.06*sin(uTime*0.8+vUv.x*2.0);vec3 warm=mix(vec3(1.0,0.62,0.22),vec3(1.0,0.92,0.72),core);float alpha=0.36*glow*uOpacity*pulse;gl_FragColor=vec4(warm,alpha);}"}
+      />
+    </instancedMesh>
   );
 }
 
@@ -516,11 +606,13 @@ function TesseractCathedral({
   foldFromIndex,
   foldStartedAt,
   isFolding,
+  exitOpacityRef,
 }: {
   projectIndex: number;
   foldFromIndex: number;
   foldStartedAt: number;
   isFolding: boolean;
+  exitOpacityRef: React.RefObject<number>;
 }) {
   return (
     <group>
@@ -532,11 +624,30 @@ function TesseractCathedral({
           foldFromIndex={foldFromIndex}
           foldStartedAt={foldStartedAt}
           isFolding={isFolding}
+          exitOpacityRef={exitOpacityRef}
         />
       ))}
-      <CathedralStardust />
       {ACT_FOUR_FOLD_POSES.map((_, index) => (
-        <ActiveStationFrame key={"active-station-frame-" + index} index={index} projectIndex={projectIndex} />
+        <CathedralStardust
+          key={"cathedral-stardust-" + index}
+          stationIndex={index}
+          projectIndex={projectIndex}
+          foldFromIndex={foldFromIndex}
+          foldStartedAt={foldStartedAt}
+          isFolding={isFolding}
+          exitOpacityRef={exitOpacityRef}
+        />
+      ))}
+      {ACT_FOUR_FOLD_POSES.map((_, index) => (
+        <StationIntersectionFlares
+          key={"station-intersection-flares-" + index}
+          stationIndex={index}
+          projectIndex={projectIndex}
+          foldFromIndex={foldFromIndex}
+          foldStartedAt={foldStartedAt}
+          isFolding={isFolding}
+          exitOpacityRef={exitOpacityRef}
+        />
       ))}
     </group>
   );
@@ -548,6 +659,7 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
   const exteriorLayer = useRef<THREE.Group>(null);
   const tunnelLayer = useRef<THREE.Group>(null);
   const vaultLayer = useRef<THREE.Group>(null);
+  const vaultOpacityRef = useRef(1);
   const previousProjectIndex = useRef(projectIndex);
   const foldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isFolding, setIsFolding] = useState(false);
@@ -584,6 +696,7 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
       const isWarpingOut = phase === "act4_warp_out";
       const exitProgress = isWarpingOut ? clamp(age / WARP_OUT_DURATION_SECONDS) : 0;
       const vaultOpacity = isWarpingOut ? 1 - smoothstep(0, WARP_OUT_VAULT_FADE_SECONDS, exitProgress) : 1;
+      vaultOpacityRef.current = vaultOpacity;
       vault.visible = (phase === "act4_warp_in" && age >= WARP_VAULT_CUTOVER_SECONDS)
         || phase === "act4_vault"
         || (isWarpingOut && exitProgress < WARP_OUT_VAULT_FADE_SECONDS);
@@ -631,7 +744,7 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
     <group ref={exteriorLayer} visible={phase === "act4_exterior"}><ActFourExterior phase={phase} warpCharge={warpCharge} /></group>
     <group ref={tunnelLayer}><WormholeTunnel phase={phase} /><WormholeLandmarks phase={phase} /></group>
     <WarpStreamParticles phase={phase} warpCharge={warpCharge} /><WarpNeedles phase={phase} />
-    <group ref={vaultLayer} visible={phase === "act4_vault" || phase === "act4_warp_out"}><TesseractCathedral projectIndex={projectIndex} foldFromIndex={foldFromIndex} foldStartedAt={foldStartedAt} isFolding={isFolding} /></group>
+    <group ref={vaultLayer} visible={phase === "act4_vault" || phase === "act4_warp_out"}><TesseractCathedral projectIndex={projectIndex} foldFromIndex={foldFromIndex} foldStartedAt={foldStartedAt} isFolding={isFolding} exitOpacityRef={vaultOpacityRef} /></group>
     <BreachFlash phase={phase} />
   </group>;
 }
