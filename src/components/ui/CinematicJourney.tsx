@@ -1097,32 +1097,33 @@ export default function CinematicJourney({
     : Math.max(states.journey.presence, smoothstep(0, 0.05, actFiveProgress))
       * (1 - smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress));
   const exitBloomOpacity = actFourPhase === "act4_warp_out"
-    ? 0.85 * smoothstep(actFourExitProgress, 0.72, 1)
-    : handoffBloom ? 0.85 : 0;
+    ? 0.42 * smoothstep(actFourExitProgress, 0.5, 0.78)
+    : handoffBloom ? 0.42 : 0;
   const entryIrisProgress = actFourWarpProgress;
-  const entryBloomRise = smoothstep(entryIrisProgress, 0.70, 0.75);
-  const entryBloomFall = 1 - smoothstep(entryIrisProgress, 0.75, 0.84);
+  // Peak 120ms earlier than the old 0.75 cutover, before the tunnel's open end.
+  const entryBloomRise = smoothstep(entryIrisProgress, 0.645, 0.695);
+  const entryBloomFall = 1 - smoothstep(entryIrisProgress, 0.695, 0.785);
   const entryBloomOpacity = actFourPhase === "act4_warp_in"
-    ? 0.88 * (entryIrisProgress <= 0.79 ? entryBloomRise : entryBloomFall)
+    ? 0.88 * (entryIrisProgress <= 0.695 ? entryBloomRise : entryBloomFall)
     : 0;
 
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none" data-active-chapter={activeChapter} onDragStart={(event) => event.preventDefault()}>
-      {actFourPhase === "act4_warp_in" && entryIrisProgress >= 0.70 && entryIrisProgress < 0.84 ? (
+      {actFourPhase === "act4_warp_in" && entryIrisProgress >= 0.645 && entryIrisProgress < 0.785 ? (
         <div aria-hidden="true" className="act-four-emergence-overlay pointer-events-none absolute inset-0 z-[100]" style={{ opacity: entryBloomOpacity }} />
       ) : (actFourPhase === "act4_vault" || actFourPhase === "act4_warp_out" || handoffBloom) && (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-[100]"
           style={{
-            opacity: handoffBloom ? 0.85 : exitBloomOpacity,
+            opacity: handoffBloom ? 0.42 : exitBloomOpacity,
             transition: actFourPhase === "act4_vault" || actFourPhase === "act5" ? "opacity 300ms ease-out" : "opacity 80ms linear",
-            background: "radial-gradient(ellipse at 50% 50%, rgba(255,205,145,0.92) 0%, rgba(255,103,57,0.78) 18%, rgba(126,10,35,0.82) 48%, rgba(27,1,11,0.96) 100%)",
-            mixBlendMode: "screen",
+            background: "rgba(2, 1, 4, 0.92)",
+            mixBlendMode: "normal",
           }}
         />
       )}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,transparent_0%,transparent_53%,rgba(0,0,0,0.28)_100%)]" />
+      {actFourPhase !== "act4_vault" && <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,transparent_0%,transparent_53%,rgba(0,0,0,0.28)_100%)]" />}
       <HeroChapter presence={states.hero.presence} />
       <EnterLaptopCue scrollProgress={scrollProgress} />
       <ActTwoAboutWorld presence={states.laptop.presence} progress={states.laptop.progress} />
