@@ -278,121 +278,283 @@ function FlashInFrontOfCamera({ material }: { material: React.RefObject<THREE.Sh
   /></mesh>;
 }
 
-type LightRibbon = {
+const GRID_YAW = 0.34;
+const VAULT_PALETTE = { void: "#020103", mirror: "#050306", card: "#08060A", champagne: "#FFF4D2", gold: "#FFBE45", amber: "#E0861A", bronze: "#7A3C0D", ruby: "#FF2A4B", crimson: "#C90F32", wine: "#4A0614", silver: "#E8D8C3", quartz: "#524438" } as const;
+
+type CathedralTextures = {
+  waterfall: THREE.CanvasTexture;
+  glass: THREE.CanvasTexture;
+  nebula: THREE.CanvasTexture;
+  glint: THREE.CanvasTexture;
+  wings: Array<[THREE.CanvasTexture, THREE.CanvasTexture]>;
+};
+
+function toCanvasTexture(canvas: HTMLCanvasElement, renderer: THREE.WebGLRenderer) {
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return texture;
+}
+
+function createCathedralTextures(renderer: THREE.WebGLRenderer): CathedralTextures {
+  const makeCanvas = (width: number, height: number) => {
+    const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas 2D is required for Act IV cathedral textures.");
+    return { canvas, context };
+  };
+  const fiberCanvas = makeCanvas(512, 512);
+  const aura = fiberCanvas.context.createRadialGradient(256, 256, 10, 256, 256, 250);
+  aura.addColorStop(0, "rgba(255,255,255,.2)"); aura.addColorStop(.48, "rgba(255,255,255,.06)"); aura.addColorStop(1, "rgba(255,255,255,0)");
+  fiberCanvas.context.fillStyle = aura; fiberCanvas.context.fillRect(0, 0, 512, 512); fiberCanvas.context.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 32; i += 1) {
+    const x = 8 + seeded(i, 307) * 496, width = 1.5 + seeded(i, 311) * 10.5;
+    const alpha = (.18 + seeded(i, 313) * .77) * Math.exp(-(((x - 256) / 130) ** 2));
+    const fiber = fiberCanvas.context.createLinearGradient(0, 0, 0, 512);
+    fiber.addColorStop(0, "rgba(255,255,255,0)"); fiber.addColorStop(.12, `rgba(255,255,255,${alpha * .72})`);
+    fiber.addColorStop(.5, `rgba(255,255,255,${alpha})`); fiber.addColorStop(.88, `rgba(255,255,255,${alpha * .72})`); fiber.addColorStop(1, "rgba(255,255,255,0)");
+    fiberCanvas.context.fillStyle = fiber; fiberCanvas.context.fillRect(x - width / 2, 0, width, 512);
+  }
+  const beamCanvas = makeCanvas(512, 256);
+  const ends = beamCanvas.context.createLinearGradient(0, 0, 512, 0);
+  [[0, 0], [.1, .75], [.24, 1], [.8, 1], [.94, .6], [1, 0]].forEach(([at, alpha]) => ends.addColorStop(at, `rgba(255,255,255,${alpha})`));
+  beamCanvas.context.fillStyle = ends; beamCanvas.context.fillRect(0, 0, 512, 256);
+  beamCanvas.context.globalCompositeOperation = "destination-in";
+  const body = beamCanvas.context.createLinearGradient(0, 16, 0, 240);
+  [[0, .02], [.15, .16], [.5, .08], [.86, .16], [1, .02]].forEach(([at, alpha]) => body.addColorStop(at, `rgba(255,255,255,${alpha})`));
+  beamCanvas.context.fillStyle = body; beamCanvas.context.fillRect(0, 16, 512, 224); beamCanvas.context.globalCompositeOperation = "source-over";
+  for (let i = 0; i < 6; i += 1) { beamCanvas.context.fillStyle = "rgba(255,255,255,.13)"; beamCanvas.context.fillRect(18, 38 + i * 34, 476, i % 2 ? 1 : 1.5); }
+  [12, 244].forEach((y) => { const edge = beamCanvas.context.createLinearGradient(0, y - 7, 0, y + 7); edge.addColorStop(0, "rgba(255,255,255,0)"); edge.addColorStop(.5, "rgba(255,255,255,.96)"); edge.addColorStop(1, "rgba(255,255,255,0)"); beamCanvas.context.shadowColor = "rgba(255,244,210,.72)"; beamCanvas.context.shadowBlur = 7; beamCanvas.context.fillStyle = edge; beamCanvas.context.fillRect(0, y - 7, 512, 14); });
+  beamCanvas.context.shadowBlur = 0;
+  beamCanvas.context.globalCompositeOperation = "destination-in";
+  beamCanvas.context.fillStyle = ends;
+  beamCanvas.context.fillRect(0, 0, 512, 256);
+  beamCanvas.context.globalCompositeOperation = "source-over";
+  const nebulaCanvas = makeCanvas(256, 256); nebulaCanvas.context.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 8; i += 1) { const x = 64 + seeded(i, 331) * 128, y = 64 + seeded(i, 337) * 128, r = 34 + seeded(i, 347) * 70; const puff = nebulaCanvas.context.createRadialGradient(x, y, 0, x, y, r); puff.addColorStop(0, "rgba(196,134,71,.17)"); puff.addColorStop(.48, "rgba(122,60,13,.11)"); puff.addColorStop(1, "rgba(122,60,13,0)"); nebulaCanvas.context.fillStyle = puff; nebulaCanvas.context.fillRect(0, 0, 256, 256); }
+  for (let i = 0; i < 180; i += 1) {
+    const x = seeded(i, 353) * 256, y = seeded(i, 359) * 256, radius = 2 + seeded(i, 367) * 12;
+    const dust = nebulaCanvas.context.createRadialGradient(x, y, 0, x, y, radius);
+    dust.addColorStop(0, `rgba(196,134,71,${0.025 + seeded(i, 373) * 0.045})`);
+    dust.addColorStop(1, "rgba(122,60,13,0)");
+    nebulaCanvas.context.fillStyle = dust; nebulaCanvas.context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+  }
+  const glintCanvas = makeCanvas(256, 256); const halo = glintCanvas.context.createRadialGradient(128, 128, 0, 128, 128, 118);
+  halo.addColorStop(0, "rgba(255,244,210,.86)"); halo.addColorStop(.04, "rgba(255,244,210,.48)"); halo.addColorStop(.2, "rgba(255,190,69,.18)"); halo.addColorStop(1, "rgba(255,190,69,0)"); glintCanvas.context.fillStyle = halo; glintCanvas.context.fillRect(0, 0, 256, 256);
+  const flareLine = glintCanvas.context.createLinearGradient(0, 128, 256, 128); flareLine.addColorStop(0, "rgba(255,244,210,0)"); flareLine.addColorStop(.48, "rgba(255,190,69,.3)"); flareLine.addColorStop(.5, "rgba(255,244,210,.96)"); flareLine.addColorStop(.52, "rgba(255,190,69,.3)"); flareLine.addColorStop(1, "rgba(255,244,210,0)"); glintCanvas.context.fillStyle = flareLine; glintCanvas.context.fillRect(0, 124, 256, 8);
+  const verticalFlare = glintCanvas.context.createLinearGradient(128, 0, 128, 256); verticalFlare.addColorStop(0, "rgba(255,244,210,0)"); verticalFlare.addColorStop(.48, "rgba(255,190,69,.2)"); verticalFlare.addColorStop(.5, "rgba(255,244,210,.78)"); verticalFlare.addColorStop(.52, "rgba(255,190,69,.2)"); verticalFlare.addColorStop(1, "rgba(255,244,210,0)"); glintCanvas.context.fillStyle = verticalFlare; glintCanvas.context.fillRect(124, 0, 8, 256);
+  const labels = ["FINDIT", "ZAMINSAATHI", "HOSTEL MANAGEMENT SYSTEM", "HEALTHGPT", "NOTEFLASH"];
+  const makeWing = (label: string) => { const { canvas, context } = makeCanvas(1024, 320); context.globalAlpha = .32; context.fillStyle = VAULT_PALETTE.champagne; context.textAlign = "center"; context.textBaseline = "middle"; context.font = "600 76px Arial, sans-serif"; context.fillText(label.toUpperCase(), 512, 160, 900); return toCanvasTexture(canvas, renderer); };
+  const textures: CathedralTextures = { waterfall: toCanvasTexture(fiberCanvas.canvas, renderer), glass: toCanvasTexture(beamCanvas.canvas, renderer), nebula: toCanvasTexture(nebulaCanvas.canvas, renderer), glint: toCanvasTexture(glintCanvas.canvas, renderer), wings: labels.map((_, i): [THREE.CanvasTexture, THREE.CanvasTexture] => [makeWing(labels[(i + labels.length - 1) % labels.length]), makeWing(labels[(i + 1) % labels.length])]) };
+  return textures;
+}
+
+type ArchitecturalSlab = {
   matrix: THREE.Matrix4;
+  bodyAlpha: number;
+  edgeAlpha: number;
   seed: number;
-  phase: number;
-  alpha: number;
   crimson: number;
 };
 
-function buildStationLightStrata(stationIndex: number) {
+type LightCurtain = {
+  matrix: THREE.Matrix4;
+  alpha: number;
+  seed: number;
+  tone: number;
+};
+
+function stationBasis(stationIndex: number) {
   const pose = ACT_FOUR_FOLD_POSES[stationIndex] ?? ACT_FOUR_FOLD_POSES[0];
   const forward = pose.target.clone().sub(pose.camera).normalize();
   const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
   const up = new THREE.Vector3().crossVectors(right, forward).normalize();
-  const origin = pose.camera;
-  const ribbons: LightRibbon[] = [];
-  type Axis = "vertical" | "depth-horizontal" | "depth-vertical" | "horizontal";
-  const addRibbon = (
-    axis: Axis,
-    index: number,
-    rightOffset: number,
-    upOffset: number,
-    depth: number,
-    length: number,
-    width: number,
-    alphaMin: number,
-    alphaMax: number,
-    crimson: boolean,
-  ) => {
-    const position = origin.clone()
-      .addScaledVector(right, rightOffset)
-      .addScaledVector(up, upOffset)
-      .addScaledVector(forward, depth);
-    // Every plane maps local X to its transverse UV and local Y to the shaft direction.
-    const across = axis === "vertical" || axis === "depth-horizontal" ? right.clone()
-      : axis === "depth-vertical" ? up.clone() : up.clone();
-    const along = axis === "vertical" ? up.clone()
-      : axis === "depth-horizontal" || axis === "depth-vertical" ? forward.clone() : right.clone();
-    const normal = new THREE.Vector3().crossVectors(across, along).normalize();
-    const basis = new THREE.Matrix4().makeBasis(across, along, normal);
-    const quaternion = new THREE.Quaternion().setFromRotationMatrix(basis);
-    const scale = new THREE.Vector3(width, length, 1);
-    ribbons.push({
-      matrix: new THREE.Matrix4().compose(position, quaternion, scale),
-      seed: seeded(index + stationIndex * 53, 101),
-      phase: seeded(index + stationIndex * 53, 103) * 2.4,
-      alpha: alphaMin + seeded(index + stationIndex * 53, 107) * (alphaMax - alphaMin),
+  const gridX = right.clone().multiplyScalar(Math.cos(GRID_YAW)).addScaledVector(forward, Math.sin(GRID_YAW)).normalize();
+  const gridZ = right.clone().multiplyScalar(-Math.sin(GRID_YAW)).addScaledVector(forward, Math.cos(GRID_YAW)).normalize();
+  return { pose, forward, right, up, gridX, gridZ };
+}
+
+function createPlaneMatrix(position: THREE.Vector3, across: THREE.Vector3, along: THREE.Vector3, width: number, length: number) {
+  const xAxis = across.clone().normalize();
+  const yAxis = along.clone().addScaledVector(xAxis, -along.dot(xAxis)).normalize();
+  const normal = new THREE.Vector3().crossVectors(xAxis, yAxis).normalize();
+  const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, normal);
+  const quaternion = new THREE.Quaternion().setFromRotationMatrix(basis);
+  return new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(width, length, 1));
+}
+
+function createArchitecturalSlabGeometry() {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute([
+    -0.5, -0.5, 0, 0.5, -0.5, 0,
+    -0.14, 0.5, 0, 0.14, 0.5, 0,
+  ], 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute([
+    0, 0, 1, 0, 0, 1, 1, 1,
+  ], 2));
+  geometry.setIndex([0, 1, 2, 1, 3, 2]);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function buildArchitecturalSlabs(stationIndex: number) {
+  const { pose, forward, up, gridX, gridZ } = stationBasis(stationIndex);
+  const slabs: ArchitecturalSlab[] = [];
+  const addSlab = ({ axis, x, y, depth, width, length, crimson = false, index }: {
+    axis: "x" | "z"; x: number; y: number; depth: number; width: number; length: number; crimson?: boolean; index: number;
+  }) => {
+    const across = axis === "x" ? gridX : gridZ;
+    const center = pose.camera.clone()
+      .addScaledVector(forward, depth)
+      .addScaledVector(gridX, x)
+      .addScaledVector(up, y);
+    slabs.push({
+      matrix: createPlaneMatrix(center, across, up, width, length),
+      bodyAlpha: 0.05 + seeded(index + stationIndex * 61, 173) * 0.04,
+      edgeAlpha: 0.09 + seeded(index + stationIndex * 67, 179) * 0.075,
+      seed: seeded(index + stationIndex * 71, 181),
       crimson: Number(crimson),
     });
   };
 
-  // 20 central shafts: 13 gold and 7 crimson, with no center keepout.
-  const goldWaterfallOffsets = [-3.6, -3.2, -2.8, -2.4, -2.0, -1.6, -1.2, -0.8, -0.4, 0.2, 4.6, 5.7, 6.5];
-  goldWaterfallOffsets.forEach((offset, index) => {
-    addRibbon("vertical", index, offset, (seeded(index, 131) - 0.5) * 2.2,
-      11.5 + seeded(index + stationIndex * 31, 109) * 16.5,
-      62 + seeded(index, 113) * 16, 0.38 + seeded(index, 127) * 2.12, 0.30, 0.58, false);
-  });
-
-  const crimsonWaterfallOffsets = [0.9, 1.5, 2.1, 2.8, 3.4, 4.2, -4.5];
-  crimsonWaterfallOffsets.forEach((offset, index) => {
-    addRibbon("vertical", 13 + index, offset, (seeded(index + 20, 133) - 0.5) * 2.2,
-      11.5 + seeded(index + stationIndex * 37, 139) * 16.5,
-      62 + seeded(index + 20, 141) * 16, 0.38 + seeded(index + 20, 143) * 2.12,
-      index === 6 ? 0.22 : 0.30, index === 6 ? 0.34 : 0.58, true);
-  });
-
-  // Four quieter outer echoes preserve the black negative-space corners.
-  [-9.4, -7.4, 7.6, 10.0].forEach((offset, index) => {
-    addRibbon("vertical", 20 + index, offset, (seeded(index + 40, 145) - 0.5) * 2.6,
-      12 + seeded(index + stationIndex * 41, 147) * 15,
-      64 + seeded(index + 40, 149) * 12, 0.4 + seeded(index + 40, 151) * 1.1,
-      0.16, 0.26, index === 3);
-  });
-
-  // 18 Z-depth sheets: 10 above/below and 8 flanking, all start at depth 0.8.
-  const depthStart = 0.8;
-  const depthLength = 56.0 - depthStart;
-  const topBottomSheets = [
-    { x: -7.5, y: 3.2 }, { x: -3.8, y: 4.2 }, { x: 1.6, y: 5.0 }, { x: 6.8, y: 6.2 }, { x: 9.0, y: 3.7 },
-    { x: -8.8, y: -3.2 }, { x: -4.0, y: -4.2 }, { x: 1.0, y: -5.0 }, { x: 6.2, y: -6.0 }, { x: 9.2, y: -3.6 },
+  // Orthogonal smoked-glass sheets follow only the yawed cathedral grid axes.
+  const perspectiveSlabs = [
+    { axis: "x" as const, x: 8.8, y: 8.1, width: 7.2, crimson: false },
+    { axis: "x" as const, x: -8.8, y: 7.6, width: 6.4, crimson: false },
+    { axis: "z" as const, x: -8.8, y: -8.1, width: 8.0, crimson: false },
+    { axis: "z" as const, x: 8.8, y: -8.4, width: 7.2, crimson: true },
   ];
-  topBottomSheets.forEach((sheet, index) => {
-    const crimson = [3, 6, 9].includes(index);
-    addRibbon("depth-horizontal", 24 + index, sheet.x, sheet.y, (depthStart + 56.0) * 0.5,
-      depthLength, 0.45 + seeded(index, 157) * 1.75, 0.18, 0.36, crimson);
-  });
-  const sideSheets = [
-    { x: -13.0, y: -3.8 }, { x: -10.0, y: 1.2 }, { x: -7.0, y: 4.5 }, { x: -4.8, y: -1.0 },
-    { x: 4.8, y: 0.5 }, { x: 7.0, y: -4.2 }, { x: 10.0, y: 2.7 }, { x: 13.0, y: -0.8 },
+  perspectiveSlabs.forEach((slab, index) => addSlab({
+    ...slab,
+    depth: 29.6,
+    length: 56.8,
+    index,
+  }));
+
+  // Six vertical prism pillars flank the monolith; their long axis is exactly up.
+  const pillars = [
+    { x: -13.5, depth: 18, width: 2.8, crimson: false },
+    { x: 13.2, depth: 22, width: 2.8, crimson: true },
+    { x: -14.2, depth: 28, width: 3.2, crimson: false },
+    { x: 14.0, depth: 34, width: 3.0, crimson: false },
+    { x: -12.8, depth: 40, width: 2.6, crimson: true },
+    { x: 13.0, depth: 44, width: 3.0, crimson: false },
   ];
-  sideSheets.forEach((sheet, index) => {
-    const crimson = index === 2 || index === 5 || index === 7;
-    addRibbon("depth-vertical", 34 + index, sheet.x, sheet.y, (depthStart + 56.0) * 0.5,
-      depthLength, 0.45 + seeded(index + 20, 159) * 1.75, 0.18, 0.36, crimson);
+  pillars.forEach((pillar, index) => {
+    const center = pose.camera.clone().addScaledVector(gridX, pillar.x).addScaledVector(forward, pillar.depth);
+    slabs.push({
+      matrix: createPlaneMatrix(center, gridX, up, pillar.width, 48 + seeded(index, 191) * 14),
+      bodyAlpha: 0.025 + seeded(index, 193) * 0.02,
+      edgeAlpha: 0.07 + seeded(index, 197) * 0.07,
+      seed: seeded(index, 199),
+      crimson: Number(pillar.crimson),
+    });
   });
 
-  // 12 horizontal cross-streams, with four restrained crimson beams.
-  const crossStreamHeights = [-4.2, -3.4, -2.6, -1.8, -0.9, 0.1, 1.0, 1.9, 2.8, 3.5, 4.0, 4.4];
-  crossStreamHeights.forEach((height, index) => {
-    const crimson = [3, 6, 9, 11].includes(index);
-    addRibbon("horizontal", 42 + index, (seeded(index, 163) - 0.5) * 5.0, height,
-      12.5 + seeded(index + stationIndex * 47, 165) * 23.5,
-      46 + seeded(index, 167) * 18, 0.32 + seeded(index, 169) * 1.03,
-      0.18, 0.36, crimson);
-  });
+  const geometry = createArchitecturalSlabGeometry();
+  const attributes: Array<[string, Float32Array]> = [
+    ["aBodyAlpha", new Float32Array(slabs.map((slab) => slab.bodyAlpha))],
+    ["aEdgeAlpha", new Float32Array(slabs.map((slab) => slab.edgeAlpha))],
+    ["aGlassSeed", new Float32Array(slabs.map((slab) => slab.seed))],
+    ["aGlassCrimson", new Float32Array(slabs.map((slab) => slab.crimson))],
+  ];
+  attributes.forEach(([name, values]) => geometry.setAttribute(name, new THREE.InstancedBufferAttribute(values, 1)));
+  return { slabs, geometry };
+}
 
+function buildLightCurtains(stationIndex: number) {
+  const { pose, forward, up, gridX } = stationBasis(stationIndex);
+  const curtains: LightCurtain[] = [];
+  const add = (x: number, width: number, length: number, alpha: number, color: string, index: number) => {
+    const center = pose.camera.clone().addScaledVector(gridX, x).addScaledVector(up, (seeded(index, 223) - .5) * .3).addScaledVector(forward, 12.5 + seeded(index, 227) * 13.5);
+    const tone = color === VAULT_PALETTE.amber ? 1 : color === VAULT_PALETTE.crimson ? 2 : color === VAULT_PALETTE.ruby ? 3 : color === VAULT_PALETTE.champagne ? 4 : 0;
+    curtains.push({ matrix: createPlaneMatrix(center, gridX, up, width, length), alpha, seed: seeded(index + stationIndex * 83, 211), tone });
+  };
+  // Seventeen zero-degree vertical curtains: gold waterfall, three champagne core fibers, ruby fall, and three gold accents.
+  [-2.8, -2.1, -1.35, -.55, .2].forEach((x, i) => add(x, 2.5 + seeded(i, 229) * 2.7, 56 + seeded(i, 233) * 14, .5 + seeded(i, 239) * .12, i % 2 ? VAULT_PALETTE.amber : VAULT_PALETTE.gold, i));
+  [-1.9, -.85, .2].forEach((x, i) => add(x, .22 + seeded(i, 379) * .22, 56 + seeded(i, 233) * 14, .66 + seeded(i, 383) * .06, VAULT_PALETTE.champagne, 5 + i));
+  [.9, 1.45, 2, 2.6, 3.1, 3.6].forEach((x, i) => add(x, 1.6 + seeded(i, 389) * 1.6, 56 + seeded(i, 233) * 14, .42 + seeded(i, 397) * .22, i % 2 ? VAULT_PALETTE.ruby : VAULT_PALETTE.crimson, 8 + i));
+  [4.4, 5, 5.6].forEach((x, i) => add(x, .65 + seeded(i, 401) * .65, 56 + seeded(i, 233) * 14, .3 + seeded(i, 409) * .16, i === 1 ? VAULT_PALETTE.champagne : VAULT_PALETTE.gold, 14 + i));
   const geometry = new THREE.PlaneGeometry(1, 1);
-  const attribute = (field: "seed" | "phase" | "alpha" | "crimson") => new THREE.InstancedBufferAttribute(
-    new Float32Array(ribbons.map((ribbon) => ribbon[field])), 1,
-  );
-  geometry.setAttribute("aSeed", attribute("seed"));
-  geometry.setAttribute("aPhase", attribute("phase"));
-  geometry.setAttribute("aAlpha", attribute("alpha"));
-  geometry.setAttribute("aIsCrimson", attribute("crimson"));
-  return { ribbons, geometry };
+  geometry.setAttribute("aCurtainAlpha", new THREE.InstancedBufferAttribute(new Float32Array(curtains.map((item) => item.alpha)), 1));
+  geometry.setAttribute("aCurtainSeed", new THREE.InstancedBufferAttribute(new Float32Array(curtains.map((item) => item.seed)), 1));
+   geometry.setAttribute("aCurtainTone", new THREE.InstancedBufferAttribute(new Float32Array(curtains.map((item) => item.tone)), 1));
+  return { curtains, geometry };
+}
+
+function stationCrossfadeWeight(stationIndex: number, projectIndex: number, foldFromIndex: number, foldStartedAt: number, isFolding: boolean) {
+  const t = isFolding && foldStartedAt > 0 ? clamp((performance.now() - foldStartedAt) / 900) : 1;
+  const eased = smoothstep(0, 1, t);
+  return isFolding
+    ? stationIndex === foldFromIndex ? 1 - eased : stationIndex === projectIndex ? eased : 0
+    : stationIndex === projectIndex ? 1 : 0;
+}
+
+function StationArchitecturalSlabs({ stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding, exitOpacityRef }: {
+  stationIndex: number; projectIndex: number; foldFromIndex: number; foldStartedAt: number; isFolding: boolean;
+  exitOpacityRef: React.RefObject<number>;
+}) {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const layout = useMemo(() => buildArchitecturalSlabs(stationIndex), [stationIndex]);
+  useEffect(() => {
+    if (!mesh.current) return;
+    layout.slabs.forEach((slab, index) => mesh.current?.setMatrixAt(index, slab.matrix));
+    mesh.current.instanceMatrix.needsUpdate = true;
+  }, [layout]);
+  useEffect(() => () => layout.geometry.dispose(), [layout]);
+  useFrame(({ clock }) => {
+    if (!mesh.current || !material.current) return;
+    const weight = stationCrossfadeWeight(stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding);
+    mesh.current.visible = weight > 0.001;
+    material.current.uniforms.uTime.value = clock.getElapsedTime();
+    material.current.uniforms.uOpacity.value = weight * exitOpacityRef.current;
+  });
+  return <instancedMesh ref={mesh} args={[layout.geometry, undefined, layout.slabs.length]} frustumCulled={false} renderOrder={3}>
+    <shaderMaterial
+      ref={material}
+      uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }}
+      transparent depthWrite={false} depthTest side={THREE.DoubleSide} blending={THREE.NormalBlending} toneMapped={false}
+      // Rim falloff is exp(-edgeDistance² * 26²); alpha mixes smoked body/rim then applies end, fold, and exit fades.
+      vertexShader={"attribute float aBodyAlpha;attribute float aEdgeAlpha;attribute float aGlassSeed;attribute float aGlassCrimson;varying vec2 vUv;varying float vBodyAlpha;varying float vEdgeAlpha;varying float vGlassSeed;varying float vGlassCrimson;void main(){vUv=uv;vBodyAlpha=aBodyAlpha;vEdgeAlpha=aEdgeAlpha;vGlassSeed=aGlassSeed;vGlassCrimson=aGlassCrimson;vec4 world=modelMatrix*instanceMatrix*vec4(position,1.0);gl_Position=projectionMatrix*viewMatrix*world;}"}
+  fragmentShader={"uniform float uTime;uniform float uOpacity;varying vec2 vUv;varying float vBodyAlpha;varying float vEdgeAlpha;varying float vGlassSeed;varying float vGlassCrimson;void main(){float edgeL=exp(-pow(vUv.x*26.0,2.0));float edgeR=exp(-pow((1.0-vUv.x)*26.0,2.0));float rim=clamp(edgeL+edgeR,0.0,1.0);float ends=smoothstep(0.0,0.14,vUv.y)*smoothstep(1.0,0.84,vUv.y);float slowSheen=0.5+0.5*cos(vUv.y*4.6+vUv.x*2.2+vGlassSeed*6.28318+uTime*0.12);vec3 goldBody=vec3(0.4784,0.2353,0.0510);vec3 goldSheen=vec3(0.8784,0.5255,0.1020);vec3 goldRim=vec3(1.0,0.7451,0.2706);vec3 rubyBody=vec3(0.2902,0.0235,0.0784);vec3 rubySheen=vec3(0.7882,0.0588,0.1961);vec3 rubyRim=vec3(1.0,0.1647,0.2941);vec3 body=mix(goldBody,rubyBody,vGlassCrimson);vec3 sheen=mix(goldSheen,rubySheen,vGlassCrimson);vec3 edge=mix(goldRim,rubyRim,vGlassCrimson);vec3 col=mix(body,sheen,0.08+slowSheen*0.2);col=mix(col,edge,rim*0.92);float alpha=mix(vBodyAlpha,vEdgeAlpha,rim)*ends*uOpacity;gl_FragColor=vec4(col,alpha);}"}
+    />
+  </instancedMesh>;
+}
+
+function StationLightCurtains({ stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding, exitOpacityRef, texture }: {
+  stationIndex: number; projectIndex: number; foldFromIndex: number; foldStartedAt: number; isFolding: boolean;
+  exitOpacityRef: React.RefObject<number>; texture: THREE.CanvasTexture;
+}) {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const layout = useMemo(() => buildLightCurtains(stationIndex), [stationIndex]);
+  useEffect(() => {
+    if (!mesh.current) return;
+    layout.curtains.forEach((curtain, index) => mesh.current?.setMatrixAt(index, curtain.matrix));
+    mesh.current.instanceMatrix.needsUpdate = true;
+  }, [layout]);
+  useEffect(() => () => layout.geometry.dispose(), [layout]);
+  useFrame(({ clock }) => {
+    if (!mesh.current || !material.current) return;
+    const weight = stationCrossfadeWeight(stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding);
+    mesh.current.visible = weight > 0.001;
+    material.current.uniforms.uTime.value = clock.getElapsedTime();
+    material.current.uniforms.uOpacity.value = weight * exitOpacityRef.current;
+  });
+  return <instancedMesh ref={mesh} args={[layout.geometry, undefined, layout.curtains.length]} frustumCulled={false} renderOrder={4}>
+    <shaderMaterial
+      ref={material}
+      uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 }, uMap: { value: texture } }}
+      transparent depthTest depthWrite={false} side={THREE.DoubleSide} blending={THREE.AdditiveBlending} toneMapped={false}
+      // Envelope = exp(-d² * 2.2); alpha multiplies silk, tapered ends, fold weight, and vault exit opacity.
+      vertexShader={"attribute float aCurtainAlpha;attribute float aCurtainSeed;attribute float aCurtainTone;varying vec2 vUv;varying float vCurtainAlpha;varying float vCurtainSeed;varying float vCurtainTone;void main(){vUv=uv;vCurtainAlpha=aCurtainAlpha;vCurtainSeed=aCurtainSeed;vCurtainTone=aCurtainTone;vec4 world=modelMatrix*instanceMatrix*vec4(position,1.0);gl_Position=projectionMatrix*viewMatrix*world;}"}
+      fragmentShader={"uniform sampler2D uMap;uniform float uTime;uniform float uOpacity;varying vec2 vUv;varying float vCurtainAlpha;varying float vCurtainSeed;varying float vCurtainTone;void main(){vec4 fiber=texture2D(uMap,vUv);float ends=smoothstep(0.0,0.12,vUv.y)*(1.0-smoothstep(0.88,1.0,vUv.y));float flow=0.94+0.06*sin(uTime*0.4+vCurtainSeed*6.28318);vec3 gold=vec3(1.0,0.745,0.27);vec3 amber=vec3(0.878,0.525,0.102);vec3 crimson=vec3(0.788,0.059,0.196);vec3 ruby=vec3(1.0,0.165,0.294);vec3 whiteGold=vec3(1.0,0.957,0.824);vec3 tint=vCurtainTone>3.5?whiteGold:vCurtainTone>2.5?ruby:vCurtainTone>1.5?crimson:vCurtainTone>0.5?amber:gold;gl_FragColor=vec4(tint*fiber.rgb,fiber.a*ends*vCurtainAlpha*uOpacity*flow);}"}
+    />
+  </instancedMesh>;
 }
 
 function StationLightStrata({
@@ -402,6 +564,7 @@ function StationLightStrata({
   foldStartedAt,
   isFolding,
   exitOpacityRef,
+  textures,
 }: {
   stationIndex: number;
   projectIndex: number;
@@ -409,54 +572,17 @@ function StationLightStrata({
   foldStartedAt: number;
   isFolding: boolean;
   exitOpacityRef: React.RefObject<number>;
+  textures: CathedralTextures;
 }) {
-  const ribbonMesh = useRef<THREE.InstancedMesh>(null);
-  const ribbonMaterial = useRef<THREE.ShaderMaterial>(null);
-  const layout = useMemo(() => buildStationLightStrata(stationIndex), [stationIndex]);
-  useEffect(() => {
-    if (!ribbonMesh.current) return;
-    layout.ribbons.forEach((ribbon, index) => {
-      ribbonMesh.current?.setMatrixAt(index, ribbon.matrix);
-    });
-    ribbonMesh.current.instanceMatrix.needsUpdate = true;
-  }, [layout]);
-  useEffect(() => () => layout.geometry.dispose(), [layout]);
-
-  useFrame(({ clock }) => {
-    if (!ribbonMesh.current || !ribbonMaterial.current) return;
-    const t = isFolding && foldStartedAt > 0
-      ? clamp((performance.now() - foldStartedAt) / 900)
-      : 1;
-    const eased = smoothstep(0, 1, t);
-    const weight = isFolding
-      ? stationIndex === foldFromIndex ? 1 - eased : stationIndex === projectIndex ? eased : 0
-      : stationIndex === projectIndex ? 1 : 0;
-    const visible = weight > 0.001;
-    ribbonMesh.current.visible = visible;
-    ribbonMaterial.current.uniforms.uTime.value = clock.getElapsedTime();
-    ribbonMaterial.current.uniforms.uOpacity.value = weight * exitOpacityRef.current;
-  });
-
   return (
-    <instancedMesh ref={ribbonMesh} args={[layout.geometry, undefined, layout.ribbons.length]} frustumCulled={false} renderOrder={4}>
-      <shaderMaterial
-        ref={ribbonMaterial}
-        uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }}
-        transparent
-        depthTest
-        depthWrite={false}
-        side={THREE.DoubleSide}
-        blending={THREE.AdditiveBlending}
-        toneMapped={false}
-        // d = 2*(u-0.5); the three Gaussian widths form aura, shaft, and continuous core.
-        vertexShader={"attribute float aSeed;attribute float aPhase;attribute float aAlpha;attribute float aIsCrimson;varying vec2 vUv;varying float vSeed;varying float vPhase;varying float vAlpha;varying float vIsCrimson;void main(){vUv=uv;vSeed=aSeed;vPhase=aPhase;vAlpha=aAlpha;vIsCrimson=aIsCrimson;vec4 world=modelMatrix*instanceMatrix*vec4(position,1.0);gl_Position=projectionMatrix*viewMatrix*world;}"}
-        fragmentShader={"uniform float uTime;uniform float uOpacity;varying vec2 vUv;varying float vSeed;varying float vPhase;varying float vAlpha;varying float vIsCrimson;void main(){float d=(vUv.x-0.5)*2.0;float halo=exp(-d*d*3.0);float shaft=exp(-d*d*22.0);float core=exp(-d*d*180.0);float ends=smoothstep(0.0,0.14,vUv.y)*smoothstep(1.0,0.86,vUv.y);float drift=0.88+0.12*sin(vUv.y*2.4-uTime*(0.5+vPhase)+vSeed*6.28318);float profile=halo*0.38+shaft*0.72+core*0.95;vec3 goldCol=(vec3(0.58,0.24,0.04)*halo*0.38+vec3(0.96,0.64,0.20)*shaft*0.72+vec3(1.0,0.88,0.62)*core*0.95)/max(profile,0.0001);vec3 crimsonCol=(vec3(0.45,0.03,0.09)*halo*0.38+vec3(0.92,0.14,0.27)*shaft*0.72+vec3(1.0,0.46,0.48)*core*0.95)/max(profile,0.0001);vec3 col=mix(goldCol,crimsonCol,step(0.5,vIsCrimson));float alpha=clamp(profile*drift*ends*uOpacity*vAlpha,0.0,1.0);gl_FragColor=vec4(col,alpha);}"}
-      />
-    </instancedMesh>
+    <>
+      <StationArchitecturalSlabs {...{ stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding, exitOpacityRef }} />
+      <StationLightCurtains {...{ stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding, exitOpacityRef }} texture={textures.waterfall} />
+    </>
   );
 }
 
-function buildStardust(stationIndex: number, count = 2500) {
+function buildStardust(stationIndex: number, count = 2600) {
   const positions = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
   const phases = new Float32Array(count);
@@ -465,28 +591,30 @@ function buildStardust(stationIndex: number, count = 2500) {
   const forward = pose.target.clone().sub(pose.camera).normalize();
   const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
   const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+  const gridX = right.clone().multiplyScalar(Math.cos(GRID_YAW)).addScaledVector(forward, Math.sin(GRID_YAW)).normalize();
 
   for (let i = 0; i < count; i += 1) {
-    const flank = i < Math.round(count * 0.65);
+    const flank = i < Math.round(count * 0.75);
     const side = seeded(i, stationIndex * 17 + 31) < 0.5 ? -1 : 1;
+    const flankSpread = Math.pow(seeded(i, stationIndex * 19 + 32), 1.35);
     const x = side * (flank
-      ? 1.4 + seeded(i, stationIndex * 19 + 32) * 10.1
-      : 9.0 + seeded(i, stationIndex * 23 + 33) * 13.0);
+      ? 3.2 + flankSpread * 8.5
+      : 11.2 + seeded(i, stationIndex * 23 + 33) * 12.0);
     const y = flank
-      ? -13.5 + seeded(i, stationIndex * 29 + 34) * 27.0
-      : -15.0 + seeded(i, stationIndex * 31 + 35) * 30.0;
+      ? -17.0 + seeded(i, stationIndex * 29 + 34) * 34.0
+      : -18.0 + seeded(i, stationIndex * 31 + 35) * 36.0;
     const depth = flank
-      ? 6.0 + seeded(i, stationIndex * 37 + 36) * 36.0
-      : 8.0 + seeded(i, stationIndex * 41 + 37) * 40.0;
+      ? 6.0 + seeded(i, stationIndex * 37 + 36) * 32.0
+      : 36.0 + seeded(i, stationIndex * 41 + 37) * 34.0;
     const point = pose.camera.clone()
       .addScaledVector(forward, depth)
-      .addScaledVector(right, x)
+      .addScaledVector(gridX, x)
       .addScaledVector(up, y);
     positions.set(point.toArray(), i * 3);
-    sizes[i] = 0.45 + seeded(i, 43) * 1.0;
+    sizes[i] = 1.1 + seeded(i, 43) * 1.9;
     phases[i] = seeded(i, 47) * Math.PI * 2;
-    const tint = seeded(i, 53);
-    const color = new THREE.Color(tint > 0.975 ? "#ff3b5c" : tint > 0.91 ? "#fff4d8" : tint > 0.48 ? "#ffd27d" : "#d97820");
+    const tintSlot = i % 20;
+    const color = new THREE.Color(tintSlot < 11 ? VAULT_PALETTE.gold : tintSlot < 16 ? VAULT_PALETTE.amber : tintSlot < 19 ? VAULT_PALETTE.champagne : VAULT_PALETTE.ruby);
     colors.set([color.r, color.g, color.b], i * 3);
   }
   const geometry = new THREE.BufferGeometry();
@@ -511,11 +639,7 @@ function CathedralStardust({ stationIndex, projectIndex, foldFromIndex, foldStar
   useEffect(() => () => geometry.dispose(), [geometry]);
   useFrame(({ clock }) => {
     if (!material.current) return;
-    const t = isFolding && foldStartedAt > 0 ? clamp((performance.now() - foldStartedAt) / 900) : 1;
-    const eased = smoothstep(0, 1, t);
-    const weight = isFolding
-      ? stationIndex === foldFromIndex ? 1 - eased : stationIndex === projectIndex ? eased : 0
-      : stationIndex === projectIndex ? 1 : 0;
+    const weight = stationCrossfadeWeight(stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding);
     material.current.uniforms.uTime.value = clock.getElapsedTime();
     material.current.uniforms.uOpacity.value = weight * exitOpacityRef.current;
   });
@@ -529,9 +653,9 @@ function CathedralStardust({ stationIndex, projectIndex, foldFromIndex, foldStar
         toneMapped={false}
         blending={THREE.AdditiveBlending}
         uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 }, uPixelRatio: { value: Math.min(gl.getPixelRatio(), 2) } }}
-        // Projected point size scales with DPR and inversely with camera-space depth.
-        vertexShader={"attribute float aSize;attribute float aPhase;attribute vec3 aColor;uniform float uTime;uniform float uPixelRatio;varying float vTwinkle;varying vec3 vColor;void main(){vec3 p=position;p.x+=sin(uTime*0.14+aPhase)*0.12;p.y+=cos(uTime*0.11+aPhase*1.7)*0.09;p.z+=sin(uTime*0.08+aPhase*0.7)*0.08;vec4 mvPosition=modelViewMatrix*vec4(p,1.0);vColor=aColor;vTwinkle=0.82+0.18*sin(uTime*1.1+aPhase);gl_PointSize=clamp(aSize*uPixelRatio*(46.0/max(2.5,-mvPosition.z)),1.2*uPixelRatio,3.6*uPixelRatio);gl_Position=projectionMatrix*mvPosition;}"}
-        fragmentShader={"uniform float uOpacity;varying float vTwinkle;varying vec3 vColor;void main(){float d=length(gl_PointCoord-0.5)*2.0;if(d>1.0)discard;float glow=exp(-d*d*7.5);float alpha=glow*vTwinkle*uOpacity*0.92;gl_FragColor=vec4(vColor,alpha);}"}
+        // Perspective scaling retains the requested 1.1–3.0 DPR-scaled pinpoint range.
+        vertexShader={"attribute float aSize;attribute float aPhase;attribute vec3 aColor;uniform float uTime;uniform float uPixelRatio;varying float vTwinkle;varying vec3 vColor;void main(){vec3 p=position;p.x+=sin(uTime*0.14+aPhase)*0.12;p.y+=cos(uTime*0.11+aPhase*1.7)*0.09;p.z+=sin(uTime*0.08+aPhase*0.7)*0.08;vec4 mvPosition=modelViewMatrix*vec4(p,1.0);vColor=aColor;vTwinkle=0.82+0.18*sin(uTime*1.1+aPhase);float depthScale=16.0/max(10.0,-mvPosition.z);gl_PointSize=clamp(aSize*uPixelRatio*depthScale,1.1*uPixelRatio,3.0*uPixelRatio);gl_Position=projectionMatrix*mvPosition;}"}
+        fragmentShader={"uniform float uOpacity;varying float vTwinkle;varying vec3 vColor;void main(){float d=length(gl_PointCoord-0.5)*2.0;if(d>1.0)discard;float glow=exp(-d*d*5.2);float alpha=glow*vTwinkle*uOpacity;gl_FragColor=vec4(vColor,alpha);}"}
       />
     </points>
   );
@@ -544,7 +668,7 @@ function buildStationIntersectionFlares(stationIndex: number) {
   const up = new THREE.Vector3().crossVectors(right, forward).normalize();
   const cameraNormal = forward.clone().negate();
   const points = [
-    [-4.8, 4.7, 13.5, 1.8], [-1.2, 5.5, 16.0, 1.5], [4.7, -4.5, 15.0, 2.0], [2.0, -5.2, 17.0, 1.6],
+    [-4.8, 4.7, 13.5, 1.1], [-1.2, 5.5, 16.0, 0.95], [4.7, -4.5, 15.0, 1.2], [2.0, -5.2, 17.0, 1.0],
   ] as const;
   const matrices = points.map(([x, y, depth, size]) => {
     const position = pose.camera.clone().addScaledVector(right, x).addScaledVector(up, y).addScaledVector(forward, depth);
@@ -595,10 +719,155 @@ function StationIntersectionFlares({ stationIndex, projectIndex, foldFromIndex, 
         blending={THREE.AdditiveBlending}
         toneMapped={false}
         vertexShader={"varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0);}"}
-        fragmentShader={"uniform float uTime;uniform float uOpacity;varying vec2 vUv;void main(){vec2 p=(vUv-0.5)*2.0;float r=length(p);float glow=exp(-r*r*6.5);float core=exp(-r*r*30.0);float pulse=0.94+0.06*sin(uTime*0.8+vUv.x*2.0);vec3 warm=mix(vec3(1.0,0.62,0.22),vec3(1.0,0.92,0.72),core);float alpha=0.36*glow*uOpacity*pulse;gl_FragColor=vec4(warm,alpha);}"}
+    fragmentShader={"uniform float uTime;uniform float uOpacity;varying vec2 vUv;void main(){vec2 p=(vUv-0.5)*2.0;float r=length(p);float glow=exp(-r*r*6.5);float core=exp(-r*r*30.0);float pulse=0.94+0.06*sin(uTime*0.8+vUv.x*2.0);vec3 warm=mix(vec3(1.0,0.62,0.22),vec3(1.0,0.92,0.72),core);float alpha=0.13*glow*uOpacity*pulse;gl_FragColor=vec4(warm,alpha);}"}
       />
     </instancedMesh>
   );
+}
+
+function activeStationWeight(stationIndex: number, projectIndex: number, foldFromIndex: number, foldStartedAt: number, isFolding: boolean, exitOpacity: number) {
+  const t = isFolding && foldStartedAt > 0 ? clamp((performance.now() - foldStartedAt) / 900) : 1;
+  const eased = smoothstep(0, 1, t);
+  const station = isFolding ? stationIndex === foldFromIndex ? 1 - eased : stationIndex === projectIndex ? eased : 0 : stationIndex === projectIndex ? 1 : 0;
+  return station * exitOpacity;
+}
+
+function CathedralDetails({ stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding, exitOpacityRef, textures }: {
+  stationIndex: number; projectIndex: number; foldFromIndex: number; foldStartedAt: number; isFolding: boolean;
+  exitOpacityRef: React.RefObject<number>; textures: CathedralTextures;
+}) {
+  const { pose, up, forward, gridX, gridZ } = useMemo(() => stationBasis(stationIndex), [stationIndex]);
+  const ringMesh = useRef<THREE.InstancedMesh>(null);
+  const ringMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const mirror = useRef<THREE.Mesh>(null);
+  const mirrorMaterial = useRef<THREE.ShaderMaterial>(null);
+  const beamBody = useRef<Array<THREE.MeshBasicMaterial | null>>([]);
+  const beamEdge = useRef<Array<THREE.MeshBasicMaterial | null>>([]);
+  const frameFaces = useRef<Array<THREE.MeshBasicMaterial | null>>([]);
+  const frameEdges = useRef<Array<THREE.LineBasicMaterial | null>>([]);
+  const wingFaces = useRef<Array<THREE.MeshBasicMaterial | null>>([]);
+  const wingText = useRef<Array<THREE.MeshBasicMaterial | null>>([]);
+  const wingReflections = useRef<Array<THREE.MeshBasicMaterial | null>>([]);
+  const wingEdges = useRef<Array<THREE.LineBasicMaterial | null>>([]);
+  const nebulaSprites = useRef<Array<THREE.Sprite | null>>([]);
+  const flareSprites = useRef<Array<THREE.Sprite | null>>([]);
+  const time = useRef(0);
+  const ringLayout = useMemo(() => {
+    const dummy = new THREE.Object3D();
+    const results: Array<{ matrix: THREE.Matrix4; color: THREE.Color }> = [];
+    const quaternion = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(gridX, gridZ, up));
+    const center = pose.camera.clone().addScaledVector(forward, 16);
+    const sets = [[8.8, [5.5, 8.2, 11.4]], [9.6, [5.5, 8.2, 11.4]], [-5.45, [4.8, 7.6, 10.8]]] as const;
+    sets.forEach(([height, radii], setIndex) => radii.forEach((radius, ringIndex) => {
+      dummy.position.copy(center).addScaledVector(up, height); dummy.quaternion.copy(quaternion); dummy.scale.set(radius, radius, 1); dummy.updateMatrix();
+      results.push({ matrix: dummy.matrix.clone(), color: new THREE.Color(setIndex === 2 ? VAULT_PALETTE.amber : ringIndex === 1 ? VAULT_PALETTE.champagne : VAULT_PALETTE.gold) });
+    }));
+    return results;
+  }, [pose, up, forward, gridX, gridZ]);
+  const mirrorMatrix = useMemo(() => {
+    const position = pose.camera.clone().addScaledVector(forward, 25).addScaledVector(up, -5.5);
+    const quaternion = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(gridX, gridZ, up));
+    return new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(64, 64, 1));
+  }, [pose, up, forward, gridX, gridZ]);
+  const beamLayout = useMemo(() => {
+    const config = [
+      ["x", 0, 5.4, 24, 62, 2.2, VAULT_PALETTE.quartz, VAULT_PALETTE.silver], ["x", 2.5, 4.7, 20, 58, 1.6, VAULT_PALETTE.quartz, VAULT_PALETTE.silver],
+      ["x", 5.2, 2.2, 28, 58, 1.7, VAULT_PALETTE.wine, VAULT_PALETTE.ruby], ["x", 5, -2.4, 24, 62, 2, VAULT_PALETTE.wine, VAULT_PALETTE.ruby],
+      ["x", -3, 4.1, 30, 56, 1.6, VAULT_PALETTE.bronze, VAULT_PALETTE.gold], ["x", -4.2, -4.6, 26, 64, 2, VAULT_PALETTE.bronze, VAULT_PALETTE.gold],
+      ["x", 0, -5, 22, 64, 2.2, VAULT_PALETTE.bronze, VAULT_PALETTE.gold], ["x", 3, -4.4, 32, 56, 1.5, VAULT_PALETTE.wine, VAULT_PALETTE.ruby],
+      ["z", -7, 5, 20, 52, 2, VAULT_PALETTE.quartz, VAULT_PALETTE.silver], ["z", 7.5, 5.2, 24, 58, 2.4, VAULT_PALETTE.quartz, VAULT_PALETTE.gold],
+      ["z", -8, 1.2, 26, 56, 1.4, VAULT_PALETTE.wine, VAULT_PALETTE.ruby], ["z", 8, .2, 22, 54, 1.6, VAULT_PALETTE.wine, VAULT_PALETTE.ruby],
+      ["z", -7.2, -4.6, 20, 60, 1.8, VAULT_PALETTE.bronze, VAULT_PALETTE.gold], ["z", 7.2, -4.8, 25, 62, 2.2, VAULT_PALETTE.bronze, VAULT_PALETTE.gold],
+      ["x", -7, -5.2, 34, 52, 1.2, VAULT_PALETTE.bronze, VAULT_PALETTE.gold], ["x", 7, 5.9, 34, 54, 1.4, VAULT_PALETTE.quartz, VAULT_PALETTE.silver],
+    ] as const;
+    return config.map(([axis, x, y, depth, length, thickness, body, edge]) => {
+      const along = axis === "x" ? gridX : gridZ;
+      const center = pose.camera.clone().addScaledVector(gridX, x).addScaledVector(up, y).addScaledVector(forward, depth);
+      return {
+        matrix: createPlaneMatrix(center, up, along, thickness, length),
+        body,
+        edge,
+        bodyOpacity: body === VAULT_PALETTE.quartz ? .26 : body === VAULT_PALETTE.wine ? .24 : .2,
+        edgeOpacity: edge === VAULT_PALETTE.silver ? .42 : edge === VAULT_PALETTE.ruby ? .48 : .38,
+      };
+    });
+  }, [pose, up, forward, gridX, gridZ]);
+  const cubeGeometry = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
+  const cubeEdgeGeometry = useMemo(() => new THREE.EdgesGeometry(cubeGeometry), [cubeGeometry]);
+  const cubeLayout = useMemo(() => {
+    const quaternion = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(gridX, up, gridZ.clone().negate()));
+    return [
+      [-11.5, 7.5, 7.5, 5.5, 7.5, 5.5, false], [-9.4, -3.1, 12.5, 4, 6, 4, true],
+      [10.2, 5, 10, 5.5, 7.5, 5.5, false], [12, -2, 15.5, 4, 6, 4, true],
+    ].map(([x, y, depth, width, height, length, crimson]) => ({
+      position: pose.camera.clone().addScaledVector(gridX, x as number).addScaledVector(up, y as number).addScaledVector(forward, depth as number),
+      size: new THREE.Vector3(width as number, height as number, length as number), quaternion, crimson: crimson as boolean,
+    }));
+  }, [pose, up, forward, gridX, gridZ]);
+  const wingMatrices = useMemo(() => [-1, 1].map((side) => {
+    const center = pose.camera.clone().addScaledVector(gridX, side * 7.4).addScaledVector(up, -.05).addScaledVector(forward, 13.8);
+    return createPlaneMatrix(center, gridX.clone().applyAxisAngle(up, side * -.56), up, 3.55, 2.35);
+  }), [pose, up, forward, gridX]);
+  const nebulaLayout = useMemo(() => [[10, 7.5, 38, 18, 13, .18], [13, 4.3, 44, 15, 12, .16], [8, -7, 36, 17, 12, .16], [-10, -7, 40, 19, 14, .2], [-13, -3.5, 48, 16, 12, .14]].map(([x, y, depth, w, h, alpha]) => ({
+    position: pose.camera.clone().addScaledVector(gridX, x!).addScaledVector(up, y!).addScaledVector(forward, depth!), width: w!, height: h!, alpha: alpha!,
+  })), [pose, gridX, up, forward]);
+  useEffect(() => () => { cubeGeometry.dispose(); cubeEdgeGeometry.dispose(); }, [cubeGeometry, cubeEdgeGeometry]);
+  const wingPlaneGeometry = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
+  const wingEdgeGeometry = useMemo(() => new THREE.EdgesGeometry(wingPlaneGeometry), [wingPlaneGeometry]);
+  useEffect(() => () => { wingPlaneGeometry.dispose(); wingEdgeGeometry.dispose(); }, [wingPlaneGeometry, wingEdgeGeometry]);
+  useEffect(() => {
+    if (!ringMesh.current) return;
+    ringLayout.forEach((ring, i) => { ringMesh.current?.setMatrixAt(i, ring.matrix); ringMesh.current?.setColorAt(i, ring.color); });
+    ringMesh.current.instanceMatrix.needsUpdate = true;
+    if (ringMesh.current.instanceColor) ringMesh.current.instanceColor.needsUpdate = true;
+  }, [ringLayout]);
+  useFrame(({ clock }) => {
+    const weight = activeStationWeight(stationIndex, projectIndex, foldFromIndex, foldStartedAt, isFolding, exitOpacityRef.current);
+    time.current = clock.getElapsedTime();
+    if (ringMesh.current && ringMaterial.current) { ringMesh.current.visible = weight > .001; ringMaterial.current.opacity = .42 * weight; }
+    if (mirror.current && mirrorMaterial.current) { mirror.current.visible = weight > .001; mirrorMaterial.current.uniforms.uTime.value = time.current; mirrorMaterial.current.uniforms.uOpacity.value = weight; }
+    beamBody.current.forEach((material, i) => { if (material) material.opacity = beamLayout[i].bodyOpacity * weight; });
+    beamEdge.current.forEach((material, i) => { if (material) material.opacity = beamLayout[i].edgeOpacity * weight; });
+    frameFaces.current.forEach((material) => { if (material) material.opacity = .07 * weight; });
+    frameEdges.current.forEach((material) => { if (material) material.opacity = .62 * weight; });
+    wingFaces.current.forEach((material) => { if (material) material.opacity = .62 * weight; });
+    wingText.current.forEach((material) => { if (material) material.opacity = weight; });
+    wingReflections.current.forEach((material) => { if (material) material.opacity = .14 * weight; });
+    wingEdges.current.forEach((material) => { if (material) material.opacity = .48 * weight; });
+    nebulaSprites.current.forEach((sprite, i) => { if (sprite) { sprite.visible = weight > .001; (sprite.material as THREE.SpriteMaterial).opacity = nebulaLayout[i].alpha * weight; } });
+    flareSprites.current.forEach((sprite) => { if (sprite) { sprite.visible = weight > .001; (sprite.material as THREE.SpriteMaterial).opacity = .55 * weight; } });
+  });
+  return <group>
+    <mesh ref={mirror} matrix={mirrorMatrix} matrixAutoUpdate={false} frustumCulled={false} renderOrder={1}><planeGeometry args={[1, 1]} />
+      <shaderMaterial ref={mirrorMaterial} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }} transparent depthTest depthWrite={false} side={THREE.DoubleSide} blending={THREE.NormalBlending} toneMapped={false}
+        vertexShader={"varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}"}
+        fragmentShader={"uniform float uTime;uniform float uOpacity;varying vec2 vUv;void main(){vec2 p=(vUv-.5)*2.0;float edge=1.0-smoothstep(.34,1.0,length(p));float gold=exp(-pow((p.x+.04)*18.0,2.0));float ruby=exp(-pow((p.x-.09)*30.0,2.0));float rings=.5+.5*cos(length(p)*44.0-uTime*.16);float tracks=.5+.5*cos(p.y*64.0);vec3 color=vec3(.0196,.0118,.0235)+vec3(1.0,.745,.27)*gold*.16+vec3(.79,.059,.196)*ruby*.11+vec3(.88,.525,.102)*rings*tracks*.025;gl_FragColor=vec4(color,edge*(.88+gold*.1)*uOpacity);}"}
+      />
+    </mesh>
+    <instancedMesh ref={ringMesh} args={[undefined, undefined, ringLayout.length]} frustumCulled={false} renderOrder={3}>
+      <torusGeometry args={[1, .1, 8, 128]} /><meshBasicMaterial ref={ringMaterial} vertexColors transparent opacity={0} blending={THREE.AdditiveBlending} depthTest depthWrite={false} toneMapped={false} />
+    </instancedMesh>
+    {beamLayout.map((beam, i) => <group key={"orthogonal-beam-" + i} matrix={beam.matrix} matrixAutoUpdate={false}>
+      <mesh frustumCulled={false} renderOrder={4}><planeGeometry args={[1, 1]} /><meshBasicMaterial ref={(m) => { beamBody.current[i] = m; }} map={textures.glass} color={beam.body} transparent opacity={0} depthTest depthWrite={false} side={THREE.DoubleSide} /></mesh>
+      <mesh frustumCulled={false} renderOrder={5}><planeGeometry args={[1, 1]} /><meshBasicMaterial ref={(m) => { beamEdge.current[i] = m; }} map={textures.glass} color={beam.edge} transparent opacity={0} blending={THREE.AdditiveBlending} depthTest depthWrite={false} side={THREE.DoubleSide} toneMapped={false} /></mesh>
+    </group>)}
+    {cubeLayout.map((cube, i) => <group key={"cathedral-cube-" + i} position={cube.position} quaternion={cube.quaternion} scale={cube.size}>
+      <mesh geometry={cubeGeometry} frustumCulled={false} renderOrder={4}><meshBasicMaterial ref={(m) => { frameFaces.current[i] = m; }} color={cube.crimson ? "#2B060F" : "#2A160B"} transparent opacity={0} side={THREE.DoubleSide} depthTest depthWrite={false} /></mesh>
+      <lineSegments geometry={cubeEdgeGeometry} frustumCulled={false} renderOrder={6}><lineBasicMaterial ref={(m) => { frameEdges.current[i] = m; }} color={cube.crimson ? VAULT_PALETTE.ruby : VAULT_PALETTE.gold} transparent opacity={0} depthTest depthWrite={false} toneMapped={false} /></lineSegments>
+    </group>)}
+    {wingMatrices.map((matrix, i) => <group key={"monolith-wing-" + i} matrix={matrix} matrixAutoUpdate={false}>
+      <mesh geometry={wingPlaneGeometry} frustumCulled={false} renderOrder={6}><meshBasicMaterial ref={(m) => { wingFaces.current[i] = m; }} color={VAULT_PALETTE.card} transparent opacity={0} side={THREE.DoubleSide} depthTest depthWrite={false} /></mesh>
+      <mesh geometry={wingPlaneGeometry} frustumCulled={false} renderOrder={7}><meshBasicMaterial ref={(m) => { wingText.current[i] = m; }} map={textures.wings[stationIndex][i]} transparent opacity={0} side={THREE.DoubleSide} depthTest depthWrite={false} /></mesh>
+      <lineSegments geometry={wingEdgeGeometry} frustumCulled={false} renderOrder={8}><lineBasicMaterial ref={(m) => { wingEdges.current[i] = m; }} color={i ? VAULT_PALETTE.ruby : VAULT_PALETTE.amber} transparent opacity={0} depthTest depthWrite={false} /></lineSegments>
+      <mesh geometry={wingPlaneGeometry} position={[0, -4.1, 0]} scale={[1, -1, 1]} frustumCulled={false} renderOrder={1}><meshBasicMaterial ref={(m) => { wingReflections.current[i] = m; }} map={textures.wings[stationIndex][i]} transparent opacity={0} side={THREE.DoubleSide} depthTest depthWrite={false} /></mesh>
+    </group>)}
+    {nebulaLayout.map((wisp, i) => <sprite key={"nebula-wisp-" + i} ref={(sprite) => { nebulaSprites.current[i] = sprite; }} position={wisp.position} scale={[wisp.width, wisp.height, 1]} frustumCulled={false} renderOrder={0}>
+      <spriteMaterial map={textures.nebula} color={VAULT_PALETTE.bronze} transparent opacity={0} depthTest depthWrite={false} />
+    </sprite>)}
+    {[[-.4, 5, 15.5, 2.2], [.2, -5, 16, 2.4], [-7.2, 0, 16.8, 1.65], [7, .4, 17.4, 1.7]].map(([x, y, depth, size], i) => <sprite key={"anamorphic-flare-" + i} ref={(sprite) => { flareSprites.current[i] = sprite; }} position={pose.camera.clone().addScaledVector(gridX, x!).addScaledVector(up, y!).addScaledVector(forward, depth!)} scale={[size!, size!, 1]} frustumCulled={false} renderOrder={8}>
+      <spriteMaterial map={textures.glint} color={VAULT_PALETTE.champagne} transparent opacity={0} blending={THREE.AdditiveBlending} depthTest depthWrite={false} />
+    </sprite>)}
+  </group>;
 }
 
 function TesseractCathedral({
@@ -614,6 +883,12 @@ function TesseractCathedral({
   isFolding: boolean;
   exitOpacityRef: React.RefObject<number>;
 }) {
+  const renderer = useThree((state) => state.gl);
+  const textures = useMemo(() => createCathedralTextures(renderer), [renderer]);
+  useEffect(() => () => {
+    textures.waterfall.dispose(); textures.glass.dispose(); textures.nebula.dispose(); textures.glint.dispose();
+    textures.wings.forEach(([previous, next]) => { previous.dispose(); next.dispose(); });
+  }, [textures]);
   return (
     <group>
       {ACT_FOUR_FOLD_POSES.map((_, index) => (
@@ -625,8 +900,10 @@ function TesseractCathedral({
           foldStartedAt={foldStartedAt}
           isFolding={isFolding}
           exitOpacityRef={exitOpacityRef}
+          textures={textures}
         />
       ))}
+      {ACT_FOUR_FOLD_POSES.map((_, index) => <CathedralDetails key={"cathedral-details-" + index} stationIndex={index} projectIndex={projectIndex} foldFromIndex={foldFromIndex} foldStartedAt={foldStartedAt} isFolding={isFolding} exitOpacityRef={exitOpacityRef} textures={textures} />)}
       {ACT_FOUR_FOLD_POSES.map((_, index) => (
         <CathedralStardust
           key={"cathedral-stardust-" + index}
