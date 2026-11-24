@@ -336,6 +336,55 @@ const ANALYTICAL_ECLIPSE_GLSL = `
     return vec4(mix(coronaColor, domeColor, domeAlpha), alpha);
   }
 `;
+const HORIZON_ECLIPSE_GLSL = `
+  vec4 sampleEclipseSky(vec2 point, float time) {
+    float lx = point.x;
+    float ly = point.y;
+    float R = 10.2;
+    float r = length(vec2(lx, ly)) / R;
+    float ang = atan(ly, lx);
+
+    float heightWeight = smoothstep(0.0, 0.82, max(0.0, ly) / R);
+    float innerGrad = pow(smoothstep(0.42, 0.992, r), 2.1) * (0.38 + 0.62 * heightWeight);
+    float edgeCrimson = pow(smoothstep(0.84, 0.996, r), 2.6);
+    vec3 domeCol = vec3(0.004, 0.000, 0.004)
+      + vec3(0.36, 0.008, 0.002) * innerGrad
+      + vec3(0.56, 0.035, 0.006) * edgeCrimson;
+    float domeMask = 1.0 - smoothstep(0.993, 1.005, r);
+
+    float dOut = max(0.0, r - 1.0);
+    float crown = pow(max(0.0, sin(clamp(ang, 0.0, 3.14159265))), 1.15);
+    float plasma = 0.95 + 0.05 * sin(ang * 5.0 - time * 0.45) * cos(ang * 3.0 + time * 0.28);
+    float lipWidth = mix(0.028, 0.056, crown);
+    float lip = exp(-pow(dOut / lipWidth, 2.0));
+    vec3 lipCol = vec3(1.00, 0.96, 0.80) * lip * 1.08;
+
+    float orangeRate = mix(13.5, 7.6, crown);
+    float orangeBand = exp(-dOut * orangeRate) * plasma;
+    vec3 orangeCol = mix(vec3(0.95, 0.36, 0.02), vec3(1.00, 0.62, 0.08), exp(-dOut * 14.0))
+      * orangeBand * 0.96;
+
+    float blendRate = mix(6.8, 3.9, crown);
+    float outerBlend = exp(-dOut * blendRate) * plasma;
+    vec3 blendCol = vec3(0.46, 0.095, 0.010) * outerBlend * 0.62;
+    float flankGlaze = exp(-max(0.0, ly) * 0.65)
+      * exp(-max(0.0, abs(lx) - R * 0.96) * 0.28)
+      * smoothstep(0.98, 1.05, r);
+    vec3 glazeCol = vec3(0.38, 0.065, 0.010) * flankGlaze * 0.38;
+
+    float maxOuterR = mix(1.48, 1.72, crown);
+    float skyCut = 1.0 - smoothstep(1.04, maxOuterR, r);
+    vec3 coronaCol = (lipCol + orangeCol + blendCol + glazeCol) * skyCut;
+    coronaCol = coronaCol / (vec3(1.0) + coronaCol * 1.25);
+    float coronaAlpha = clamp((lip + orangeBand * 0.88 + outerBlend * 0.55 + flankGlaze * 0.35)
+      * skyCut, 0.0, 1.0);
+    float aboveWater = step(0.0, ly) * smoothstep(-0.015, 0.025, ly);
+
+    vec3 finalCol = mix(coronaCol, domeCol, domeMask);
+    float finalAlpha = max(domeMask, coronaAlpha) * aboveWater * uVaultOpacity;
+    return vec4(finalCol, finalAlpha);
+  }
+`;
 const SEA_VERTEX_SHADER = `
   varying vec2 vUv;
   varying vec3 vWorldPos;
@@ -521,10 +570,10 @@ const CORONA_FRAGMENT_SHADER = `
   uniform float uTime;
   uniform float uVaultOpacity;
   varying vec3 vLocalPos;
-  ${ANALYTICAL_ECLIPSE_GLSL}
+  ${HORIZON_ECLIPSE_GLSL}
   void main() {
     vec4 eclipse = sampleEclipseSky(vLocalPos.xy, uTime);
-    gl_FragColor = vec4(eclipse.rgb, eclipse.a * uVaultOpacity);
+    gl_FragColor = vec4(eclipse.rgb, eclipse.a);
   }
 `;
 const DUST_VERTEX_SHADER = `
