@@ -2413,9 +2413,13 @@ canvas {
   z-index: 60;
   padding: 0.66rem 0.92rem;
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  border: 1px solid rgba(255, 204, 132, 0.26);
+  background: rgba(4, 3, 7, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 232, 178, 0.2), 0 8px 28px rgba(0, 0, 0, 0.62);
   font: 600 9px/1.2 var(--font-mono, ui-monospace, monospace);
   letter-spacing: 0.16em;
   text-transform: uppercase;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95);
 }
 
 .act-four-gate-wave {
@@ -2499,30 +2503,72 @@ canvas {
 
 .act-four-time-slice-dossier {
   position: absolute;
+  isolation: isolate;
   top: 50%;
   left: 50%;
   display: grid;
-  width: min(56vw, 760px);
+  width: min(56vw, 740px);
   min-height: min(48vh, 380px);
   grid-template-rows: auto 1fr auto;
   padding: clamp(1.1rem, 2.2vw, 1.8rem);
   color: #f7f3ec;
-  background: transparent;
-  border: 0;
-  filter: drop-shadow(0 2px 16px rgba(0, 0, 0, 0.48));
+  background: linear-gradient(155deg, rgba(14, 10, 12, 0.90) 0%, rgba(8, 6, 10, 0.94) 55%, rgba(14, 8, 10, 0.91) 100%);
+  border: 1px solid rgba(255, 190, 69, 0.48);
+  box-shadow: inset 0 1px 0 rgba(255, 244, 210, 0.72), inset 0 -1px 0 rgba(255, 190, 69, 0.45), inset 1px 0 0 rgba(255, 212, 121, 0.38), 0 28px 90px rgba(0, 0, 0, 0.92), 0 0 65px rgba(255, 190, 69, 0.22);
+  backdrop-filter: none;
   transform: translate(-50%, -50%);
   opacity: 1;
-  transition: opacity 220ms ease;
+  transition: opacity 420ms cubic-bezier(0.2, 0.72, 0.24, 1), filter 420ms ease, transform 420ms cubic-bezier(0.2, 0.72, 0.24, 1);
   pointer-events: auto;
+}
+
+.act-four-time-slice-dossier::before,
+.act-four-time-slice-dossier::after {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  content: "";
+}
+
+.act-four-time-slice-dossier::before {
+  bottom: -1px;
+  left: 27%;
+  width: 46%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ffbe45 20%, #fff4d2 50%, #ffbe45 80%, transparent);
+  box-shadow: 0 0 9px rgba(255, 190, 69, 0.88), 0 0 22px rgba(255, 190, 69, 0.5);
+}
+
+.act-four-time-slice-dossier::after {
+  top: 26%;
+  bottom: 26%;
+  left: -1px;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, #ffbe45 20%, #fff4d2 50%, #ffbe45 80%, transparent);
+  box-shadow: 0 0 9px rgba(255, 190, 69, 0.88), 0 0 22px rgba(255, 190, 69, 0.5);
 }
 
 .act-four-time-slice-dossier.is-folding {
   opacity: 0;
-  transition-duration: 120ms;
+  filter: blur(7px);
+  transform: translate(-50%, -50%) scale(0.985);
+  transition-duration: 260ms;
   pointer-events: none;
 }
 
-.act-four-time-slice-dossier.is-arriving { opacity: 1; }
+.act-four-time-slice-dossier.is-arriving { opacity: 1; animation: act-four-dossier-lock-in 520ms cubic-bezier(0.2, 0.72, 0.24, 1) both; }
+
+@keyframes act-four-dossier-lock-in {
+  from { opacity: 0; filter: blur(9px); transform: translate(-50%, -48%) scale(1.025); }
+  to { opacity: 1; filter: blur(0); transform: translate(-50%, -50%) scale(1); }
+}
+
+.act-four-exit-control {
+  border: 1px solid rgba(255, 190, 69, 0.28);
+  background: rgba(5, 3, 6, 0.68);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 244, 210, 0.12);
+  backdrop-filter: none;
+}
 
 .act-four-time-slice-topline {
   display: flex;
@@ -2651,6 +2697,12 @@ canvas {
   display: flex;
   align-items: center;
   gap: clamp(0.9rem, 2vw, 1.8rem);
+  padding: 0.48rem 0.9rem;
+  border: 1px solid rgba(255, 204, 128, 0.16);
+  border-radius: 999px;
+  background: rgba(5, 3, 6, 0.68);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 224, 165, 0.1);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95);
   transform: translateX(-50%);
   pointer-events: auto;
 }
@@ -2662,6 +2714,7 @@ canvas {
   font: 600 10px/1 var(--font-mono, ui-monospace, monospace);
   letter-spacing: 0.14em;
   transition: color 180ms ease, text-shadow 180ms ease;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95);
 }
 
 .act-four-time-slice-rail button::after {
@@ -2711,7 +2764,7 @@ button.act-four-time-slice-hint.is-launch:hover {
 }
 
 @media (max-width: 800px) {
-  .act-four-time-slice-dossier { width: min(86vw, 760px); min-height: min(50vh, 380px); padding: 1rem; }
+  .act-four-time-slice-dossier { width: min(86vw, 740px); min-height: min(50vh, 380px); padding: 1rem; }
   .act-four-time-slice-hero h2 { font-size: clamp(2rem, 8vw, 3.3rem); }
   .act-four-time-slice-hero h2.is-long-title { font-size: clamp(1.8rem, 6.7vw, 2.8rem); }
   .act-four-time-slice-hero p { font-size: 14px; }
@@ -2727,4 +2780,5 @@ button.act-four-time-slice-hint.is-launch:hover {
   .act-four-time-slice-rail button,
   .act-four-time-slice-rail button::after,
   .act-four-time-slice-hint { transition-duration: 0.01ms; }
+  .act-four-time-slice-dossier.is-arriving { animation-duration: 0.01ms; }
 }

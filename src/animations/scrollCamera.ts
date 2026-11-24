@@ -16,18 +16,32 @@ import {
 import { ACT_FOUR_CORE_POSITION, ACT_FOUR_EXIT_CAMERA_PATH, ACT_FOUR_EXIT_TARGET_PATH, ACT_FOUR_PROJECT_STATIONS, createActFourExitPaths, getActFourProjectPose } from "./actFourChoreography";
 
 const WORMHOLE_ARRIVAL_POSE = getActFourProjectPose(0);
+const stageForward = WORMHOLE_ARRIVAL_POSE.target.clone().sub(WORMHOLE_ARRIVAL_POSE.camera).normalize();
+const stageRight = stageForward.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+const stageUp = stageRight.clone().cross(stageForward).normalize();
+/** Station 0's landed coordinate frame anchors the entire Act IV sea and eclipse. */
+export const ACT_FOUR_STAGE_BASIS = {
+  origin: WORMHOLE_ARRIVAL_POSE.camera.clone(),
+  target: WORMHOLE_ARRIVAL_POSE.target.clone(),
+  right: stageRight,
+  up: stageUp,
+  forward: stageForward,
+};
 const ACT_FOUR_CAMERA_OFFSETS = [
-  new THREE.Vector3(-1.65, 0.1, 8.4),
-  new THREE.Vector3(8.4, 0.1, 1.65),
-  new THREE.Vector3(1.65, 0.1, -8.4),
-  new THREE.Vector3(-8.4, 0.1, -1.65),
-  new THREE.Vector3(-1.65, 0.1, 8.4),
+  { right: 0, up: 0, depth: 0 },
+  { right: 1.3, up: 0.15, depth: -0.5 },
+  { right: 2.3, up: 0.25, depth: -0.9 },
+  { right: -1.2, up: 0.15, depth: -0.6 },
+  { right: -2.2, up: 0.05, depth: -0.3 },
 ];
 /** One canonical set of camera/target poses drives both the fold and each physical slab. */
-export const ACT_FOUR_FOLD_POSES = ACT_FOUR_PROJECT_STATIONS.map((station, index) => ({
-  // Station 01 is the exact same pose used by the wormhole arrival endpoint.
-  camera: index === 0 ? WORMHOLE_ARRIVAL_POSE.camera.clone() : station.clone().add(ACT_FOUR_CAMERA_OFFSETS[index] ?? ACT_FOUR_CAMERA_OFFSETS[0]),
-  target: index === 0 ? WORMHOLE_ARRIVAL_POSE.target.clone() : station.clone().add(new THREE.Vector3(0, 0.1, 0)),
+export const ACT_FOUR_FOLD_POSES = ACT_FOUR_CAMERA_OFFSETS.slice(0, ACT_FOUR_PROJECT_STATIONS.length).map((offset) => ({
+  // Station 01 is exactly the wormhole endpoint. All stations share its fixed look target.
+  camera: ACT_FOUR_STAGE_BASIS.origin.clone()
+    .addScaledVector(ACT_FOUR_STAGE_BASIS.right, offset.right)
+    .addScaledVector(ACT_FOUR_STAGE_BASIS.up, offset.up)
+    .addScaledVector(ACT_FOUR_STAGE_BASIS.forward, offset.depth),
+  target: ACT_FOUR_STAGE_BASIS.target.clone(),
 }));
 export const ACT_FOUR_WARP_IN_DURATION_MS = 2200;
 export const ACT_FOUR_WARP_IN_DURATION_SECONDS = ACT_FOUR_WARP_IN_DURATION_MS / 1000;
@@ -50,9 +64,9 @@ export const WORMHOLE_PATH_LENGTH = WORMHOLE_CURVE.getLength();
 /** Scale the 8.5-unit design radius to this exact, joined spline length. */
 export const WORMHOLE_TUBE_RADIUS = 8.5 * WORMHOLE_PATH_LENGTH / 180;
 
-function cubicBezier(start: THREE.Vector3, controlOne: THREE.Vector3, controlTwo: THREE.Vector3, end: THREE.Vector3, t: number) {
+function cubicBezier(start: THREE.Vector3, controlOne: THREE.Vector3, controlTwo: THREE.Vector3, end: THREE.Vector3, t: number, target: THREE.Vector3) {
   const inverse = 1 - t;
-  return start.clone().multiplyScalar(inverse ** 3)
+  return target.copy(start).multiplyScalar(inverse ** 3)
     .addScaledVector(controlOne, 3 * inverse ** 2 * t)
     .addScaledVector(controlTwo, 3 * inverse * t ** 2)
     .addScaledVector(end, t ** 3);
@@ -248,6 +262,10 @@ export function CinematicCamera({
   const foldEndQuaternion = useRef(new THREE.Quaternion());
   const foldQuaternion = useRef(new THREE.Quaternion());
   const foldPointer = useRef(new THREE.Vector2());
+  const desiredPositionScratch = useRef(new THREE.Vector3());
+  const desiredLookAtScratch = useRef(new THREE.Vector3());
+  const foldTwistAxis = useRef(new THREE.Vector3(0, 0, 1));
+  const foldTwist = useRef(new THREE.Quaternion());
   // Use a Camera, not a generic Object3D: cameras look along local -Z, while
   // Object3D.lookAt aims local +Z at the target and reverses the view direction.
   const foldLookObject = useRef(new THREE.Camera());
@@ -343,8 +361,8 @@ export function CinematicCamera({
     const localT = THREE.MathUtils.clamp((p - from.progress) / segmentLength, 0, 1);
     const easedT = localT * localT * (3.0 - 2.0 * localT);
 
-    const desiredPosition = new THREE.Vector3().lerpVectors(from.camera, to.camera, easedT);
-    const desiredLookAt = new THREE.Vector3().lerpVectors(from.lookAt, to.lookAt, easedT);
+    const desiredPosition = desiredPositionScratch.current.lerpVectors(from.camera, to.camera, easedT);
+    const desiredLookAt = desiredLookAtScratch.current.lerpVectors(from.lookAt, to.lookAt, easedT);
     let desiredFov = THREE.MathUtils.lerp(from.fov, to.fov, easedT);
     let authoredActFiveRoll = 0;
     let authoredActFivePitch = 0;
@@ -473,7 +491,6 @@ export function CinematicCamera({
       camera.up.set(0, 1, 0);
       const nextIndex = THREE.MathUtils.clamp(Math.round(actFourProjectIndex), 0, ACT_FOUR_FOLD_POSES.length - 1);
       if (nextIndex !== projectMotionTo.current) {
-        const fromPose = ACT_FOUR_FOLD_POSES[projectMotionTo.current] ?? ACT_FOUR_FOLD_POSES[0];
         const toPose = ACT_FOUR_FOLD_POSES[nextIndex] ?? ACT_FOUR_FOLD_POSES[0];
         projectMotionFrom.current = projectMotion.current;
         projectMotionTo.current = nextIndex;
@@ -487,13 +504,10 @@ export function CinematicCamera({
         foldLookObject.current.up.set(0, 1, 0);
         foldLookObject.current.lookAt(toPose.target);
         foldEndQuaternion.current.copy(foldLookObject.current.quaternion);
-        const targetDelta = toPose.target.clone().sub(fromPose.target);
-        const side = new THREE.Vector3(targetDelta.z, 0, -targetDelta.x).normalize();
-        if (side.lengthSq() < 0.1) side.set(1, 0, 0);
-        const startRadial = camera.position.clone().sub(currentLookAt.current).normalize();
-        const endRadial = toPose.camera.clone().sub(toPose.target).normalize();
-        foldControlOne.current.copy(camera.position).addScaledVector(startRadial, 2.3).addScaledVector(side, 4.2);
-        foldControlTwo.current.copy(toPose.camera).addScaledVector(endRadial, 2.3).addScaledVector(side, -4.2);
+        // The shared fixed target and authored camera offsets create the subtle orbital sweep.
+        // Collinear Bezier controls keep the glide smooth without adding a box-room turn.
+        foldControlOne.current.copy(camera.position).lerp(toPose.camera, 1 / 3);
+        foldControlTwo.current.copy(camera.position).lerp(toPose.camera, 2 / 3);
         foldTransitionActive.current = true;
       }
       const rawFlight = foldTransitionActive.current
@@ -504,17 +518,18 @@ export function CinematicCamera({
         : rawFlight < 0.5 ? 4 * rawFlight ** 3 : 1 - Math.pow(-2 * rawFlight + 2, 3) / 2;
       const destination = ACT_FOUR_FOLD_POSES[projectMotionTo.current] ?? ACT_FOUR_FOLD_POSES[0];
       if (foldTransitionActive.current) {
-        desiredPosition.copy(cubicBezier(foldStartPosition.current, foldControlOne.current, foldControlTwo.current, foldEndPosition.current, flight));
+        cubicBezier(foldStartPosition.current, foldControlOne.current, foldControlTwo.current, foldEndPosition.current, flight, desiredPosition);
         desiredLookAt.lerpVectors(foldStartTarget.current, foldEndTarget.current, flight);
         const elapsed = rawFlight;
         if (arrivalSettleActive.current) desiredFov = THREE.MathUtils.lerp(foldStartFov.current, foldEndFov.current, flight);
-        else if (elapsed < 0.38) desiredFov = THREE.MathUtils.lerp(42, 51, THREE.MathUtils.smoothstep(elapsed, 0, 0.38));
-        else if (elapsed < 0.64) desiredFov = 51;
-        else desiredFov = THREE.MathUtils.lerp(51, 42, THREE.MathUtils.smoothstep(elapsed, 0.64, 1));
+        else if (elapsed < 0.38) desiredFov = THREE.MathUtils.lerp(42, 46, THREE.MathUtils.smoothstep(elapsed, 0, 0.38));
+        else if (elapsed < 0.64) desiredFov = 46;
+        else desiredFov = THREE.MathUtils.lerp(46, 42, THREE.MathUtils.smoothstep(elapsed, 0.64, 1));
         const direction = Math.sign(projectMotionTo.current - projectMotionFrom.current) || 1;
         foldQuaternion.current.copy(foldStartQuaternion.current).slerp(foldEndQuaternion.current, flight);
         if (!arrivalSettleActive.current) {
-          foldQuaternion.current.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(9) * Math.sin(rawFlight * Math.PI) * direction));
+          foldTwist.current.setFromAxisAngle(foldTwistAxis.current, THREE.MathUtils.degToRad(9) * Math.sin(rawFlight * Math.PI) * direction);
+          foldQuaternion.current.multiply(foldTwist.current);
         }
         projectMotion.current = THREE.MathUtils.lerp(projectMotionFrom.current, projectMotionTo.current, flight);
         if (rawFlight >= 1) {
@@ -533,10 +548,8 @@ export function CinematicCamera({
         foldQuaternion.current.copy(foldLookObject.current.quaternion);
         const pointerWeight = THREE.MathUtils.clamp((time - projectMotionStartedAt.current - foldTransitionDuration.current) / 0.45, 0, 1);
         foldPointer.current.lerp(state.pointer, 1 - Math.exp(-4.2 * delta));
-        desiredPosition.x += foldPointer.current.x * 0.45 * pointerWeight;
-        desiredPosition.y += foldPointer.current.y * 0.25 * pointerWeight;
-        desiredLookAt.x += foldPointer.current.x * 0.11 * pointerWeight;
-        desiredLookAt.y += foldPointer.current.y * 0.07 * pointerWeight;
+        desiredPosition.addScaledVector(ACT_FOUR_STAGE_BASIS.right, foldPointer.current.x * 0.45 * pointerWeight);
+        desiredPosition.addScaledVector(ACT_FOUR_STAGE_BASIS.up, foldPointer.current.y * 0.25 * pointerWeight);
         foldLookObject.current.position.copy(desiredPosition);
         foldLookObject.current.lookAt(desiredLookAt);
         foldQuaternion.current.copy(foldLookObject.current.quaternion);

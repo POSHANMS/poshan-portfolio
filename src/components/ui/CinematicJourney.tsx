@@ -614,7 +614,7 @@ function ProjectsChapter({
       <>
       {phase === "act4_vault" && (
         <div className="act-four-time-slice-layer" aria-label="Act IV project dossier">
-          <section className={`act-four-time-slice-dossier ${copyPhase === "folding" ? "is-folding" : copyPhase === "arriving" ? "is-arriving" : ""}`} aria-label={`${String(displayProjectIndex + 1).padStart(2, "0")} of ${String(PROJECTS.length).padStart(2, "0")}: ${project.name}`} aria-live="polite" aria-atomic="true" style={{ "--act-four-accent": accent } as React.CSSProperties}>
+          <section className={`act-four-time-slice-dossier ${copyPhase === "folding" ? "is-folding" : copyPhase === "arriving" ? "is-arriving" : ""}`} data-surface="obsidian-monolith" aria-label={`${String(displayProjectIndex + 1).padStart(2, "0")} of ${String(PROJECTS.length).padStart(2, "0")}: ${project.name}`} aria-live="polite" aria-atomic="true" style={{ "--act-four-accent": accent } as React.CSSProperties}>
             <header className="act-four-time-slice-topline">
               <div className="act-four-time-slice-index"><span>{String(displayProjectIndex + 1).padStart(2, "0")} / {String(PROJECTS.length).padStart(2, "0")}</span><i aria-hidden="true">—</i><span className="act-four-time-slice-category">{project.subtitle}</span></div>
               <TimeSliceProjectMark index={displayProjectIndex} />
