@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { ActFourPhase } from "@/types/actFour";
@@ -461,6 +461,11 @@ const SEA_FRAGMENT_SHADER = `
     return (1.0 - smoothstep(4.15, 4.6, r)) * smoothstep(0.25, 0.9, r);
   }
 
+  vec3 safeNormalize(vec3 value, vec3 fallbackValue) {
+    float magnitudeSquared = dot(value, value);
+    return magnitudeSquared > 1e-10 ? value * inversesqrt(magnitudeSquared) : fallbackValue;
+  }
+
   void main() {
     float x = (vUv.x - 0.5) * 180.0;
     float depth = vUv.y * 150.0 - 10.0;
@@ -487,12 +492,13 @@ const SEA_FRAGMENT_SHADER = `
     float pointerEnergy = 0.0;
     vec2 pointerGradient = vec2(0.0);
     for (int i = 0; i < 6; i++) {
-      float age = uTime - uPointerRipples[i].z;
+      float rawAge = uTime - uPointerRipples[i].z;
+      float age = max(rawAge, 0.0);
       float ringR = age * 4.2;
       vec2 rippleDelta = seaXZ - uPointerRipples[i].xy;
       float dist = max(length(rippleDelta), 0.001);
       float crest = exp(-pow((dist - ringR) / 0.16, 2.0)) * exp(-age * 1.25)
-        * step(0.0, age) * (1.0 - smoothstep(1.8, 1.9, age));
+        * step(0.0, rawAge) * (1.0 - smoothstep(1.8, 1.9, age));
       pointerEnergy += crest * uPointerRipples[i].w;
       float crestSlope = -2.0 * (dist - ringR) / (0.16 * 0.16) * crest * uPointerRipples[i].w;
       pointerGradient += rippleDelta / dist * crestSlope;
@@ -500,24 +506,25 @@ const SEA_FRAGMENT_SHADER = `
     dHx += pointerGradient.x * 0.015;
     dHz += pointerGradient.y * 0.015;
 
-    float shockAge = uTime - uShockwaveTime;
+    float rawShockAge = uTime - uShockwaveTime;
+    float shockAge = max(rawShockAge, 0.0);
     float shockR = shockAge * 18.0;
     float shockDist = length(seaXZ - sculptureCenter);
     float shockCrest = exp(-pow((shockDist - shockR) / 0.28, 2.0)) * exp(-shockAge * 1.6)
-      * step(0.0, shockAge) * (1.0 - smoothstep(2.6, 2.9, shockAge));
+      * step(0.0, rawShockAge) * (1.0 - smoothstep(2.6, 2.9, shockAge));
     vec2 shockDirection = shockDist > 0.001 ? (seaXZ - sculptureCenter) / shockDist : vec2(0.0);
     float shockSlope = -2.0 * (shockDist - shockR) / (0.28 * 0.28) * shockCrest;
     dHx += shockDirection.x * shockSlope * 0.02;
     dHz += shockDirection.y * shockSlope * 0.02;
 
-    vec3 N = normalize(uStageUp - dHx * waveAmp * uStageRight - dHz * waveAmp * uStageForward);
+    vec3 N = safeNormalize(uStageUp - dHx * waveAmp * uStageRight - dHz * waveAmp * uStageForward, uStageUp);
     vec3 surface = vWorldPos + uStageUp * (h + ripWave * sculptureEnvelope * 0.025);
-    vec3 V = normalize(surface - uCameraPos);
+    vec3 V = safeNormalize(surface - uCameraPos, uStageForward);
     vec3 viewToCamera = -V;
     vec3 ray = reflect(V, N);
     float rayUp = dot(ray, uStageUp);
-    if (rayUp < 0.001) ray = normalize(ray + uStageUp * (0.001 - rayUp));
-    float fresnel = 0.14 + 0.86 * pow(1.0 - max(dot(viewToCamera, N), 0.0), 3.6);
+    if (rayUp < 0.001) ray = safeNormalize(ray + uStageUp * (0.001 - rayUp), uStageUp);
+    float fresnel = 0.14 + 0.86 * pow(max(1.0 - clamp(dot(viewToCamera, N), 0.0, 1.0), 0.0001), 3.6);
 
     vec3 reflectedSky = vec3(0.003, 0.002, 0.004);
     float reflectedCoverage = 0.0;
@@ -544,7 +551,7 @@ const SEA_FRAGMENT_SHADER = `
     float reflectionMask = 1.0 - smoothstep(68.0, 102.0, depth);
     float reflection = fresnel * reflectedCoverage * reflectionMask;
     vec3 reflectedColor = reflectedSky / max(reflectedCoverage, 0.001);
-    vec3 lightDirection = normalize(uEclipseCenter - surface);
+    vec3 lightDirection = safeNormalize(uEclipseCenter - surface, uStageUp);
     float eclipseFacing = max(dot(N, lightDirection), 0.0);
     float wetGlint = pow(max(dot(reflect(-lightDirection, N), viewToCamera), 0.0), 42.0) * eclipseFacing;
     float pointerGlint = pow(max(pointerEnergy, 0.0), 2.0) * 0.035;
@@ -556,11 +563,16 @@ const SEA_FRAGMENT_SHADER = `
       + vec3(1.0, 0.82, 0.46) * pointerGlint
       + vec3(1.0, 0.74, 0.28) * shockGlint
       + vec3(0.62, 0.035, 0.045) * shockGlint * 0.35;
-    color = min(color, vec3(1.0));
+    if (!(color.r >= 0.0)) color.r = 0.0;
+    if (!(color.g >= 0.0)) color.g = 0.0;
+    if (!(color.b >= 0.0)) color.b = 0.0;
+    color = clamp(color, vec3(0.0), vec3(1.0));
 
     float edgeX = smoothstep(0.0, 0.08, vUv.x) * (1.0 - smoothstep(0.92, 1.0, vUv.x));
     float farHorizonFade = 1.0 - smoothstep(0.78, 1.0, vUv.y);
     float alpha = edgeX * farHorizonFade * uVaultOpacity;
+    if (!(alpha >= 0.0)) alpha = 0.0;
+    alpha = clamp(alpha, 0.0, 1.0);
     gl_FragColor = vec4(color, alpha);
   }
 `;
@@ -643,18 +655,17 @@ function ObsidianMirrorSea({ exitOpacityRef, shockwaveStartedAtRef }: {
   );
   useFrame(({ clock, pointer, camera, raycaster }) => {
     const time = clock.getElapsedTime();
-    if (!materialRef.current) return;
     uniforms.uTime.value = time;
     uniforms.uVaultOpacity.value = exitOpacityRef.current;
     uniforms.uCameraPos.value.copy(camera.position);
     const shockStart = shockwaveStartedAtRef.current;
-    const shockAge = shockStart < 0 ? -10 : performance.now() / 1000 - shockStart;
-    uniforms.uShockwaveTime.value = time - shockAge;
+    uniforms.uShockwaveTime.value = shockStart < 0 ? -10 : shockStart;
     raycaster.setFromCamera(pointer, camera);
     if (!raycaster.ray.intersectPlane(seaPlane, hitPoint)) { hasLastHit.current = false; return; }
     hitOffset.subVectors(hitPoint, SEA_LOCAL_ORIGIN);
     const localX = hitOffset.dot(ACT_FOUR_STAGE_BASIS.right);
     const localDepth = hitOffset.dot(ACT_FOUR_STAGE_BASIS.forward);
+    if (!Number.isFinite(localX) || !Number.isFinite(localDepth)) { hasLastHit.current = false; return; }
     const dx = localX - lastHit.current.x;
     const dy = localDepth - lastHit.current.y;
     if (!hasLastHit.current) {
@@ -694,58 +705,65 @@ function HorizonEclipseCorona({ exitOpacityRef }: { exitOpacityRef: React.RefObj
   );
 }
 
-function CosmicDustVeil({ exitOpacityRef }: { exitOpacityRef: React.RefObject<number> }) {
-  const geometry = useMemo(() => {
-    const positions = new Float32Array(SINGULARITY_DUST_COUNT * 3);
-    const colors = new Float32Array(SINGULARITY_DUST_COUNT * 3);
-    const sizes = new Float32Array(SINGULARITY_DUST_COUNT);
-    const seeds = new Float32Array(SINGULARITY_DUST_COUNT);
-    const opacities = new Float32Array(SINGULARITY_DUST_COUNT);
-    for (let index = 0; index < SINGULARITY_DUST_COUNT; index += 1) {
-      let x = 2.8;
-      let up = -2.8;
-      let depth = 10.0;
-      let domeDistance = 0;
-      for (let attempt = 0; attempt < 40; attempt += 1) {
-        x = 2.8 + seeded(index + attempt * SINGULARITY_DUST_COUNT, 523) * (13.5 - 2.8);
-        up = -2.8 + seeded(index + attempt * SINGULARITY_DUST_COUNT, 527) * (7.5 + 2.8);
-        depth = 10.0 + seeded(index + attempt * SINGULARITY_DUST_COUNT, 521) * 16.0;
-        domeDistance = Math.hypot(x + 0.2, up);
-        if (up < 0.0 || domeDistance >= 11.4) break;
-      }
-      if (up >= 0.0 && domeDistance < 11.4) {
-        x = 13.5;
-        up = 7.5;
-        domeDistance = Math.hypot(x + 0.2, up);
-      }
-      positions.set([
-        ACT_FOUR_STAGE_BASIS.origin.x + ACT_FOUR_STAGE_BASIS.right.x * x + ACT_FOUR_STAGE_BASIS.forward.x * depth + ACT_FOUR_STAGE_BASIS.up.x * (SEA_WATERLINE_OFFSET + up),
-        ACT_FOUR_STAGE_BASIS.origin.y + ACT_FOUR_STAGE_BASIS.right.y * x + ACT_FOUR_STAGE_BASIS.forward.y * depth + ACT_FOUR_STAGE_BASIS.up.y * (SEA_WATERLINE_OFFSET + up),
-        ACT_FOUR_STAGE_BASIS.origin.z + ACT_FOUR_STAGE_BASIS.right.z * x + ACT_FOUR_STAGE_BASIS.forward.z * depth + ACT_FOUR_STAGE_BASIS.up.z * (SEA_WATERLINE_OFFSET + up),
-      ], index * 3);
-      const tint = seeded(index, 529);
-      const color = new THREE.Color(tint > 0.982 ? "#B80A18" : tint > 0.82 ? "#FFF4D2" : "#FFBE45");
-      colors.set([color.r, color.g, color.b], index * 3);
-      sizes[index] = 0.45 + seeded(index, 531);
-      seeds[index] = seeded(index, 533);
-      const edgeFade = Math.min(
-        smoothstep(2.8, 4.0, x),
-        1.0 - smoothstep(12.4, 13.5, x),
-        smoothstep(-2.8, -1.5, up),
-        1.0 - smoothstep(6.2, 7.5, up),
-        smoothstep(10.0, 12.5, depth),
-        1.0 - smoothstep(23.5, 26.0, depth),
-        up >= 0.0 ? smoothstep(11.4, 13.2, domeDistance) : 1.0,
-      );
-      opacities[index] = (0.52 + seeded(index, 535) * 0.38) * edgeFade;
+function createCosmicDustGeometry() {
+  const positions = new Float32Array(SINGULARITY_DUST_COUNT * 3);
+  const colors = new Float32Array(SINGULARITY_DUST_COUNT * 3);
+  const sizes = new Float32Array(SINGULARITY_DUST_COUNT);
+  const seeds = new Float32Array(SINGULARITY_DUST_COUNT);
+  const opacities = new Float32Array(SINGULARITY_DUST_COUNT);
+  for (let index = 0; index < SINGULARITY_DUST_COUNT; index += 1) {
+    let x = 2.8;
+    let up = -2.8;
+    let depth = 10.0;
+    let domeDistance = 0;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      x = 2.8 + seeded(index + attempt * SINGULARITY_DUST_COUNT, 523) * (13.5 - 2.8);
+      up = -2.8 + seeded(index + attempt * SINGULARITY_DUST_COUNT, 527) * (7.5 + 2.8);
+      depth = 10.0 + seeded(index + attempt * SINGULARITY_DUST_COUNT, 521) * 16.0;
+      domeDistance = Math.hypot(x + 0.2, up);
+      if (up < 0.0 || domeDistance >= 11.4) break;
     }
-    const result = new THREE.BufferGeometry();
-    result.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    result.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    result.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
-    result.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
-    result.setAttribute("aOpacity", new THREE.BufferAttribute(opacities, 1));
-    return result;
+    if (up >= 0.0 && domeDistance < 11.4) {
+      x = 13.5;
+      up = 7.5;
+      domeDistance = Math.hypot(x + 0.2, up);
+    }
+    positions.set([
+      ACT_FOUR_STAGE_BASIS.origin.x + ACT_FOUR_STAGE_BASIS.right.x * x + ACT_FOUR_STAGE_BASIS.forward.x * depth + ACT_FOUR_STAGE_BASIS.up.x * (SEA_WATERLINE_OFFSET + up),
+      ACT_FOUR_STAGE_BASIS.origin.y + ACT_FOUR_STAGE_BASIS.right.y * x + ACT_FOUR_STAGE_BASIS.forward.y * depth + ACT_FOUR_STAGE_BASIS.up.y * (SEA_WATERLINE_OFFSET + up),
+      ACT_FOUR_STAGE_BASIS.origin.z + ACT_FOUR_STAGE_BASIS.right.z * x + ACT_FOUR_STAGE_BASIS.forward.z * depth + ACT_FOUR_STAGE_BASIS.up.z * (SEA_WATERLINE_OFFSET + up),
+    ], index * 3);
+    const tint = seeded(index, 529);
+    const color = new THREE.Color(tint > 0.982 ? "#B80A18" : tint > 0.82 ? "#FFF4D2" : "#FFBE45");
+    colors.set([color.r, color.g, color.b], index * 3);
+    sizes[index] = 0.45 + seeded(index, 531);
+    seeds[index] = seeded(index, 533);
+    const edgeFade = Math.min(
+      smoothstep(2.8, 4.0, x),
+      1.0 - smoothstep(12.4, 13.5, x),
+      smoothstep(-2.8, -1.5, up),
+      1.0 - smoothstep(6.2, 7.5, up),
+      smoothstep(10.0, 12.5, depth),
+      1.0 - smoothstep(23.5, 26.0, depth),
+      up >= 0.0 ? smoothstep(11.4, 13.2, domeDistance) : 1.0,
+    );
+    opacities[index] = (0.52 + seeded(index, 535) * 0.38) * edgeFade;
+  }
+  const result = new THREE.BufferGeometry();
+  result.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  result.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  result.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+  result.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
+  result.setAttribute("aOpacity", new THREE.BufferAttribute(opacities, 1));
+  return result;
+}
+
+function CosmicDustVeil({ exitOpacityRef }: { exitOpacityRef: React.RefObject<number> }) {
+  const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
+  useEffect(() => {
+    const nextGeometry = createCosmicDustGeometry();
+    setGeometry(nextGeometry);
+    return () => nextGeometry.dispose();
   }, []);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const { gl } = useThree();
@@ -754,12 +772,12 @@ function CosmicDustVeil({ exitOpacityRef }: { exitOpacityRef: React.RefObject<nu
     uPixelRatio: { value: Math.min(gl.getPixelRatio(), 1.5) },
     uVaultOpacity: { value: 1 },
   }), [gl]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
   useFrame(({ clock }) => {
     uniforms.uTime.value = clock.getElapsedTime();
     uniforms.uPixelRatio.value = Math.min(gl.getPixelRatio(), 1.5);
     uniforms.uVaultOpacity.value = exitOpacityRef.current;
   });
+  if (!geometry) return null;
   return (
     <points geometry={geometry} frustumCulled={false} renderOrder={3}>
       <shaderMaterial ref={materialRef} uniforms={uniforms} vertexColors transparent depthTest depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} vertexShader={DUST_VERTEX_SHADER} fragmentShader={DUST_FRAGMENT_SHADER} />
@@ -791,10 +809,11 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
   const vaultLights = useRef<(THREE.PointLight | THREE.AmbientLight)[]>([]);
   const previousProjectIndex = useRef(projectIndex);
   const shockwaveStartedAtRef = useRef(-1);
+  const seaClockTimeRef = useRef(0);
   useEffect(() => {
     if (previousProjectIndex.current === projectIndex) return;
     previousProjectIndex.current = projectIndex;
-    shockwaveStartedAtRef.current = performance.now() / 1000;
+    shockwaveStartedAtRef.current = seaClockTimeRef.current;
   }, [projectIndex]);
   useEffect(() => { phaseStartedAt.current = performance.now(); previousPhase.current = phase; }, [phase]);
   useEffect(() => {
@@ -813,7 +832,8 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
     vaultLights.current = lights;
     return () => { vaultMaterials.current = []; vaultLights.current = []; };
   }, []);
-  useFrame(() => {
+  useFrame(({ clock }) => {
+    seaClockTimeRef.current = clock.getElapsedTime();
     if (previousPhase.current !== phase) { previousPhase.current = phase; phaseStartedAt.current = performance.now(); }
     const age = (performance.now() - phaseStartedAt.current) / 1000;
     const progress = age / WARP_IN_DURATION_SECONDS;
