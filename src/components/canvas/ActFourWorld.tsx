@@ -348,23 +348,23 @@ const HORIZON_ECLIPSE_GLSL = `
     float innerGrad = pow(smoothstep(0.42, 0.992, r), 2.1) * (0.38 + 0.62 * heightWeight);
     float edgeCrimson = pow(smoothstep(0.84, 0.996, r), 2.6);
     vec3 domeCol = vec3(0.004, 0.000, 0.004)
-      + vec3(0.36, 0.008, 0.002) * innerGrad
-      + vec3(0.56, 0.035, 0.006) * edgeCrimson;
+      + vec3(0.07, 0.0015, 0.0003) * innerGrad
+      + vec3(0.12, 0.006, 0.001) * edgeCrimson;
     float domeMask = 1.0 - smoothstep(0.993, 1.005, r);
 
     float dOut = max(0.0, r - 1.0);
     float crown = pow(max(0.0, sin(clamp(ang, 0.0, 3.14159265))), 1.15);
     float plasma = 0.95 + 0.05 * sin(ang * 5.0 - time * 0.45) * cos(ang * 3.0 + time * 0.28);
-    float lipWidth = mix(0.028, 0.056, crown);
+    float lipWidth = mix(0.016, 0.030, crown);
     float lip = exp(-pow(dOut / lipWidth, 2.0));
-    vec3 lipCol = vec3(1.00, 0.96, 0.80) * lip * 1.08;
+    vec3 lipCol = vec3(1.00, 0.78, 0.42) * lip * 0.90;
 
-    float orangeRate = mix(13.5, 7.6, crown);
+    float orangeRate = mix(10.5, 6.2, crown);
     float orangeBand = exp(-dOut * orangeRate) * plasma;
-    vec3 orangeCol = mix(vec3(0.95, 0.36, 0.02), vec3(1.00, 0.62, 0.08), exp(-dOut * 14.0))
+    vec3 orangeCol = mix(vec3(0.95, 0.27, 0.01), vec3(1.00, 0.50, 0.04), exp(-dOut * 14.0))
       * orangeBand * 0.96;
 
-    float blendRate = mix(6.8, 3.9, crown);
+    float blendRate = mix(8.0, 5.4, crown);
     float outerBlend = exp(-dOut * blendRate) * plasma;
     vec3 blendCol = vec3(0.46, 0.095, 0.010) * outerBlend * 0.62;
     float flankGlaze = exp(-max(0.0, ly) * 0.65)
@@ -375,7 +375,12 @@ const HORIZON_ECLIPSE_GLSL = `
     float maxOuterR = mix(1.48, 1.72, crown);
     float skyCut = 1.0 - smoothstep(1.04, maxOuterR, r);
     vec3 coronaCol = (lipCol + orangeCol + blendCol + glazeCol) * skyCut;
-    coronaCol = coronaCol / (vec3(1.0) + coronaCol * 1.25);
+    coronaCol = coronaCol / (vec3(1.0) + coronaCol * 1.25) * vec3(0.36, 0.33, 0.20);
+    float exteriorCrimson = exp(-pow((dOut - 0.035) / 0.030, 2.0))
+      * smoothstep(0.0, 0.010, dOut);
+    coronaCol += vec3(0.58, 0.018, 0.008) * exteriorCrimson * skyCut * 0.55;
+    float coreLine = exp(-pow(dOut / (lipWidth * 0.32), 2.0));
+    coronaCol += vec3(1.25, 0.98, 0.58) * coreLine * skyCut;
     float coronaAlpha = clamp((lip + orangeBand * 0.88 + outerBlend * 0.55 + flankGlaze * 0.35)
       * skyCut, 0.0, 1.0);
     float aboveWater = step(0.0, ly) * smoothstep(-0.015, 0.025, ly);
