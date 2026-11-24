@@ -67,20 +67,19 @@ function WarpStreamParticles({ phase, warpCharge }: { phase: ActFourPhase; warpC
     const tailSpan = 0.012 + charge * 0.035;
     const travelSpeed = 0.08 + charge * 1.12;
     const motionTime = time;
-    particles.forEach((particle, index) => {
+    for (let index = 0; index < particles.length; index += 1) {
+      const particle = particles[index];
       const travel = (particle.phaseOffset + motionTime * travelSpeed * particle.speed * 0.16) % 1;
-      const pathPoint = (depth: number, radial: number) => {
-        const halfHeight = halfHeightAt(depth);
-        const halfWidth = halfHeight * aspect;
-        const angle = particle.angle + motionTime * 0.11 * particle.speed + Math.sin(motionTime * 0.8 + particle.phaseOffset * 6.28) * particle.curve;
-        return new THREE.Vector3(Math.cos(angle) * halfWidth * radial, Math.sin(angle) * halfHeight * radial, -depth);
-      };
       const depth = THREE.MathUtils.lerp(72, 3, travel);
-      const head = pathPoint(depth, particle.radius);
-      const tail = pathPoint(depth, Math.max(0.555, particle.radius - tailSpan));
-      position.setXYZ(index * 2, tail.x, tail.y, tail.z);
-      position.setXYZ(index * 2 + 1, head.x, head.y, head.z);
-    });
+      const halfHeight = halfHeightAt(depth);
+      const halfWidth = halfHeight * aspect;
+      const angle = particle.angle + motionTime * 0.11 * particle.speed + Math.sin(motionTime * 0.8 + particle.phaseOffset * 6.28) * particle.curve;
+      const cosAngle = Math.cos(angle);
+      const sinAngle = Math.sin(angle);
+      const tailRadius = Math.max(0.555, particle.radius - tailSpan);
+      position.setXYZ(index * 2, cosAngle * halfWidth * tailRadius, sinAngle * halfHeight * tailRadius, -depth);
+      position.setXYZ(index * 2 + 1, cosAngle * halfWidth * particle.radius, sinAngle * halfHeight * particle.radius, -depth);
+    }
     position.needsUpdate = true;
     groupRef.current.position.copy(camera.position);
     groupRef.current.quaternion.copy(camera.quaternion);
@@ -222,13 +221,14 @@ function WarpNeedles({ phase }: { phase: ActFourPhase }) {
     const dissolve = smoothstep(0.74, 0.79, progress);
     const reveal = smoothstep(0.24, 0.29, progress);
     material.current.uniforms.uOpacity.value = reveal * (1 - dissolve);
-    layout.forEach((needle, index) => {
+    for (let index = 0; index < layout.length; index += 1) {
+      const needle = layout[index];
       dummy.position.copy(needle.position);
       dummy.quaternion.copy(needle.quaternion);
       dummy.scale.set(1, 1, needle.length);
       dummy.updateMatrix();
       instances.current?.setMatrixAt(index, dummy.matrix);
-    });
+    }
     instances.current.instanceMatrix.needsUpdate = true;
   });
   return (
@@ -267,9 +267,10 @@ function BreachFlash({ phase }: { phase: ActFourPhase }) {
 
 function FlashInFrontOfCamera({ material }: { material: React.RefObject<THREE.ShaderMaterial | null> }) {
   const mesh = useRef<THREE.Mesh>(null);
+  const cameraDirection = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ camera }) => {
     if (!mesh.current) return;
-    mesh.current.position.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(2.4));
+    mesh.current.position.copy(camera.position).addScaledVector(camera.getWorldDirection(cameraDirection), 2.4);
     mesh.current.quaternion.copy(camera.quaternion);
   });
   return <mesh ref={mesh} frustumCulled={false} renderOrder={30}><planeGeometry args={[8, 5]} /><shaderMaterial ref={material} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }} transparent depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
@@ -291,16 +292,235 @@ const SEA_ORIENTATION = new THREE.Quaternion().setFromRotationMatrix(new THREE.M
 const CORONA_CENTER = ACT_FOUR_STAGE_BASIS.origin.clone()
   .addScaledVector(ACT_FOUR_STAGE_BASIS.right, -0.2)
   .addScaledVector(ACT_FOUR_STAGE_BASIS.forward, 54)
-  .addScaledVector(ACT_FOUR_STAGE_BASIS.up, -4.3);
+  .addScaledVector(ACT_FOUR_STAGE_BASIS.up, -4.2);
 const CORONA_ORIENTATION = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(
   ACT_FOUR_STAGE_BASIS.right, ACT_FOUR_STAGE_BASIS.up, ACT_FOUR_STAGE_BASIS.forward.clone().negate(),
 ));
-const SEA_VERTEX_SHADER = "varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}";
-const SEA_FRAGMENT_SHADER = "uniform float uTime;uniform float uExitOpacity;uniform float uShockwaveTime;uniform vec4 uPointerRipples[6];varying vec2 vUv;void main(){float x=(vUv.x-0.5)*180.0;float depth=vUv.y*150.0-10.0;float farBlend=smoothstep(8.0,118.0,depth);float amplitude=mix(0.19,0.025,farBlend);float a=x*0.075+depth*0.38+uTime*0.24;float b=x*-0.19+depth*0.62-uTime*0.31;float c=x*0.35+depth*0.16+uTime*0.18;float d=x*0.58+depth*1.05-uTime*0.22;float organic=x*0.038+sin(depth*0.031+uTime*0.11)*0.48;float h=amplitude*(0.43*sin(a)+0.27*sin(b)+0.17*sin(c)+0.08*sin(d)+0.05*sin(organic));float dhx=amplitude*(0.43*0.075*cos(a)-0.27*0.19*cos(b)+0.17*0.35*cos(c)+0.08*0.58*cos(d)+0.05*0.038*cos(organic));float dhz=amplitude*(0.43*0.38*cos(a)+0.27*0.62*cos(b)+0.17*0.16*cos(c)+0.08*1.05*cos(d)+0.05*0.48*0.031*cos(depth*0.031+uTime*0.11));vec3 normal=normalize(vec3(-dhx,1.0,-dhz));vec3 surface=vec3(x,-4.2+h,depth);vec3 viewDir=normalize(-surface);vec3 coronaPoint=vec3(-0.2,3.25,54.0);vec3 lightDir=normalize(coronaPoint-surface);vec3 reflected=reflect(-viewDir,normal);float analyticSpec=pow(max(dot(reflected,lightDir),0.0),30.0);float reflectionT=clamp((54.0-depth)/64.0,0.0,1.0);float reflectionWidth=mix(0.52,3.35,reflectionT);float reflectionCenter=-0.2+sin(depth*0.14-uTime*0.31)*0.13+dhx*0.8;float reflectionColumn=exp(-pow((x-reflectionCenter)/reflectionWidth,2.0));float bandPhase=depth*1.62+sin(x*0.15+uTime*0.38)*0.42-uTime*1.08+h*2.2;float liquidBands=pow(max(0.0,0.5+0.5*sin(bandPhase)),13.0);float reflection=reflectionColumn*(0.16+0.84*liquidBands)*(0.45+0.55*reflectionT);float sculptureRadius=length(vec2(x-5.2,depth-14.5));float sculptureWave=0.5+0.5*sin(sculptureRadius*3.4-uTime*0.62);float sculptureRings=pow(sculptureWave,16.0)*exp(-sculptureRadius*0.115);float sculptureCaustic=exp(-pow(sculptureRadius/5.8,2.0))*(0.5+0.5*sin(sculptureRadius*1.3-uTime*0.24));float pointerEnergy=0.0;for(int i=0;i<6;i++){float age=uTime-uPointerRipples[i].z;float radius=max(age,0.0)*4.2;float distanceToRipple=length(vec2(x-uPointerRipples[i].x,depth-uPointerRipples[i].y));float ring=exp(-pow((distanceToRipple-radius)/0.38,2.0));float alive=(1.0-smoothstep(1.7,2.2,age))*step(0.0,age);pointerEnergy+=ring*alive*uPointerRipples[i].w;}float shockAge=uShockwaveTime;float shockRadius=max(shockAge,0.0)*72.0;float shockDistance=length(vec2(x-5.2,depth-14.5));float shockRing=exp(-pow((shockDistance-shockRadius)/0.82,2.0))*(1.0-smoothstep(0.88,1.12,shockAge))*step(0.0,shockAge);float leftCalm=smoothstep(-12.0,-3.0,x);float goldEnergy=(reflection*(0.22+liquidBands*0.78)+analyticSpec*0.18+sculptureRings*0.20+sculptureCaustic*0.10+pointerEnergy*0.14+shockRing*0.42)*mix(0.10,1.0,leftCalm);float rubyEnergy=(reflection*liquidBands*0.11+shockRing*0.12)*mix(0.05,1.0,leftCalm);vec3 color=vec3(0.012,0.008,0.020)+vec3(1.0,0.745,0.271)*goldEnergy+vec3(0.878,0.525,0.102)*(sculptureRings*0.10+sculptureCaustic*0.07)+vec3(0.620,0.031,0.086)*rubyEnergy+vec3(1.0,0.957,0.824)*(reflection*liquidBands*0.24+analyticSpec*0.12+pointerEnergy*0.08+shockRing*0.16);color=min(color,vec3(1.0));float edgeX=smoothstep(0.0,0.12,vUv.x)*(1.0-smoothstep(0.88,1.0,vUv.x));float edgeNear=smoothstep(0.0,0.07,vUv.y);float edgeFar=1.0-smoothstep(0.78,1.0,vUv.y);float alpha=edgeX*edgeNear*edgeFar*uExitOpacity;gl_FragColor=vec4(color,alpha);}";
-const CORONA_VERTEX_SHADER = "varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}";
-const CORONA_FRAGMENT_SHADER = "uniform float uTime;uniform float uExitOpacity;varying vec2 vUv;void main(){vec2 p=(vUv-0.5)*vec2(52.0,34.0);float dist=length(p);float radius=7.6;float waterline=0.10;float surfaceMask=smoothstep(waterline-0.025,waterline+0.025,p.y);float core=1.0-smoothstep(radius-0.018,radius+0.024,dist);float insideLimb=smoothstep(radius*0.72,radius*0.94,dist)*core;float outside=max(dist-radius,0.0);float angle=atan(p.y,p.x);float flowA=0.5+0.5*sin(angle*3.2+uTime*0.19+sin(angle*5.1-uTime*0.075)*0.24);float flowB=0.5+0.5*sin(angle*7.0-uTime*0.11+sin(dist*0.72+uTime*0.08)*0.18);float plasma=0.84+0.10*flowA+0.06*flowB;float crown=0.20+0.80*smoothstep(waterline,4.7,p.y);float edgeTaper=smoothstep(waterline-0.01,1.75,p.y);float envelope=exp(-outside*0.49)*(1.0-smoothstep(8.2,15.0,outside));float lip=exp(-pow(outside/0.105,2.0))*crown*edgeTaper;float goldCorona=envelope*plasma*crown*edgeTaper;float amberCorona=exp(-outside*0.24)*(1.0-smoothstep(5.0,13.0,outside))*crown*edgeTaper;vec3 abyss=vec3(0.0039,0.0,0.0078);vec3 innerRed=mix(vec3(0.478,0.024,0.063),vec3(0.769,0.039,0.110),smoothstep(radius*0.74,radius,dist));vec3 gold=vec3(1.0,0.745,0.271);vec3 amber=vec3(0.878,0.525,0.102);vec3 champagne=vec3(1.0,0.957,0.824);vec3 color=mix(abyss,innerRed,insideLimb*0.72);color+=gold*goldCorona*0.68+amber*amberCorona*0.19+champagne*lip*0.92;float alpha=clamp((core+goldCorona*0.72+amberCorona*0.18+lip*0.42)*surfaceMask,0.0,1.0)*uExitOpacity;color=min(color,vec3(1.0));gl_FragColor=vec4(color,alpha);}";
-const DUST_VERTEX_SHADER = "uniform float uTime;uniform float uPixelRatio;attribute float aSize;attribute float aSeed;attribute float aOpacity;varying vec3 vColor;varying float vOpacity;void main(){vec3 p=position;p.x+=sin(uTime*0.12+aSeed*6.28318)*0.075;p.y+=cos(uTime*0.095+aSeed*9.1)*0.10;p.z+=sin(uTime*0.11+aSeed*4.7)*0.11;vec4 mvPosition=modelViewMatrix*vec4(p,1.0);gl_Position=projectionMatrix*mvPosition;gl_PointSize=clamp(aSize*uPixelRatio*(46.0/max(2.5,-mvPosition.z)),1.0*uPixelRatio,2.4*uPixelRatio);vColor=color;vOpacity=aOpacity;}";
-const DUST_FRAGMENT_SHADER = "uniform float uExitOpacity;varying vec3 vColor;varying float vOpacity;void main(){float radius=length(gl_PointCoord-0.5);float pin=1.0-smoothstep(0.16,0.5,radius);gl_FragColor=vec4(vColor,pin*vOpacity*uExitOpacity);}";
+const SEA_VERTEX_SHADER = `
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+  void main() {
+    vUv = uv;
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPos = worldPosition.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+  }
+`;
+const SEA_FRAGMENT_SHADER = `
+  uniform float uTime;
+  uniform float uExitOpacity;
+  uniform float uShockwaveTime;
+  uniform vec3 uCameraPos;
+  uniform vec3 uStageRight;
+  uniform vec3 uStageUp;
+  uniform vec3 uStageForward;
+  uniform vec3 uEclipseCenter;
+  uniform vec4 uPointerRipples[6];
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+
+  float waveHeight(vec2 pos, float t) {
+    vec2 warpedPos = pos + 0.35 * vec2(
+      sin(pos.y * 0.45 + t * 0.4),
+      cos(pos.x * 0.35 - t * 0.3)
+    );
+    vec2 q = vec2(warpedPos.x * 0.32, warpedPos.y * 1.15);
+    return 0.27 * sin(q.y * 0.72 + q.x * 0.10 + t * 0.55)
+      + 0.19 * sin(q.y * 1.11 - q.x * 0.17 - t * 0.39)
+      + 0.15 * sin(q.y * 0.43 + q.x * 0.24 + t * 0.27)
+      + 0.12 * sin(q.y * 1.63 + q.x * 0.09 - t * 0.21)
+      + 0.10 * sin(q.y * 0.88 - q.x * 0.31 + t * 0.18)
+      + 0.09 * sin(q.y * 2.07 + q.x * 0.27 - t * 0.31)
+      + 0.08 * sin(q.y * 0.57 - q.x * 0.08 - t * 0.16);
+  }
+
+  float rightPoolMask(float r) {
+    return (1.0 - smoothstep(1.8, 5.8, r)) * smoothstep(0.35, 1.1, r);
+  }
+
+  void main() {
+    float x = (vUv.x - 0.5) * 180.0;
+    float depth = vUv.y * 150.0 - 10.0;
+    vec2 seaXZ = vec2(x, depth);
+    float amp = mix(0.22, 0.06, smoothstep(8.0, 70.0, depth));
+    float epsilon = 0.08;
+    float h = waveHeight(seaXZ, uTime) * amp;
+    float dHx = (waveHeight(seaXZ + vec2(epsilon, 0.0), uTime)
+      - waveHeight(seaXZ - vec2(epsilon, 0.0), uTime)) / (2.0 * epsilon);
+    float dHz = (waveHeight(seaXZ + vec2(0.0, epsilon), uTime)
+      - waveHeight(seaXZ - vec2(0.0, epsilon), uTime)) / (2.0 * epsilon);
+    vec3 N = normalize(-dHx * amp * uStageRight + uStageUp - dHz * amp * uStageForward);
+    vec3 surface = vWorldPos + uStageUp * h;
+    float sculptureR = length(seaXZ - vec2(5.2, 14.5));
+    float zoneMask = rightPoolMask(sculptureR);
+    float sculpturePhase = sculptureR * 4.6 - uTime * 1.5;
+    float ringBase = 0.5 + 0.5 * cos(sculpturePhase);
+    float ringWave = pow(ringBase, 14.0) * zoneMask;
+    float ringSlope = -32.2 * sin(sculpturePhase) * pow(max(ringBase, 0.001), 13.0) * zoneMask;
+    vec2 sculptureDir = sculptureR > 0.001 ? (seaXZ - vec2(5.2, 14.5)) / sculptureR : vec2(0.0);
+    N = normalize(N - ringSlope * 0.012 * (sculptureDir.x * uStageRight + sculptureDir.y * uStageForward));
+
+    float pointerEnergy = 0.0;
+    vec2 pointerGradient = vec2(0.0);
+    for (int i = 0; i < 6; i++) {
+      float age = uTime - uPointerRipples[i].z;
+      float ringR = age * 4.2;
+      vec2 rippleDelta = seaXZ - uPointerRipples[i].xy;
+      float dist = max(length(rippleDelta), 0.001);
+      float crest = exp(-pow((dist - ringR) / 0.55, 2.0)) * exp(-age * 1.25)
+        * step(0.0, age) * (1.0 - smoothstep(1.8, 1.9, age));
+      pointerEnergy += crest * uPointerRipples[i].w;
+      float crestSlope = -2.0 * (dist - ringR) / (0.55 * 0.55) * crest * uPointerRipples[i].w;
+      pointerGradient += rippleDelta / dist * crestSlope;
+    }
+    N = normalize(N - 0.015 * (pointerGradient.x * uStageRight + pointerGradient.y * uStageForward));
+
+    float shockAge = uTime - uShockwaveTime;
+    float shockR = shockAge * 18.0;
+    float shockDist = length(seaXZ - vec2(5.2, 14.5));
+    float shockCrest = exp(-pow((shockDist - shockR) / 1.4, 2.0)) * exp(-shockAge * 1.6)
+      * step(0.0, shockAge) * (1.0 - smoothstep(2.6, 2.9, shockAge));
+    vec2 shockDirection = shockDist > 0.001 ? (seaXZ - vec2(5.2, 14.5)) / shockDist : vec2(0.0);
+    float shockSlope = -2.0 * (shockDist - shockR) / (1.4 * 1.4) * shockCrest;
+    N = normalize(N - 0.02 * shockSlope * (shockDirection.x * uStageRight + shockDirection.y * uStageForward));
+
+    vec3 V = normalize(uCameraPos - surface);
+    vec3 Rdir = reflect(-V, N);
+    float fresnel = 0.18 + 0.82 * pow(1.0 - max(dot(N, V), 0.0), 3.6);
+
+    vec3 reflectionColor = vec3(0.004, 0.002, 0.008);
+    float reflectionStrength = 0.0;
+    float planeDenom = dot(Rdir, uStageForward);
+    if (abs(planeDenom) > 0.0001) {
+      float hitT = dot(uEclipseCenter - surface, uStageForward) / planeDenom;
+      if (hitT > 0.0) {
+        vec3 hit = surface + Rdir * hitT;
+        vec3 hitLocal = hit - uEclipseCenter;
+        float reflX = dot(hitLocal, uStageRight);
+        float reflY = abs(dot(hitLocal, uStageUp));
+        float dRefl = length(vec2(reflX, reflY));
+        float radius = 7.6;
+        if (dRefl < radius) {
+          float innerEdge = smoothstep(radius * 0.78, radius, dRefl);
+          reflectionColor = vec3(0.18, 0.02, 0.01) * innerEdge;
+          reflectionStrength = innerEdge * 0.20;
+        } else {
+          float dr = dRefl - radius;
+          float angle = atan(reflY, reflX);
+          float plasma = 0.92 + 0.05 * sin(angle * 2.7 + uTime * 0.25)
+            + 0.03 * sin(angle * 5.3 - uTime * 0.17 + sin(angle * 3.1) * 0.2);
+          float lip = exp(-dr * 4.8);
+          float mid = exp(-dr * 1.15);
+          float halo = exp(-dr * 0.34);
+          float crown = 0.72 + 0.28 * smoothstep(0.0, 0.85, reflY / max(dRefl, 0.001));
+          vec3 goldCorona = (vec3(0.58, 0.16, 0.02) * halo * 0.48
+            + vec3(1.0, 0.64, 0.14) * mid * 0.88
+            + vec3(1.0, 0.95, 0.80) * lip * 1.05) * crown * plasma;
+          float wave = waveHeight(seaXZ, uTime);
+          float bandPhase = depth * 1.62 + sin(x * 0.15 + uTime * 0.38) * 0.42
+            - uTime * 1.08 + wave * 3.2 + h * 2.2;
+          float liquidBands = pow(max(0.0, 0.5 + 0.5 * sin(bandPhase)), 13.0);
+          reflectionColor = goldCorona;
+          reflectionStrength = liquidBands;
+          float inPlane = (1.0 - smoothstep(25.5, 27.0, abs(reflX)))
+            * (1.0 - smoothstep(15.0, 17.0, reflY));
+          reflectionStrength *= inPlane;
+        }
+      }
+    }
+
+    float reflection = reflectionStrength * fresnel;
+    float specularWave = pow(ringBase, 14.0);
+    float sculptureCaustic = exp(-sculptureR * sculptureR * 0.25) * specularWave * zoneMask * 0.22;
+    float goldRipple = ringWave * 0.42 + sculptureCaustic;
+    vec3 color = vec3(0.004, 0.002, 0.008)
+      + reflectionColor * reflection
+      + vec3(1.0, 0.74, 0.28) * goldRipple
+      + vec3(1.0, 0.74, 0.28) * pointerEnergy * 0.42
+      + vec3(1.0, 0.74, 0.28) * shockCrest * 0.46
+      + vec3(0.62, 0.035, 0.045) * shockCrest * 0.16;
+    color = min(color, vec3(1.0));
+
+    float edgeX = smoothstep(0.0, 0.08, vUv.x) * (1.0 - smoothstep(0.92, 1.0, vUv.x));
+    float farHorizonFade = 1.0 - smoothstep(0.78, 1.0, vUv.y);
+    float alpha = edgeX * farHorizonFade * uExitOpacity;
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+const CORONA_VERTEX_SHADER = `
+  varying vec3 vLocalPos;
+  void main() {
+    vLocalPos = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const CORONA_FRAGMENT_SHADER = `
+  uniform float uTime;
+  uniform float uExitOpacity;
+  varying vec3 vLocalPos;
+  void main() {
+    vec2 p = vLocalPos.xy;
+    float d = length(p);
+    float R = 7.6;
+    float aboveHorizon = smoothstep(-0.04, 0.10, p.y);
+    float insideMask = 1.0 - smoothstep(R - 0.14, R + 0.05, d);
+    float limb = pow(clamp(d / R, 0.0, 1.0), 4.2);
+    vec3 insideCol = mix(vec3(0.004, 0.002, 0.006), vec3(0.58, 0.09, 0.02), limb);
+    float dr = max(0.0, d - R);
+    float outsideMask = smoothstep(R - 0.12, R + 0.06, d);
+    float angle = atan(p.y, p.x);
+    float noiseA = sin(angle * 3.0 + uTime * 0.25 + sin(angle * 5.1 - uTime * 0.08) * 0.22);
+    float noiseB = sin(angle * 7.0 - uTime * 0.17 + sin(angle * 2.3 + uTime * 0.06) * 0.16);
+    float plasma = mix(0.90, 1.10, 0.5 + 0.25 * noiseA + 0.25 * noiseB);
+    float lip = exp(-dr * 4.8) * outsideMask;
+    float mid = exp(-dr * 1.15) * outsideMask * plasma;
+    float halo = exp(-dr * 0.34) * outsideMask * plasma;
+    float crown = 0.72 + 0.28 * smoothstep(0.0, 0.85, p.y / max(d, 0.001));
+    vec3 coronaCol = (vec3(0.58, 0.16, 0.02) * halo * 0.48
+      + vec3(1.0, 0.64, 0.14) * mid * 0.88
+      + vec3(1.0, 0.95, 0.80) * lip * 1.05) * crown;
+    coronaCol = min(coronaCol, vec3(1.05));
+    vec3 finalCol = mix(coronaCol, insideCol, insideMask);
+    float outerAlpha = clamp((halo * 0.45 + mid * 0.85 + lip) * crown, 0.0, 1.0);
+    float edgeFade = (1.0 - smoothstep(19.0, 26.5, abs(p.x)))
+      * (1.0 - smoothstep(12.0, 16.8, p.y))
+      * smoothstep(0.0, 0.06, p.y);
+    float finalAlpha = max(insideMask, outerAlpha * outsideMask) * aboveHorizon * edgeFade * uExitOpacity;
+    gl_FragColor = vec4(finalCol, finalAlpha);
+  }
+`;
+const DUST_VERTEX_SHADER = `
+  uniform float uTime;
+  uniform float uPixelRatio;
+  attribute float aSize;
+  attribute float aSeed;
+  attribute float aOpacity;
+  varying vec3 vColor;
+  varying float vOpacity;
+  void main() {
+    vec3 p = position;
+    p += vec3(
+      sin(uTime * 0.12 + aSeed * 6.28318) * 0.075,
+      sin(uTime * 0.11 + aSeed * 4.7) * 0.11,
+      cos(uTime * 0.095 + aSeed * 9.1) * 0.10
+    );
+    vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+    gl_PointSize = clamp(aSize * uPixelRatio * (36.0 / max(4.0, -mvPosition.z)), 1.4, 3.4);
+    vColor = color;
+    vOpacity = aOpacity;
+  }
+`;
+const DUST_FRAGMENT_SHADER = `
+  uniform float uExitOpacity;
+  varying vec3 vColor;
+  varying float vOpacity;
+  void main() {
+    float radius = length(gl_PointCoord - 0.5);
+    float pin = 1.0 - smoothstep(0.16, 0.5, radius);
+    gl_FragColor = vec4(vColor, pin * vOpacity * uExitOpacity);
+  }
+`;
 const SEA_RIPPLE_COUNT = 6;
 
 function ObsidianMirrorSea({ exitOpacityRef, shockwaveStartedAtRef }: {
@@ -316,6 +536,11 @@ function ObsidianMirrorSea({ exitOpacityRef, shockwaveStartedAtRef }: {
     uTime: { value: 0 },
     uExitOpacity: { value: 1 },
     uShockwaveTime: { value: -10 },
+    uCameraPos: { value: new THREE.Vector3() },
+    uStageRight: { value: ACT_FOUR_STAGE_BASIS.right },
+    uStageUp: { value: ACT_FOUR_STAGE_BASIS.up },
+    uStageForward: { value: ACT_FOUR_STAGE_BASIS.forward },
+    uEclipseCenter: { value: CORONA_CENTER },
     uPointerRipples: { value: Array.from({ length: SEA_RIPPLE_COUNT }, () => new THREE.Vector4(-1000, -1000, -100, 0)) },
   }), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
@@ -329,8 +554,10 @@ function ObsidianMirrorSea({ exitOpacityRef, shockwaveStartedAtRef }: {
     if (!materialRef.current) return;
     uniforms.uTime.value = time;
     uniforms.uExitOpacity.value = exitOpacityRef.current;
+    uniforms.uCameraPos.value.copy(camera.position);
     const shockStart = shockwaveStartedAtRef.current;
-    uniforms.uShockwaveTime.value = shockStart < 0 ? -10 : performance.now() / 1000 - shockStart;
+    const shockAge = shockStart < 0 ? -10 : performance.now() / 1000 - shockStart;
+    uniforms.uShockwaveTime.value = time - shockAge;
     raycaster.setFromCamera(pointer, camera);
     if (!raycaster.ray.intersectPlane(seaPlane, hitPoint)) { hasLastHit.current = false; return; }
     hitOffset.subVectors(hitPoint, SEA_LOCAL_ORIGIN);
@@ -353,7 +580,7 @@ function ObsidianMirrorSea({ exitOpacityRef, shockwaveStartedAtRef }: {
     }
   });
   return (
-    <mesh position={SEA_CENTER} quaternion={SEA_ORIENTATION} scale={[1, SEA_DEPTH_SPAN / SEA_WIDTH, 1]} frustumCulled={false} renderOrder={1}>
+    <mesh position={SEA_CENTER} quaternion={SEA_ORIENTATION} scale={[1, SEA_DEPTH_SPAN / SEA_WIDTH, 1]} frustumCulled={false} renderOrder={2}>
       <planeGeometry args={[SEA_WIDTH, SEA_WIDTH, 1, 1]} />
       <shaderMaterial ref={materialRef} uniforms={uniforms} transparent depthTest depthWrite={false} blending={THREE.NormalBlending} toneMapped={false} vertexShader={SEA_VERTEX_SHADER} fragmentShader={SEA_FRAGMENT_SHADER} />
     </mesh>
@@ -368,8 +595,8 @@ function HorizonEclipseCorona({ exitOpacityRef }: { exitOpacityRef: React.RefObj
     uniforms.uExitOpacity.value = exitOpacityRef.current;
   });
   return (
-    <mesh position={CORONA_CENTER} quaternion={CORONA_ORIENTATION} frustumCulled={false} renderOrder={2}>
-      <planeGeometry args={[52, 34, 1, 1]} />
+    <mesh position={CORONA_CENTER} quaternion={CORONA_ORIENTATION} frustumCulled={false} renderOrder={1}>
+      <planeGeometry args={[54, 34, 1, 1]} />
       <shaderMaterial ref={materialRef} uniforms={uniforms} transparent depthTest depthWrite={false} blending={THREE.NormalBlending} toneMapped={false} vertexShader={CORONA_VERTEX_SHADER} fragmentShader={CORONA_FRAGMENT_SHADER} />
     </mesh>
   );
@@ -387,15 +614,22 @@ function CosmicDustVeil({ exitOpacityRef }: { exitOpacityRef: React.RefObject<nu
       const depth = 12 + seeded(index, 521) * 108;
       const halfHeight = Math.tan(THREE.MathUtils.degToRad(21)) * depth;
       const halfWidth = halfHeight * aspect;
-      const x = halfWidth * (0.45 + seeded(index, 523) * 0.50);
-      const up = Math.max(-0.35, -0.25 * halfHeight) + seeded(index, 527) * halfHeight * 1.05;
-      positions.set([x, depth, up], index * 3);
+      const cluster = index < Math.floor(SINGULARITY_DUST_COUNT * 0.8)
+        ? 0.36 + seeded(index, 523) * 0.42
+        : 0.78 + seeded(index, 523) * 0.20;
+      const x = (cluster * 2 - 1) * halfWidth;
+      const up = SEA_WATERLINE_OFFSET + 0.12 + seeded(index, 527) * halfHeight * 1.02;
+      positions.set([
+        ACT_FOUR_STAGE_BASIS.origin.x + ACT_FOUR_STAGE_BASIS.right.x * x + ACT_FOUR_STAGE_BASIS.forward.x * depth + ACT_FOUR_STAGE_BASIS.up.x * up,
+        ACT_FOUR_STAGE_BASIS.origin.y + ACT_FOUR_STAGE_BASIS.right.y * x + ACT_FOUR_STAGE_BASIS.forward.y * depth + ACT_FOUR_STAGE_BASIS.up.y * up,
+        ACT_FOUR_STAGE_BASIS.origin.z + ACT_FOUR_STAGE_BASIS.right.z * x + ACT_FOUR_STAGE_BASIS.forward.z * depth + ACT_FOUR_STAGE_BASIS.up.z * up,
+      ], index * 3);
       const tint = seeded(index, 529);
       const color = new THREE.Color(tint > 0.965 ? "#C40A1C" : tint > 0.78 ? "#FFF4D2" : "#FFBE45");
       colors.set([color.r, color.g, color.b], index * 3);
       sizes[index] = 0.45 + seeded(index, 531);
       seeds[index] = seeded(index, 533);
-      opacities[index] = 0.34 + seeded(index, 535) * 0.48;
+      opacities[index] = 0.52 + seeded(index, 535) * 0.38;
     }
     const result = new THREE.BufferGeometry();
     result.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -445,6 +679,8 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
   const tunnelLayer = useRef<THREE.Group>(null);
   const vaultLayer = useRef<THREE.Group>(null);
   const vaultOpacityRef = useRef(1);
+  const vaultMaterials = useRef<THREE.Material[]>([]);
+  const vaultLights = useRef<(THREE.PointLight | THREE.AmbientLight)[]>([]);
   const previousProjectIndex = useRef(projectIndex);
   const shockwaveStartedAtRef = useRef(-1);
   useEffect(() => {
@@ -453,6 +689,22 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
     shockwaveStartedAtRef.current = performance.now() / 1000;
   }, [projectIndex]);
   useEffect(() => { phaseStartedAt.current = performance.now(); previousPhase.current = phase; }, [phase]);
+  useEffect(() => {
+    const vault = vaultLayer.current;
+    if (!vault) return;
+    const materials: THREE.Material[] = [];
+    const lights: (THREE.PointLight | THREE.AmbientLight)[] = [];
+    vault.traverse((object) => {
+      if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points) {
+        const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+        for (let index = 0; index < objectMaterials.length; index += 1) materials.push(objectMaterials[index]);
+      }
+      if (object instanceof THREE.PointLight || object instanceof THREE.AmbientLight) lights.push(object);
+    });
+    vaultMaterials.current = materials;
+    vaultLights.current = lights;
+    return () => { vaultMaterials.current = []; vaultLights.current = []; };
+  }, []);
   useFrame(() => {
     if (previousPhase.current !== phase) { previousPhase.current = phase; phaseStartedAt.current = performance.now(); }
     const age = (performance.now() - phaseStartedAt.current) / 1000;
@@ -468,43 +720,40 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
       vault.visible = (phase === "act4_warp_in" && age >= WARP_VAULT_CUTOVER_SECONDS)
         || phase === "act4_vault"
         || (isWarpingOut && exitProgress < WARP_OUT_VAULT_FADE_SECONDS);
-      vault.traverse((object) => {
-        const materials = object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points
-          ? (Array.isArray(object.material) ? object.material : [object.material])
-          : [];
-        materials.forEach((material) => {
-          if (material instanceof THREE.ShaderMaterial && material.uniforms.uExitOpacity) {
-            material.uniforms.uExitOpacity.value = vaultOpacity;
-            return;
-          }
-          const saved = material.userData.actFourExitFade as { opacity: number; transparent: boolean; depthWrite: boolean } | undefined;
-          if (isWarpingOut && vaultOpacity < 1) {
-            if (!saved) {
-              material.userData.actFourExitFade = { opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite };
-              material.transparent = true;
-              material.depthWrite = false;
-              material.needsUpdate = true;
-            }
-            material.opacity = (saved?.opacity ?? material.opacity) * vaultOpacity;
-          } else if (saved) {
-            material.opacity = saved.opacity;
-            material.transparent = saved.transparent;
-            material.depthWrite = saved.depthWrite;
-            delete material.userData.actFourExitFade;
+      for (let index = 0; index < vaultMaterials.current.length; index += 1) {
+        const material = vaultMaterials.current[index];
+        if (material instanceof THREE.ShaderMaterial && material.uniforms.uExitOpacity) {
+          material.uniforms.uExitOpacity.value = vaultOpacity;
+          continue;
+        }
+        const saved = material.userData.actFourExitFade as { opacity: number; transparent: boolean; depthWrite: boolean } | undefined;
+        if (isWarpingOut && vaultOpacity < 1) {
+          if (!saved) {
+            material.userData.actFourExitFade = { opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite };
+            material.transparent = true;
+            material.depthWrite = false;
             material.needsUpdate = true;
           }
-        });
-        if (object instanceof THREE.PointLight || object instanceof THREE.AmbientLight) {
-          const savedIntensity = object.userData.actFourExitFadeIntensity as number | undefined;
-          if (isWarpingOut && vaultOpacity < 1) {
-            if (savedIntensity === undefined) object.userData.actFourExitFadeIntensity = object.intensity;
-            object.intensity = (savedIntensity ?? object.intensity) * vaultOpacity;
-          } else if (savedIntensity !== undefined) {
-            object.intensity = savedIntensity;
-            delete object.userData.actFourExitFadeIntensity;
-          }
+          material.opacity = (saved?.opacity ?? material.opacity) * vaultOpacity;
+        } else if (saved) {
+          material.opacity = saved.opacity;
+          material.transparent = saved.transparent;
+          material.depthWrite = saved.depthWrite;
+          delete material.userData.actFourExitFade;
+          material.needsUpdate = true;
         }
-      });
+      }
+      for (let index = 0; index < vaultLights.current.length; index += 1) {
+        const light = vaultLights.current[index];
+        const savedIntensity = light.userData.actFourExitFadeIntensity as number | undefined;
+        if (isWarpingOut && vaultOpacity < 1) {
+          if (savedIntensity === undefined) light.userData.actFourExitFadeIntensity = light.intensity;
+          light.intensity = (savedIntensity ?? light.intensity) * vaultOpacity;
+        } else if (savedIntensity !== undefined) {
+          light.intensity = savedIntensity;
+          delete light.userData.actFourExitFadeIntensity;
+        }
+      }
     }
   });
   return <group>
