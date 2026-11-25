@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import React, { useEffect, useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { ActFourPhase } from "@/types/actFour";
+import ActFourSculptures from "@/components/canvas/ActFourSculptures";
 import { ACT_FOUR_STAGE_BASIS, ACT_FOUR_WARP_IN_DURATION_MS, WORMHOLE_CURVE, WORMHOLE_PATH_LENGTH, WORMHOLE_TUBE_RADIUS } from "@/animations/scrollCamera";
 import ActFourExterior from "./ActFourExterior";
 
@@ -279,7 +280,6 @@ function FlashInFrontOfCamera({ material }: { material: React.RefObject<THREE.Sh
   /></mesh>;
 }
 
-const SINGULARITY_DUST_COUNT = 700;
 const SEA_WIDTH = 180;
 const SEA_DEPTH_SPAN = 150;
 const SEA_NEAR_DEPTH = -10;
@@ -478,16 +478,22 @@ const SEA_FRAGMENT_SHADER = `
     float dHz = (liquidHeight(seaXZ + vec2(0.0, epsilon), uTime)
       - liquidHeight(seaXZ - vec2(0.0, epsilon), uTime)) / (2.0 * epsilon);
 
-    vec2 sculptureCenter = vec2(6.0, 15.0);
+    vec2 sculptureCenter = vec2(5.4, 14.5);
     vec2 sculptureDelta = seaXZ - sculptureCenter;
     float sculptureR = length(sculptureDelta);
     vec2 sculptureDirection = sculptureR > 0.001 ? sculptureDelta / sculptureR : vec2(0.0);
     float sculptureEnvelope = rightPoolEnvelope(sculptureR);
-    float ripWave = sin(sculptureR * 4.8 - uTime * 1.15);
+    float ripplePhase = sculptureR * 4.8 - uTime * 1.15;
+    float ripplePhaseWidth = max(fwidth(ripplePhase), 0.02);
+    float ripWave = sin(ripplePhase) * exp(-ripplePhaseWidth * 0.28);
     dHx += sculptureDirection.x * ripWave * sculptureEnvelope * 0.24;
     dHz += sculptureDirection.y * ripWave * sculptureEnvelope * 0.24;
     float lightFacing = 0.25 + 0.75 * (1.0 - smoothstep(-0.25, 0.95, sculptureDirection.x));
-    float rippleSpecular = pow(max(0.0, ripWave), 10.0) * sculptureEnvelope * (0.28 + 0.55 * lightFacing);
+    float rippleSharpness = mix(10.0, 7.5, smoothstep(2.0, 4.6, sculptureR));
+    float rippleSpecular = pow(max(0.0, ripWave), rippleSharpness) * sculptureEnvelope * (0.28 + 0.55 * lightFacing);
+    float shimmerNoise = valueNoise2D(seaXZ * 1.4 + vec2(uTime * 0.16, -uTime * 0.12));
+    float sculptureShimmer = exp(-dot(sculptureDelta, sculptureDelta) / 5.8)
+      * (0.5 + 0.5 * sin(uTime * 1.8 + shimmerNoise * 5.0)) * (0.55 + shimmerNoise * 0.45);
 
     float pointerEnergy = 0.0;
     vec2 pointerGradient = vec2(0.0);
@@ -560,6 +566,7 @@ const SEA_FRAGMENT_SHADER = `
       + reflectedColor * reflection
       + vec3(1.0, 0.94, 0.72) * wetGlint * 0.075
       + vec3(1.0, 0.74, 0.28) * rippleSpecular * 0.16
+      + vec3(1.0, 0.69, 0.29) * sculptureShimmer * 0.035
       + vec3(1.0, 0.82, 0.46) * pointerGlint
       + vec3(1.0, 0.74, 0.28) * shockGlint
       + vec3(0.62, 0.035, 0.045) * shockGlint * 0.35;
@@ -591,38 +598,6 @@ const CORONA_FRAGMENT_SHADER = `
   void main() {
     vec4 eclipse = sampleEclipseSky(vLocalPos.xy, uTime);
     gl_FragColor = vec4(eclipse.rgb, eclipse.a);
-  }
-`;
-const DUST_VERTEX_SHADER = `
-  uniform float uTime;
-  uniform float uPixelRatio;
-  attribute float aSize;
-  attribute float aSeed;
-  attribute float aOpacity;
-  varying vec3 vColor;
-  varying float vOpacity;
-  void main() {
-    vec3 p = position;
-    p += vec3(
-      sin(uTime * 0.12 + aSeed * 6.28318) * 0.075,
-      sin(uTime * 0.11 + aSeed * 4.7) * 0.11,
-      cos(uTime * 0.095 + aSeed * 9.1) * 0.10
-    );
-    vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
-    gl_Position = projectionMatrix * mvPosition;
-    gl_PointSize = clamp(aSize * uPixelRatio * (36.0 / max(4.0, -mvPosition.z)), 1.4, 3.4);
-    vColor = color;
-    vOpacity = aOpacity;
-  }
-`;
-const DUST_FRAGMENT_SHADER = `
-  uniform float uVaultOpacity;
-  varying vec3 vColor;
-  varying float vOpacity;
-  void main() {
-    float radius = length(gl_PointCoord - 0.5);
-    float pin = 1.0 - smoothstep(0.16, 0.5, radius);
-    gl_FragColor = vec4(vColor, pin * vOpacity * uVaultOpacity);
   }
 `;
 const SEA_RIPPLE_COUNT = 6;
@@ -705,95 +680,16 @@ function HorizonEclipseCorona({ exitOpacityRef }: { exitOpacityRef: React.RefObj
   );
 }
 
-function createCosmicDustGeometry() {
-  const positions = new Float32Array(SINGULARITY_DUST_COUNT * 3);
-  const colors = new Float32Array(SINGULARITY_DUST_COUNT * 3);
-  const sizes = new Float32Array(SINGULARITY_DUST_COUNT);
-  const seeds = new Float32Array(SINGULARITY_DUST_COUNT);
-  const opacities = new Float32Array(SINGULARITY_DUST_COUNT);
-  for (let index = 0; index < SINGULARITY_DUST_COUNT; index += 1) {
-    let x = 2.8;
-    let up = -2.8;
-    let depth = 10.0;
-    let domeDistance = 0;
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      x = 2.8 + seeded(index + attempt * SINGULARITY_DUST_COUNT, 523) * (13.5 - 2.8);
-      up = -2.8 + seeded(index + attempt * SINGULARITY_DUST_COUNT, 527) * (7.5 + 2.8);
-      depth = 10.0 + seeded(index + attempt * SINGULARITY_DUST_COUNT, 521) * 16.0;
-      domeDistance = Math.hypot(x + 0.2, up);
-      if (up < 0.0 || domeDistance >= 11.4) break;
-    }
-    if (up >= 0.0 && domeDistance < 11.4) {
-      x = 13.5;
-      up = 7.5;
-      domeDistance = Math.hypot(x + 0.2, up);
-    }
-    positions.set([
-      ACT_FOUR_STAGE_BASIS.origin.x + ACT_FOUR_STAGE_BASIS.right.x * x + ACT_FOUR_STAGE_BASIS.forward.x * depth + ACT_FOUR_STAGE_BASIS.up.x * (SEA_WATERLINE_OFFSET + up),
-      ACT_FOUR_STAGE_BASIS.origin.y + ACT_FOUR_STAGE_BASIS.right.y * x + ACT_FOUR_STAGE_BASIS.forward.y * depth + ACT_FOUR_STAGE_BASIS.up.y * (SEA_WATERLINE_OFFSET + up),
-      ACT_FOUR_STAGE_BASIS.origin.z + ACT_FOUR_STAGE_BASIS.right.z * x + ACT_FOUR_STAGE_BASIS.forward.z * depth + ACT_FOUR_STAGE_BASIS.up.z * (SEA_WATERLINE_OFFSET + up),
-    ], index * 3);
-    const tint = seeded(index, 529);
-    const color = new THREE.Color(tint > 0.982 ? "#B80A18" : tint > 0.82 ? "#FFF4D2" : "#FFBE45");
-    colors.set([color.r, color.g, color.b], index * 3);
-    sizes[index] = 0.45 + seeded(index, 531);
-    seeds[index] = seeded(index, 533);
-    const edgeFade = Math.min(
-      smoothstep(2.8, 4.0, x),
-      1.0 - smoothstep(12.4, 13.5, x),
-      smoothstep(-2.8, -1.5, up),
-      1.0 - smoothstep(6.2, 7.5, up),
-      smoothstep(10.0, 12.5, depth),
-      1.0 - smoothstep(23.5, 26.0, depth),
-      up >= 0.0 ? smoothstep(11.4, 13.2, domeDistance) : 1.0,
-    );
-    opacities[index] = (0.52 + seeded(index, 535) * 0.38) * edgeFade;
-  }
-  const result = new THREE.BufferGeometry();
-  result.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  result.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  result.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
-  result.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
-  result.setAttribute("aOpacity", new THREE.BufferAttribute(opacities, 1));
-  return result;
-}
-
-function CosmicDustVeil({ exitOpacityRef }: { exitOpacityRef: React.RefObject<number> }) {
-  const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
-  useEffect(() => {
-    const nextGeometry = createCosmicDustGeometry();
-    setGeometry(nextGeometry);
-    return () => nextGeometry.dispose();
-  }, []);
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const { gl } = useThree();
-  const uniforms = useMemo(() => ({
-    uTime: { value: 0 },
-    uPixelRatio: { value: Math.min(gl.getPixelRatio(), 1.5) },
-    uVaultOpacity: { value: 1 },
-  }), [gl]);
-  useFrame(({ clock }) => {
-    uniforms.uTime.value = clock.getElapsedTime();
-    uniforms.uPixelRatio.value = Math.min(gl.getPixelRatio(), 1.5);
-    uniforms.uVaultOpacity.value = exitOpacityRef.current;
-  });
-  if (!geometry) return null;
-  return (
-    <points geometry={geometry} frustumCulled={false} renderOrder={3}>
-      <shaderMaterial ref={materialRef} uniforms={uniforms} vertexColors transparent depthTest depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} vertexShader={DUST_VERTEX_SHADER} fragmentShader={DUST_FRAGMENT_SHADER} />
-    </points>
-  );
-}
-
-function ObsidianSingularityInterior({ exitOpacityRef, shockwaveStartedAtRef }: {
+function ObsidianSingularityInterior({ exitOpacityRef, shockwaveStartedAtRef, projectIndex }: {
   exitOpacityRef: React.RefObject<number>;
   shockwaveStartedAtRef: React.RefObject<number>;
+  projectIndex: number;
 }) {
   return (
-    <group>
+    <group frustumCulled={false}>
       <ObsidianMirrorSea exitOpacityRef={exitOpacityRef} shockwaveStartedAtRef={shockwaveStartedAtRef} />
       <HorizonEclipseCorona exitOpacityRef={exitOpacityRef} />
-      <CosmicDustVeil exitOpacityRef={exitOpacityRef} />
+      <ActFourSculptures projectIndex={projectIndex} vaultOpacityRef={exitOpacityRef} />
     </group>
   );
 }
@@ -889,7 +785,7 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
     <group ref={exteriorLayer} visible={phase === "act4_exterior"}><ActFourExterior phase={phase} warpCharge={warpCharge} /></group>
     <group ref={tunnelLayer}><WormholeTunnel phase={phase} /><WormholeLandmarks phase={phase} /></group>
     <WarpStreamParticles phase={phase} warpCharge={warpCharge} /><WarpNeedles phase={phase} />
-    <group ref={vaultLayer} visible={phase === "act4_vault" || phase === "act4_warp_out"}><ObsidianSingularityInterior exitOpacityRef={vaultOpacityRef} shockwaveStartedAtRef={shockwaveStartedAtRef} /></group>
+    <group ref={vaultLayer} visible={phase === "act4_vault" || phase === "act4_warp_out"} frustumCulled={false}><ObsidianSingularityInterior exitOpacityRef={vaultOpacityRef} shockwaveStartedAtRef={shockwaveStartedAtRef} projectIndex={projectIndex} /></group>
     <BreachFlash phase={phase} />
   </group>;
 }

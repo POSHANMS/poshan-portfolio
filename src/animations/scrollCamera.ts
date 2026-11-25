@@ -32,11 +32,11 @@ export const ACT_FOUR_STAGE_BASIS = {
   forward: stageForward,
 };
 const ACT_FOUR_CAMERA_OFFSETS = [
-  { right: 0, up: 0, depth: 0 },
-  { right: 1.3, up: 0.15, depth: -0.5 },
-  { right: 2.3, up: 0.25, depth: -0.9 },
-  { right: -1.2, up: 0.15, depth: -0.6 },
-  { right: -2.2, up: 0.05, depth: -0.3 },
+  { right: 0.0, up: 0.0, depth: 0.0 },
+  { right: 0.85, up: 0.10, depth: -0.38 },
+  { right: 1.65, up: 0.20, depth: -0.75 },
+  { right: 1.05, up: 0.14, depth: -0.50 },
+  { right: 0.40, up: 0.06, depth: -0.22 },
 ];
 /** One canonical set of camera/target poses drives both the fold and each physical slab. */
 export const ACT_FOUR_FOLD_POSES = ACT_FOUR_CAMERA_OFFSETS.slice(0, ACT_FOUR_PROJECT_STATIONS.length).map((offset) => ({
