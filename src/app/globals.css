@@ -2616,9 +2616,13 @@ canvas {
 .act-four-time-slice-hero h2.is-long-title {
   width: min(40vw, 540px);
   max-width: 100%;
-  font-size: inherit;
-  line-height: inherit;
-  letter-spacing: inherit;
+  font-size: clamp(1.9rem, 3.1vw, 3.15rem);
+  font-weight: 850;
+  line-height: 0.96;
+  letter-spacing: -0.02em;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
 }
 
 .act-four-time-slice-hero p {
@@ -2649,6 +2653,12 @@ canvas {
   font: 550 clamp(11px, 0.72vw, 14px)/1.6 var(--font-mono, ui-monospace, monospace);
   letter-spacing: 0.045em;
   text-transform: uppercase;
+}
+
+@media (min-width: 769px) {
+  .act-four-time-slice-stack {
+    max-width: min(100%, 32vw, 680px);
+  }
 }
 
 .act-four-time-slice-slash { color: #ff526a; }
