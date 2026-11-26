@@ -628,7 +628,8 @@ function ProjectsChapter({
                 {project.stack.map((item, index) => <React.Fragment key={item}>{index > 0 && <span className="act-four-time-slice-slash" aria-hidden="true">/</span>}<span>{item}</span></React.Fragment>)}
               </div>
               <div className="act-four-time-slice-links">
-                {PROFILE.github && <a href={PROFILE.github} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()}>GitHub <span aria-hidden="true">↗</span></a>}
+                {project.githubUrl && <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()}>GitHub <span aria-hidden="true">↗</span></a>}
+                {project.backendUrl && <a href={project.backendUrl} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()}>Backend <span aria-hidden="true">↗</span></a>}
                 {typeof project.href === "string" && project.href.trim() !== "" && <a className="is-live" href={project.href} target="_blank" rel="noopener noreferrer" onPointerDown={(event) => event.stopPropagation()}>Live Demo <span aria-hidden="true">↗</span></a>}
               </div>
             </footer>

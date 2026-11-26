@@ -20,49 +20,55 @@ export const STATS = [
 
 export const PROJECTS = [
   {
-    name: "FindIt",
-    subtitle: "Campus Lost & Found Portal",
-    stack: ["React", "Flask", "PostgreSQL", "Redis", "Socket.io", "JWT", "Docker", "Leaflet.js"],
+    name: "FINDIT",
+    subtitle: "CAMPUS LOST & FOUND PORTAL",
+    stack: ["REACT", "FLASK", "POSTGRESQL", "REDIS", "SOCKET.IO", "LEAFLET", "DOCKER"],
+    githubUrl: "https://github.com/POSHANMS/lost-found-frontend",
+    backendUrl: "https://github.com/POSHANMS/lost-found-backend",
     liveLabel: "Deployed on Vercel",
-    href: "https://findit-portal.vercel.app/",
+    href: "https://findit-portal.vercel.app",
     description:
-      "Built a full-stack portal that matches lost and found items and alerts users in real time with Socket.io, JWT auth, Redis caching, GPS location pinning, Docker, and Vercel deployment.",
+      "A full-stack campus portal where students pin lost or found items on a live Leaflet map, upload photos straight to Cloudinary, and verify ownership through secret claim questions. Runs on a Flask API with Redis caching, rate limiting, and real-time Socket.io alerts.",
   },
   {
-    name: "ZaminSaathi",
-    subtitle: "AI Land Document Assistant",
-    stack: ["Python", "Google ADK", "Gemini", "Flask", "Audit Logging"],
+    name: "ZAMINSAATHI",
+    subtitle: "MULTI-AGENT LAND DOCUMENT AI",
+    stack: ["PYTHON", "GOOGLE ADK", "GEMINI 2.5", "FASTMCP", "FLASK", "DOCKER"],
+    githubUrl: "https://github.com/POSHANMS/zaminsaathi",
     liveLabel: "Kaggle x Google capstone",
     href: "",
     description:
-      "Designed a 3-agent AI system that reads Karnataka land records, explains dense legal language in plain English, and cross-checks documents for discrepancies with independent security layers.",
+      "A three-agent Google ADK pipeline that turns Karnataka RTC and mutation records into plain English, cross-checks survey numbers over a live stdio MCP server to catch hidden mismatches, and lays out the exact office steps to fix them—cutting prompt context by 62% with on-demand skills.",
   },
   {
-    name: "Hostel Management System",
-    subtitle: "Role-Based Campus Operations",
-    stack: ["Node.js", "Express.js", "MySQL", "HTML", "CSS", "JavaScript"],
+    name: "HOSTEL MANAGEMENT SYSTEM",
+    subtitle: "DUAL-PORTAL HOSTEL PLATFORM",
+    stack: ["NODE.JS", "EXPRESS", "MYSQL", "REST API", "JAVASCRIPT"],
+    githubUrl: "https://github.com/POSHANMS/Hostel-Management-System",
     liveLabel: "Admin + student portals",
     href: "",
     description:
-      "Built separate admin and student portals with role-based access control, 15+ RESTful API endpoints, normalized MySQL tables, fee recording, room allocation, and complaint tracking.",
+      "An admin and student web portal built to replace paper hostel logs. Wardens manage student records, room allocations, fee tracking, and maintenance complaints from one dashboard, while students check their room details, payment history, and ticket status through a Node.js and MySQL REST API.",
   },
   {
-    name: "HealthGPT",
-    subtitle: "Disease Prediction System",
-    stack: ["Python", "Flask", "ML", "CNN", "Model Evaluation"],
+    name: "HEALTHGPT",
+    subtitle: "MULTI-DISEASE DIAGNOSTIC AI",
+    stack: ["PYTHON", "TENSORFLOW", "XGBOOST", "SCIKIT-LEARN", "FLASK", "SQLITE3"],
+    githubUrl: "https://github.com/POSHANMS/HealthGPT---Intelligent-Healthcare-System",
     liveLabel: "Final-year group project",
     href: "",
     description:
-      "Owned the Flask backend connecting trained ML and CNN models to the frontend for an 8-condition disease prediction system averaging 90%+ accuracy in a 4-person final-year build.",
+      "A Flask screening portal covering eight conditions across medical scans and lab metrics. Pairs transfer-learning CNNs (VGG19, ResNet152V2, DenseNet201) on MRI and X-ray images with XGBoost and Random Forest on clinical data—averaging over 90% validation accuracy with SQLite3 report history.",
   },
   {
-    name: "NoteFlash",
-    subtitle: "Flask + MySQL Notes App",
-    stack: ["Flask", "MySQL", "Railway"],
+    name: "NOTEFLASH",
+    subtitle: "REAL-TIME NOTES WORKSPACE",
+    stack: ["PYTHON", "FLASK", "SQLALCHEMY", "MYSQL", "QUILL.JS", "JAVASCRIPT"],
+    githubUrl: "https://github.com/POSHANMS/notes-keeper-app",
     liveLabel: "Flask + MySQL notes app",
     href: "",
     description:
-      "Deployed on Railway with a custom subdomain and a focused note management workflow for creating, organizing, and managing notes.",
+      "A fast Keep-style notes app built on Flask, SQLAlchemy, and MySQL with a Quill rich-text editor. Handles 1-second debounced auto-save so drafts never vanish, 300ms live search across titles and body text, pinned masonry cards, persistent dark mode, and strict per-user route isolation.",
   },
 ];
 
