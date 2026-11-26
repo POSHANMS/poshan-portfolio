@@ -53,12 +53,12 @@ function pointOnShape(shape: number, index: number, count: number, target: THREE
     if (b < 0.68) {
       const z = c * 2 - 1;
       const planar = Math.sqrt(Math.max(0.001, 1 - z * z));
-      const radius = 2.35 + seeded(index, 29) * 1.3;
+      const radius = 2.45 + seeded(index, 29) * 1.2;
       target.set(Math.cos(a) * planar * radius, z * radius, Math.sin(a) * planar * radius);
       return;
     }
     const angle = a + (c - 0.5) * 0.12;
-    const radius = 2.58 + seeded(index, 31) * 0.54;
+    const radius = 2.58 + seeded(index, 31) * 0.9;
     const orbitalDepth = Math.sin(angle) * radius;
     target.set(
       Math.cos(angle) * radius,
@@ -69,41 +69,44 @@ function pointOnShape(shape: number, index: number, count: number, target: THREE
   }
 
   if (shape === 1) {
-    const contour = 2.28 + Math.floor(b * 7) * 0.17;
-    const ripple = Math.sin(a * 3 + contour * 1.8) * 0.2 + Math.cos(a * 5 - contour) * 0.11;
-    const radius = contour + ripple;
-    target.set(Math.cos(a) * radius, 0.42 * Math.sin(a * 2.2) + 0.2 * Math.sin(contour * 3) + (c - 0.5) * 0.18, Math.sin(a) * radius);
+    const contourIndex = Math.floor(b * 3);
+    const contour = 2.5 + contourIndex * 0.48;
+    const ripple = Math.sin(a * 3 + contourIndex * 1.4) * 0.12 + Math.cos(a * 5 - contourIndex) * 0.07;
+    const radius = contour + ripple + (c - 0.5) * 0.035;
+    target.set(
+      Math.cos(a) * radius,
+      0.24 * Math.sin(a * 2.0 + contourIndex * 0.7) + 0.12 * Math.sin(contourIndex * 2.4) + (c - 0.5) * 0.11,
+      Math.sin(a) * radius,
+    );
     return;
   }
 
   if (shape === 2) {
-    if (b < 0.78) {
-      const axis = Math.floor(seeded(index, 29) * 3);
-      const sideA = seeded(index, 31) < 0.5 ? -2.2 : 2.2;
-      const sideB = seeded(index, 37) < 0.5 ? -2.2 : 2.2;
-      const along = (c * 2 - 1) * 2.2;
-      if (axis === 0) target.set(along, sideA, sideB);
-      else if (axis === 1) target.set(sideA, along, sideB);
-      else target.set(sideA, sideB, along);
+    if (b < 0.68) {
+      const filament = Math.floor(seeded(index, 29) * 7);
+      const angle = filament * TAU / 7 + (c - 0.5) * 0.24;
+      const radius = 2.75 + seeded(index, 31) * 0.85;
+      const rise = (seeded(index, 37) * 2 - 1) * 2.25;
+      target.set(Math.cos(angle) * radius, rise, Math.sin(angle) * radius);
     } else {
-      const radius = 2.3 + c * 1.45;
-      target.set(Math.cos(a) * radius, -2.1 + seeded(index, 41) * 4.2, Math.sin(a) * radius);
+      const radius = 2.7 + c * 1.0;
+      target.set(Math.cos(a) * radius, Math.sin(a * 2.0) * 0.22 + (seeded(index, 41) - 0.5) * 0.16, Math.sin(a) * radius);
     }
     return;
   }
 
   if (shape === 3) {
     const strand = index % 2 === 0 ? 0 : Math.PI;
-    const angle = t * TAU * 3.2 + strand;
-    const y = (b * 2 - 1) * 2.72;
-    const radius = 2.3 + Math.sqrt(Math.max(0.05, 1.0 - (y / 2.72) ** 2)) * 0.72;
+    const angle = t * TAU * 2.15 + strand + (b - 0.5) * 0.12;
+    const y = (t - 0.5) * 4.8 + (c - 0.5) * 0.16;
+    const radius = 2.58 + b * 0.98 + Math.sin(angle * 0.5) * 0.08;
     target.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
     return;
   }
 
-  const angle = t * TAU * 3.15 + (b - 0.5) * 0.5;
-  const radius = 2.3 + t * 1.42 + (c - 0.5) * 0.2;
-  target.set(Math.cos(angle) * radius, (t - 0.5) * 4.5, Math.sin(angle) * radius);
+  const angle = t * TAU * 2.4 + (b - 0.5) * 0.16;
+  const radius = 2.55 + t * 1.08 + (c - 0.5) * 0.12;
+  target.set(Math.cos(angle) * radius, (t - 0.5) * 4.35, Math.sin(angle) * radius);
 }
 
 function chooseParticleCount(width: number, cores: number) {
@@ -172,8 +175,9 @@ const AURA_VERTEX_SHADER = `
 
     vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mvPosition;
-    float sizeCap = aSeed > 0.97 ? 7.2 : 5.2;
-    gl_PointSize = clamp(aSize * uPixelRatio * (68.0 / max(3.0, -mvPosition.z)), 1.8 * uPixelRatio, sizeCap * uPixelRatio);
+    float restScale = mix(0.62, 1.18, burst);
+    float dynamicCap = aSeed > 0.975 ? mix(4.2, 6.8, burst) : mix(3.1, 5.2, burst);
+    gl_PointSize = clamp(aSize * restScale * uPixelRatio * (58.0 / max(3.0, -mvPosition.z)), 1.15 * uPixelRatio, dynamicCap * uPixelRatio);
     vParticleColor = aColorMix;
     float mist = 1.0 - smoothstep(0.0, 2.7, length(p));
     vAlpha = mix(0.42, 0.95, clamp(aSeed * 0.72 + (1.0 - mist) * 0.28, 0.0, 1.0));
@@ -193,11 +197,11 @@ const AURA_FRAGMENT_SHADER = `
     vec2 p = gl_PointCoord - 0.5;
     float d = length(p) * 2.0;
     if (d > 1.0) discard;
-    float core = exp(-d * d * 5.2);
-    float halo = exp(-d * d * 1.7) * 0.42;
-    float twinkle = 0.72 + 0.28 * sin(uTime * (1.1 + vParticleSeed * 2.2) + vParticleSeed * 64.0);
-    float alpha = clamp((core + halo) * twinkle * vAlpha * uVaultOpacity, 0.0, 1.0);
-    gl_FragColor = vec4(vParticleColor * (1.3 + vBurst * 0.8), alpha);
+    float core = exp(-d * d * 6.5);
+    float halo = exp(-d * d * 2.4) * mix(0.14, 0.36, vBurst);
+    float restAlphaMult = mix(0.42, 1.05, vBurst);
+    float alpha = clamp((core + halo) * vAlpha * restAlphaMult * uVaultOpacity, 0.0, 1.0);
+    gl_FragColor = vec4(vParticleColor * mix(0.88, 1.55, vBurst), alpha);
   }
 `;
 
@@ -229,18 +233,19 @@ const OBSIDIAN_FRAGMENT_SHADER = `
     float facing = max(dot(N, V), 0.0);
     float goldFacing = max(dot(N, eclipseLight), 0.0);
     float studioFacing = max(dot(N, studioLight), 0.0);
-    float fresnel = pow(1.0 - facing, 2.6);
-    float rimBand = smoothstep(0.42, 0.99, fresnel);
-    float goldRim = rimBand * (0.12 + goldFacing * 0.98);
-    float champagneFresnel = smoothstep(0.72, 0.99, fresnel) * (0.08 + studioFacing * 0.92);
-    float champagneSpecular = pow(max(dot(reflect(-studioLight, N), V), 0.0), 64.0) * 0.56;
-    float diffuse = 0.055 + goldFacing * 0.075 + studioFacing * 0.055;
+    vec3 H = normalize(studioLight + V);
+    float fresnel = pow(1.0 - facing, 3.4);
+    float rimBand = smoothstep(0.34, 0.94, fresnel);
+    float goldRim = rimBand * (0.08 + goldFacing * 0.9);
+    float champagneFresnel = smoothstep(0.7, 0.985, fresnel) * (0.06 + studioFacing * 0.76);
+    float champagneSpecular = pow(max(dot(N, H), 0.0), 42.0) * 0.28;
+    float diffuse = 0.035 + goldFacing * 0.055 + studioFacing * 0.038;
     float cavityShade = mix(1.0, 0.56, clamp(uCavity * (1.0 - smoothstep(-0.45, 0.35, N.y)), 0.0, 1.0));
-    vec3 base = mix(vec3(0.004, 0.003, 0.006), vec3(0.028, 0.023, 0.035), clamp(diffuse * 3.2, 0.0, 1.0)) * cavityShade;
+    vec3 base = mix(vec3(0.008, 0.007, 0.012), vec3(0.025, 0.022, 0.034), clamp(diffuse * 3.2, 0.0, 1.0)) * cavityShade;
     vec3 color = base
-      + vec3(1.0, 0.42, 0.075) * goldRim * 0.66
-      + vec3(0.66, 0.018, 0.035) * goldFacing * fresnel * 0.08
-      + vec3(0.88, 0.82, 0.72) * (champagneFresnel * 0.38 + champagneSpecular * 0.28);
+      + vec3(1.0, 0.36, 0.035) * goldRim * 0.58
+      + vec3(0.66, 0.018, 0.035) * goldFacing * fresnel * 0.07
+      + vec3(0.91, 0.875, 0.812) * (champagneFresnel * 0.3 + champagneSpecular * 0.34);
 
     // Weight the FindIt sheen to its upper-right contour and the eclipse bounce to its lower-left grazing edge.
     float upperRightMask = smoothstep(-0.42, 0.64, N.x) * smoothstep(-0.5, 0.62, N.y);
@@ -257,11 +262,11 @@ const OBSIDIAN_FRAGMENT_SHADER = `
     float capFace = max(dot(N, normalize(vec3(-0.08, 0.92, 0.38))), 0.0);
     vec3 warmFace = mix(vec3(0.369, 0.192, 0.043), vec3(1.0, 0.659, 0.18), smoothstep(0.08, 0.88, goldFacing));
     vec3 satinCap = mix(vec3(0.18, 0.169, 0.208), vec3(0.902, 0.863, 0.796), smoothstep(0.08, 0.9, studioFacing));
-    vec3 architecturalColor = vec3(0.035, 0.031, 0.055)
-      + warmFace * leftFace * 0.44
-      + satinCap * capFace * 0.36
-      + vec3(1.0, 0.659, 0.18) * goldRim * leftFace * 0.22
-      + vec3(0.902, 0.863, 0.796) * champagneFresnel * capFace * 0.12;
+    vec3 architecturalColor = vec3(0.008, 0.007, 0.012)
+      + warmFace * leftFace * 0.16
+      + satinCap * capFace * 0.15
+      + vec3(1.0, 0.659, 0.18) * goldRim * leftFace * 0.18
+      + vec3(0.902, 0.863, 0.796) * champagneFresnel * capFace * 0.1;
     color = mix(color, architecturalColor, uArchitecture);
     color = clamp(color, vec3(0.0), vec3(1.0));
     gl_FragColor = vec4(color, clamp(uOpacity * uVaultOpacity, 0.0, 1.0));
@@ -282,12 +287,13 @@ const RADIAL_GLOW_FRAGMENT_SHADER = `
   varying vec2 vGlowUv;
   void main() {
     float radius = length(vGlowUv - 0.5) * 2.0;
-    float goldBand = smoothstep(0.08, 0.46, radius);
-    float emberBand = smoothstep(0.38, 0.92, radius);
-    vec3 color = mix(vec3(1.0, 0.93, 0.72), vec3(1.0, 0.58, 0.16), goldBand);
-    color = mix(color, vec3(0.693, 0.072, 0.0024), emberBand);
-    float feather = 1.0 - smoothstep(0.12, 1.0, radius);
-    float alpha = feather * (0.16 + 0.07 * (1.0 - radius)) * uOpacity * uVaultOpacity;
+    float champagneCore = exp(-radius * radius * 190.0);
+    float moltenHalo = exp(-radius * radius * 30.0);
+    float emberHalo = exp(-radius * radius * 8.0);
+    vec3 color = vec3(1.0, 0.94, 0.72) * champagneCore
+      + vec3(1.0, 0.42, 0.055) * moltenHalo * 0.72
+      + vec3(0.72, 0.025, 0.018) * emberHalo * 0.32;
+    float alpha = clamp((champagneCore * 0.34 + moltenHalo * 0.12 + emberHalo * 0.035) * uOpacity * uVaultOpacity, 0.0, 1.0);
     gl_FragColor = vec4(color, alpha);
   }
 `;
@@ -327,9 +333,9 @@ function makeParticleResources(count: number, pixelRatio: number): ParticleResou
   for (let index = 0; index < count; index += 1) {
     const seed = seeded(index, 53);
     seeds[index] = seed;
-    sizes[index] = seed > 0.97 ? 1.85 + seeded(index, 59) * 0.55 : 0.45 + seeded(index, 61);
+    sizes[index] = seed > 0.975 ? 1.45 + seeded(index, 59) * 0.45 : 0.45 + seeded(index, 61);
     let colorIndex = 0;
-    if (seed > 0.97) colorIndex = 2;
+    if (seed > 0.975) colorIndex = 2;
     else if (seed >= 0.55 && seed < 0.77) colorIndex = 1;
     else if (seed >= 0.77 && seed < 0.92) colorIndex = 2;
     else if (seed >= 0.92) colorIndex = 3;
@@ -486,58 +492,97 @@ function FindItArtifact() {
   );
 }
 
+const TOPOGRAPHIC_RADII = [2.15, 1.82, 1.49, 1.17, 0.87, 0.58] as const;
+
+function createTopographicContour(layer: number, radius: number) {
+  const sides = layer % 2 === 0 ? 8 : 7;
+  const shape = new THREE.Shape();
+  for (let vertex = 0; vertex < sides; vertex += 1) {
+    const angle = vertex / sides * TAU + layer * 0.11;
+    const irregularity = 0.91 + 0.055 * Math.sin(vertex * 2.7 + layer * 1.8) + 0.035 * Math.cos(vertex * 4.1 - layer);
+    const x = Math.cos(angle) * radius * irregularity;
+    const y = Math.sin(angle) * radius * irregularity * (0.88 + 0.035 * Math.sin(layer * 1.7));
+    if (vertex === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return shape;
+}
+
 function ZaminSaathiArtifact() {
   const root = useRef<THREE.Group>(null);
   const orbitNodes = useRef<(THREE.Group | null)[]>([]);
-  const terrainRadii = [1.72, 1.49, 1.26, 1.03, 0.8];
+  const orbitalTracks = useRef<(THREE.Mesh | null)[]>([]);
   useFrame(({ clock }, delta) => {
     const time = clock.getElapsedTime();
     if (root.current) {
-      root.current.rotation.y = Math.sin(time * 0.22) * 0.08;
-      root.current.rotation.x = Math.sin(time * 0.16) * 0.035;
+      root.current.rotation.y = time * 0.055;
+      root.current.rotation.x = Math.sin(time * 0.12) * 0.018;
+    }
+    for (let index = 0; index < orbitalTracks.current.length; index += 1) {
+      const track = orbitalTracks.current[index];
+      if (track) track.rotation.y = time * (index % 2 === 0 ? 0.035 : -0.028);
     }
     for (let index = 0; index < orbitNodes.current.length; index += 1) {
       const node = orbitNodes.current[index];
       if (!node) continue;
-      const angle = time * (0.28 + index * 0.035) + index * TAU / 3;
-      node.position.set(Math.cos(angle) * 2.05, 0.2 + Math.sin(angle * 1.7) * 0.35, Math.sin(angle) * 2.05);
-      node.rotation.y += delta * 0.7;
+      const angle = time * (0.2 + index * 0.025) + index * TAU / 3;
+      const radius = 2.45 + index * 0.12;
+      node.position.set(Math.cos(angle) * radius, 0.08 + Math.sin(angle * 1.4) * 0.48, Math.sin(angle) * radius);
+      node.rotation.y = angle * 0.7;
+      node.rotation.x = angle * 0.22;
     }
   });
   return (
     <group ref={root} scale={1.24} frustumCulled={false}>
-      {terrainRadii.map((radius, index) => (
-        <group key={index} position={[0, -0.76 + index * 0.43, 0]} rotation={[0.08, index * 0.16, 0.384]} frustumCulled={false}>
-          <mesh frustumCulled={false}>
-            <cylinderGeometry args={[radius - 0.13, radius, 0.28, 40, 1]} />
-            <ObsidianShellMaterial />
-          </mesh>
-          <mesh position={[0, 0.125, 0]} rotation={[Math.PI / 2, 0, 0]} frustumCulled={false}>
-            <torusGeometry args={[radius - 0.04, 0.014, 4, 88]} />
-            <GoldLineMaterial opacity={0.82 - index * 0.07} />
-          </mesh>
-        </group>
-      ))}
-      {[0, 1, 2].map((index) => (
-        <mesh key={index} position={[0, -0.9 + index * 0.74, 0]} rotation={[Math.PI / 2, 0, index * 0.55]} frustumCulled={false}>
-          <torusGeometry args={[1.92 + index * 0.11, 0.006, 4, 104]} />
-          <GoldLineMaterial opacity={0.38} />
+      <group rotation={[0.419, 0.0, 0]} frustumCulled={false}>
+        <mesh position={[0, -1.12, 0]} frustumCulled={false}>
+          <cylinderGeometry args={[1.84, 1.92, 0.22, 10, 1]} />
+          <ObsidianShellMaterial />
         </mesh>
-      ))}
-      {[0, 1, 2].map((index) => (
-        <group key={`node-${index}`} ref={(node) => { orbitNodes.current[index] = node; }} frustumCulled={false}>
-          <mesh frustumCulled={false}><octahedronGeometry args={[0.17, 0]} /><meshBasicMaterial color={index === 1 ? CRIMSON : CHAMPAGNE} toneMapped={false} /></mesh>
-          <pointLight color={index === 1 ? CRIMSON : GOLD} intensity={0.7} distance={1.5} decay={2} />
-        </group>
-      ))}
+        <mesh position={[0, -1.005, 0]} rotation={[Math.PI / 2, 0, 0]} frustumCulled={false}>
+          <torusGeometry args={[1.86, 0.012, 4, 112]} /><GoldLineMaterial opacity={0.88} />
+        </mesh>
+        {TOPOGRAPHIC_RADII.map((radius, index) => {
+          const layerY = -0.84 + index * 0.34;
+          return (
+            <group key={index} position={[0, layerY, 0]} rotation={[0, index * 0.13, 0]} frustumCulled={false}>
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.13, 0]} frustumCulled={false}>
+                <extrudeGeometry args={[createTopographicContour(index, radius), { depth: 0.26, steps: 1, bevelEnabled: true, bevelThickness: 0.045, bevelSize: 0.055, bevelSegments: 1 }]} />
+                <ObsidianShellMaterial />
+              </mesh>
+              <mesh position={[0, 0.143, 0]} rotation={[Math.PI / 2, 0, 0]} frustumCulled={false}>
+                <torusGeometry args={[radius * 0.94, 0.009, 4, 96]} />
+                <GoldLineMaterial opacity={0.76 - index * 0.045} />
+              </mesh>
+            </group>
+          );
+        })}
+        <mesh position={[0, 1.32, 0]} frustumCulled={false}>
+          <cylinderGeometry args={[0.008, 0.014, 0.72, 6, 1]} />
+          <meshBasicMaterial color={CRIMSON} transparent opacity={0.82} toneMapped={false} depthWrite={false} />
+        </mesh>
+        {[0, 1, 2].map((index) => (
+          <mesh key={`track-${index}`} ref={(node) => { orbitalTracks.current[index] = node; }} position={[0, 0.12 + index * 0.14, 0]} rotation={index === 0 ? [0.82, 0.28, 0.5] : index === 1 ? [1.12, -0.38, 0.95] : [0.54, 0.82, -0.44]} frustumCulled={false}>
+            <torusGeometry args={[2.33 + index * 0.13, 0.007, 4, 112]} />
+            <GoldLineMaterial color={index === 1 ? CRIMSON : CHAMPAGNE} opacity={index === 1 ? 0.46 : 0.32} />
+          </mesh>
+        ))}
+        {[0, 1, 2].map((index) => (
+          <group key={`node-${index}`} ref={(node) => { orbitNodes.current[index] = node; }} frustumCulled={false}>
+            <mesh frustumCulled={false}><octahedronGeometry args={[0.115, 0]} /><meshBasicMaterial color={index === 1 ? CRIMSON : CHAMPAGNE} toneMapped={false} /></mesh>
+            <pointLight color={index === 1 ? CRIMSON : GOLD} intensity={0.42} distance={1.2} decay={2} />
+          </group>
+        ))}
+      </group>
     </group>
   );
 }
 
 const HOSTEL_TOWERS = [
-  [-1.32, -1.06, 0.58, 2.45, 0.62], [-0.66, -0.82, 0.62, 3.25, 0.68], [0.02, -1.12, 0.7, 2.72, 0.72],
-  [0.75, -0.78, 0.64, 3.6, 0.66], [1.35, -0.96, 0.5, 2.42, 0.56], [-1.08, 0.76, 0.52, 1.72, 0.58],
-  [-0.38, 0.92, 0.6, 2.35, 0.62], [0.38, 0.62, 0.66, 2.0, 0.7], [1.02, 0.88, 0.5, 1.48, 0.56],
+  [-0.84, -0.78, 0.46, 1.65, 0.44], [0, -0.82, 0.52, 2.45, 0.5], [0.84, -0.78, 0.42, 1.55, 0.42],
+  [-0.86, 0, 0.5, 2.0, 0.48], [0, 0, 0.42, 1.15, 0.42], [0.88, 0, 0.52, 2.95, 0.52],
+  [-0.82, 0.78, 0.4, 1.35, 0.42], [0, 0.82, 0.54, 2.5, 0.5], [0.82, 0.78, 0.44, 1.75, 0.46],
 ] as const;
 
 function HostelArtifact() {
@@ -553,44 +598,36 @@ function HostelArtifact() {
   });
   return (
     <group ref={root} scale={1.24} frustumCulled={false}>
-      <group rotation={[0.244346, 0.558505, 0]} frustumCulled={false}>
+      <group rotation={[0.279253, 0.593412, 0]} frustumCulled={false}>
+        <mesh position={[0, -0.94, 0]} frustumCulled={false}>
+          <cylinderGeometry args={[1.72, 1.82, 0.24, 10, 1]} />
+          <ObsidianShellMaterial />
+        </mesh>
+        <mesh position={[0, -0.812, 0]} rotation={[Math.PI / 2, 0, 0]} frustumCulled={false}>
+          <torusGeometry args={[1.76, 0.012, 4, 112]} /><GoldLineMaterial opacity={0.86} />
+        </mesh>
         {HOSTEL_TOWERS.map(([x, z, width, height, depth], index) => (
-          <group key={index} position={[x, -0.42 + height / 2, z]} frustumCulled={false}>
+          <group key={index} position={[x, -0.82 + height / 2, z]} frustumCulled={false}>
             <RoundedBox args={[width, height, depth]} radius={0.055} smoothness={3} frustumCulled={false}>
               <ObsidianShellMaterial architecture />
             </RoundedBox>
-            <mesh position={[-width * 0.47, 0, depth / 2 + 0.014]} frustumCulled={false}>
-              <boxGeometry args={[0.018, height * 0.94, 0.014]} />
-              <GoldLineMaterial color={CHAMPAGNE} opacity={0.42} />
-            </mesh>
-            <mesh position={[width * 0.47, 0, depth / 2 + 0.014]} frustumCulled={false}>
-              <boxGeometry args={[0.018, height * 0.94, 0.014]} />
-              <GoldLineMaterial opacity={0.34} />
-            </mesh>
-            <mesh position={[0, height * 0.47, depth / 2 + 0.014]} frustumCulled={false}>
-              <boxGeometry args={[width * 0.92, 0.018, 0.014]} />
-              <GoldLineMaterial color={CHAMPAGNE} opacity={0.3} />
-            </mesh>
-            <mesh position={[0, 0, depth / 2 + 0.006]} frustumCulled={false}>
-              <boxGeometry args={[width * 0.035, height * 0.92, 0.012]} />
-              <GoldLineMaterial opacity={0.72} />
-            </mesh>
-            <mesh position={[0, height * 0.28, depth / 2 + 0.012]} frustumCulled={false}>
-              <boxGeometry args={[width * 0.56, 0.025, 0.012]} />
-              <meshBasicMaterial color={index === 4 ? CRIMSON : GOLD} transparent opacity={0.72} toneMapped={false} depthWrite={false} />
-            </mesh>
+            {index === 1 || index === 5 || index === 7 ? (
+              <mesh position={[-width * 0.46, 0, depth / 2 + 0.012]} frustumCulled={false}>
+                <boxGeometry args={[0.009, height * 0.76, 0.01]} />
+                <GoldLineMaterial color={index === 5 ? CHAMPAGNE : GOLD} opacity={0.68} />
+              </mesh>
+            ) : null}
           </group>
         ))}
-        <mesh ref={core} position={[0, 0.32, 0]} frustumCulled={false}>
-          <octahedronGeometry args={[0.38, 0]} />
-          <meshBasicMaterial color="#FF263B" toneMapped={false} />
+        <mesh ref={core} position={[0.04, 0.43, 0.04]} frustumCulled={false}>
+          <octahedronGeometry args={[0.29, 0]} />
+          <meshBasicMaterial color={CRIMSON} toneMapped={false} />
         </mesh>
-        {[1.95, 2.34].map((radius, index) => (
-          <mesh key={radius} position={[0, 0.18 + index * 0.24, 0]} rotation={index === 0 ? [0.92, 0.34, 0.22] : [0.42, -0.72, 0.88]} frustumCulled={false}>
-            <torusGeometry args={[radius, 0.014, 5, 112]} />
-            <GoldLineMaterial color={index === 1 ? CHAMPAGNE : GOLD} opacity={0.76} />
-          </mesh>
-        ))}
+        <pointLight position={[0.04, 0.43, 0.04]} color={CRIMSON} intensity={0.58} distance={2.8} decay={2} />
+        <mesh position={[0.04, 0.52, 0.1]} rotation={[0.82, 0.34, 0.22]} frustumCulled={false}>
+          <torusGeometry args={[1.74, 0.012, 5, 128]} />
+          <GoldLineMaterial color={GOLD} opacity={0.62} />
+        </mesh>
       </group>
     </group>
   );
@@ -640,7 +677,7 @@ function HealthArtifact() {
 function NoteFlashArtifact() {
   const root = useRef<THREE.Group>(null);
   const shards = useRef<(THREE.Group | null)[]>([]);
-  const core = useRef<THREE.Mesh>(null);
+  const core = useRef<THREE.Group>(null);
   const glow = useRef<THREE.Mesh>(null);
   const inverseRootQuaternion = useMemo(() => new THREE.Quaternion(), []);
   useFrame(({ clock, camera }) => {
@@ -664,11 +701,17 @@ function NoteFlashArtifact() {
   });
   return (
     <group ref={root} frustumCulled={false}>
-      <mesh ref={core} frustumCulled={false}>
-        <sphereGeometry args={[0.24, 24, 18]} />
-        <meshStandardMaterial color="#FFF6DA" emissive={GOLD} emissiveIntensity={0.08} roughness={0.58} metalness={0.05} />
-      </mesh>
-      <mesh ref={glow} scale={4.2} frustumCulled={false} renderOrder={11}>
+      <group ref={core} frustumCulled={false}>
+        <mesh frustumCulled={false}>
+          <sphereGeometry args={[0.19, 24, 18]} />
+          <meshBasicMaterial color="#FF8C1A" toneMapped={false} />
+        </mesh>
+        <mesh frustumCulled={false}>
+          <sphereGeometry args={[0.072, 20, 14]} />
+          <meshBasicMaterial color={CHAMPAGNE} toneMapped={false} />
+        </mesh>
+      </group>
+      <mesh ref={glow} scale={2.8} frustumCulled={false} renderOrder={11}>
         <planeGeometry args={[1, 1]} />
         <shaderMaterial
           uniforms={{ uOpacity: { value: 1 }, uVaultOpacity: { value: 1 } }}
@@ -681,18 +724,18 @@ function NoteFlashArtifact() {
           toneMapped={false}
         />
       </mesh>
-      <pointLight position={[0, 0, 0]} color={GOLD} intensity={0.18} distance={3.8} decay={2} />
+      <pointLight position={[0, 0, 0]} color={GOLD} intensity={0.26} distance={2.6} decay={2} />
       {Array.from({ length: 9 }, (_, index) => (
         <group key={index} ref={(node) => { shards.current[index] = node; }} frustumCulled={false}>
           <RoundedBox args={[0.85, 1.25, 0.06]} radius={0.035} smoothness={2} frustumCulled={false}>
             <ObsidianShellMaterial />
           </RoundedBox>
-          <mesh position={[0, 0.64, 0]} frustumCulled={false}><boxGeometry args={[0.76, 0.018, 0.018]} /><GoldLineMaterial color={index === 2 || index === 7 ? CRIMSON : GOLD} /></mesh>
-          <mesh position={[0, -0.64, 0]} frustumCulled={false}><boxGeometry args={[0.76, 0.018, 0.018]} /><GoldLineMaterial /></mesh>
-          <mesh position={[-0.42, 0, 0]} frustumCulled={false}><boxGeometry args={[0.018, 1.25, 0.018]} /><GoldLineMaterial color={index === 2 || index === 7 ? CRIMSON : CHAMPAGNE} /></mesh>
-          <mesh position={[0.42, 0, 0]} frustumCulled={false}><boxGeometry args={[0.018, 1.25, 0.018]} /><GoldLineMaterial /></mesh>
-          <mesh position={[0, 0.19, 0.04]} frustumCulled={false}><boxGeometry args={[0.45, 0.018, 0.012]} /><GoldLineMaterial color={CHAMPAGNE} opacity={0.5} /></mesh>
-          <mesh position={[0, 0.05, 0.04]} frustumCulled={false}><boxGeometry args={[0.34, 0.012, 0.012]} /><GoldLineMaterial opacity={0.34} /></mesh>
+          <mesh position={[0, 0.64, 0]} frustumCulled={false}><boxGeometry args={[0.76, 0.01, 0.012]} /><GoldLineMaterial color={index === 2 || index === 7 ? CRIMSON : GOLD} opacity={0.74} /></mesh>
+          <mesh position={[0, -0.64, 0]} frustumCulled={false}><boxGeometry args={[0.76, 0.01, 0.012]} /><GoldLineMaterial opacity={0.74} /></mesh>
+          <mesh position={[-0.42, 0, 0]} frustumCulled={false}><boxGeometry args={[0.01, 1.25, 0.012]} /><GoldLineMaterial color={index === 2 || index === 7 ? CRIMSON : CHAMPAGNE} opacity={0.74} /></mesh>
+          <mesh position={[0.42, 0, 0]} frustumCulled={false}><boxGeometry args={[0.01, 1.25, 0.012]} /><GoldLineMaterial opacity={0.74} /></mesh>
+          <mesh position={[0, 0.19, 0.04]} frustumCulled={false}><boxGeometry args={[0.45, 0.01, 0.008]} /><GoldLineMaterial color={CHAMPAGNE} opacity={0.42} /></mesh>
+          <mesh position={[0, 0.05, 0.04]} frustumCulled={false}><boxGeometry args={[0.34, 0.008, 0.008]} /><GoldLineMaterial opacity={0.28} /></mesh>
         </group>
       ))}
     </group>
@@ -866,7 +909,7 @@ function ActFourSculptures({ projectIndex, vaultOpacityRef }: { projectIndex: nu
       const stationWeight = stationWeights.current[entry.station];
       const effectiveWeight = stationWeight * opacity;
       entry.material.opacity = entry.opacity * stationWeight * opacity;
-      entry.material.transparent = true;
+      entry.material.transparent = effectiveWeight < 0.999;
       entry.material.depthWrite = effectiveWeight > 0.96 ? entry.depthWrite : false;
       if (entry.emissiveIntensity !== null && entry.material instanceof THREE.MeshStandardMaterial) {
         entry.material.emissiveIntensity = entry.emissiveIntensity * stationWeight * opacity;
