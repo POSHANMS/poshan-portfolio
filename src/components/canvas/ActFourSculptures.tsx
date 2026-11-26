@@ -50,6 +50,14 @@ function pointOnShape(shape: number, index: number, count: number, target: THREE
   const t = index / Math.max(1, count - 1);
 
   if (shape === 0) {
+    if (b < 0.06) {
+      target.set(
+        2.15 + (seeded(index, 29) - 0.5) * 0.2,
+        1.05 + (seeded(index, 31) - 0.5) * 0.18,
+        0.35 + (seeded(index, 37) - 0.5) * 0.14,
+      );
+      return;
+    }
     if (b < 0.68) {
       const z = c * 2 - 1;
       const planar = Math.sqrt(Math.max(0.001, 1 - z * z));
@@ -132,6 +140,7 @@ const AURA_VERTEX_SHADER = `
   attribute float aSeed;
   attribute float aSize;
   attribute vec3 aColorMix;
+  attribute float aFindItSpark;
   varying vec3 vParticleColor;
   varying float vAlpha;
   varying float vParticleSeed;
@@ -175,10 +184,11 @@ const AURA_VERTEX_SHADER = `
 
     vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mvPosition;
-    float restScale = mix(0.62, 1.18, burst);
-    float dynamicCap = aSeed > 0.975 ? mix(4.2, 6.8, burst) : mix(3.1, 5.2, burst);
-    gl_PointSize = clamp(aSize * restScale * uPixelRatio * (58.0 / max(3.0, -mvPosition.z)), 1.15 * uPixelRatio, dynamicCap * uPixelRatio);
-    vParticleColor = aColorMix;
+    float restScale = mix(0.78, 1.18, burst);
+    float dynamicCap = aSeed > 0.965 ? mix(5.2, 6.8, burst) : mix(3.8, 5.2, burst);
+    gl_PointSize = clamp(aSize * restScale * uPixelRatio * (64.0 / max(3.0, -mvPosition.z)), 1.45 * uPixelRatio, dynamicCap * uPixelRatio);
+    float findItWeight = (uFromIndex == 0 ? 1.0 - progress : 0.0) + (uToIndex == 0 ? progress : 0.0);
+    vParticleColor = mix(aColorMix, vec3(1.0, 0.78, 0.36), aFindItSpark * findItWeight);
     float mist = 1.0 - smoothstep(0.0, 2.7, length(p));
     vAlpha = mix(0.42, 0.95, clamp(aSeed * 0.72 + (1.0 - mist) * 0.28, 0.0, 1.0));
     vParticleSeed = aSeed;
@@ -197,11 +207,11 @@ const AURA_FRAGMENT_SHADER = `
     vec2 p = gl_PointCoord - 0.5;
     float d = length(p) * 2.0;
     if (d > 1.0) discard;
-    float core = exp(-d * d * 6.5);
-    float halo = exp(-d * d * 2.4) * mix(0.14, 0.36, vBurst);
-    float restAlphaMult = mix(0.42, 1.05, vBurst);
+    float core = exp(-d * d * 5.8);
+    float halo = exp(-d * d * 2.2) * mix(0.16, 0.36, vBurst);
+    float restAlphaMult = mix(0.62, 1.05, vBurst);
     float alpha = clamp((core + halo) * vAlpha * restAlphaMult * uVaultOpacity, 0.0, 1.0);
-    gl_FragColor = vec4(vParticleColor * mix(0.88, 1.55, vBurst), alpha);
+    gl_FragColor = vec4(vParticleColor * mix(1.12, 1.55, vBurst), alpha);
   }
 `;
 
@@ -234,18 +244,18 @@ const OBSIDIAN_FRAGMENT_SHADER = `
     float goldFacing = max(dot(N, eclipseLight), 0.0);
     float studioFacing = max(dot(N, studioLight), 0.0);
     vec3 H = normalize(studioLight + V);
-    float fresnel = pow(1.0 - facing, 3.4);
+    float fresnel = pow(1.0 - facing, 3.8);
     float rimBand = smoothstep(0.34, 0.94, fresnel);
     float goldRim = rimBand * (0.08 + goldFacing * 0.9);
     float champagneFresnel = smoothstep(0.7, 0.985, fresnel) * (0.06 + studioFacing * 0.76);
-    float champagneSpecular = pow(max(dot(N, H), 0.0), 42.0) * 0.28;
-    float diffuse = 0.035 + goldFacing * 0.055 + studioFacing * 0.038;
+    float champagneSpecular = pow(max(dot(N, H), 0.0), 52.0) * 0.3;
+    float diffuse = 0.015 + goldFacing * 0.023 + studioFacing * 0.018;
     float cavityShade = mix(1.0, 0.56, clamp(uCavity * (1.0 - smoothstep(-0.45, 0.35, N.y)), 0.0, 1.0));
     vec3 base = mix(vec3(0.008, 0.007, 0.012), vec3(0.025, 0.022, 0.034), clamp(diffuse * 3.2, 0.0, 1.0)) * cavityShade;
     vec3 color = base
-      + vec3(1.0, 0.36, 0.035) * goldRim * 0.58
+      + vec3(1.0, 0.36, 0.016) * goldRim * 0.58
       + vec3(0.66, 0.018, 0.035) * goldFacing * fresnel * 0.07
-      + vec3(0.91, 0.875, 0.812) * (champagneFresnel * 0.3 + champagneSpecular * 0.34);
+      + vec3(0.918, 0.878, 0.816) * (champagneFresnel * 0.3 + champagneSpecular * 0.34);
 
     // Weight the FindIt sheen to its upper-right contour and the eclipse bounce to its lower-left grazing edge.
     float upperRightMask = smoothstep(-0.42, 0.64, N.x) * smoothstep(-0.5, 0.62, N.y);
@@ -263,8 +273,8 @@ const OBSIDIAN_FRAGMENT_SHADER = `
     vec3 warmFace = mix(vec3(0.369, 0.192, 0.043), vec3(1.0, 0.659, 0.18), smoothstep(0.08, 0.88, goldFacing));
     vec3 satinCap = mix(vec3(0.18, 0.169, 0.208), vec3(0.902, 0.863, 0.796), smoothstep(0.08, 0.9, studioFacing));
     vec3 architecturalColor = vec3(0.008, 0.007, 0.012)
-      + warmFace * leftFace * 0.16
-      + satinCap * capFace * 0.15
+      + warmFace * leftFace * 0.06
+      + satinCap * capFace * 0.055
       + vec3(1.0, 0.659, 0.18) * goldRim * leftFace * 0.18
       + vec3(0.902, 0.863, 0.796) * champagneFresnel * capFace * 0.1;
     color = mix(color, architecturalColor, uArchitecture);
@@ -314,11 +324,12 @@ const RADAR_SWEEP_FRAGMENT_SHADER = `
     vec2 centered = (vSweepUv - 0.5) * 2.0;
     float radius = length(centered);
     float angle = atan(centered.y, centered.x);
-    float sector = mod(angle + 6.2831853, 6.2831853) / 1.012291;
-    float angularFalloff = 1.0 - smoothstep(0.0, 1.0, sector);
-    float radialFalloff = 1.0 - smoothstep(0.92, 1.0, radius);
-    float alpha = angularFalloff * radialFalloff * 0.65 * uOpacity * uVaultOpacity;
-    gl_FragColor = vec4(0.90, 0.018, 0.035, alpha);
+    float sector = clamp(angle / 0.907571, 0.0, 1.0);
+    float trailingGradient = exp(-4.8 * (1.0 - sector));
+    float leadingLine = exp(-pow((sector - 1.0) / 0.018, 2.0));
+    float radialFeather = smoothstep(0.07, 0.2, radius) * (1.0 - smoothstep(0.82, 1.0, radius));
+    float alpha = max(trailingGradient * 0.34, leadingLine * 0.58) * radialFeather * uOpacity * uVaultOpacity;
+    gl_FragColor = vec4(0.94, 0.012, 0.047, alpha);
   }
 `;
 
@@ -327,15 +338,17 @@ function makeParticleResources(count: number, pixelRatio: number): ParticleResou
   const seeds = new Float32Array(count);
   const sizes = new Float32Array(count);
   const colors = new Float32Array(count * 3);
+  const findItSparks = new Float32Array(count);
   const palette = [new THREE.Color(GOLD), new THREE.Color(AMBER), new THREE.Color(CHAMPAGNE), new THREE.Color(CRIMSON)];
   const target = new THREE.Vector3();
 
   for (let index = 0; index < count; index += 1) {
     const seed = seeded(index, 53);
+    findItSparks[index] = seeded(index, 17) < 0.06 ? 1 : 0;
     seeds[index] = seed;
-    sizes[index] = seed > 0.975 ? 1.45 + seeded(index, 59) * 0.45 : 0.45 + seeded(index, 61);
+    sizes[index] = seed > 0.965 ? 1.75 + seeded(index, 59) * 0.45 : 0.45 + seeded(index, 61);
     let colorIndex = 0;
-    if (seed > 0.975) colorIndex = 2;
+    if (seed > 0.965) colorIndex = 2;
     else if (seed >= 0.55 && seed < 0.77) colorIndex = 1;
     else if (seed >= 0.77 && seed < 0.92) colorIndex = 2;
     else if (seed >= 0.92) colorIndex = 3;
@@ -361,6 +374,7 @@ function makeParticleResources(count: number, pixelRatio: number): ParticleResou
   geometry.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
   geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
   geometry.setAttribute("aColorMix", new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute("aFindItSpark", new THREE.BufferAttribute(findItSparks, 1));
 
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -472,8 +486,8 @@ function FindItArtifact() {
           <GoldLineMaterial opacity={0.52} />
         </mesh>
         <group ref={sweep} position={[0, 0, 0.22]} frustumCulled={false}>
-          <mesh rotation={[0, 0, 4.9]} frustumCulled={false}>
-            <circleGeometry args={[1.58, 64, 0, TAU * 58 / 360]} />
+          <mesh rotation={[0, 0, 2.15]} frustumCulled={false}>
+            <circleGeometry args={[1.35, 64, 0, TAU * 52 / 360]} />
             <shaderMaterial
               uniforms={{ uOpacity: { value: 1 }, uVaultOpacity: { value: 1 } }}
               vertexShader={RADAR_SWEEP_VERTEX_SHADER}
@@ -513,7 +527,7 @@ function ZaminSaathiArtifact() {
   const root = useRef<THREE.Group>(null);
   const orbitNodes = useRef<(THREE.Group | null)[]>([]);
   const orbitalTracks = useRef<(THREE.Mesh | null)[]>([]);
-  useFrame(({ clock }, delta) => {
+  useFrame(({ clock }) => {
     const time = clock.getElapsedTime();
     if (root.current) {
       root.current.rotation.y = time * 0.055;
@@ -623,7 +637,7 @@ function HostelArtifact() {
           <octahedronGeometry args={[0.29, 0]} />
           <meshBasicMaterial color={CRIMSON} toneMapped={false} />
         </mesh>
-        <pointLight position={[0.04, 0.43, 0.04]} color={CRIMSON} intensity={0.58} distance={2.8} decay={2} />
+        <pointLight position={[0.04, 0.43, 0.04]} color={CRIMSON} intensity={0.76} distance={2.8} decay={2} />
         <mesh position={[0.04, 0.52, 0.1]} rotation={[0.82, 0.34, 0.22]} frustumCulled={false}>
           <torusGeometry args={[1.74, 0.012, 5, 128]} />
           <GoldLineMaterial color={GOLD} opacity={0.62} />
