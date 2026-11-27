@@ -638,8 +638,11 @@ function ProjectsChapter({
             {PROJECTS.map((item, index) => <React.Fragment key={item.name}>{index > 0 && <span className="act-four-time-slice-rail-separator" aria-hidden="true">—</span>}<button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelectProject(index)} aria-label={`Open station ${String(index + 1).padStart(2, "0")}: ${item.name}`} aria-current={index === displayProjectIndex ? "step" : undefined}>{String(index + 1).padStart(2, "0")}</button></React.Fragment>)}
           </nav>
           {finalProject ? (
-            <button type="button" className="act-four-time-slice-hint is-launch" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }}>Scroll forward or click to launch Act V <span aria-hidden="true">↗</span></button>
-          ) : <p className="act-four-time-slice-hint">Scroll to fold dimension</p>}
+            <button type="button" className="act-four-time-slice-hint is-launch" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }}>
+              <span className="act-four-launch-title">Eject to Education · Act V <span className="act-four-launch-arrow" aria-hidden="true">↗</span></span>
+              <span className="act-four-launch-subtitle">Scroll forward or click to eject</span>
+            </button>
+          ) : <p className="act-four-time-slice-hint">Scroll to explore next project</p>}
         </div>
       )}
       <button
@@ -647,9 +650,9 @@ function ProjectsChapter({
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExit(); }}
         className="act-four-exit-control pointer-events-auto absolute right-6 top-6 z-[60]"
-        aria-label="Exit the Act IV vault"
+        aria-label="Exit to Act V. Press Escape"
         style={{ "--act-four-accent": accent, transition: "opacity 200ms ease, transform 200ms ease", opacity: phase === "act4_vault" ? 1 : 0, pointerEvents: phase === "act4_vault" ? "auto" : "none", transform: phase === "act4_vault" ? undefined : "translateY(-12px)" } as React.CSSProperties}
-      >[ ESC // EXIT VAULT ]</button>
+      >EXIT TO ACT V <span aria-hidden="true">· ESC ↗</span></button>
       </>
     );
   }
@@ -1098,7 +1101,7 @@ export default function CinematicJourney({
     : Math.max(states.journey.presence, smoothstep(0, 0.05, actFiveProgress))
       * (1 - smoothstep(ACT_FIVE_TIMING.cameraExitStart, ACT_FIVE_TIMING.sceneExit, scrollProgress));
   const exitBloomOpacity = actFourPhase === "act4_warp_out"
-    ? 0.42 * smoothstep(actFourExitProgress, 0.5, 0.78)
+    ? 0.42 * smoothstep(0.5, 0.78, actFourExitProgress)
     : handoffBloom ? 0.42 : 0;
   const entryIrisProgress = actFourWarpProgress;
   // Peak 120ms earlier than the old 0.75 cutover, before the tunnel's open end.

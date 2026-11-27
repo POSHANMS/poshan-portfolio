@@ -2411,16 +2411,20 @@ canvas {
   top: 1.5rem;
   right: 1.5rem;
   z-index: 60;
-  padding: 0.66rem 0.92rem;
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
-  border: 1px solid rgba(255, 204, 132, 0.26);
-  background: rgba(4, 3, 7, 0.62);
-  box-shadow: inset 0 1px 0 rgba(255, 232, 178, 0.2), 0 8px 28px rgba(0, 0, 0, 0.62);
-  font: 600 9px/1.2 var(--font-mono, ui-monospace, monospace);
-  letter-spacing: 0.16em;
+  padding: 0.35rem 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(255, 248, 236, 0.86);
+  font: 600 10px/1.4 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.98), 0 0 8px rgba(0, 0, 0, 0.9);
+  transition: color 180ms ease, text-shadow 180ms ease;
 }
+
+.act-four-exit-control:hover,
+.act-four-exit-control:focus-visible { color: #FFBE45; text-shadow: 0 2px 12px #000, 0 0 14px rgba(255, 190, 69, 0.35); }
 
 .act-four-gate-wave {
   position: absolute;
@@ -2544,9 +2548,9 @@ canvas {
 }
 
 .act-four-exit-control {
-  border: 1px solid rgba(255, 190, 69, 0.28);
-  background: rgba(5, 3, 6, 0.68);
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 244, 210, 0.12);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   backdrop-filter: none;
 }
 
@@ -2790,15 +2794,87 @@ canvas {
 }
 
 button.act-four-time-slice-hint.is-launch {
-  color: #ff7182;
+  isolation: isolate;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  min-width: min(23rem, 88vw);
+  bottom: 0.3rem;
+  padding: 0.4rem 1rem 0.25rem;
+  border: 0;
+  background: transparent;
+  color: #fff4d2;
   font-weight: 700;
   pointer-events: auto;
-  transition: color 160ms ease, text-shadow 160ms ease;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.98), 0 0 8px rgba(0, 0, 0, 0.9);
+  transition: color 180ms ease, text-shadow 180ms ease;
+}
+
+button.act-four-time-slice-hint.is-launch::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -0.85rem -2rem -0.5rem;
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 190, 69, 0.13), rgba(12, 7, 5, 0.34) 34%, rgba(2, 1, 3, 0) 76%);
+  pointer-events: none;
+}
+
+button.act-four-time-slice-hint.is-launch::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0.25rem;
+  width: min(17rem, 72vw);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 244, 210, 0.82), rgba(255, 190, 69, 0.9), transparent);
+  box-shadow: 0 0 12px rgba(255, 190, 69, 0.46);
+  transform: translateX(-50%) scaleX(0.72);
+  transform-origin: center;
+  animation: act-four-launch-glide 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.act-four-launch-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #fff4d2;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  line-height: 1.4;
+}
+
+.act-four-launch-arrow {
+  display: inline-block;
+  color: #ffbe45;
+  font-size: 15px;
+  animation: act-four-launch-arrow 1.5s ease-in-out infinite;
+}
+
+.act-four-launch-subtitle {
+  color: rgba(255, 244, 220, 0.74);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  line-height: 1.4;
 }
 
 button.act-four-time-slice-hint.is-launch:hover {
-  color: #fff1cc;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.96), 0 0 6px rgba(0, 0, 0, 0.92), 0 0 16px rgba(255, 190, 85, 0.65);
+  color: #FFBE45;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.98), 0 0 18px rgba(255, 190, 69, 0.56);
+}
+
+button.act-four-time-slice-hint.is-launch:hover .act-four-launch-title,
+button.act-four-time-slice-hint.is-launch:focus-visible .act-four-launch-title { color: #FFBE45; }
+
+@keyframes act-four-launch-glide {
+  0%, 100% { opacity: 0.45; transform: translateX(-50%) scaleX(0.62); }
+  50% { opacity: 1; transform: translateX(-50%) scaleX(1); }
+}
+
+@keyframes act-four-launch-arrow {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(3px, -3px); }
 }
 
 @media (max-width: 900px) {
@@ -2856,5 +2932,7 @@ button.act-four-time-slice-hint.is-launch:hover {
   .act-four-time-slice-rail button,
   .act-four-time-slice-rail button::after,
   .act-four-time-slice-hint { transition-duration: 0.01ms; }
+  button.act-four-time-slice-hint.is-launch::after,
+  .act-four-launch-arrow { animation-duration: 0.01ms; animation-iteration-count: 1; }
   .act-four-time-slice-dossier.is-arriving { animation-duration: 0.01ms; }
 }

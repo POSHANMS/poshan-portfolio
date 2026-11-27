@@ -15,6 +15,7 @@ const WARP_IN_DURATION_SECONDS = ACT_FOUR_WARP_IN_DURATION_MS / 1000;
 const WARP_VAULT_CUTOVER_SECONDS = WARP_IN_DURATION_SECONDS * 0.755;
 const WARP_OUT_DURATION_SECONDS = 1.1;
 const WARP_OUT_VAULT_FADE_SECONDS = 0.45;
+const EJECTION_STREAK_COUNT = 280;
 function clamp(value: number, min = 0, max = 1) { return Math.max(min, Math.min(max, value)); }
 function smoothstep(edge0: number, edge1: number, value: number) {
   const t = clamp((value - edge0) / (edge1 - edge0));
@@ -367,9 +368,10 @@ function BreachFlash({ phase }: { phase: ActFourPhase }) {
   useFrame(({ clock }) => {
     if (!material.current) return;
     const time = clock.getElapsedTime();
-    const progress = clamp((performance.now() - phaseStart.current) / (WARP_IN_DURATION_SECONDS * 1000));
-    const rise = smoothstep(0.655, 0.735, progress);
-    const fade = 1 - smoothstep(0.755, 0.84, progress);
+    const age = (performance.now() - phaseStart.current) / 1000;
+    const sinceCutover = age - WARP_VAULT_CUTOVER_SECONDS;
+    const rise = smoothstep(-0.09, 0, sinceCutover);
+    const fade = 1 - smoothstep(0, 0.17, sinceCutover);
     material.current.uniforms.uOpacity.value = phase === "act4_warp_in" ? rise * fade * 0.78 : 0;
     material.current.uniforms.uTime.value = time;
   });
@@ -379,15 +381,113 @@ function BreachFlash({ phase }: { phase: ActFourPhase }) {
 function FlashInFrontOfCamera({ material, visible }: { material: React.RefObject<THREE.ShaderMaterial | null>; visible: boolean }) {
   const mesh = useRef<THREE.Mesh>(null);
   const cameraDirection = useMemo(() => new THREE.Vector3(), []);
-  useFrame(({ camera }) => {
+  useFrame(({ camera, size }) => {
     if (!mesh.current) return;
     mesh.current.position.copy(camera.position).addScaledVector(camera.getWorldDirection(cameraDirection), 2.4);
     mesh.current.quaternion.copy(camera.quaternion);
+    const shader = material.current;
+    if (shader) shader.uniforms.uAspect.value = size.width / Math.max(1, size.height);
   });
-  return <mesh ref={mesh} visible={visible} frustumCulled={false} renderOrder={30}><planeGeometry args={[8, 5]} /><shaderMaterial ref={material} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }} transparent depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
+  return <mesh ref={mesh} visible={visible} frustumCulled={false} renderOrder={30}><planeGeometry args={[8, 5]} /><shaderMaterial ref={material} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 }, uAspect: { value: 1 } }} transparent depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
     vertexShader={`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-    fragmentShader={`uniform float uTime;uniform float uOpacity;varying vec2 vUv;void main(){vec2 p=(vUv-0.5)*vec2(1.0,1.12);float r=length(p);float center=exp(-r*r*176.0);float aureole=exp(-r*r*28.0);float breachRim=exp(-pow((r-0.24)/0.055,2.0));float emberHalo=exp(-r*5.8);float pulse=0.97+0.03*sin(uTime*1.35);vec3 champagne=vec3(1.0,0.957,0.824);vec3 moltenOrange=vec3(1.0,0.5804,0.0941);vec3 burntCrimson=vec3(0.3608,0.0549,0.0157);vec3 color=champagne*center*0.78+moltenOrange*(aureole*0.48+breachRim*0.3)+burntCrimson*emberHalo*0.16;float alpha=clamp(center*0.42+aureole*0.22+breachRim*0.14+emberHalo*0.08,0.0,0.48)*uOpacity*pulse;gl_FragColor=vec4(color,alpha);}`}
+    fragmentShader={`uniform float uOpacity;uniform float uAspect;varying vec2 vUv;void main(){vec2 p=vec2((vUv.x-0.5)*2.0*uAspect,(vUv.y-0.5)*2.0);float r=length(p);float glow=exp(-r*r*3.8);float wide=exp(-r*r*1.15)*0.42;float edgeFade=1.0-smoothstep(0.0,1.0,r);vec3 champagne=vec3(1.00,0.96,0.84);vec3 moltenGold=vec3(1.00,0.62,0.12);vec3 color=mix(moltenGold,champagne,glow);float alpha=clamp(glow+wide,0.0,1.0)*edgeFade*uOpacity;gl_FragColor=vec4(color,alpha);}`}
   /></mesh>;
+}
+
+function EjectionWarp({ phase, exitProgressRef }: { phase: ActFourPhase; exitProgressRef: React.RefObject<number> }) {
+  const group = useRef<THREE.Group>(null);
+  const streaks = useRef<THREE.InstancedMesh>(null);
+  const corridorMesh = useRef<THREE.Mesh>(null);
+  const streakMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const corridorMaterial = useRef<THREE.ShaderMaterial>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const streakColor = useMemo(() => new THREE.Color(), []);
+  const gold = useMemo(() => new THREE.Color("#FFBE45"), []);
+  const champagne = useMemo(() => new THREE.Color("#FFF4D2"), []);
+  const crimson = useMemo(() => new THREE.Color("#E6192E"), []);
+  const deepCrimson = useMemo(() => new THREE.Color("#9E0816"), []);
+  const streakSeeds = useMemo(() => Array.from({ length: EJECTION_STREAK_COUNT }, (_, index) => ({
+    angle: seeded(index, 43) * Math.PI * 2,
+    radius: 0.72 + seeded(index, 47) * 0.28,
+    depth: 5 + seeded(index, 53) * 22,
+    length: 0.7 + seeded(index, 59) * 2.8,
+    width: 0.008 + seeded(index, 61) * 0.022,
+    phase: seeded(index, 67),
+  })), []);
+
+  useFrame(({ camera, size, clock }) => {
+    const active = phase === "act4_warp_out";
+    const root = group.current;
+    if (!root) return;
+    root.visible = active;
+    const progress = active ? clamp(exitProgressRef.current) : 0;
+    const pull = smoothstep(0.02, 0.28, progress);
+    const tunnel = smoothstep(0.2, 0.52, progress) * (1 - smoothstep(0.72, 0.9, progress));
+    const revealFade = 1 - smoothstep(0.78, 1, progress);
+    const activeOpacity = active ? revealFade : 0;
+    root.position.copy(camera.position);
+    root.quaternion.copy(camera.quaternion);
+    const cameraFov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 45;
+    const corridorHalfHeight = 3 * Math.tan(THREE.MathUtils.degToRad(cameraFov * 0.5));
+    if (corridorMesh.current) corridorMesh.current.scale.set(corridorHalfHeight * size.width / Math.max(1, size.height), corridorHalfHeight, 1);
+
+    const corridor = corridorMaterial.current;
+    if (corridor) {
+      corridor.uniforms.uProgress.value = progress;
+      corridor.uniforms.uAspect.value = size.width / Math.max(1, size.height);
+      corridor.uniforms.uTime.value = clock.elapsedTime;
+      corridor.uniforms.uOpacity.value = active ? 0.025 * Math.max(pull * (1 - smoothstep(0.7, 0.9, progress)), tunnel) * activeOpacity : 0;
+      corridor.uniforms.uRedshift.value = smoothstep(0.2, 0.65, progress);
+    }
+
+    const instanceMesh = streaks.current;
+    if (!instanceMesh) return;
+    const aspect = size.width / Math.max(1, size.height);
+    const halfHeight = Math.tan(THREE.MathUtils.degToRad(cameraFov * 0.5));
+    const redshift = smoothstep(0.2, 0.65, progress);
+    const dim = activeOpacity * 0.025 * Math.max(pull * (1 - smoothstep(0.68, 0.9, progress)), tunnel);
+    for (let index = 0; index < EJECTION_STREAK_COUNT; index += 1) {
+      const seed = streakSeeds[index];
+      const depth = Math.max(1.15, seed.depth - pull * seed.depth * 0.78);
+      const viewportRadius = depth * halfHeight;
+      const angle = seed.angle + progress * (0.55 + seed.phase * 0.65);
+      const radius = viewportRadius * seed.radius * (1 - smoothstep(0.74, 1, progress) * 0.42);
+      dummy.position.set(Math.cos(angle) * radius * aspect, Math.sin(angle) * radius, -depth);
+      dummy.rotation.set(0, 0, angle + Math.PI * 0.5);
+      dummy.scale.set(seed.width * (1 + pull * 0.45), seed.length * (0.55 + pull * 1.8) * (1 - smoothstep(0.76, 1, progress)), 1);
+      dummy.updateMatrix();
+      instanceMesh.setMatrixAt(index, dummy.matrix);
+      const warmth = (Math.sin(seed.phase * Math.PI * 2 + progress * 9) + 1) * 0.5;
+      streakColor.copy(gold).lerp(champagne, warmth * 0.34).lerp(crimson, redshift).lerp(deepCrimson, redshift * 0.28);
+      instanceMesh.setColorAt(index, streakColor);
+    }
+    instanceMesh.instanceMatrix.needsUpdate = true;
+    if (instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
+    if (streakMaterial.current) streakMaterial.current.opacity = dim;
+  });
+
+  return (
+    <group ref={group} visible={false} frustumCulled={false}>
+      <mesh ref={corridorMesh} position={[0, 0, -3]} frustumCulled={false} renderOrder={41}>
+        <planeGeometry args={[2, 2]} />
+        <shaderMaterial
+          ref={corridorMaterial}
+          transparent
+          depthTest={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+          uniforms={{ uProgress: { value: 0 }, uAspect: { value: 1 }, uTime: { value: 0 }, uOpacity: { value: 0 }, uRedshift: { value: 0 } }}
+          vertexShader={`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
+          fragmentShader={`uniform float uProgress;uniform float uAspect;uniform float uTime;uniform float uOpacity;uniform float uRedshift;varying vec2 vUv;void main(){vec2 p=vec2((vUv.x-0.5)*2.0*uAspect,(vUv.y-0.5)*2.0);float r=length(p);float a=atan(p.y,p.x);float edge=1.0-smoothstep(0.78,1.32,r);float coreClear=smoothstep(0.05,0.22,r);float spokes=pow(max(0.0,sin(a*24.0+uTime*2.4+r*18.0)),18.0);float ringA=exp(-pow((r-(0.28+uProgress*0.42))*18.0,2.0));float ringB=exp(-pow((r-(0.62-uProgress*0.2))*11.0,2.0));float tunnelLines=(spokes*0.18+ringA*0.34+ringB*0.16)*coreClear;float pullHalo=exp(-pow((r-(0.42+uProgress*0.2))*8.0,2.0))*smoothstep(0.0,0.22,uProgress)*0.22;vec3 gold=vec3(1.0,0.56,0.12);vec3 champagne=vec3(1.0,0.92,0.68);vec3 red=vec3(0.9,0.025,0.06);vec3 color=mix(mix(gold,champagne,ringA*0.55),red,uRedshift);float alpha=(tunnelLines+pullHalo)*edge*uOpacity;gl_FragColor=vec4(color,alpha);}`}
+        />
+      </mesh>
+      <instancedMesh ref={streaks} args={[undefined, undefined, EJECTION_STREAK_COUNT]} frustumCulled={false} renderOrder={40}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial ref={streakMaterial} color="white" transparent opacity={0} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </instancedMesh>
+    </group>
+  );
 }
 
 const SEA_WIDTH = 180;
@@ -811,6 +911,7 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
   const tunnelLayer = useRef<THREE.Group>(null);
   const vaultLayer = useRef<THREE.Group>(null);
   const vaultOpacityRef = useRef(1);
+  const exitProgressRef = useRef(0);
   const vaultMaterials = useRef<THREE.Material[]>([]);
   const vaultLights = useRef<(THREE.PointLight | THREE.AmbientLight)[]>([]);
   const previousProjectIndex = useRef(projectIndex);
@@ -843,6 +944,7 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
     if (previousPhase.current !== phase) { previousPhase.current = phase; phaseStartedAt.current = performance.now(); }
     const age = (performance.now() - phaseStartedAt.current) / 1000;
     const progress = age / WARP_IN_DURATION_SECONDS;
+    exitProgressRef.current = phase === "act4_warp_out" ? clamp(age / WARP_OUT_DURATION_SECONDS) : 0;
     if (exteriorLayer.current) exteriorLayer.current.visible = phase === "act4_exterior" || (phase === "act4_warp_in" && progress < 0.27);
     if (tunnelLayer.current) tunnelLayer.current.visible = phase === "act4_warp_in" && progress >= 0.22 && progress < 0.695;
     if (vaultLayer.current) {
@@ -897,5 +999,6 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
     <WarpStreamParticles phase={phase} warpCharge={warpCharge} /><WarpNeedles phase={phase} />
     <group ref={vaultLayer} visible={phase === "act4_vault" || phase === "act4_warp_out"} frustumCulled={false}><ObsidianSingularityInterior exitOpacityRef={vaultOpacityRef} shockwaveStartedAtRef={shockwaveStartedAtRef} projectIndex={projectIndex} /></group>
     <BreachFlash phase={phase} />
+    <EjectionWarp phase={phase} exitProgressRef={exitProgressRef} />
   </group>;
 }
