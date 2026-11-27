@@ -15,6 +15,7 @@ const WARP_IN_DURATION_SECONDS = ACT_FOUR_WARP_IN_DURATION_MS / 1000;
 const WARP_VAULT_CUTOVER_SECONDS = WARP_IN_DURATION_SECONDS * 0.755;
 const WARP_OUT_DURATION_SECONDS = 1.1;
 const WARP_OUT_VAULT_FADE_SECONDS = 0.45;
+const EJECTION_STREAK_COUNT = 280;
 function clamp(value: number, min = 0, max = 1) { return Math.max(min, Math.min(max, value)); }
 function smoothstep(edge0: number, edge1: number, value: number) {
   const t = clamp((value - edge0) / (edge1 - edge0));
@@ -89,10 +90,116 @@ function WarpStreamParticles({ phase, warpCharge }: { phase: ActFourPhase; warpC
   return <group ref={groupRef} renderOrder={18}><lineSegments geometry={geometry} frustumCulled={false} renderOrder={18}><lineBasicMaterial ref={materialRef} vertexColors transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} toneMapped={false} /></lineSegments></group>;
 }
 
+// TubeGeometry maps uv.x along the spline and uv.y around its circumference.
+// The flow field below scrolls only along uv.x; its angular harmonics stay
+// mostly aligned with the tube axis, then taper them with a slower 2D field.
+const WORMHOLE_TUNNEL_VERTEX_SHADER = `
+  varying vec2 vUv;
+  varying float vDistFromCamera;
+  void main() {
+    vUv = uv;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vDistFromCamera = distance(cameraPosition, worldPos.xyz);
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+// Domain warp: q = uv + (fbm(uv * f1), fbm(uv * f2)) * amplitude.
+// Filament brightness is a narrow angular harmonic multiplied by a broad
+// longitudinal gate, while seam alpha fades smoothly at both spline ends.
+const WORMHOLE_TUNNEL_FRAGMENT_SHADER = `
+  uniform float uTime;
+  uniform float uWarpProgress;
+  uniform float uTubeVisibility;
+  varying vec2 vUv;
+  varying float vDistFromCamera;
+
+  float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash21(i);
+    float b = hash21(i + vec2(1.0, 0.0));
+    float c = hash21(i + vec2(0.0, 1.0));
+    float d = hash21(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+
+  float fbm(vec2 p) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    for (int octave = 0; octave < 4; octave++) {
+      value += noise(p) * amplitude;
+      p = mat2(1.62, -1.18, 1.18, 1.62) * p + vec2(3.7, 5.2);
+      amplitude *= 0.5;
+    }
+    return value;
+  }
+
+  void main() {
+    float along = vUv.x;
+    float around = vUv.y;
+    float angular = around * 6.28318530718;
+    float speed = mix(1.05, 2.55, smoothstep(0.0, 1.0, uWarpProgress));
+    float flowU = along * 4.6 - uTime * speed;
+
+    float warpA = fbm(vec2(around * 5.1 + uTime * 0.035, flowU * 0.72));
+    float warpB = fbm(vec2(around * 8.7 - uTime * 0.028, flowU * 1.13 + 4.2));
+    vec2 domain = vec2(around * 4.2 + (warpA - 0.5) * 1.55,
+                       flowU + (warpB - 0.5) * 1.7);
+    float currents = mix(warpA, warpB, 0.5);
+    float folds = fbm(domain * vec2(1.75, 1.3) + vec2(-uTime * 0.09, 3.8));
+    float bloodCurrent = smoothstep(0.43, 0.76, currents + (folds - 0.5) * 0.25);
+    float amberCurrent = smoothstep(0.54, 0.82, folds) * (1.0 - smoothstep(0.74, 0.92, currents));
+
+    float lanePhase = angular * 8.0
+      + sin(angular * 3.0 - flowU * 1.9 + warpA * 2.2) * 0.46
+      + sin(angular * 13.0 + flowU * 1.17 + warpB * 2.8) * 0.19;
+    float laneDistance = abs(sin(lanePhase));
+    float laneWidth = 0.018 + 0.048 * noise(vec2(around * 13.0 + warpA, along * 5.0 + warpB));
+    float lineMask = 1.0 - smoothstep(laneWidth, laneWidth + 0.075, laneDistance);
+    float lineGate = smoothstep(0.31, 0.68, mix(currents, folds, 0.58));
+    float goldFilament = lineMask * lineGate;
+    float goldHalo = exp(-laneDistance * 13.0) * lineGate * 0.18;
+
+    float microPhase = angular * 19.0
+      + sin(angular * 5.0 + flowU * 2.8 + warpA * 3.0) * 0.52
+      + flowU * 0.72;
+    float microDistance = abs(sin(microPhase));
+    float microGate = smoothstep(0.52, 0.81, mix(warpA, folds, 0.64));
+    float champagneFilament = (1.0 - smoothstep(0.012, 0.035, microDistance)) * microGate;
+
+    float exitGlow = smoothstep(0.56, 0.98, along) * smoothstep(0.32, 0.88, uWarpProgress);
+    float exitCore = exp(-pow((along - 0.965) / 0.085, 2.0));
+    vec3 obsidian = vec3(0.012, 0.004, 0.024);
+    vec3 crimson = vec3(0.55, 0.031, 0.086);
+    vec3 burntAmber = vec3(0.36, 0.094, 0.016);
+    vec3 orangeGold = vec3(0.91, 0.415, 0.063);
+    vec3 moltenGold = vec3(1.0, 0.745, 0.271);
+    vec3 champagne = vec3(1.0, 0.957, 0.824);
+    vec3 color = obsidian
+      + crimson * bloodCurrent * 0.48
+      + burntAmber * amberCurrent * 0.28
+      + mix(orangeGold, moltenGold, smoothstep(0.35, 0.86, warpA)) * (goldFilament * 0.92 + goldHalo)
+      + champagne * champagneFilament * 0.62
+      + mix(burntAmber, orangeGold, smoothstep(0.30, 0.78, folds)) * exitGlow * 0.32
+      + mix(crimson, moltenGold, smoothstep(0.35, 0.78, around)) * exitCore * 0.24;
+
+    float endFade = smoothstep(0.0, 0.035, along) * (1.0 - smoothstep(0.965, 1.0, along));
+    float distanceFade = 1.0 - smoothstep(${(WORMHOLE_PATH_LENGTH * 0.82).toFixed(2)}, ${(WORMHOLE_PATH_LENGTH * 0.98).toFixed(2)}, vDistFromCamera);
+    float layerEnergy = clamp(bloodCurrent * 0.12 + amberCurrent * 0.08 + goldFilament * 0.2 + champagneFilament * 0.12, 0.0, 0.45);
+    float alpha = clamp(0.76 + layerEnergy, 0.0, 0.98) * endFade * distanceFade * uTubeVisibility;
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
 function WormholeTunnel({ phase }: { phase: ActFourPhase }) {
   const group = useRef<THREE.Group>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
-  const geometry = useMemo(() => new THREE.TubeGeometry(WORMHOLE_CURVE, 140, WORMHOLE_TUBE_RADIUS, 48, false), []);
   const phaseStartedAt = useRef(performance.now());
   useEffect(() => { phaseStartedAt.current = performance.now(); }, [phase]);
   const isWarpIn = phase === "act4_warp_in";
@@ -101,22 +208,24 @@ function WormholeTunnel({ phase }: { phase: ActFourPhase }) {
     material.current.uniforms.uTime.value = clock.getElapsedTime();
     const age = (performance.now() - phaseStartedAt.current) / 1000;
     const progress = clamp(age / WARP_IN_DURATION_SECONDS);
+    material.current.uniforms.uWarpProgress.value = progress;
     material.current.uniforms.uTubeVisibility.value = isWarpIn ? smoothstep(0.23, 0.31, progress) : 0;
     if (group.current) group.current.visible = isWarpIn && progress >= 0.22 && progress < 0.695;
   });
   return (
     <group ref={group} visible={false}>
-      <mesh geometry={geometry} frustumCulled={false} renderOrder={12}>
+      <mesh frustumCulled={false} renderOrder={12}>
+        <tubeGeometry args={[WORMHOLE_CURVE, 140, WORMHOLE_TUBE_RADIUS, 48, false]} />
         <shaderMaterial
           ref={material}
-          uniforms={{ uTime: { value: 0 }, uTubeVisibility: { value: 0 } }}
-          transparent={false}
+          uniforms={{ uTime: { value: 0 }, uWarpProgress: { value: 0 }, uTubeVisibility: { value: 0 } }}
+          transparent
           side={THREE.BackSide}
           depthTest
-          depthWrite
+          depthWrite={false}
           toneMapped={false}
-          vertexShader={`varying vec2 vUv;varying float vDistFromCamera;void main(){vUv=uv;vec4 worldPos=modelMatrix*vec4(position,1.0);vDistFromCamera=distance(cameraPosition,worldPos.xyz);gl_Position=projectionMatrix*viewMatrix*worldPos;}`}
-          fragmentShader={`uniform float uTime;uniform float uTubeVisibility;varying vec2 vUv;varying float vDistFromCamera;float hash21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash21(i),hash21(i+vec2(1.0,0.0)),f.x),mix(hash21(i+vec2(0.0,1.0)),hash21(i+1.0),f.x),f.y);}float fbm(vec2 p){float sum=0.0,amp=0.5;for(int i=0;i<4;i++){sum+=noise(p)*amp;p=mat2(1.62,-1.18,1.18,1.62)*p+vec2(3.7,5.2);amp*=0.5;}return sum;}void main(){float lengthAxis=vUv.x;float around=vUv.y+lengthAxis*1.45;float flow=fbm(vec2(around*8.5+uTime*0.07,lengthAxis*12.0-uTime*2.5));float turbulence=fbm(vec2(around*17.0-uTime*0.1,lengthAxis*21.0-uTime*1.9));float goldVeins=pow(max(0.0,0.5+0.5*sin(around*118.0+flow*4.2+sin(lengthAxis*12.0-uTime*0.7)*0.34+turbulence*0.22)),23.0);float rubyVeins=pow(max(0.0,0.5+0.5*sin(around*76.0-flow*3.1+lengthAxis*2.0-uTime*0.45)),18.0);float gaps=smoothstep(0.25,0.62,flow);float fog=1.0-smoothstep(7.0,${(WORMHOLE_PATH_LENGTH * 0.94).toFixed(2)},vDistFromCamera);vec3 voidColor=vec3(0.0078,0.0039,0.0196);vec3 obsidian=vec3(0.0196,0.0039,0.0314);vec3 wallColor=vec3(0.0941,0.0078,0.0431);vec3 gold=vec3(1.0,0.745,0.333);vec3 ruby=vec3(0.878,0.118,0.282);vec3 plasma=gold*goldVeins*0.92+ruby*rubyVeins*0.38;vec3 nearWall=mix(obsidian,wallColor+plasma*gaps,clamp(uTubeVisibility,0.0,1.0));vec3 color=mix(voidColor,nearWall,fog);gl_FragColor=vec4(color,1.0);}`}
+          vertexShader={WORMHOLE_TUNNEL_VERTEX_SHADER}
+          fragmentShader={WORMHOLE_TUNNEL_FRAGMENT_SHADER}
         />
       </mesh>
     </group>
@@ -137,7 +246,8 @@ function WormholeLandmarks({ phase }: { phase: ActFourPhase }) {
       dummy.quaternion.setFromUnitVectors(zAxis, frames.tangents[frameIndex]);
       dummy.scale.setScalar(1);
       dummy.updateMatrix();
-      return { matrix: dummy.matrix.clone(), color: new THREE.Color(index % 2 === 0 ? "#ffd882" : "#ff2e55") };
+      const color = index % 4 === 0 ? "#FFF4D2" : index % 4 === 3 ? "#B80A18" : "#FFBE45";
+      return { matrix: dummy.matrix.clone(), color: new THREE.Color(color) };
     });
   }, [dummy]);
   useEffect(() => {
@@ -156,16 +266,16 @@ function WormholeLandmarks({ phase }: { phase: ActFourPhase }) {
     const active = phase === "act4_warp_in" && progress >= 0.22 && progress < 0.695;
     if (!instances.current || !material.current) return;
     instances.current.visible = active;
-    material.current.uniforms.uOpacity.value = 0.78 * smoothstep(0.24, 0.30, progress) * (1 - smoothstep(0.75, 0.79, progress));
+    material.current.uniforms.uOpacity.value = 0.76 * smoothstep(0.24, 0.30, progress) * (1 - smoothstep(0.63, 0.695, progress));
   });
   return (
     <instancedMesh ref={instances} args={[undefined, undefined, WORMHOLE_RING_COUNT]} frustumCulled={false} renderOrder={14}>
-      <torusGeometry args={[WORMHOLE_TUBE_RADIUS * 0.93, 0.055, 8, 48]} />
+      <torusGeometry args={[WORMHOLE_TUBE_RADIUS * 0.94, 0.016, 6, 48]} />
       <shaderMaterial
         ref={material}
         uniforms={{ uOpacity: { value: 0 } }}
         vertexShader={`varying vec3 vColor;varying vec3 vRingCenter;void main(){vec4 center=modelMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0);vec4 worldPosition=modelMatrix*instanceMatrix*vec4(position,1.0);vRingCenter=center.xyz;vColor=instanceColor;gl_Position=projectionMatrix*viewMatrix*worldPosition;}`}
-        fragmentShader={`uniform float uOpacity;varying vec3 vColor;varying vec3 vRingCenter;void main(){float cameraDistance=distance(vRingCenter,cameraPosition);float nearFade=smoothstep(2.0,6.5,cameraDistance);gl_FragColor=vec4(vColor,uOpacity*nearFade);}`}
+        fragmentShader={`uniform float uOpacity;varying vec3 vColor;varying vec3 vRingCenter;void main(){float cameraDistance=distance(vRingCenter,cameraPosition);float approachFade=smoothstep(2.8,7.0,cameraDistance);float farFade=1.0-smoothstep(${(WORMHOLE_PATH_LENGTH * 0.82).toFixed(2)},${(WORMHOLE_PATH_LENGTH * 0.96).toFixed(2)},cameraDistance);gl_FragColor=vec4(vColor,uOpacity*approachFade*farFade);}`}
         transparent
         depthTest
         depthWrite={false}
@@ -190,12 +300,13 @@ function WarpNeedles({ phase }: { phase: ActFourPhase }) {
       const binormal = frames.binormals[frameIndex];
       const tangent = frames.tangents[frameIndex];
       const angle = seeded(index, 92) * Math.PI * 2;
-      const radius = WORMHOLE_TUBE_RADIUS * (0.64 + seeded(index, 93) * 0.26);
+      const radius = WORMHOLE_TUBE_RADIUS * (0.78 + seeded(index, 93) * 0.20);
       const radial = normal.clone().multiplyScalar(Math.cos(angle) * radius).addScaledVector(binormal, Math.sin(angle) * radius);
       const position = WORMHOLE_CURVE.getPointAt(u).add(radial);
       const quaternion = new THREE.Quaternion().setFromUnitVectors(zAxis, tangent);
-      const length = 4 + seeded(index, 94) * 2;
-      const color = new THREE.Color(index % 5 === 0 ? "#ff3554" : index % 3 === 0 ? "#fff6e5" : "#ffd27d");
+      const length = 4.4 + seeded(index, 94) * 2.2;
+      const paletteSlot = index % 20;
+      const color = new THREE.Color(paletteSlot < 13 ? "#FFBE45" : paletteSlot < 18 ? "#FFF4D2" : "#D9081E");
       dummy.position.copy(position);
       dummy.quaternion.copy(quaternion);
       dummy.scale.set(1, 1, length);
@@ -219,7 +330,7 @@ function WarpNeedles({ phase }: { phase: ActFourPhase }) {
     const active = phase === "act4_warp_in" && progress >= 0.24 && progress < 0.695;
     if (!instances.current || !material.current) return;
     instances.current.visible = active;
-    const dissolve = smoothstep(0.74, 0.79, progress);
+    const dissolve = 1 - smoothstep(0.62, 0.695, progress);
     const reveal = smoothstep(0.24, 0.29, progress);
     material.current.uniforms.uOpacity.value = reveal * (1 - dissolve);
     for (let index = 0; index < layout.length; index += 1) {
@@ -239,7 +350,7 @@ function WarpNeedles({ phase }: { phase: ActFourPhase }) {
         ref={material}
         uniforms={{ uOpacity: { value: 0 } }}
         vertexShader={`varying vec3 vColor;varying vec3 vNeedleCenter;varying float vAlong;void main(){vec4 center=modelMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0);vec4 worldPosition=modelMatrix*instanceMatrix*vec4(position,1.0);vNeedleCenter=center.xyz;vColor=instanceColor;vAlong=clamp(position.z+0.5,0.0,1.0);gl_Position=projectionMatrix*viewMatrix*worldPosition;}`}
-        fragmentShader={`uniform float uOpacity;varying vec3 vColor;varying vec3 vNeedleCenter;varying float vAlong;void main(){float distanceToCamera=distance(vNeedleCenter,cameraPosition);float nearFade=smoothstep(1.8,5.5,distanceToCamera);float endTaper=smoothstep(0.0,0.16,vAlong)*(1.0-smoothstep(0.84,1.0,vAlong));gl_FragColor=vec4(vColor,uOpacity*nearFade*endTaper);}`}
+        fragmentShader={`uniform float uOpacity;varying vec3 vColor;varying vec3 vNeedleCenter;varying float vAlong;void main(){float distanceToCamera=distance(vNeedleCenter,cameraPosition);float approachFade=smoothstep(1.8,5.5,distanceToCamera);float farFade=1.0-smoothstep(${(WORMHOLE_PATH_LENGTH * 0.82).toFixed(2)},${(WORMHOLE_PATH_LENGTH * 0.96).toFixed(2)},distanceToCamera);float endTaper=smoothstep(0.0,0.16,vAlong)*(1.0-smoothstep(0.84,1.0,vAlong));gl_FragColor=vec4(vColor,uOpacity*approachFade*farFade*endTaper);}`}
         transparent
         depthTest
         depthWrite={false}
@@ -252,32 +363,131 @@ function WarpNeedles({ phase }: { phase: ActFourPhase }) {
 
 function BreachFlash({ phase }: { phase: ActFourPhase }) {
   const material = useRef<THREE.ShaderMaterial>(null);
-  const phaseStart = useRef(0);
-  const lastPhase = useRef(phase);
-  useFrame(({ clock }, delta) => {
+  const phaseStart = useRef(performance.now());
+  useEffect(() => { phaseStart.current = performance.now(); }, [phase]);
+  useFrame(({ clock }) => {
     if (!material.current) return;
     const time = clock.getElapsedTime();
-    if (lastPhase.current !== phase) { lastPhase.current = phase; phaseStart.current = time; }
-    // A centered radial flash reads as a brown oval during exit, so keep this layer off.
-    const exit = 0;
-    material.current.uniforms.uOpacity.value = THREE.MathUtils.damp(material.current.uniforms.uOpacity.value, exit, 10, delta);
+    const age = (performance.now() - phaseStart.current) / 1000;
+    const sinceCutover = age - WARP_VAULT_CUTOVER_SECONDS;
+    const rise = smoothstep(-0.09, 0, sinceCutover);
+    const fade = 1 - smoothstep(0, 0.17, sinceCutover);
+    material.current.uniforms.uOpacity.value = phase === "act4_warp_in" ? rise * fade * 0.78 : 0;
     material.current.uniforms.uTime.value = time;
   });
-  return <FlashInFrontOfCamera material={material} />;
+  return <FlashInFrontOfCamera material={material} visible={phase === "act4_warp_in"} />;
 }
 
-function FlashInFrontOfCamera({ material }: { material: React.RefObject<THREE.ShaderMaterial | null> }) {
+function FlashInFrontOfCamera({ material, visible }: { material: React.RefObject<THREE.ShaderMaterial | null>; visible: boolean }) {
   const mesh = useRef<THREE.Mesh>(null);
   const cameraDirection = useMemo(() => new THREE.Vector3(), []);
-  useFrame(({ camera }) => {
+  useFrame(({ camera, size }) => {
     if (!mesh.current) return;
     mesh.current.position.copy(camera.position).addScaledVector(camera.getWorldDirection(cameraDirection), 2.4);
     mesh.current.quaternion.copy(camera.quaternion);
+    const shader = material.current;
+    if (shader) shader.uniforms.uAspect.value = size.width / Math.max(1, size.height);
   });
-  return <mesh ref={mesh} frustumCulled={false} renderOrder={30}><planeGeometry args={[8, 5]} /><shaderMaterial ref={material} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 } }} transparent depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
+  return <mesh ref={mesh} visible={visible} frustumCulled={false} renderOrder={30}><planeGeometry args={[8, 5]} /><shaderMaterial ref={material} uniforms={{ uTime: { value: 0 }, uOpacity: { value: 0 }, uAspect: { value: 1 } }} transparent depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false}
     vertexShader={`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
-    fragmentShader={`uniform float uTime;uniform float uOpacity;varying vec2 vUv;void main(){vec2 p=vUv-0.5;float radial=exp(-dot(p*vec2(0.9,1.15),p*vec2(0.9,1.15))*18.0);float breath=exp(-pow((p.y+sin(uTime*0.42)*0.008)*18.0,2.0))*exp(-abs(p.x)*3.4);float pulse=0.94+0.06*sin(uTime*1.4);vec3 obsidian=vec3(0.0078,0.0039,0.0157);vec3 champagne=vec3(1.0,0.902,0.702);vec3 color=mix(obsidian,champagne,radial*0.32+breath*0.12);float alpha=clamp(radial*0.46+breath*0.12,0.0,0.58)*uOpacity*pulse;gl_FragColor=vec4(color,alpha);}`}
+    fragmentShader={`uniform float uOpacity;uniform float uAspect;varying vec2 vUv;void main(){vec2 p=vec2((vUv.x-0.5)*2.0*uAspect,(vUv.y-0.5)*2.0);float r=length(p);float glow=exp(-r*r*3.8);float wide=exp(-r*r*1.15)*0.42;float edgeFade=1.0-smoothstep(0.0,1.0,r);vec3 champagne=vec3(1.00,0.96,0.84);vec3 moltenGold=vec3(1.00,0.62,0.12);vec3 color=mix(moltenGold,champagne,glow);float alpha=clamp(glow+wide,0.0,1.0)*edgeFade*uOpacity;gl_FragColor=vec4(color,alpha);}`}
   /></mesh>;
+}
+
+function EjectionWarp({ phase, exitProgressRef }: { phase: ActFourPhase; exitProgressRef: React.RefObject<number> }) {
+  const group = useRef<THREE.Group>(null);
+  const streaks = useRef<THREE.InstancedMesh>(null);
+  const corridorMesh = useRef<THREE.Mesh>(null);
+  const streakMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const corridorMaterial = useRef<THREE.ShaderMaterial>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const streakColor = useMemo(() => new THREE.Color(), []);
+  const gold = useMemo(() => new THREE.Color("#FFBE45"), []);
+  const champagne = useMemo(() => new THREE.Color("#FFF4D2"), []);
+  const crimson = useMemo(() => new THREE.Color("#E6192E"), []);
+  const deepCrimson = useMemo(() => new THREE.Color("#9E0816"), []);
+  const streakSeeds = useMemo(() => Array.from({ length: EJECTION_STREAK_COUNT }, (_, index) => ({
+    angle: seeded(index, 43) * Math.PI * 2,
+    radius: 0.72 + seeded(index, 47) * 0.28,
+    depth: 5 + seeded(index, 53) * 22,
+    length: 0.7 + seeded(index, 59) * 2.8,
+    width: 0.008 + seeded(index, 61) * 0.022,
+    phase: seeded(index, 67),
+  })), []);
+
+  useFrame(({ camera, size, clock }) => {
+    const active = phase === "act4_warp_out";
+    const root = group.current;
+    if (!root) return;
+    root.visible = active;
+    const progress = active ? clamp(exitProgressRef.current) : 0;
+    const pull = smoothstep(0.02, 0.28, progress);
+    const tunnel = smoothstep(0.2, 0.52, progress) * (1 - smoothstep(0.72, 0.9, progress));
+    const revealFade = 1 - smoothstep(0.78, 1, progress);
+    const activeOpacity = active ? revealFade : 0;
+    root.position.copy(camera.position);
+    root.quaternion.copy(camera.quaternion);
+    const cameraFov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 45;
+    const corridorHalfHeight = 3 * Math.tan(THREE.MathUtils.degToRad(cameraFov * 0.5));
+    if (corridorMesh.current) corridorMesh.current.scale.set(corridorHalfHeight * size.width / Math.max(1, size.height), corridorHalfHeight, 1);
+
+    const corridor = corridorMaterial.current;
+    if (corridor) {
+      corridor.uniforms.uProgress.value = progress;
+      corridor.uniforms.uAspect.value = size.width / Math.max(1, size.height);
+      corridor.uniforms.uTime.value = clock.elapsedTime;
+      corridor.uniforms.uOpacity.value = active ? 0.025 * Math.max(pull * (1 - smoothstep(0.7, 0.9, progress)), tunnel) * activeOpacity : 0;
+      corridor.uniforms.uRedshift.value = smoothstep(0.2, 0.65, progress);
+    }
+
+    const instanceMesh = streaks.current;
+    if (!instanceMesh) return;
+    const aspect = size.width / Math.max(1, size.height);
+    const halfHeight = Math.tan(THREE.MathUtils.degToRad(cameraFov * 0.5));
+    const redshift = smoothstep(0.2, 0.65, progress);
+    const dim = activeOpacity * 0.025 * Math.max(pull * (1 - smoothstep(0.68, 0.9, progress)), tunnel);
+    for (let index = 0; index < EJECTION_STREAK_COUNT; index += 1) {
+      const seed = streakSeeds[index];
+      const depth = Math.max(1.15, seed.depth - pull * seed.depth * 0.78);
+      const viewportRadius = depth * halfHeight;
+      const angle = seed.angle + progress * (0.55 + seed.phase * 0.65);
+      const radius = viewportRadius * seed.radius * (1 - smoothstep(0.74, 1, progress) * 0.42);
+      dummy.position.set(Math.cos(angle) * radius * aspect, Math.sin(angle) * radius, -depth);
+      dummy.rotation.set(0, 0, angle + Math.PI * 0.5);
+      dummy.scale.set(seed.width * (1 + pull * 0.45), seed.length * (0.55 + pull * 1.8) * (1 - smoothstep(0.76, 1, progress)), 1);
+      dummy.updateMatrix();
+      instanceMesh.setMatrixAt(index, dummy.matrix);
+      const warmth = (Math.sin(seed.phase * Math.PI * 2 + progress * 9) + 1) * 0.5;
+      streakColor.copy(gold).lerp(champagne, warmth * 0.34).lerp(crimson, redshift).lerp(deepCrimson, redshift * 0.28);
+      instanceMesh.setColorAt(index, streakColor);
+    }
+    instanceMesh.instanceMatrix.needsUpdate = true;
+    if (instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
+    if (streakMaterial.current) streakMaterial.current.opacity = dim;
+  });
+
+  return (
+    <group ref={group} visible={false} frustumCulled={false}>
+      <mesh ref={corridorMesh} position={[0, 0, -3]} frustumCulled={false} renderOrder={41}>
+        <planeGeometry args={[2, 2]} />
+        <shaderMaterial
+          ref={corridorMaterial}
+          transparent
+          depthTest={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+          uniforms={{ uProgress: { value: 0 }, uAspect: { value: 1 }, uTime: { value: 0 }, uOpacity: { value: 0 }, uRedshift: { value: 0 } }}
+          vertexShader={`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`}
+          fragmentShader={`uniform float uProgress;uniform float uAspect;uniform float uTime;uniform float uOpacity;uniform float uRedshift;varying vec2 vUv;void main(){vec2 p=vec2((vUv.x-0.5)*2.0*uAspect,(vUv.y-0.5)*2.0);float r=length(p);float a=atan(p.y,p.x);float edge=1.0-smoothstep(0.78,1.32,r);float coreClear=smoothstep(0.05,0.22,r);float spokes=pow(max(0.0,sin(a*24.0+uTime*2.4+r*18.0)),18.0);float ringA=exp(-pow((r-(0.28+uProgress*0.42))*18.0,2.0));float ringB=exp(-pow((r-(0.62-uProgress*0.2))*11.0,2.0));float tunnelLines=(spokes*0.18+ringA*0.34+ringB*0.16)*coreClear;float pullHalo=exp(-pow((r-(0.42+uProgress*0.2))*8.0,2.0))*smoothstep(0.0,0.22,uProgress)*0.22;vec3 gold=vec3(1.0,0.56,0.12);vec3 champagne=vec3(1.0,0.92,0.68);vec3 red=vec3(0.9,0.025,0.06);vec3 color=mix(mix(gold,champagne,ringA*0.55),red,uRedshift);float alpha=(tunnelLines+pullHalo)*edge*uOpacity;gl_FragColor=vec4(color,alpha);}`}
+        />
+      </mesh>
+      <instancedMesh ref={streaks} args={[undefined, undefined, EJECTION_STREAK_COUNT]} frustumCulled={false} renderOrder={40}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial ref={streakMaterial} color="white" transparent opacity={0} depthTest={false} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </instancedMesh>
+    </group>
+  );
 }
 
 const SEA_WIDTH = 180;
@@ -701,6 +911,7 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
   const tunnelLayer = useRef<THREE.Group>(null);
   const vaultLayer = useRef<THREE.Group>(null);
   const vaultOpacityRef = useRef(1);
+  const exitProgressRef = useRef(0);
   const vaultMaterials = useRef<THREE.Material[]>([]);
   const vaultLights = useRef<(THREE.PointLight | THREE.AmbientLight)[]>([]);
   const previousProjectIndex = useRef(projectIndex);
@@ -733,6 +944,7 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
     if (previousPhase.current !== phase) { previousPhase.current = phase; phaseStartedAt.current = performance.now(); }
     const age = (performance.now() - phaseStartedAt.current) / 1000;
     const progress = age / WARP_IN_DURATION_SECONDS;
+    exitProgressRef.current = phase === "act4_warp_out" ? clamp(age / WARP_OUT_DURATION_SECONDS) : 0;
     if (exteriorLayer.current) exteriorLayer.current.visible = phase === "act4_exterior" || (phase === "act4_warp_in" && progress < 0.27);
     if (tunnelLayer.current) tunnelLayer.current.visible = phase === "act4_warp_in" && progress >= 0.22 && progress < 0.695;
     if (vaultLayer.current) {
@@ -787,5 +999,6 @@ export default function ActFourWorld({ phase, projectIndex, warpCharge }: { phas
     <WarpStreamParticles phase={phase} warpCharge={warpCharge} /><WarpNeedles phase={phase} />
     <group ref={vaultLayer} visible={phase === "act4_vault" || phase === "act4_warp_out"} frustumCulled={false}><ObsidianSingularityInterior exitOpacityRef={vaultOpacityRef} shockwaveStartedAtRef={shockwaveStartedAtRef} projectIndex={projectIndex} /></group>
     <BreachFlash phase={phase} />
+    <EjectionWarp phase={phase} exitProgressRef={exitProgressRef} />
   </group>;
 }
